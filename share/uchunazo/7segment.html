@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7 SEGMENT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* デジタルな雰囲気を出すための基本的なスタイル */
+        body {
+            font-family: 'Orbitron', sans-serif; /* Orbitronフォントがない場合はsans-serifが適用されます */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow: hidden; /* スクロールバーを非表示 */
+        }
+
+        /* 7セグメントディスプレイのコンテナ */
+        .segment-display {
+            position: relative;
+            width: 120px;
+            height: 200px;
+            transform: scale(var(--scale-factor, 1));
+        }
+
+        /* 各セグメントの基本スタイル */
+        .segment {
+            position: absolute;
+            background-color: #333; /* OFFの時の色 */
+            border-radius: 4px;
+            transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+        /* セグメントがONになった時のスタイル */
+        .segment.on {
+            background-color: #00f6ff; /* ONの時の色 */
+            box-shadow: 0 0 10px #00f6ff, 0 0 20px #00f6ff;
+        }
+
+        /* クリア演出用の交互色スタイル */
+        .segment.on.flash {
+            background-color: #fef08a; /* 交互に光る色 (黄) */
+            box-shadow: 0 0 15px #fef08a, 0 0 25px #fef08a;
+        }
+
+        /* 横向き・縦向きのセグメントのサイズ */
+        .h-segment { width: 80px; height: 20px; }
+        .v-segment { width: 20px; height: 80px; }
+
+        /* 各セグメントの位置調整 */
+        .segment-a { top: 0;   left: 20px; }
+        .segment-b { top: 20px;  left: 100px; }
+        .segment-c { top: 100px; left: 100px; }
+        .segment-d { top: 180px; left: 20px; }
+        .segment-e { top: 100px; left: 0; }
+        .segment-f { top: 20px;  left: 0; }
+        .segment-g { top: 90px;  left: 20px; }
+
+        /* ボタンを円形に配置するためのコンテナ */
+        .button-ring {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+        }
+
+        /* 数字ボタンのスタイル */
+        .num-button {
+            position: absolute;
+            width: 15%; height: 15%;
+            max-width: 64px; max-height: 64px;
+            background-color: #2d3748;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(16px, 3vw, 24px);
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid #4a5568;
+        }
+        .num-button:hover:not(:disabled) {
+            background-color: #4a5568;
+            transform: scale(1.1);
+        }
+        .num-button:disabled {
+            background-color: #1a202c;
+            color: #4a5568;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        /* ステージによって使用不可にされたボタンのスタイル */
+        .num-button.stage-disabled::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 10%;
+            width: 80%;
+            height: 4px; /* 斜線の太さ */
+            background-color: #ef4444; /* 赤色 */
+            transform: rotate(-45deg);
+            border-radius: 2px;
+            box-shadow: 0 0 5px #ef4444;
+        }
+
+        /* メッセージ表示用のスタイル */
+        #message-box {
+            transition: opacity 0.5s ease-in-out;
+            font-size: clamp(40px, 10vw, 96px);
+        }
+
+        /* 規定回数ランプのスタイル */
+        .lamp {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background-color: #333;
+            border: 2px solid #4a5568;
+            transition: all 0.2s ease;
+        }
+        .lamp.lit {
+            background-color: #00f6ff;
+            border-color: #7dd3fc;
+            box-shadow: 0 0 8px #00f6ff;
+        }
+
+        /* ステージ表示用ランプのスタイル */
+        .stage-lamp {
+            width: 32px; height: 12px;
+            background-color: #333;
+            border: 2px solid #4a5568;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+        .stage-lamp.current {
+            background-color: #fef08a; /* 薄い黄色 */
+            border-color: #fde047;
+            box-shadow: 0 0 8px #fef08a;
+        }
+        .stage-lamp.completed {
+            background-color: #4ade80; /* 緑色 */
+            border-color: #86efac;
+            box-shadow: 0 0 8px #4ade80;
+        }
+    </style>
+    <!-- デジタル風フォントの読み込み -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white flex flex-col justify-center items-center min-h-screen p-2 sm:p-4">
+    
+    <!-- 上部UIエリア -->
+    <div class="absolute top-4 left-4">
+        <div id="stage-lamp-container" class="flex space-x-2"></div>
+    </div>
+    
+    <div class="text-center mb-4 sm:mb-8">
+        <h1 class="text-4xl sm:text-5xl font-bold tracking-widest text-cyan-300">7 SEGMENT</h1>
+    </div>
+
+    <!-- ゲーム全体のコンテナ -->
+    <div id="game-container" class="relative flex justify-center items-center w-[85vw] h-[85vw] max-w-[450px] max-h-[450px] aspect-square">
+        <div class="segment-display">
+            <div id="seg-a" class="segment h-segment segment-a"></div><div id="seg-b" class="segment v-segment segment-b"></div><div id="seg-c" class="segment v-segment segment-c"></div><div id="seg-d" class="segment h-segment segment-d"></div><div id="seg-e" class="segment v-segment segment-e"></div><div id="seg-f" class="segment v-segment segment-f"></div><div id="seg-g" class="segment h-segment segment-g"></div>
+        </div>
+        <div id="button-container" class="button-ring"></div>
+        <!-- 規定回数ランプ (レスポンシブ対応) -->
+        <div id="lamp-container" class="absolute flex flex-row space-x-2 top-full mt-4 left-1/2 -translate-x-1/2 sm:flex-col sm:space-y-2 sm:space-x-0 sm:top-auto sm:left-full sm:mt-0 sm:bottom-0 sm:mb-8 sm:ml-4 sm:translate-x-0"></div>
+    </div>
+
+    <!-- メッセージ表示エリア -->
+    <div id="message-box" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-black text-yellow-300 opacity-0 pointer-events-none" style="text-shadow: 0 0 15px #fef08a;"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM要素 ---
+            const dom = {
+                segmentElements: { a: document.getElementById('seg-a'), b: document.getElementById('seg-b'), c: document.getElementById('seg-c'), d: document.getElementById('seg-d'), e: document.getElementById('seg-e'), f: document.getElementById('seg-f'), g: document.getElementById('seg-g') },
+                buttonContainer: document.getElementById('button-container'),
+                messageBox: document.getElementById('message-box'),
+                lampContainer: document.getElementById('lamp-container'),
+                stageLampContainer: document.getElementById('stage-lamp-container')
+            };
+
+            // --- 定数 ---
+            const SEGMENT_MAP = [[1,1,1,1,1,1,0],[0,1,1,0,0,0,0],[1,1,0,1,1,0,1],[1,1,1,1,0,0,1],[0,1,1,0,0,1,1],[1,0,1,1,0,1,1],[1,0,1,1,1,1,1],[1,1,1,0,0,1,0],[1,1,1,1,1,1,1],[1,1,1,1,0,1,1]];
+            const STAGE_CONFIG = [
+                { requiredPresses: 1, disabledButtons: [] },
+                { requiredPresses: 3, disabledButtons: [8] },
+                { requiredPresses: 4, disabledButtons: [8, 5] },
+                { requiredPresses: 5, disabledButtons: [8, 5, 6] },
+            ];
+
+            // --- ゲーム状態変数 ---
+            let state = {
+                segment: [0,0,0,0,0,0,0],
+                pressCount: 0,
+                buttons: [],
+                isLocked: false,
+                clearAnimationInterval: null,
+                currentStageIndex: 0
+            };
+
+            // --- 関数 ---
+            const updateDisplay = () => Object.keys(dom.segmentElements).forEach((id, i) => dom.segmentElements[id].classList.toggle('on', state.segment[i] === 1));
+
+            const positionButtons = () => {
+                const ring = document.getElementById('game-container');
+                const radius = ring.offsetWidth / 2;
+                const centerX = ring.offsetWidth / 2, centerY = ring.offsetHeight / 2;
+                state.buttons.forEach((button, i) => {
+                    const buttonSize = button.offsetWidth;
+                    const angle = (i / 10) * 2 * Math.PI - (Math.PI / 2);
+                    const x = centerX + (radius - buttonSize * 0.7) * Math.cos(angle) - (buttonSize / 2);
+                    const y = centerY + (radius - buttonSize * 0.7) * Math.sin(angle) - (buttonSize / 2);
+                    button.style.left = `${x}px`;
+                    button.style.top = `${y}px`;
+                });
+            };
+
+            const setupStage = (stageIndex) => {
+                state.isLocked = false;
+                if (state.clearAnimationInterval) clearInterval(state.clearAnimationInterval);
+                document.querySelectorAll('.segment.on.flash').forEach(s => s.classList.remove('flash'));
+                dom.messageBox.classList.add('opacity-0');
+
+                state.currentStageIndex = stageIndex;
+                const config = STAGE_CONFIG[stageIndex];
+
+                state.segment = [0,0,0,0,0,0,0];
+                state.pressCount = 0;
+                updateDisplay();
+
+                // ステージランプの更新
+                const stageLamps = dom.stageLampContainer.children;
+                for (let i = 0; i < stageLamps.length; i++) {
+                    stageLamps[i].classList.remove('current', 'completed');
+                    if (i < stageIndex) {
+                        stageLamps[i].classList.add('completed');
+                    } else if (i === stageIndex) {
+                        stageLamps[i].classList.add('current');
+                    }
+                }
+                
+                // 規定回数ランプの生成
+                dom.lampContainer.innerHTML = '';
+                for (let i = 0; i < config.requiredPresses; i++) {
+                    const lamp = document.createElement('div');
+                    lamp.classList.add('lamp', 'lit'); // 最初は点灯状態にする
+                    dom.lampContainer.appendChild(lamp);
+                }
+
+                // ボタンの状態を更新
+                state.buttons.forEach((button, i) => {
+                    const isDisabledByStage = config.disabledButtons.includes(i);
+                    button.disabled = isDisabledByStage;
+                    button.classList.toggle('stage-disabled', isDisabledByStage);
+                });
+            };
+
+            const checkResult = () => {
+                const isClear = state.segment.every(s => s === 1);
+                
+                if (isClear) { // 回数チェックはhandleButtonClickで行うため、ここではクリアしたかどうかの判定のみ
+                    state.clearAnimationInterval = setInterval(() => document.querySelectorAll('.segment.on').forEach(seg => seg.classList.toggle('flash')), 200);
+                    
+                    setTimeout(() => {
+                        const nextStageIndex = state.currentStageIndex + 1;
+                        if (nextStageIndex < STAGE_CONFIG.length) {
+                            setupStage(nextStageIndex);
+                        } else {
+                            if (state.clearAnimationInterval) clearInterval(state.clearAnimationInterval);
+                            dom.messageBox.textContent = "ALL CLEAR!";
+                            dom.messageBox.classList.remove('opacity-0');
+                             // 最終ステージランプを緑に
+                            dom.stageLampContainer.children[state.currentStageIndex].classList.remove('current');
+                            dom.stageLampContainer.children[state.currentStageIndex].classList.add('completed');
+                        }
+                    }, 1500);
+                } else {
+                    setTimeout(() => setupStage(state.currentStageIndex), 1000);
+                }
+            };
+            
+            const handleButtonClick = (num, buttonElement) => {
+                const config = STAGE_CONFIG[state.currentStageIndex];
+                if (state.isLocked || state.pressCount >= config.requiredPresses || buttonElement.disabled) return;
+
+                buttonElement.disabled = true;
+                state.pressCount++;
+                
+                const lamps = dom.lampContainer.querySelectorAll('.lamp');
+                if (state.pressCount <= lamps.length) {
+                    // 上から順に消灯させる
+                    lamps[state.pressCount - 1].classList.remove('lit');
+                }
+
+                const pattern = SEGMENT_MAP[num];
+                state.segment = state.segment.map((val, i) => val ^ pattern[i]);
+                updateDisplay();
+
+                if (state.pressCount === config.requiredPresses) {
+                    state.isLocked = true; // 操作をロック
+                    // 全てのボタンを非活性化
+                    state.buttons.forEach(btn => btn.disabled = true);
+                    checkResult();
+                }
+            };
+
+            const initializeGame = () => {
+                // ステージランプを生成
+                for(let i = 0; i < STAGE_CONFIG.length; i++) {
+                    const stageLamp = document.createElement('div');
+                    stageLamp.classList.add('stage-lamp');
+                    dom.stageLampContainer.appendChild(stageLamp);
+                }
+
+                // 数字ボタンを生成
+                for (let i = 0; i < 10; i++) {
+                    const button = document.createElement('button');
+                    // button.textContent = i; // 数字の表示を削除
+                    button.classList.add('num-button');
+                    button.addEventListener('click', () => handleButtonClick(i, button));
+                    dom.buttonContainer.appendChild(button);
+                    state.buttons.push(button);
+                }
+                
+                let resizeTimer;
+                window.addEventListener('resize', () => {
+                    clearTimeout(resizeTimer);
+                    resizeTimer = setTimeout(positionButtons, 100);
+                });
+
+                setupStage(0);
+                setTimeout(positionButtons, 0); 
+            };
+            
+            initializeGame();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+

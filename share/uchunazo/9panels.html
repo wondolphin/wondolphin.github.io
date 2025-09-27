@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>9 panels</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Fredoka+One&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* --- どんな画面サイズでも収まるように、可変かつ上限のあるサイズ指定に変更 --- */
+            --board-size: min(300px, 70vw, 65vh);
+            --cell-size: calc(var(--board-size) / 3);
+            --result-area-size: min(50px, 12vw, 11vh);
+            --gap: min(10px, 2vw, 2vh);
+            /* --- ここまで修正 --- */
+
+            --border-color: #555;
+            --cell-bg: #e0e0e0;
+            --cell-shadow-light: #ffffff;
+            --cell-shadow-dark: #b0b0b0;
+
+            --correct-color-text: #ffeb3b;
+            --correct-color-bg: #4CAF50;
+            --correct-glow: #ffdd57;
+
+            --error-color-text: #ffffff;
+            --error-color-bg: #F44336;
+            --error-negative-bg: #3498db; /* 水色の変数を追加 */
+
+            --select-color-glow: #00ffff;
+            --clear-color: #FFD700;
+        }
+
+        body {
+            font-family: 'Fredoka One', cursive;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #2c3e50, #4ca1af);
+            color: #eee;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            overflow: hidden;
+            padding: 0 10px; /* 左右の基本的な余白を追加 */
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            /* --- フォントサイズも可変に --- */
+            font-size: min(3em, 10vw, 8vh);
+            letter-spacing: 0.1em;
+            /* --- マージンも可変に --- */
+            margin-bottom: min(30px, 4vh);
+            color: #fff;
+            text-shadow: 5px 5px 0px #000, 
+                         7px 7px 0px #333;
+            text-align: center; /* 複数行になった場合も中央揃え */
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-columns: var(--result-area-size) var(--board-size);
+            grid-template-rows: var(--result-area-size) var(--board-size);
+            gap: var(--gap);
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: var(--gap);
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.7);
+        }
+
+        .column-results {
+            grid-column: 2 / 3;
+            grid-row: 1 / 2;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        .row-results {
+            grid-column: 1 / 2;
+            grid-row: 2 / 3;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .result {
+            font-size: 1.2em;
+            font-weight: bold;
+            width: calc(var(--cell-size) - 10px);
+            height: calc(var(--result-area-size) - 10px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3), 
+                        inset -2px -2px 5px rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+            background-color: #333;
+            color: #ccc;
+        }
+
+        .result.correct {
+            background-color: var(--correct-color-bg);
+            color: var(--correct-color-text);
+            font-size: 1.8em;
+            text-shadow: 0 0 15px var(--correct-glow);
+            box-shadow: 0 0 20px var(--correct-glow), inset 0 0 10px var(--correct-color-text);
+        }
+
+        .result.error {
+            background-color: var(--error-color-bg);
+            color: var(--error-color-text);
+            font-size: 1.4em;
+            box-shadow: 0 0 10px rgba(255,0,0,0.5), inset 2px 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        .result.error-negative {
+            background-color: var(--error-negative-bg);
+            color: var(--error-color-text);
+            font-size: 1.4em;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.5), inset 2px 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .board {
+            grid-column: 2 / 3;
+            grid-row: 2 / 3;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8), inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+            background-color: var(--cell-bg);
+            cursor: pointer;
+            transition: all 0.2s ease-out;
+            box-shadow: inset 4px 4px 8px var(--cell-shadow-dark), 
+                        inset -4px -4px 8px var(--cell-shadow-light);
+            border-radius: 8px;
+        }
+
+        .cell:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3),
+                        inset 4px 4px 8px var(--cell-shadow-dark), 
+                        inset -4px -4px 8px var(--cell-shadow-light);
+        }
+
+        .cell.selected {
+            box-shadow: 0 0 15px 5px var(--select-color-glow),
+                        inset 0 0 10px var(--select-color-glow);
+            transform: scale(1.05);
+            background-color: #d1ffff;
+            z-index: 10;
+        }
+        
+        .clear-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: var(--clear-color);
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10vw;
+            font-weight: bold;
+            text-shadow: 
+                0 0 10px var(--clear-color), 0 0 20px var(--clear-color), 0 0 30px var(--clear-color),
+                0 0 40px #fff, 0 0 50px #fff;
+            cursor: pointer;
+            z-index: 100;
+            animation: clearGlow 1.5s infinite alternate;
+        }
+
+        @keyframes clearGlow {
+            from { text-shadow: 0 0 10px var(--clear-color), 0 0 20px var(--clear-color); }
+            to { text-shadow: 0 0 20px var(--clear-color), 0 0 30px #fff, 0 0 50px #fff; }
+        }
+
+        /* --- スマホ表示対応 (画面が狭い場合に特に最適化) --- */
+        @media (max-width: 480px) {
+            :root {
+                --board-size: 70vw;
+                --result-area-size: 10vw;
+                --gap: 2vw;
+            }
+
+            h1 {
+                font-size: 10vw;
+                letter-spacing: 0;
+                margin-bottom: 20px;
+                text-shadow: 3px 3px 0px #000, 
+                             4px 4px 0px #333;
+            }
+            
+            .result {
+                font-size: 3.5vw;
+            }
+
+            .result.correct {
+                font-size: 5vw;
+            }
+
+            .result.error, .result.error-negative {
+                font-size: 4vw;
+            }
+
+            .clear-overlay {
+                font-size: 15vw;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>9 panels</h1>
+
+    <div class="game-container">
+        <div class="column-results">
+            <div id="col-res-0" class="result"></div>
+            <div id="col-res-1" class="result"></div>
+            <div id="col-res-2" class="result"></div>
+        </div>
+        <div class="row-results">
+            <div id="row-res-0" class="result"></div>
+            <div id="row-res-1" class="result"></div>
+            <div id="row-res-2" class="result"></div>
+        </div>
+        <div class="board" id="board"></div>
+    </div>
+
+    <div class="clear-overlay" id="clear-message">
+        CLEAR!
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const boardElement = document.getElementById('board');
+            const clearMessageElement = document.getElementById('clear-message');
+            const magicNumber = 15;
+            let numbers; // init関数で初期化
+            
+            let selectedCell = null;
+            let isSwapping = false; // Flag to prevent clicks during swap animation
+
+            function init() {
+                // 指定された初期配置を設定
+                numbers = [
+                    [9, 8, 3],
+                    [1, 2, 6],
+                    [7, 5, 4]
+                ];
+                renderBoard();
+                updateResults();
+            }
+
+            function renderBoard() {
+                boardElement.innerHTML = '';
+                for (let i = 0; i < 3; i++) {
+                    for (let j = 0; j < 3; j++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        cell.dataset.row = i;
+                        cell.dataset.col = j;
+                        cell.addEventListener('click', onCellClick);
+                        boardElement.appendChild(cell);
+                    }
+                }
+            }
+
+            function onCellClick(event) {
+                if (isSwapping) return; // Prevent clicks during swap
+
+                const clickedCell = event.target;
+
+                if (!selectedCell) {
+                    // Select first cell
+                    selectedCell = clickedCell;
+                    selectedCell.classList.add('selected');
+                } else {
+                    // Select second cell
+                    if (selectedCell !== clickedCell) {
+                        isSwapping = true;
+                        clickedCell.classList.add('selected');
+
+                        setTimeout(() => {
+                            swapNumbers(selectedCell, clickedCell);
+                            updateResults();
+                            checkWin();
+                            
+                            // Deselect both cells
+                            selectedCell.classList.remove('selected');
+                            clickedCell.classList.remove('selected');
+                            selectedCell = null;
+                            isSwapping = false;
+                        }, 300);
+                    } else {
+                        // Deselect if the same cell is clicked again
+                        selectedCell.classList.remove('selected');
+                        selectedCell = null;
+                    }
+                }
+            }
+            
+            function swapNumbers(cell1, cell2) {
+                const { row: r1, col: c1 } = cell1.dataset;
+                const { row: r2, col: c2 } = cell2.dataset;
+                [numbers[r1][c1], numbers[r2][c2]] = [numbers[r2][c2], numbers[r1][c1]];
+            }
+            
+            function updateResults() {
+                let allCorrect = true;
+
+                // Check rows
+                for (let i = 0; i < 3; i++) {
+                    const rowSum = numbers[i][0] + numbers[i][1] + numbers[i][2];
+                    const diff = rowSum - magicNumber;
+                    if (!updateResultElement(document.getElementById(`row-res-${i}`), diff)) {
+                        allCorrect = false;
+                    }
+                }
+
+                // Check columns
+                for (let j = 0; j < 3; j++) {
+                    const colSum = numbers[0][j] + numbers[1][j] + numbers[2][j];
+                    const diff = colSum - magicNumber;
+                    if (!updateResultElement(document.getElementById(`col-res-${j}`), diff)) {
+                        allCorrect = false;
+                    }
+                }
+                return allCorrect;
+            }
+            
+            function updateResultElement(element, diff) {
+                element.classList.remove('correct', 'error', 'error-negative');
+                if (diff === 0) {
+                    element.textContent = '◯';
+                    element.classList.add('correct');
+                    return true;
+                } else {
+                    element.textContent = (diff > 0 ? '+' : '') + diff;
+                    if (diff > 0) {
+                        element.classList.add('error'); // プラスの誤差
+                    } else {
+                        element.classList.add('error-negative'); // マイナスの誤差
+                    }
+                    return false;
+                }
+            }
+
+            function checkWin() {
+                if (updateResults()) {
+                    clearMessageElement.style.display = 'flex';
+                }
+            }
+
+            clearMessageElement.addEventListener('click', () => {
+                clearMessageElement.style.display = 'none';
+                init(); // Start a new game after clearing
+            });
+
+            init();
+        });
+    </script>
+
+</body>
+</html>
+
