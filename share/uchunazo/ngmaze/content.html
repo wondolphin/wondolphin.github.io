@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ナゾ条件迷路</title>
+    <style>
+        /* ページの基本スタイル */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom right, #e0eafc, #cfdef3); /* 背景グラデーション */
+            touch-action: none; /* スマートフォンでの画面スクロールを無効化 */
+            -webkit-user-select: none; /* テキスト選択を無効化 */
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        h1 {
+            color: #1d3557; /* 深い青色 */
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        /* ゲーム全体のコンテナ */
+        #game-container {
+            position: relative; /* ボールの絶対位置の基準 */
+            padding: 10px;
+            background-color: #c1d1e0; /* 新しい背景色 */
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1); /* 影を強調 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #grid-board {
+            display: grid;
+            /* 盤面を7列に変更 */
+            grid-template-columns: repeat(7, clamp(35px, 8vw, 45px));
+            grid-template-rows: repeat(7, clamp(35px, 8vw, 45px));
+            gap: 2px;
+            background-color: transparent; /* 背景を透明に */
+            border-radius: 4px; /* 角を少し丸める */
+        }
+
+        /* 個々のマス */
+        .cell {
+            background-color: #f7f9fc; /* 少し青みがかった白 */
+            transition: background-color 0.1s ease-in-out;
+            position: relative; /* ゴールの丸を配置するため */
+            box-sizing: border-box; /* ボーダーをサイズに含める */
+        }
+        
+        /* スタートとゴールのマス */
+        .endpoint-cell {
+            background-color: #dff0d8; /* 薄い黄緑 */
+        }
+
+        /* 非表示のマス */
+        .empty-cell {
+            background-color: transparent; /* 背景パネルと同じ色 */
+        }
+
+        /* 通過したマス */
+        .cell.lit {
+            background-color: #8ecae6; /* 明るい青 */
+            box-shadow: inset 0 0 8px #219ebc;
+        }
+
+        /* エラー（数字が重複した）マス */
+        .cell.error {
+            animation: blink-error 0.25s infinite alternate;
+        }
+
+        @keyframes blink-error {
+            from { background-color: #f7dc6f; }
+            to { background-color: #ff595e; } /* 明るい赤色 */
+        }
+        
+        /* プレイヤーが操作する丸 */
+        #player-ball {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: clamp(20px, 5vw, 28px);
+            height: clamp(20px, 5vw, 28px);
+            border-radius: 50%;
+            background-color: #ff7b00; /* 鮮やかなオレンジ */
+            cursor: pointer;
+            z-index: 10;
+            box-shadow: 0 0 15px #ff7b00;
+            /* 位置の変更を滑らかにする */
+            transition: left 0.05s linear, top 0.05s linear;
+            /* アニメーションを追加 */
+            animation: pulsate 2s infinite ease-in-out;
+        }
+        
+        /* 丸の強調アニメーション */
+        @keyframes pulsate {
+            0% { transform: scale(1); box-shadow: 0 0 15px #ff7b00; }
+            50% { transform: scale(1.15); box-shadow: 0 0 25px #ff9500; }
+            100% { transform: scale(1); box-shadow: 0 0 15px #ff7b00; }
+        }
+
+        /* ゴールの点線の丸 */
+        #end-point {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: clamp(20px, 5vw, 28px);
+            height: clamp(20px, 5vw, 28px);
+            border-radius: 50%;
+            border: 3px dashed #ff7b00; /* 鮮やかなオレンジ */
+            box-sizing: border-box;
+        }
+
+        /* クリアメッセージ */
+        #clear-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(29, 53, 87, 0.85); /* 背景をテーマに合わせる */
+            color: white;
+            font-size: clamp(2.5rem, 10vw, 5rem);
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s;
+            z-index: 20;
+        }
+
+        #clear-message.show {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>NGマス可変迷路</h1>
+    <div id="game-container">
+        <div id="grid-board"></div>
+        <div id="player-ball"></div>
+    </div>
+    <div id="clear-message">CLEAR!</div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // HTML要素の取得
+        const gameContainer = document.getElementById('game-container');
+        const gridBoard = document.getElementById('grid-board');
+        const playerBall = document.getElementById('player-ball');
+        const clearMessage = document.getElementById('clear-message');
+
+        // 定数
+        const ROWS = 7;
+        const COLS = 5; // プレイエリアの列数
+        const GRID_COLS = COLS + 2; // 表示上のグリッド列数 (スタート/ゴール含む)
+        const GRID_VALUES = [
+            [1, 8, 3, 4, 5], [2, 3, 4, 11, 6], [11, 12, 5, 6, 7],
+            [4, 9, 10, 7, 9], [8, 1, 9, 8, 13], [5, 4, 10, 1, 2],
+            [6, 7, 11, 12, 13]
+        ];
+
+        // ゲームの状態を管理する変数
+        let isDrawing = false;
+        let path = [];
+        let cells = [];
+        let initialBallPosition = {};
+
+        // 盤面とボールを初期化
+        function initializeGame() {
+            gridBoard.innerHTML = '';
+            cells = [];
+            for (let r = 0; r < ROWS; r++) {
+                cells[r] = [];
+                for (let c = 0; c < GRID_COLS; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    // セルの種類を判定
+                    if (r === 0 && c === 0) { // スタート
+                        cell.classList.add('endpoint-cell');
+                    } else if (r === ROWS - 1 && c === GRID_COLS - 1) { // ゴール
+                        cell.classList.add('endpoint-cell');
+                        const endPoint = document.createElement('div');
+                        endPoint.id = 'end-point';
+                        cell.appendChild(endPoint);
+                    } else if (c > 0 && c <= COLS) { // プレイエリア
+                        cell.dataset.value = GRID_VALUES[r][c-1];
+                    } else { // 非表示エリア
+                        cell.classList.add('empty-cell');
+                    }
+
+                    gridBoard.appendChild(cell);
+                    cells[r][c] = cell;
+                }
+            }
+            
+            // ボールの初期位置を計算して設定
+            const startCell = cells[0][0];
+            const startRect = startCell.getBoundingClientRect();
+            const containerRect = gameContainer.getBoundingClientRect();
+            initialBallPosition = {
+                x: startRect.left - containerRect.left + (startRect.width / 2) - (playerBall.offsetWidth / 2),
+                y: startRect.top - containerRect.top + (startRect.height / 2) - (playerBall.offsetHeight / 2),
+            };
+            resetGame();
+        }
+
+        // ゲームをリセット
+        function resetGame() {
+            path = [];
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.classList.remove('lit', 'error');
+            });
+            isDrawing = false;
+            playerBall.style.animation = 'pulsate 2s infinite ease-in-out';
+            updateBallPosition(null, initialBallPosition.x, initialBallPosition.y);
+        }
+
+        // ボールの位置を更新
+        function updateBallPosition(targetElement, x, y) {
+            let targetX, targetY;
+            if (targetElement) {
+                const targetRect = targetElement.getBoundingClientRect();
+                const containerRect = gameContainer.getBoundingClientRect();
+                targetX = targetRect.left - containerRect.left + (targetRect.width / 2) - (playerBall.offsetWidth / 2);
+                targetY = targetRect.top - containerRect.top + (targetRect.height / 2) - (playerBall.offsetHeight / 2);
+            } else {
+                targetX = x;
+                targetY = y;
+            }
+            playerBall.style.left = `${targetX}px`;
+            playerBall.style.top = `${targetY}px`;
+        }
+
+        // ドラッグ開始
+        function handleDragStart(e) {
+            e.preventDefault();
+            const startCell = cells[0][0];
+            // ボールがスタートマスにある時のみドラッグ開始
+            if (path.length === 0) {
+                 const ballRect = playerBall.getBoundingClientRect();
+                 const startRect = startCell.getBoundingClientRect();
+                 if (ballRect.left >= startRect.left && ballRect.right <= startRect.right &&
+                     ballRect.top >= startRect.top && ballRect.bottom <= startRect.bottom) {
+                     isDrawing = true;
+                     playerBall.style.animation = 'none';
+                     path.push(startCell);
+                 }
+            } else {
+                 isDrawing = true;
+                 playerBall.style.animation = 'none';
+            }
+        }
+        
+        // ドラッグ中
+        function handleDragMove(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+            const element = document.elementFromPoint(clientX, clientY);
+            const lastCell = path.length > 0 ? path[path.length - 1] : null;
+
+            if (element && element.classList.contains('cell')) {
+                const currentCell = element;
+
+                if (currentCell !== lastCell && !currentCell.classList.contains('empty-cell')) {
+                    if (isAdjacent(currentCell, lastCell) && !path.includes(currentCell)) {
+                        path.push(currentCell);
+                        if (currentCell.dataset.value) {
+                             currentCell.classList.add('lit');
+                        }
+                        updateBallPosition(currentCell);
+                    }
+                    else if (path.length > 1 && currentCell === path[path.length - 2]) {
+                        if (lastCell.dataset.value) {
+                             lastCell.classList.remove('lit');
+                        }
+                        path.pop();
+                        updateBallPosition(currentCell);
+                    }
+                }
+            }
+        }
+
+        // ドラッグ終了
+        function handleDragEnd(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            playerBall.style.animation = 'pulsate 2s infinite ease-in-out';
+            
+            checkPath();
+        }
+
+        function isAdjacent(cell1, cell2) {
+            if (!cell1 || !cell2) return false;
+            const r1 = parseInt(cell1.dataset.row);
+            const c1 = parseInt(cell1.dataset.col);
+            const r2 = parseInt(cell2.dataset.row);
+            const c2 = parseInt(cell2.dataset.col);
+            return Math.abs(r1 - r2) + Math.abs(c1 - c2) === 1;
+        }
+
+        function checkPath() {
+            const lastCell = path.length > 0 ? path[path.length - 1] : null;
+            if (!lastCell || lastCell.dataset.row != ROWS - 1 || lastCell.dataset.col != GRID_COLS - 1) {
+                return;
+            }
+
+            const valuesToCheck = path
+                .filter(cell => cell.dataset.value)
+                .map(cell => parseInt(cell.dataset.value));
+
+            const valueCounts = valuesToCheck.reduce((acc, val) => {
+                acc[val] = (acc[val] || 0) + 1;
+                return acc;
+            }, {});
+            const duplicates = Object.keys(valueCounts).filter(val => valueCounts[val] > 1).map(Number);
+
+            if (duplicates.length > 0) {
+                handleFailure(duplicates);
+            } else {
+                handleSuccess();
+            }
+        }
+        
+        function handleSuccess() {
+            clearMessage.classList.add('show');
+        }
+
+        function handleFailure(duplicates) {
+            path.forEach(cell => {
+                if (duplicates.includes(parseInt(cell.dataset.value))) {
+                    cell.classList.add('error');
+                }
+            });
+            setTimeout(resetGame, 1000);
+        }
+
+        function hideClearMessage() {
+            clearMessage.classList.remove('show');
+            resetGame();
+        }
+
+        // イベントリスナー
+        playerBall.addEventListener('mousedown', handleDragStart);
+        document.body.addEventListener('mousemove', handleDragMove);
+        document.body.addEventListener('mouseup', handleDragEnd);
+
+        playerBall.addEventListener('touchstart', handleDragStart, { passive: false });
+        document.body.addEventListener('touchmove', handleDragMove, { passive: false });
+        document.body.addEventListener('touchend', handleDragEnd);
+
+        clearMessage.addEventListener('click', hideClearMessage);
+        
+        window.addEventListener('resize', initializeGame);
+
+        initializeGame();
+    });
+    </script>
+
+</body>
+</html>
+

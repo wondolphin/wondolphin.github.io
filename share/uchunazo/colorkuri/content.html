@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>からくりパネル</title>
+    <style>
+        :root {
+            /* オーブとランプの色を定義 */
+            --color-1: #E53935; /* Red */
+            --color-2: #1E88E5; /* Blue */
+            --color-3: #43A047; /* Green */
+            --color-4: #FFEE58; /* Brighter Yellow */
+            --color-5: #8E24AA; /* Purple */
+            --color-6: #FB8C00; /* Orange */
+            --color-7: #84FFFF; /* Even Lighter Cyan */
+            --color-8: #FF80AB; /* Lighter Pink */
+            
+            /* 消灯時の各色に対応する暗い色 */
+            --color-1-off: #541b1a; /* Dark Red */
+            --color-2-off: #0b3558; /* Dark Blue */
+            --color-3-off: #173a19; /* Dark Green */
+            --color-4-off: #645f23; /* Dark Yellow */
+            --color-5-off: #380e44; /* Dark Purple */
+            --color-6-off: #643800; /* Dark Orange */
+            --color-7-off: #2e5858; /* Dark Cyan */
+            --color-8-off: #663344; /* Dark Pink */
+
+            --background-color: #111827;
+            --board-bg-color: #1f2937;
+            --button-bg-color: #4b5563;
+            --button-hover-bg-color: #6b7280;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            color: #f3f4f6;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 2vmin 2vmin 6vmin; /* 下側の余白を増やす */
+            box-sizing: border-box;
+            user-select: none; /* テキスト選択を無効化 */
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3vmin; /* Use responsive gap */
+            max-width: 500px;
+            width: min(95vw, calc(100vh - 33vmin)); /* ヘッダーや上下余白の高さをより正確に考慮し、全体がはみ出ないように調整 */
+        }
+
+        h1 {
+            font-size: clamp(1.75rem, 8vmin, 2.5rem); /* Make font size responsive */
+            font-weight: bold;
+            color: #e5e7eb;
+            margin: 0;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- ランプ --- */
+        .lamps {
+            display: flex;
+            justify-content: center;
+            gap: 2vmin;
+            padding: 1.5vmin;
+            background-color: var(--board-bg-color);
+            border-radius: 9999px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .lamp {
+            width: clamp(20px, 6vmin, 30px);
+            height: clamp(20px, 6vmin, 30px);
+            border-radius: 50%;
+            /* background-color: var(--color-lamp-off); この行を削除 */
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .lamp.lit {
+            /* 点灯時のスタイル */
+            box-shadow: 0 0 15px 3px currentColor;
+        }
+
+        /* --- ゲームボード --- */
+        .game-board {
+            display: grid;
+            /* ボタン用の列/行を柔軟なサイズに */
+            grid-template-columns: 12% repeat(4, 1fr) 12%;
+            grid-template-rows: 12% repeat(4, 1fr) 12%;
+            gap: 1.5vmin; /* ギャップも可変に */
+            width: 100%;
+            aspect-ratio: 1 / 1;
+        }
+
+        /* --- オーブ --- */
+        .orb-grid {
+            grid-column: 2 / 6;
+            grid-row: 2 / 6;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 2vmin; /* ギャップを可変に */
+            background-color: var(--board-bg-color);
+            padding: 2vmin; /* パディングを可変に */
+            border-radius: 2vmin; /* 角丸を可変に */
+            box-shadow: inset 0 3px 6px rgba(0,0,0,0.4);
+        }
+
+        .orb {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            transition: background-color 0.3s ease;
+            box-shadow: inset 0 -4px 8px rgba(0,0,0,0.3);
+        }
+
+        /* --- オーブの色設定 --- */
+        .orb.c1 { background-color: var(--color-1); }
+        .orb.c2 { background-color: var(--color-2); }
+        .orb.c3 { background-color: var(--color-3); }
+        .orb.c4 { background-color: var(--color-4); }
+        .orb.c5 { background-color: var(--color-5); }
+        .orb.c6 { background-color: var(--color-6); }
+        .orb.c7 { background-color: var(--color-7); }
+        .orb.c8 { background-color: var(--color-8); }
+        
+        /* --- ランプの消灯時の色設定 --- */
+        .lamp.c1 { background-color: var(--color-1-off); }
+        .lamp.c2 { background-color: var(--color-2-off); }
+        .lamp.c3 { background-color: var(--color-3-off); }
+        .lamp.c4 { background-color: var(--color-4-off); }
+        .lamp.c5 { background-color: var(--color-5-off); }
+        .lamp.c6 { background-color: var(--color-6-off); }
+        .lamp.c7 { background-color: var(--color-7-off); }
+        .lamp.c8 { background-color: var(--color-8-off); }
+
+        /* 点灯時のランプ色 */
+        .lamp.lit.c1 { color: var(--color-1); background-color: var(--color-1); }
+        .lamp.lit.c2 { color: var(--color-2); background-color: var(--color-2); }
+        .lamp.lit.c3 { color: var(--color-3); background-color: var(--color-3); }
+        .lamp.lit.c4 { color: var(--color-4); background-color: var(--color-4); }
+        .lamp.lit.c5 { color: var(--color-5); background-color: var(--color-5); }
+        .lamp.lit.c6 { color: var(--color-6); background-color: var(--color-6); }
+        .lamp.lit.c7 { color: var(--color-7); background-color: var(--color-7); }
+        .lamp.lit.c8 { color: var(--color-8); background-color: var(--color-8); }
+
+
+        /* --- ボタン --- */
+        .control-button {
+            background-color: var(--button-bg-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .control-button:hover {
+            background-color: var(--button-hover-bg-color);
+        }
+
+        .arrow {
+            border: solid #f3f4f6;
+            border-width: 0 4px 4px 0;
+            display: inline-block;
+            padding: 4px;
+        }
+        
+        .up { transform: rotate(-135deg); }
+        .down { transform: rotate(45deg); }
+        .left { transform: rotate(135deg); }
+        .right { transform: rotate(-45deg); }
+
+        /* ボタンコンテナのスタイル */
+        .button-container {
+            display: grid;
+            gap: 2vmin; /* オーブのgapと合わせる */
+            box-sizing: border-box;
+        }
+
+        .button-container-top {
+            grid-row: 1;
+            grid-column: 2 / 6;
+            grid-template-columns: repeat(4, 1fr);
+            padding: 0 2vmin; /* オーブの左右paddingと合わせる */
+        }
+
+        .button-container-down {
+            grid-row: 6;
+            grid-column: 2 / 6;
+            grid-template-columns: repeat(4, 1fr);
+            padding: 0 2vmin; /* オーブの左右paddingと合わせる */
+        }
+
+        .button-container-left {
+            grid-row: 2 / 6;
+            grid-column: 1;
+            grid-template-rows: repeat(4, 1fr);
+            padding: 2vmin 0; /* オーブの上下paddingと合わせる */
+        }
+
+        .button-container-right {
+            grid-row: 2 / 6;
+            grid-column: 6;
+            grid-template-rows: repeat(4, 1fr);
+            padding: 2vmin 0; /* オーブの上下paddingと合わせる */
+        }
+
+        /* --- クリア表示 --- */
+        .clear-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            cursor: pointer;
+        }
+        .clear-modal-text {
+            font-size: 8vw;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 0 20px #ffdd44, 0 0 30px #ffdd44;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>からくりパネル</h1>
+
+        <div class="lamps">
+            <!-- JavaScriptでランプを生成 -->
+        </div>
+
+        <div class="game-board">
+            <div class="orb-grid">
+                <!-- JavaScriptでオーブを生成 -->
+            </div>
+            <!-- JavaScriptでボタンを生成 -->
+        </div>
+    </div>
+    
+    <div id="clear-modal" class="clear-modal hidden">
+        <span class="clear-modal-text">CLEAR!</span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- ゲーム設定 ---
+            const initialBoard = [
+                [1, 7, 2, 4],
+                [6, 1, 4, 3],
+                [3, 5, 8, 6],
+                [5, 2, 7, 8],
+            ];
+            const gridSize = 4;
+            const numColors = 8;
+            let board = JSON.parse(JSON.stringify(initialBoard)); // 初期盤面のディープコピー
+
+            // --- DOM要素 ---
+            const orbGrid = document.querySelector('.orb-grid');
+            const lampsContainer = document.querySelector('.lamps');
+            const gameBoard = document.querySelector('.game-board');
+            const clearModal = document.getElementById('clear-modal');
+
+            // --- ゲーム要素の生成 ---
+
+            // オーブの生成
+            const orbElements = [];
+            for (let r = 0; r < gridSize; r++) {
+                orbElements[r] = [];
+                for (let c = 0; c < gridSize; c++) {
+                    const orb = document.createElement('div');
+                    orb.classList.add('orb');
+                    orb.dataset.row = r;
+                    orb.dataset.col = c;
+                    orbGrid.appendChild(orb);
+                    orbElements[r][c] = orb;
+                }
+            }
+
+            // ランプの生成
+            const lampElements = [];
+            for (let i = 1; i <= numColors; i++) {
+                const lamp = document.createElement('div');
+                lamp.classList.add('lamp', `c${i}`);
+                lamp.dataset.color = i;
+                lampsContainer.appendChild(lamp);
+                lampElements.push(lamp);
+            }
+            
+            // ボタンコンテナの生成
+            const btnContainers = {
+                up: document.createElement('div'),
+                down: document.createElement('div'),
+                left: document.createElement('div'),
+                right: document.createElement('div')
+            };
+
+            btnContainers.up.className = 'button-container button-container-top';
+            btnContainers.down.className = 'button-container button-container-down';
+            btnContainers.left.className = 'button-container button-container-left';
+            btnContainers.right.className = 'button-container button-container-right';
+
+            gameBoard.appendChild(btnContainers.up);
+            gameBoard.appendChild(btnContainers.down);
+            gameBoard.appendChild(btnContainers.left);
+            gameBoard.appendChild(btnContainers.right);
+
+            // ボタンの生成
+            for (let i = 0; i < gridSize; i++) {
+                // 上ボタン
+                const btnUp = createButton('up', i);
+                btnContainers.up.appendChild(btnUp);
+                
+                // 下ボタン
+                const btnDown = createButton('down', i);
+                btnContainers.down.appendChild(btnDown);
+
+                // 左ボタン
+                const btnLeft = createButton('left', i);
+                btnContainers.left.appendChild(btnLeft);
+
+                // 右ボタン
+                const btnRight = createButton('right', i);
+                btnContainers.right.appendChild(btnRight);
+            }
+            
+            function createButton(direction, index) {
+                const button = document.createElement('button');
+                button.classList.add('control-button');
+                const arrow = document.createElement('i');
+                arrow.classList.add('arrow');
+
+                if (direction === 'up' || direction === 'down') {
+                    button.dataset.col = index;
+                    arrow.classList.add(direction);
+                    button.addEventListener('click', () => handleColumnShift(index, direction));
+                } else {
+                    button.dataset.row = index;
+                    arrow.classList.add(direction);
+                    button.addEventListener('click', () => handleRowShift(index, direction));
+                }
+                button.appendChild(arrow);
+                return button;
+            }
+
+            // --- ゲームロジック ---
+
+            // 行をシフト
+            function handleRowShift(rowIndex, direction) {
+                const row = board[rowIndex];
+                if (direction === 'left') {
+                    row.push(row.shift()); // 先頭を末尾へ
+                } else { // right
+                    row.unshift(row.pop()); // 末尾を先頭へ
+                }
+                updateGame();
+            }
+
+            // 列をシフト
+            function handleColumnShift(colIndex, direction) {
+                const column = board.map(row => row[colIndex]);
+                if (direction === 'up') {
+                    column.push(column.shift()); // 先頭を末尾へ
+                } else { // down
+                    column.unshift(column.pop()); // 末尾を先頭へ
+                }
+                board.forEach((row, i) => {
+                    row[colIndex] = column[i];
+                });
+                updateGame();
+            }
+
+            // 画面の更新
+            function renderBoard() {
+                for (let r = 0; r < gridSize; r++) {
+                    for (let c = 0; c < gridSize; c++) {
+                        const orb = orbElements[r][c];
+                        const color = board[r][c];
+                        orb.className = 'orb'; // 既存の色クラスをリセット
+                        orb.classList.add(`c${color}`);
+                    }
+                }
+            }
+
+            // ランプの状態をチェックして更新
+            function checkLamps() {
+                const foundPairs = new Set();
+
+                // 横方向のペアをチェック
+                for (let r = 0; r < gridSize; r++) {
+                    for (let c = 0; c < gridSize - 1; c++) {
+                        if (board[r][c] === board[r][c + 1]) {
+                            foundPairs.add(board[r][c]);
+                        }
+                    }
+                }
+
+                // 縦方向のペアをチェック
+                for (let c = 0; c < gridSize; c++) {
+                    for (let r = 0; r < gridSize - 1; r++) {
+                        if (board[r][c] === board[r + 1][c]) {
+                            foundPairs.add(board[r][c]);
+                        }
+                    }
+                }
+
+                // ランプの表示を更新
+                lampElements.forEach(lamp => {
+                    const color = parseInt(lamp.dataset.color);
+                    if (foundPairs.has(color)) {
+                        lamp.classList.add('lit');
+                    } else {
+                        lamp.classList.remove('lit');
+                    }
+                });
+
+                return foundPairs.size;
+            }
+
+            // クリア判定
+            function checkClear(pairCount) {
+                if (pairCount === numColors) {
+                    setTimeout(() => {
+                        clearModal.classList.remove('hidden');
+                    }, 500); // 0.5秒待ってから表示
+                }
+            }
+            
+            // クリア画面を閉じる
+            clearModal.addEventListener('click', () => {
+                clearModal.classList.add('hidden');
+            });
+
+
+            // ゲーム状態の更新と再描画
+            function updateGame() {
+                renderBoard();
+                const pairCount = checkLamps();
+                checkClear(pairCount);
+            }
+            
+            // --- 初期化 ---
+            updateGame();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
