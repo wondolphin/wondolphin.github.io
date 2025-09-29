@@ -134,20 +134,58 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: clamp(3rem, 15vw, 8rem);
-            font-weight: bold;
-            color: #fff;
-            text-shadow: 0 0 10px var(--selected-glow), 0 0 20px var(--selected-glow), 0 0 40px var(--selected-glow);
             cursor: pointer;
             z-index: 10;
             opacity: 0;
             visibility: hidden;
             transition: opacity 0.5s, visibility 0.5s;
-            animation: clear-text-anim 2s ease-in-out;
+        }
+        
+        .clear-message-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
         }
 
+        .clear-text {
+            font-size: clamp(3rem, 15vw, 8rem);
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px var(--selected-glow), 0 0 20px var(--selected-glow), 0 0 40px var(--selected-glow);
+            animation: clear-text-anim 2s ease-in-out;
+        }
+        
+        .share-button {
+            margin-top: 5vh;
+            display: inline-block;
+            padding: clamp(10px, 2vmin, 14px) clamp(20px, 4vmin, 30px);
+            font-size: clamp(1rem, 3vmin, 1.5rem);
+            color: #fff;
+            background-color: #1DA1F2; /* X brand color */
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            opacity: 0;
+            transform: translateY(20px);
+            visibility: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .share-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+        
         .clear-message.show {
             opacity: 1;
+            visibility: visible;
+        }
+
+        .clear-message.show-share .share-button {
+            opacity: 1;
+            transform: translateY(0);
             visibility: visible;
         }
 
@@ -194,7 +232,18 @@
         <button id="reset-button">リセット</button>
     </div>
 
-    <div class="clear-message" id="clear-message">CLEAR!</div>
+    <div class="clear-message" id="clear-message">
+        <div class="clear-message-content">
+            <div class="clear-text">CLEAR!</div>
+            <a href="https://twitter.com/intent/tweet?text=%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Findependent_order%2Findex.html" 
+               class="share-button" 
+               id="share-button" 
+               target="_blank"
+               onclick="event.stopPropagation()">
+               喜びをXでシェアする
+            </a>
+        </div>
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -204,7 +253,6 @@
             const resetButton = document.getElementById('reset-button');
 
             const BOARD_SIZE = 7;
-            // 盤面のデータを更新
             const boardData = [
                 [2, 4, 2, 1, 2, 5, 3],
                 [4, 5, 3, 5, 4, 6, 1],
@@ -230,7 +278,7 @@
                 // HTML要素をクリア
                 boardElement.innerHTML = '';
                 lightsContainer.innerHTML = '';
-                clearMessageElement.classList.remove('show');
+                clearMessageElement.classList.remove('show', 'show-share');
 
                 // ライトを生成
                 for (let i = 0; i < BOARD_SIZE; i++) {
@@ -282,6 +330,10 @@
                 if (currentStep > BOARD_SIZE) {
                     setTimeout(() => {
                         clearMessageElement.classList.add('show');
+                        // 1.5秒後にシェアボタンを表示
+                        setTimeout(() => {
+                            clearMessageElement.classList.add('show-share');
+                        }, 1500);
                     }, 500); // アニメーションが終わるのを少し待つ
                 }
             }
@@ -332,11 +384,5 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
 
 
