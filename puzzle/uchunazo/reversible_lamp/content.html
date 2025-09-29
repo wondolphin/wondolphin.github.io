@@ -123,10 +123,6 @@
             margin-bottom: 20px;
         }
         
-        .gauge-icon {
-            font-size: 32px;
-        }
-
         #progress-bar {
             width: 100%;
             height: 20px;
@@ -182,18 +178,63 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.85);
             display: none; /* 最初は非表示 */
+            flex-direction: column; /* 子要素を縦に並べる */
             justify-content: center;
             align-items: center;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        #clear-text {
             font-size: 10vw;
             color: #00ffff;
             text-shadow: 0 0 20px #00ffff;
             animation: clear-fadein 1s;
-            cursor: pointer;
         }
-
+        
         @keyframes clear-fadein {
             from { opacity: 0; transform: scale(0.8); }
             to { opacity: 1; transform: scale(1); }
+        }
+
+        /* シェアボタン */
+        #share-button {
+            background-color: #1DA1F2; /* Xのブランドカラー */
+            color: white;
+            padding: 15px 30px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 40px;
+            opacity: 0; /* 最初は非表示 */
+            transition: opacity 0.5s ease-in-out, transform 0.2s;
+            pointer-events: none; /* 非表示時はクリック不可 */
+            cursor: pointer;
+        }
+        
+        #share-button.visible {
+            opacity: 1;
+            pointer-events: auto; /* 表示されたらクリック可能に */
+            animation: button-pop-in 0.5s ease-out;
+        }
+
+        #share-button:hover {
+            background-color: #0c85d0;
+        }
+        #share-button:active {
+            transform: scale(0.95);
+        }
+
+        @keyframes button-pop-in {
+            from {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
 
     </style>
@@ -215,7 +256,10 @@
         </div>
     </div>
 
-    <div id="clear-message">CLEAR!</div>
+    <div id="clear-message">
+        <span id="clear-text">CLEAR!</span>
+        <a href="https://twitter.com/intent/tweet?text=%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Freversible_lamp%2Findex.html" target="_blank" id="share-button">喜びをXでシェアする</a>
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -239,6 +283,7 @@
             const gameBoardElement = document.getElementById('game-board');
             const progressFillElement = document.getElementById('progress-fill');
             const clearMessageElement = document.getElementById('clear-message');
+            const shareButton = document.getElementById('share-button');
             const undoBtn = document.getElementById('undo-btn');
             const resetBtn = document.getElementById('reset-btn');
 
@@ -252,6 +297,7 @@
                 firstSelection = null;
                 isProcessing = false;
                 clearMessageElement.style.display = 'none';
+                shareButton.classList.remove('visible'); // シェアボタンも隠す
                 updateGame();
             };
             
@@ -391,6 +437,10 @@
                 if (blackCount === totalCount) {
                     setTimeout(() => {
                         clearMessageElement.style.display = 'flex';
+                        // 1.5秒後にシェアボタンを表示
+                        setTimeout(() => {
+                            shareButton.classList.add('visible');
+                        }, 1500);
                     }, 500);
                 }
             };
@@ -400,6 +450,10 @@
             undoBtn.addEventListener('click', handleUndo);
             clearMessageElement.addEventListener('click', () => {
                 clearMessageElement.style.display = 'none';
+                shareButton.classList.remove('visible'); // メッセージを消すときにボタンも隠す
+            });
+            shareButton.addEventListener('click', (event) => {
+                event.stopPropagation(); // ボタンクリックでメッセージが消えないようにする
             });
             
             // ゲーム初期化
@@ -408,5 +462,4 @@
     </script>
 </body>
 </html>
-
 
