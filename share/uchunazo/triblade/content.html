@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>作れ！トライブレード</title>
+    <style>
+        :root {
+            --color-a: #ff4757; /* 赤 */
+            --color-b: #487eb0; /* 青 */
+            --color-c: #2ed573; /* 緑 */
+            --color-d: #ffa502; /* 黄 */
+            --color-e: #9c59b6; /* 紫 */
+            --color-f: #00bcd4; /* シアン */
+            --bg-color: #2f3542;
+            --light-bg: #4f5b66;
+            --border-color: #718093;
+            --text-color: #f1f2f6;
+        }
+
+        body {
+            font-family: sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+
+        h1 {
+            color: var(--text-color);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        #game-board {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+
+        #radar-chart-container {
+            width: 300px;
+            height: 300px;
+        }
+        
+        #radar-chart {
+            /* transition is no longer needed here */
+        }
+
+        #light-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 36px);
+            grid-template-rows: repeat(6, 36px);
+            gap: 8px;
+            padding: 12px;
+            background-color: var(--light-bg);
+            border-radius: 10px;
+            border: 2px solid var(--border-color);
+        }
+
+        .light {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            transition: opacity 0.3s, box-shadow 0.3s, transform 0.2s;
+            position: relative;
+        }
+
+        .light.off {
+            opacity: 0.2;
+            box-shadow: none !important;
+        }
+        
+        .light.color-a { background-color: var(--color-a); box-shadow: 0 0 8px var(--color-a), inset 2px 2px 4px rgba(255,255,255,0.5); }
+        .light.color-b { background-color: var(--color-b); box-shadow: 0 0 8px var(--color-b), inset 2px 2px 4px rgba(255,255,255,0.5); }
+        .light.color-c { background-color: var(--color-c); box-shadow: 0 0 8px var(--color-c), inset 2px 2px 4px rgba(255,255,255,0.5); }
+        .light.color-d { background-color: var(--color-d); box-shadow: 0 0 8px var(--color-d), inset 2px 2px 4px rgba(255,255,255,0.5); }
+        .light.color-e { background-color: var(--color-e); box-shadow: 0 0 8px var(--color-e), inset 2px 2px 4px rgba(255,255,255,0.5); }
+        .light.color-f { background-color: var(--color-f); box-shadow: 0 0 8px var(--color-f), inset 2px 2px 4px rgba(255,255,255,0.5); }
+
+        #controls {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .control-set {
+            display: grid;
+            grid-template-columns: 50px 50px 50px;
+            grid-template-rows: 50px 50px;
+            justify-items: center;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .control-set button {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(145deg, #556270, #47535e);
+            color: #e0e0e0;
+            border: 1px solid #3a434c;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1);
+        }
+
+        .control-set button:hover {
+            background: linear-gradient(145deg, #606f80, #505d6a);
+        }
+
+        .control-set button:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4), inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .control-set button:disabled {
+            cursor: not-allowed;
+            background: #3a434c;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4), inset 0 2px 4px rgba(0,0,0,0.2);
+            color: #718093;
+            opacity: 0.6;
+        }
+
+        .up { grid-area: 1 / 2 / 2 / 3; }
+        .left { grid-area: 2 / 1 / 3 / 2; }
+        .right { grid-area: 2 / 3 / 3 / 4; }
+        .down { grid-area: 2 / 2 / 3 / 3; }
+
+        #clear-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 30px 60px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #ffd700;
+            font-size: 6em;
+            font-weight: bold;
+            border-radius: 20px;
+            text-shadow: 0 0 15px #ffd700;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s, visibility 0.5s;
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        #clear-message.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>作れ！トライブレード</h1>
+
+    <div id="game-board">
+        <div id="radar-chart-container">
+            <canvas id="radar-chart" width="300" height="300"></canvas>
+        </div>
+        <div id="light-grid"></div>
+        <div id="controls"></div>
+    </div>
+
+    <div id="clear-message">CLEAR!</div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 定数定義 ---
+            const GRID_SIZE = 6;
+            const LABELS = ['a', 'b', 'c', 'd', 'e', 'f'];
+            const LIGHT_GRID_SETUP = [
+                ['d', 'b', 'c', 'a', 'b', 'f'], ['b', 'c', 'e', 'b', 'f', 'e'],
+                ['a', 'f', 'd', 'c', 'd', 'c'], ['f', 'a', 'b', 'd', 'e', 'f'],
+                ['e', 'b', 'd', 'f', 'c', 'a'], ['c', 'e', 'a', 'd', 'a', 'e']
+            ];
+            const CLEAR_CONDITION = { a: 5, c: 5, e: 5, b: 2, d: 2, f: 2 };
+
+            // --- DOM要素 ---
+            const gridContainer = document.getElementById('light-grid');
+            const controlsContainer = document.getElementById('controls');
+            const clearMessage = document.getElementById('clear-message');
+            const canvas = document.getElementById('radar-chart');
+            const ctx = canvas.getContext('2d');
+            
+            // --- ゲームの状態 ---
+            let lightElements = [];
+            let covers = [
+                { id: 1, x: 2, y: 0, width: 3, height: 3 },
+                { id: 2, x: 0, y: 2, width: 2, height: 2 },
+                { id: 3, x: 0, y: 3, width: 2, height: 2 }
+            ];
+            let currentCounts = {};
+            let animationFrameId = null;
+            let isGameLocked = false;
+
+            // --- 初期化 ---
+            function init() {
+                createLightGrid();
+                createControls();
+                updateLights();
+                currentCounts = calculateLightCounts();
+                drawRadarChart(currentCounts);
+                checkClear(currentCounts);
+                clearMessage.addEventListener('click', () => {
+                    clearMessage.classList.remove('show');
+                    isGameLocked = false;
+                    setControlsEnabled(true);
+                });
+            }
+
+            // --- グリッドとコントロールの生成 ---
+            function createLightGrid() {
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    lightElements[y] = [];
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        const light = document.createElement('div');
+                        light.classList.add('light', `color-${LIGHT_GRID_SETUP[y][x]}`);
+                        light.dataset.color = LIGHT_GRID_SETUP[y][x];
+                        gridContainer.appendChild(light);
+                        lightElements[y][x] = light;
+                    }
+                }
+            }
+
+            function createControls() {
+                const svgIcons = {
+                    up: `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4L2 20h20L12 4z"/></svg>`,
+                    left: `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="transform: rotate(-90deg);"><path d="M12 4L2 20h20L12 4z"/></svg>`,
+                    right: `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="transform: rotate(90deg);"><path d="M12 4L2 20h20L12 4z"/></svg>`,
+                    down: `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="transform: rotate(180deg);"><path d="M12 4L2 20h20L12 4z"/></svg>`
+                };
+                for (let i = 0; i < 3; i++) {
+                    const controlSet = document.createElement('div');
+                    controlSet.classList.add('control-set');
+                    const moves = { up: {x:0, y:-1}, left: {x:-1, y:0}, right: {x:1, y:0}, down: {x:0, y:1} };
+                    Object.entries(moves).forEach(([dir, move]) => {
+                        const button = document.createElement('button');
+                        button.innerHTML = svgIcons[dir];
+                        button.classList.add(dir);
+                        button.addEventListener('click', () => moveCover(i, move.x, move.y));
+                        controlSet.appendChild(button);
+                    });
+                    controlsContainer.appendChild(controlSet);
+                }
+            }
+
+            // --- ゲームロジック ---
+            function setControlsEnabled(enabled) {
+                controlsContainer.querySelectorAll('button').forEach(btn => btn.disabled = !enabled);
+            }
+
+            function moveCover(coverIndex, dx, dy) {
+                if (isGameLocked) return;
+                const cover = covers[coverIndex];
+                const newX = cover.x + dx;
+                const newY = cover.y + dy;
+                if (newX >= 0 && newX + cover.width <= GRID_SIZE && newY >= 0 && newY + cover.height <= GRID_SIZE) {
+                    cover.x = newX;
+                    cover.y = newY;
+                    updateGame();
+                }
+            }
+
+            function isCovered(x, y) {
+                return covers.some(c => x >= c.x && x < c.x + c.width && y >= c.y && y < c.y + c.height);
+            }
+            
+            function calculateLightCounts() {
+                const counts = Object.fromEntries(LABELS.map(label => [label, 0]));
+                 for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        if (!isCovered(x, y)) {
+                            counts[lightElements[y][x].dataset.color]++;
+                        }
+                    }
+                }
+                return counts;
+            }
+
+            function updateLights() {
+                 for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        lightElements[y][x].classList.toggle('off', isCovered(x, y));
+                    }
+                }
+            }
+
+            // --- 更新と描画 ---
+            function updateGame() {
+                updateLights();
+                const newCounts = calculateLightCounts();
+                if (JSON.stringify(newCounts) !== JSON.stringify(currentCounts)) {
+                    animateChart(currentCounts, newCounts);
+                    currentCounts = { ...newCounts };
+                }
+                checkClear(newCounts);
+            }
+
+            function animateChart(startCounts, endCounts) {
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                }
+                
+                const duration = 100;
+                let startTime = performance.now();
+                
+                function animationStep(timestamp) {
+                    const elapsed = timestamp - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    const interpolatedCounts = {};
+                    for (const label of LABELS) {
+                        interpolatedCounts[label] = 
+                            startCounts[label] + 
+                            (endCounts[label] - startCounts[label]) * progress;
+                    }
+                    
+                    drawRadarChart(interpolatedCounts);
+                    
+                    if (progress < 1) {
+                        animationFrameId = requestAnimationFrame(animationStep);
+                    } else {
+                        animationFrameId = null;
+                    }
+                }
+                
+                animationFrameId = requestAnimationFrame(animationStep);
+            }
+            
+            function drawRadarChart(counts, overrideColors = null) {
+                const width = canvas.width;
+                const height = canvas.height;
+                const center = { x: width / 2, y: height / 2 };
+                const radius = width / 2 * 0.85;
+                const sides = 6;
+                const maxValue = 6;
+                ctx.clearRect(0, 0, width, height);
+
+                const drawPolygon = (data, fillColor, strokeColor) => {
+                    ctx.beginPath();
+                    ctx.fillStyle = fillColor;
+                    ctx.strokeStyle = strokeColor;
+                    ctx.lineWidth = 2;
+                    LABELS.forEach((label, i) => {
+                        const value = data[label] || 0;
+                        const angle = (Math.PI * 2 / sides) * i - Math.PI / 2;
+                        const r = radius * (value / maxValue);
+                        const x = center.x + r * Math.cos(angle);
+                        const y = center.y + r * Math.sin(angle);
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    });
+                    ctx.closePath();
+                    if (strokeColor) ctx.stroke();
+                    if (fillColor) ctx.fill();
+                };
+
+                // 静的な要素: 外側の円と目標の形
+                ctx.beginPath();
+                ctx.strokeStyle = varToCss('--border-color');
+                ctx.lineWidth = 2;
+                ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                drawPolygon(CLEAR_CONDITION, 'rgba(255, 215, 0, 0.1)', 'rgba(255, 215, 0, 0.15)');
+
+                // アニメーションする要素: 現在のデータの形
+                const fillColor = overrideColors ? overrideColors.fill : 'rgba(0, 188, 212, 0.7)';
+                const strokeColor = overrideColors ? overrideColors.stroke : varToCss('--color-f');
+                drawPolygon(counts, fillColor, strokeColor);
+            }
+
+            // --- クリア判定 ---
+            function checkClear(counts) {
+                const isClear = LABELS.every(label => counts[label] === CLEAR_CONDITION[label]);
+                if (isClear && !isGameLocked) {
+                    isGameLocked = true;
+                    setControlsEnabled(false);
+                    
+                    // Wait for the final move animation to finish before starting clear sequence.
+                    setTimeout(() => {
+                        startClearSequence();
+                    }, 110); 
+                }
+            }
+
+            function startClearSequence() {
+                let startTime = performance.now();
+                const flashDuration = 600;
+                const holdDuration = 400;
+                const totalDuration = flashDuration + holdDuration;
+                
+                const cyan = { r: 0, g: 188, b: 212 };
+                const green = { r: 46, g: 213, b: 115 };
+
+                function clearAnimationStep(timestamp) {
+                    const elapsed = timestamp - startTime;
+                    let overrideColors;
+                    
+                    if (elapsed < flashDuration) {
+                        // Phase 1: Flashing (600ms)
+                        const segmentDuration = flashDuration / 3; // 200ms per segment
+                        const currentSegment = Math.floor(elapsed / segmentDuration);
+                        const progress = (elapsed % segmentDuration) / segmentDuration;
+
+                        let fromColor, toColor;
+                        if (currentSegment === 0) { // Cyan -> Green
+                            fromColor = cyan;
+                            toColor = green;
+                        } else if (currentSegment === 1) { // Green -> Cyan
+                            fromColor = green;
+                            toColor = cyan;
+                        } else { // Cyan -> Green
+                            fromColor = cyan;
+                            toColor = green;
+                        }
+
+                        const r = fromColor.r + (toColor.r - fromColor.r) * progress;
+                        const g = fromColor.g + (toColor.g - fromColor.g) * progress;
+                        const b = fromColor.b + (toColor.b - fromColor.b) * progress;
+                        
+                        overrideColors = {
+                            fill: `rgba(${r}, ${g}, ${b}, 0.7)`,
+                            stroke: `rgb(${r}, ${g}, ${b})`
+                        };
+
+                    } else {
+                        // Phase 2: Holding green (400ms)
+                        overrideColors = {
+                            fill: `rgba(${green.r}, ${green.g}, ${green.b}, 0.7)`,
+                            stroke: `rgb(${green.r}, ${green.g}, ${green.b})`
+                        };
+                    }
+                    
+                    drawRadarChart(currentCounts, overrideColors);
+
+                    if (elapsed < totalDuration) {
+                        requestAnimationFrame(clearAnimationStep);
+                    } else {
+                        overrideColors = {
+                           fill: `rgba(${green.r}, ${green.g}, ${green.b}, 0.7)`,
+                           stroke: `rgb(${green.r}, ${green.g}, ${green.b})`
+                        };
+                        drawRadarChart(currentCounts, overrideColors);
+                        clearMessage.classList.add('show');
+                    }
+                }
+                
+                requestAnimationFrame(clearAnimationStep);
+            }
+            
+            // --- ヘルパー関数 ---
+            function varToCss(varName) {
+                return getComputedStyle(document.documentElement).getPropertyValue(varName.trim());
+            }
+
+            // --- ゲーム開始 ---
+            init();
+        });
+    </script>
+
+</body>
+</html>
+
