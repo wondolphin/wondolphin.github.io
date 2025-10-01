@@ -177,9 +177,31 @@
                 margin-bottom: 0;
             }
             #controls {
-                /* Revert to default vertical stacking for controls on mobile */
+                /* Arrange controls horizontally on mobile */
+                flex-direction: row;
+                justify-content: center;
                 align-items: center;
-                gap: 20px;
+                gap: 15px;
+            }
+            .control-set {
+                /* Make control sets responsive */
+                grid-template-columns: repeat(3, 11vw);
+                grid-template-rows: repeat(2, 11vw);
+                max-width: 130px;
+                max-height: 88px;
+                gap: 3px;
+            }
+            .control-set button {
+                width: 11vw;
+                height: 11vw;
+                max-width: 44px;
+                max-height: 44px;
+            }
+            .control-set button svg {
+                width: 5vw;
+                height: 5vw;
+                max-width: 20px;
+                max-height: 20px;
             }
             #radar-chart-container {
                 width: 90vw;
@@ -516,5 +538,6 @@
 
 </body>
 </html>
+
 
 
