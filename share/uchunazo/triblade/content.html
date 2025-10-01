@@ -177,31 +177,27 @@
                 margin-bottom: 0;
             }
             #controls {
-                /* Arrange controls horizontally on mobile */
+                /* Arrange controls horizontally on mobile, but allow wrapping */
                 flex-direction: row;
                 justify-content: center;
                 align-items: center;
                 gap: 15px;
+                flex-wrap: wrap;
+                max-width: 100%;
             }
             .control-set {
-                /* Make control sets responsive */
-                grid-template-columns: repeat(3, 11vw);
-                grid-template-rows: repeat(2, 11vw);
-                max-width: 130px;
-                max-height: 88px;
-                gap: 3px;
+                /* Use fixed sizes for stability */
+                grid-template-columns: repeat(3, 44px);
+                grid-template-rows: repeat(2, 44px);
+                gap: 5px;
             }
             .control-set button {
-                width: 11vw;
-                height: 11vw;
-                max-width: 44px;
-                max-height: 44px;
+                width: 44px;
+                height: 44px;
             }
             .control-set button svg {
-                width: 5vw;
-                height: 5vw;
-                max-width: 20px;
-                max-height: 20px;
+                width: 20px;
+                height: 20px;
             }
             #radar-chart-container {
                 width: 90vw;
@@ -538,6 +534,7 @@
 
 </body>
 </html>
+
 
 
 
