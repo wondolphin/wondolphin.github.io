@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>作れ！トライブレード</title>
     <style>
         :root {
@@ -159,6 +160,32 @@
             visibility: visible;
         }
 
+        /* Responsive layout for mobile devices */
+        @media (max-width: 800px) {
+            body {
+                justify-content: flex-start;
+                padding-top: 15px;
+                padding-bottom: 30px;
+            }
+            #game-board {
+                flex-direction: column;
+                gap: 25px;
+            }
+            h1 {
+                font-size: 1.5em;
+                margin-bottom: 0;
+            }
+            #controls {
+                flex-direction: row;
+                gap: 20px;
+                justify-content: center;
+            }
+            #radar-chart-container {
+                width: 280px;
+                height: 280px;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -217,6 +244,12 @@
                     clearMessage.classList.remove('show');
                     isGameLocked = false;
                     setControlsEnabled(true);
+                });
+
+                window.addEventListener('resize', () => {
+                    if (!isGameLocked) {
+                        drawRadarChart(currentCounts);
+                    }
                 });
             }
 
@@ -340,6 +373,13 @@
             }
             
             function drawRadarChart(counts, overrideColors = null) {
+                // Dynamically adjust canvas size to its container
+                const container = document.getElementById('radar-chart-container');
+                if (canvas.width !== container.clientWidth || canvas.height !== container.clientHeight) {
+                    canvas.width = container.clientWidth;
+                    canvas.height = container.clientHeight;
+                }
+                
                 const width = canvas.width;
                 const height = canvas.height;
                 const center = { x: width / 2, y: height / 2 };
