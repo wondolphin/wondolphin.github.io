@@ -164,25 +164,28 @@
         @media (max-width: 800px) {
             body {
                 justify-content: flex-start;
-                padding-top: 15px;
-                padding-bottom: 30px;
+                padding: 15px 10px 30px 10px;
+                box-sizing: border-box;
             }
             #game-board {
                 flex-direction: column;
                 gap: 25px;
+                width: 100%;
             }
             h1 {
                 font-size: 1.5em;
                 margin-bottom: 0;
             }
             #controls {
-                flex-direction: row;
+                /* Revert to default vertical stacking for controls on mobile */
+                align-items: center;
                 gap: 20px;
-                justify-content: center;
             }
             #radar-chart-container {
-                width: 280px;
-                height: 280px;
+                width: 90vw;
+                height: 90vw;
+                max-width: 280px;
+                max-height: 280px;
             }
         }
 
@@ -513,4 +516,5 @@
 
 </body>
 </html>
+
 
