@@ -229,11 +229,14 @@
             const GRID_SIZE = 6;
             const LABELS = ['a', 'b', 'c', 'd', 'e', 'f'];
             const LIGHT_GRID_SETUP = [
-                ['d', 'b', 'c', 'a', 'b', 'f'], ['b', 'c', 'e', 'b', 'f', 'e'],
-                ['a', 'f', 'd', 'c', 'd', 'c'], ['f', 'a', 'b', 'd', 'e', 'f'],
-                ['e', 'b', 'd', 'f', 'c', 'a'], ['c', 'e', 'a', 'd', 'a', 'e']
+                ['a', 'c', 'b', 'd', 'f', 'a'],
+                ['e', 'f', 'e', 'f', 'b', 'e'],
+                ['f', 'b', 'c', 'd', 'e', 'c'],
+                ['b', 'd', 'e', 'a', 'f', 'd'],
+                ['c', 'b', 'd', 'c', 'd', 'b'],
+                ['a', 'c', 'f', 'a', 'e', 'a']
             ];
-            const CLEAR_CONDITION = { a: 5, c: 5, e: 5, b: 2, d: 2, f: 2 };
+            const CLEAR_CONDITION = { a: 6, c: 6, e: 6, b: 2, d: 2, f: 2 };
 
             // --- DOM要素 ---
             const gridContainer = document.getElementById('light-grid');
@@ -245,9 +248,9 @@
             // --- ゲームの状態 ---
             let lightElements = [];
             let covers = [
-                { id: 1, x: 2, y: 0, width: 3, height: 3 },
-                { id: 2, x: 0, y: 2, width: 2, height: 2 },
-                { id: 3, x: 0, y: 3, width: 2, height: 2 }
+                { id: 1, x: 2, y: 2, width: 2, height: 2 },
+                { id: 2, x: 2, y: 2, width: 2, height: 2 },
+                { id: 3, x: 2, y: 2, width: 2, height: 2 }
             ];
             let currentCounts = {};
             let animationFrameId = null;
@@ -534,7 +537,4 @@
 
 </body>
 </html>
-
-
-
 
