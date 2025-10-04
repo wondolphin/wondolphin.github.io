@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>ヒント | 宇宙謎【7 SEGMENTS】</title>
+    <meta property="og:title" content="宇宙謎【7 SEGMENTS】 - ヒント">
+    <meta property="og:description" content="挙動からルールを推察するパズル（宇宙謎）のヒントページです。">
+
+    <style>
+        /* index.htmlのスタイルを継承 */
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #ffe0b2;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.2em;
+            color: #333;
+            margin-bottom: 25px;
+            font-weight: bold;
+        }
+        p.description {
+            font-size: 1.1em;
+            line-height: 1.7;
+            margin-bottom: 35px;
+            color: #555;
+        }
+        .btn {
+            display: inline-block;
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            text-align: center;
+            width: 50%;
+            box-sizing: border-box;
+            padding: 12px 10px;
+            font-size: 1.1em;
+            border-radius: 5px;
+            box-shadow: 0 2px 3px rgba(0,0,0,0.15);
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+        }
+        .btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+        }
+        .btn-back {
+            background-color: #007bff;
+            border-bottom: 4px solid #0056b3;
+        }
+        .btn-back:active {
+             border-bottom-width: 2px;
+        }
+
+        /* トグル（ヒント）用のスタイル */
+        .hints-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px; /* 各ヒントの間隔 */
+            margin-bottom: 40px;
+        }
+        details {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden; 
+        }
+        summary {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #333;
+            background-color: #f7f7f7;
+            padding: 15px 20px;
+            cursor: pointer;
+            outline: none; 
+            transition: background-color 0.2s;
+        }
+        summary:hover {
+            background-color: #efefef;
+        }
+        .hint-content {
+            padding: 20px;
+            background-color: #fff;
+            text-align: left;
+            border-top: 1px solid #ddd;
+            line-height: 1.6;
+        }
+
+        /* 画像用のスタイルを追加 */
+        .hint-image {
+            max-width: 70%;
+            height: auto; /* アスペクト比を維持 */
+            display: block; /* 中央寄せのため */
+            margin: 15px auto; /* 上下と中央に余白を設定 */
+            border-radius: 5px; /* デザインに合わせて角を少し丸める */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+
+        <h1>ヒント</h1>
+
+        <p class="description">
+            クリックすると内容が表示されます。
+        </p>
+
+        <div class="hints-wrapper">
+            <details>
+                <summary>ヒント 1</summary>
+                <div class="hint-content">
+                    <p>ここにヒント1の内容を記述します。</p>
+                    
+                    <img src="./images/hint01.png" alt="ヒントの画像" class="hint-image">
+                </div>
+            </details>
+
+            <details>
+                <summary>ヒント 2</summary>
+                <div class="hint-content">
+                    <p>ここにヒント2の内容を記述します。</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>ヒント 3</summary>
+                <div class="hint-content">
+                    <p>ここにヒント3の内容を記述します。</p>
+                </div>
+            </details>
+
+            <details>
+                <summary>ヒント 4</summary>
+                <div class="hint-content">
+                    <p>ここにヒント4の内容を記述します。</p>
+                </div>
+            </details>
+        </div>
+
+        <a href="./index.html" class="btn btn-back">戻る</a>
+
+    </div>
+
+</body>
+</html>
