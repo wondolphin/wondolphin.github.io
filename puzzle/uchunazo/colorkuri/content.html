@@ -243,6 +243,29 @@
             100% { transform: scale(1); }
         }
 
+        .share-button {
+            position: absolute;
+            bottom: 10vh;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #000000;
+            color: #ffffff;
+            padding: 12px 24px;
+            border: 1px solid #333;
+            border-radius: 9999px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: clamp(1rem, 2.5vmin, 1.2rem);
+            transition: transform 0.2s ease, background-color 0.2s ease;
+            cursor: pointer;
+            z-index: 101;
+        }
+
+        .share-button:hover {
+            background-color: #1a1a1a;
+            transform: translateX(-50%) scale(1.05);
+        }
+
         .hidden {
             display: none;
         }
@@ -267,6 +290,7 @@
     
     <div id="clear-modal" class="clear-modal hidden">
         <span class="clear-modal-text">CLEAR!</span>
+        <a href="https://twitter.com/intent/tweet?text=%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Fcolorkuri%2Findex.html" target="_blank" id="share-button" class="share-button hidden">喜びをXでシェアする</a>
     </div>
 
     <script>
@@ -287,6 +311,7 @@
             const lampsContainer = document.querySelector('.lamps');
             const gameBoard = document.querySelector('.game-board');
             const clearModal = document.getElementById('clear-modal');
+            const shareButton = document.getElementById('share-button');
 
             // --- ゲーム要素の生成 ---
 
@@ -449,13 +474,21 @@
                 if (pairCount === numColors) {
                     setTimeout(() => {
                         clearModal.classList.remove('hidden');
+                        // CLEAR!表示の1.5秒後にシェアボタンを表示
+                        setTimeout(() => {
+                            shareButton.classList.remove('hidden');
+                        }, 1500);
                     }, 500); // 0.5秒待ってから表示
                 }
             }
             
             // クリア画面を閉じる
-            clearModal.addEventListener('click', () => {
-                clearModal.classList.add('hidden');
+            clearModal.addEventListener('click', (event) => {
+                // シェアボタンをクリックしたときはモーダルを閉じない
+                if (event.target !== shareButton) {
+                    clearModal.classList.add('hidden');
+                    shareButton.classList.add('hidden'); // ボタンも隠す
+                }
             });
 
 
@@ -472,6 +505,7 @@
     </script>
 </body>
 </html>
+
 
 
 
