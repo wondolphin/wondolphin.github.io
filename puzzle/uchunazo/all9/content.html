@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>オール９</title>
+    <!-- Tailwind CSSを読み込み、モダンなデザインを適用します -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* HTML内に直接スタイルを記述します */
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            -webkit-tap-highlight-color: transparent; /* スマホでのタップ時のハイライトを無効化 */
+        }
+
+        /* 数字が9になった時のスタイルを定義します */
+        .glowing {
+            color: #fde047; /* 明るいオレンジがかった黄色 */
+            /* テキストの周りにぼんやり光る効果を追加 */
+            text-shadow: 0 0 8px rgba(251, 191, 36, 0.8), 0 0 16px rgba(245, 158, 11, 0.5);
+        }
+
+        /* クリアメッセージ用のフェードインアニメーション */
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        /* フェードインアニメーションのキーフレーム */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="text-center">
+        <!-- ゲームタイトル -->
+        <h1 class="text-5xl md:text-6xl font-black mb-8 text-cyan-400" style="text-shadow: 0 0 10px rgba(34, 211, 238, 0.7);">オール９</h1>
+        
+        <!-- 3x3のゲーム盤面 -->
+        <div id="board" class="grid grid-cols-3 gap-2 p-2 bg-gray-800 rounded-lg shadow-2xl mx-auto">
+            <!-- JavaScriptによってマスが生成されます -->
+        </div>
+    </div>
+
+    <!-- クリア時に表示されるメッセージ -->
+    <div id="clear-message" class="hidden absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center cursor-pointer">
+        <div class="text-center">
+            <p class="text-7xl sm:text-8xl md:text-9xl font-black text-white fade-in" style="text-shadow: 0 0 20px #fff, 0 0 40px #0ea5e9, 0 0 60px #0ea5e9;">CLEAR!</p>
+        </div>
+        <!-- Xでシェアするボタンのコンテナ -->
+        <div id="share-container" class="hidden absolute bottom-12 left-0 right-0 text-center">
+            <a href="https://twitter.com/intent/tweet?text=%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Fall9%2Findex.html" target="_blank" rel="noopener noreferrer" class="inline-block bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 text-lg shadow-lg">
+                喜びをXでシェアする
+            </a>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const board = document.getElementById('board');
+            const clearMessage = document.getElementById('clear-message');
+            const shareContainer = document.getElementById('share-container');
+
+            // --- ゲームのデータ設定 ---
+            // 各マスの固定値
+            const fixedValues = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+            // 各マスの変動値 (初期状態)
+            let variableValues = [6, 7, 8, 4, 0, 3, 2, 5, 1];
+            
+            const cells = []; // 各マスのHTML要素を格納する配列
+
+            // --- ゲームの初期化 ---
+            function initializeGame() {
+                // 9つのマスを生成
+                for (let i = 0; i < 9; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 bg-gray-700 rounded-md flex items-center justify-center text-4xl md:text-5xl font-bold cursor-pointer select-none transition-all duration-200 ease-in-out hover:bg-gray-600 active:scale-95';
+                    cell.dataset.index = i; // インデックスをデータ属性として保持
+                    // タップ（クリック）された時の処理を設定
+                    cell.addEventListener('click', () => handleTap(i));
+                    board.appendChild(cell);
+                    cells.push(cell);
+                }
+                renderBoard(); // 盤面を初期描画
+            }
+
+            // --- 盤面の描画 ---
+            function renderBoard() {
+                for (let i = 0; i < 9; i++) {
+                    const sum = fixedValues[i] + variableValues[i];
+                    cells[i].textContent = sum;
+
+                    // 合計が9なら光るクラスを付与、そうでなければ削除
+                    if (sum === 9) {
+                        cells[i].classList.add('glowing');
+                    } else {
+                        cells[i].classList.remove('glowing');
+                    }
+                }
+            }
+
+            // --- マスがタップされた時の処理 ---
+            function handleTap(tappedIndex) {
+                // 変動値が0のマスのインデックスを探す
+                const zeroIndex = variableValues.indexOf(0);
+
+                // タップしたのが0のマスなら何もしない
+                if (tappedIndex === zeroIndex) {
+                    return;
+                }
+
+                // タップされたマスと0のマスの行と列を計算
+                const tappedRow = Math.floor(tappedIndex / 3);
+                const tappedCol = tappedIndex % 3;
+                const zeroRow = Math.floor(zeroIndex / 3);
+                const zeroCol = zeroIndex % 3;
+
+                // 行も列も違う場合はスライドできないので処理を終了
+                if (tappedRow !== zeroRow && tappedCol !== zeroCol) {
+                    return;
+                }
+
+                // --- 変動値のスライド処理 ---
+                // 同じ行でスライド
+                if (tappedRow === zeroRow) {
+                    const direction = Math.sign(zeroIndex - tappedIndex); // 1か-1
+                    let currentIndex = zeroIndex;
+                    while (currentIndex !== tappedIndex) {
+                        variableValues[currentIndex] = variableValues[currentIndex - direction];
+                        currentIndex -= direction;
+                    }
+                }
+                // 同じ列でスライド
+                else if (tappedCol === zeroCol) {
+                    const direction = Math.sign(zeroIndex - tappedIndex); // 1か-1
+                    const step = direction * 3;
+                    let currentIndex = zeroIndex;
+                    while (currentIndex !== tappedIndex) {
+                        variableValues[currentIndex] = variableValues[currentIndex - step];
+                        currentIndex -= step;
+                    }
+                }
+                
+                // タップされた位置に0を移動
+                variableValues[tappedIndex] = 0;
+
+                renderBoard(); // 盤面を再描画
+                checkClear(); // クリアしたかチェック
+            }
+
+            // --- クリア条件のチェック ---
+            function checkClear() {
+                // すべてのマスで (固定値 + 変動値) が 9 になっているか確認
+                const isClear = variableValues.every((val, i) => fixedValues[i] + val === 9);
+
+                if (isClear) {
+                    // 0.5秒待ってからクリアメッセージを表示
+                    setTimeout(() => {
+                        clearMessage.classList.remove('hidden');
+                        
+                        // さらに1.5秒待ってからシェアボタンを表示
+                        setTimeout(() => {
+                            shareContainer.classList.remove('hidden');
+                            shareContainer.classList.add('fade-in');
+                        }, 1500); // 1500ミリ秒 = 1.5秒
+
+                        // クリアメッセージの背景をクリックしたら閉じる
+                        clearMessage.addEventListener('click', (event) => {
+                            // クリックされたのが背景自体の場合のみ閉じる
+                            if (event.target === clearMessage) {
+                                clearMessage.classList.add('hidden');
+                                shareContainer.classList.add('hidden');
+                                shareContainer.classList.remove('fade-in');
+                            }
+                        });
+                    }, 500); // 500ミリ秒 = 0.5秒
+                }
+            }
+            
+            // ゲーム開始
+            initializeGame();
+        });
+    </script>
+</body>
+</html>
+
