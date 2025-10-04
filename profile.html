@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>わんだるふぃんのプロフィール</title>
+    <style>
+        /* ページ全体の基本デザイン */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #e9edf1;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        /* プロフィール全体を囲むカード */
+        .profile-container {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 30px;
+            background-color: #faffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            text-align: center; /* 中の要素を中央揃えに */
+        }
+        /* プロフィール画像 */
+        .profile-image {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%; /* 画像を円形にする */
+            object-fit: cover;   /* 画像の比率を保ったままトリミング */
+            margin-bottom: 20px;
+            border: 3px solid #eee;
+        }
+        /* 名前 */
+        h1 {
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        /* Xアカウント情報 */
+        .x-account {
+            margin-bottom: 30px;
+        }
+        .x-account p {
+            margin: 5px 0; /* 上下の余白を調整 */
+        }
+        .x-account a {
+            color: #1DA1F2; /* X（Twitter）のブランドカラー */
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .x-account a:hover {
+            text-decoration: underline; /* マウスを乗せたら下線を表示 */
+        }
+        .x-account .note {
+            font-size: 0.9em;
+            color: #666;
+        }
+        /* 自己紹介エリア */
+        .bio {
+            text-align: left; /* 紹介文は読みやすいように左揃えに */
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        .bio h2 {
+            font-size: 1.5em;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="profile-container">
+        <img src="profile.png" alt="わんだるふぃんのプロフィール画像" class="profile-image">
+
+        <h1>わんだるふぃん</h1>
+
+        <div class="x-account">
+            <p>
+                <a href="https://x.com/wondolphin" target="_blank" rel="noopener noreferrer">@wondolphin</a>
+            </p>
+            <p class="note">♪フォロー、DMお気軽に!</p>
+        </div>
+
+        <div class="bio">
+            <h2>自己紹介</h2>
+            <p>
+                パズル・謎解き・ゲームなど、「知的わくわく」が趣味のクリエイターです。友達募集中。<br>プログラミングは素人であるため、思いついたゲームは生成AIを活用して実装しています。ソースコードは見ないでね🙏
+            </p>
+        </div>
+    </div>
+
+</body>
+</html>
