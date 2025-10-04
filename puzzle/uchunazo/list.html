@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>リンク集</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #fafafa;
+      text-align: center;
+      margin: 50px;
+    }
+    h1 {
+      margin-bottom: 30px;
+    }
+    .gallery {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 30px;
+    }
+    .item {
+      width: 200px;
+    }
+    .item img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      transition: transform 0.2s;
+    }
+    .item img:hover {
+      transform: scale(1.05);
+    }
+    .item p {
+      margin-top: 8px;
+      font-size: 1.1em;
+    }
+    a {
+      text-decoration: none;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>ページ一覧</h1>
+  <div class="gallery">
+    <div class="item">
+      <a href="all9/index.html">
+        <img src="all9/images/preview.png" alt="all9 preview">
+        <p>all9</p>
+      </a>
+    </div>
+    <div class="item">
+      <a href="star_feast/index.html">
+        <img src="star_feast/images/preview.png" alt="star_feast preview">
+        <p>star_feast</p>
+      </a>
+    </div>
+    <!-- 新しいフォルダが増えたらここに同じ形式で追加 -->
+    <!--
+    <div class="item">
+      <a href="another_folder/index.html">
+        <img src="another_folder/images/preview.png" alt="another_folder preview">
+        <p>another_folder</p>
+      </a>
+    </div>
+    -->
+  </div>
+</body>
+</html>
