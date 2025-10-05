@@ -77,36 +77,45 @@
         #game-screen { padding: 5px; }
         #game-ui-container {
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 10px;
+            flex-direction: column; /* 要素を縦に並べる */
+            align-items: center; /* 中央揃え */
+            gap: 5px; /* 要素間の隙間を縮小 */
             width: 100%;
         }
 
+        .scoreboards-container {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            max-width: 400px; /* ボードの幅に合わせる */
+            gap: 10px;
+        }
+
         .scoreboard {
-            width: 100px; /* 横幅を縮小 */
-            padding: 10px; /* パディングを縮小 */
+            width: 45%;
+            max-width: 180px;
+            padding: 8px;
             border: 2px solid var(--border-color);
             border-radius: 8px;
             background: #fff;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .scoreboard h3 { margin: 0 0 8px 0; font-size: 1em; } /* フォントサイズ調整 */
-        .scoreboard .score { font-size: 2em; font-weight: bold; margin-bottom: 10px; } /* フォントサイズ調整 */
+        .scoreboard h3 { margin: 0 0 5px 0; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .scoreboard .score { font-size: 1.8em; font-weight: bold; margin-bottom: 8px; }
         #p1-scoreboard .score { color: var(--p1-color); }
         #p2-scoreboard .score { color: var(--p2-color); }
 
         .stamina-container {
             width: 100%;
-            height: 20px; /* 高さを縮小 */
-            background-color: #6c757d; /* 濃い灰色 (削れた部分の背景) */
+            height: 20px;
+            background-color: #6c757d;
             border-radius: 5px;
             overflow: hidden;
             border: 1px solid #ccc;
         }
         .stamina-bar-wrapper {
             height: 100%;
-            background-color: #e0e0e0; /* 薄い灰色 (現在の最大スタミナの背景) */
+            background-color: #e0e0e0;
             transition: width 1s linear;
         }
         .stamina-bar {
@@ -116,35 +125,35 @@
             text-align: center;
             color: white;
             font-weight: bold;
-            line-height: 20px; /* 高さに合わせる */
-            font-size: 12px; /* フォントサイズ調整 */
+            line-height: 20px;
+            font-size: 12px;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
         }
         #p1-stamina { background-color: var(--p1-color); }
         #p2-stamina { background-color: var(--p2-color); }
-        .stamina-label { font-size: 0.7em; margin-top: 5px; } /* フォントサイズ調整 */
+        .stamina-label { font-size: 0.7em; margin-top: 5px; }
 
         #game-center-area {
             display: flex;
             flex-direction: column;
             align-items: center;
-            position: relative; /* カウントダウン表示のため */
+            position: relative;
         }
 
         #timer {
-            font-size: 1.8em; /* フォントサイズ調整 */
+            font-size: 1.8em;
             font-weight: bold;
-            margin-bottom: 5px; /* マージン調整 */
+            margin-bottom: 5px;
         }
 
         #game-board {
             display: grid;
-            grid-template-columns: repeat(8, 1fr); /* 8x8に変更 */
-            grid-template-rows: repeat(8, 1fr); /* 8x8に変更 */
-            width: 400px; /* サイズ調整 */
-            height: 400px; /* サイズ調整 */
-            max-width: 85vw; /* スマホでの最大幅調整 */
-            max-height: 85vw; /* スマホでの最大高調整 */
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            width: 380px;
+            height: 380px;
+            max-width: 90vw; /* スマホでの最大幅 */
+            max-height: 90vw; /* スマホでの最大高 */
             border: 2px solid #333;
             background-color: var(--board-bg);
             position: relative;
@@ -161,8 +170,8 @@
 
         .piece {
             position: absolute;
-            width: calc(100% / 8); /* 8x8に変更 */
-            height: calc(100% / 8); /* 8x8に変更 */
+            width: calc(100% / 8);
+            height: calc(100% / 8);
             border-radius: 50%;
             box-sizing: border-box;
             transition: top 0.15s ease-out, left 0.15s ease-out;
@@ -183,7 +192,7 @@
         .tile-p2 { background-color: var(--p2-tile-color); }
         .tile-blocker { background-color: var(--blocker-color); }
 
-        #exit-button { background-color: #dc3545; margin-top: 10px;} /* マージン調整 */
+        #exit-button { background-color: #dc3545; margin-top: 10px;}
         #exit-button:hover { background-color: #c82333; }
         
         /* カウントダウン表示 */
@@ -195,7 +204,7 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.7);
             color: white;
-            display: none; /* Initially hidden */
+            display: none;
             flex-direction: column;
             justify-content: center;
             align-items: center;
@@ -231,25 +240,6 @@
         }
         #result-text { font-size: 2em; font-weight: bold; margin-bottom: 20px; }
 
-        /* レスポンシブ対応 */
-        @media (max-width: 700px) {
-            #game-ui-container {
-                flex-direction: column;
-                align-items: center;
-            }
-            .scoreboard {
-                width: 80%;
-                margin-bottom: 10px;
-                order: 1; 
-            }
-            #game-center-area {
-                order: 0; 
-            }
-            #game-board {
-                width: 90vw;
-                height: 90vw;
-            }
-        }
     </style>
 </head>
 <body>
@@ -290,13 +280,25 @@
         <!-- 3. ゲーム画面 -->
         <div id="game-screen" class="screen">
             <div id="game-ui-container">
-                <div id="p1-scoreboard" class="scoreboard">
-                    <h3 id="p1-name">Player 1</h3>
-                    <div id="p1-score" class="score">0</div>
-                    <div class="stamina-label">スタミナ</div>
-                    <div class="stamina-container">
-                        <div id="p1-stamina-wrapper" class="stamina-bar-wrapper">
-                            <div id="p1-stamina" class="stamina-bar">30</div>
+                <div class="scoreboards-container">
+                    <div id="p1-scoreboard" class="scoreboard">
+                        <h3 id="p1-name">Player 1</h3>
+                        <div id="p1-score" class="score">0</div>
+                        <div class="stamina-label">スタミナ</div>
+                        <div class="stamina-container">
+                            <div id="p1-stamina-wrapper" class="stamina-bar-wrapper">
+                                <div id="p1-stamina" class="stamina-bar">30</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="p2-scoreboard" class="scoreboard">
+                        <h3 id="p2-name">Player 2</h3>
+                        <div id="p2-score" class="score">0</div>
+                        <div class="stamina-label">スタミナ</div>
+                        <div class="stamina-container">
+                            <div id="p2-stamina-wrapper" class="stamina-bar-wrapper">
+                                <div id="p2-stamina" class="stamina-bar">30</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -309,17 +311,6 @@
                         <div id="countdown-player-info"></div>
                     </div>
                 </div>
-
-                <div id="p2-scoreboard" class="scoreboard">
-                    <h3 id="p2-name">Player 2</h3>
-                    <div id="p2-score" class="score">0</div>
-                    <div class="stamina-label">スタミナ</div>
-                    <div class="stamina-container">
-                        <div id="p2-stamina-wrapper" class="stamina-bar-wrapper">
-                            <div id="p2-stamina" class="stamina-bar">30</div>
-                        </div>
-                    </div>
-                </div>
             </div>
             <button id="exit-button" onclick="exitRoom()">ルームから退出する</button>
         </div>
@@ -329,7 +320,7 @@
             <div class="modal-content">
                 <h2 id="result-text">結果</h2>
                 <p id="result-details"></p>
-                <button onclick="exitRoom()">ロビーに戻る</button>
+                <button onclick="exitToLobby()">ロビーに戻る</button>
             </div>
         </div>
     </div>
@@ -455,8 +446,10 @@
         // ルーム情報更新ハンドラ
         function handleRoomUpdate(snapshot) {
             if (!snapshot.exists()) {
-                console.log("ルームが閉じられました。");
-                exitRoom();
+                if (currentRoomId) { 
+                     console.log("ルームが閉じられました。");
+                     exitToLobby();
+                }
                 return;
             }
             const roomData = snapshot.val();
@@ -467,7 +460,7 @@
                 if (screens.game.style.display !== 'block') {
                     showScreen('game');
                     setupGameBoard();
-                    startCountdown(roomData.game); // カウントダウン開始
+                    startCountdown(roomData.game); 
                 }
                 updateGameUI(roomData.game);
             } else if (roomData.status === 'finished') {
@@ -516,8 +509,8 @@
                     [1,1,1,0,0,0,0,0],
                     [0,0,0,0,0,0,0,0],
                     [0,0,0,0,0,0,0,0],
-                    [0,0,0,'b',0,0,0,0],
-                    [0,0,0,0,'b',0,0,0],
+                    [0,0,'b',0,0,0,0,0],
+                    [0,0,0,0,0,'b',0,0],
                     [0,0,0,0,0,0,0,0],
                     [0,0,0,0,0,0,0,0],
                     [0,0,0,0,0,2,2,2]
@@ -533,7 +526,7 @@
                         stamina: { [p1_id]: 30, [p2_id]: 30 },
                         maxStamina: { [p1_id]: 60, [p2_id]: 60 },
                         lastUpdate: firebase.database.ServerValue.TIMESTAMP,
-                        startTime: 0 // まだ開始しない
+                        startTime: 0 
                     }
                 });
             });
@@ -561,23 +554,26 @@
                 countdownText.textContent = "Go!";
                 setTimeout(() => {
                     overlay.style.display = 'none';
-                    // ホストがゲームの実際の開始時間を記録
                     roomRef.once('value', snapshot => {
                        const roomData = snapshot.val();
-                       if (roomData.hostId === myPlayerId) {
+                       if (roomData && roomData.hostId === myPlayerId) {
                            roomRef.child('game/startTime').set(firebase.database.ServerValue.TIMESTAMP);
                        }
                        beginActualGame(roomData);
                     });
-                }, 500); // 0.5秒後
-            }, 2000); // 2秒後
+                }, 500);
+            }, 2000);
         }
         
-        // ゲーム画面のセットアップ
         function beginActualGame(roomData) {
+            if (!roomData) return;
             setupDragListeners();
-            // タイマー処理
+            
             const gameTimer = setInterval(() => {
+                if (!roomRef) {
+                    clearInterval(gameTimer);
+                    return;
+                }
                 roomRef.child('game/startTime').once('value', snap => {
                     const startTime = snap.val();
                     if (!startTime || startTime === 0) return;
@@ -590,19 +586,21 @@
                     }
                 });
             }, 500);
+            gameIntervals.push(gameTimer);
 
-            // スタミナ回復＆最大値減少処理 (ホストのみが実行)
             if (roomData.hostId === myPlayerId) {
                 const staminaInterval = setInterval(() => {
+                    if (!roomRef) {
+                        clearInterval(staminaInterval);
+                        return;
+                    }
                     roomRef.child('game').transaction(gameData => {
                         if (gameData && gameData.status !== 'finished' && gameData.startTime && gameData.startTime !== 0) {
                             const now = Date.now();
                             
-                            // 最大スタミナの計算
                             const totalElapsedGameSeconds = Math.floor((now - gameData.startTime) / 1000);
                             const newMaxStamina = Math.max(10, 60 - totalElapsedGameSeconds);
 
-                            // スタミナ回復の計算
                             const lastUpdate = gameData.lastUpdate || now;
                             const elapsedSecondsSinceUpdate = (now - lastUpdate) / 1000;
 
@@ -620,11 +618,8 @@
                 }, 1000); 
                 gameIntervals.push(staminaInterval);
             }
-
-            gameIntervals.push(gameTimer);
         }
         
-        // ゲーム盤の生成
         function setupGameBoard() {
             const boardEl = document.getElementById('game-board');
             boardEl.innerHTML = '';
@@ -639,7 +634,6 @@
             }
         }
         
-        // ゲームUIの更新
         function updateGameUI(gameData) {
             if (!gameData || !gameData.board) return;
             const { board, playerMap, p1_name, p2_name, stamina, maxStamina } = gameData;
@@ -687,7 +681,6 @@
                 }
             }
 
-            // スコアボードの更新
             if (!playerMap) return;
             const p1_id = playerMap.p1;
             const p2_id = playerMap.p2;
@@ -724,7 +717,6 @@
             });
         }
 
-        // ドラッグ操作のリスナー
         function setupDragListeners() {
             const boardEl = document.getElementById('game-board');
             let startX, startY, startRow, startCol, draggedPiece;
@@ -732,9 +724,8 @@
             const onDragStart = (e) => {
                 if (!e.target.classList.contains('draggable')) return;
                 
-                // ゲームが実際に始まっているか確認
                 roomRef.child('game/startTime').once('value', snap => {
-                    if (snap.val() === 0) return; // まだ始まっていない
+                    if (snap.val() === 0) return;
 
                     draggedPiece = e.target;
                     const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
@@ -792,7 +783,6 @@
             boardEl.addEventListener('touchstart', onDragStart, { passive: true });
         }
         
-        // 移動リクエスト
         function requestMove(row, col, direction) {
             roomRef.child('game').transaction(gameData => {
                 if (!gameData || gameData.startTime === 0) return;
@@ -844,7 +834,6 @@
             });
         }
         
-        // ゲーム終了処理
         function endGame() {
             clearGameIntervals();
             if(!currentRoomId) return;
@@ -857,7 +846,6 @@
             });
         }
         
-        // 結果表示
         function showResult(gameData) {
             clearGameIntervals();
             if(!gameData) return;
@@ -883,29 +871,38 @@
             document.getElementById('result-details').textContent = `スコア: ${p1Score} 対 ${p2Score}`;
             document.getElementById('result-modal').style.display = 'flex';
         }
-
-        // ルーム退出
+        
+        // This button is on the game screen to leave mid-game
         window.exitRoom = () => {
+            if (!currentRoomId) return;
+            
+            const myPlayerRef = db.ref(`rooms/${currentRoomId}/players/${myPlayerId}`);
+            myPlayerRef.remove();
+            // onDisconnect will handle cleanup if browser is closed
+            // For manual exit, we go back to lobby immediately
+            exitToLobby();
+        }
+
+        // This function handles the cleanup and screen transition
+        function exitToLobby() {
             clearGameIntervals();
             document.getElementById('result-modal').style.display = 'none';
 
-            if (!currentRoomId || !myPlayerId) {
-                showScreen('lobby');
-                return;
-            };
+            if (roomRef) {
+                roomRef.off('value', handleRoomUpdate); // Stop listening to room updates
+            }
+            
+            // Check if room still exists and if we are the last player
+            if (currentRoomId) {
+                const roomToCleanRef = db.ref('rooms/' + currentRoomId);
+                roomToCleanRef.child('players').once('value', snapshot => {
+                    const remainingPlayers = snapshot.val();
+                    if (remainingPlayers === null) {
+                        roomToCleanRef.remove();
+                    }
+                });
+            }
 
-            const myPlayerRef = db.ref(`rooms/${currentRoomId}/players/${myPlayerId}`);
-            myPlayerRef.remove();
-
-            roomRef.once('value', snapshot => {
-                const roomData = snapshot.val();
-                if (roomData && roomData.hostId === myPlayerId) {
-                    // ホストが抜けたらルームを削除
-                    roomRef.remove();
-                }
-            });
-
-            if (roomRef) roomRef.off('value', handleRoomUpdate);
             currentRoomId = null;
             roomRef = null;
             showScreen('lobby');
