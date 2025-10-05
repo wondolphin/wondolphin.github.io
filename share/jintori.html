@@ -22,11 +22,12 @@
             background-color: #f4f4f9;
             color: #333;
             margin: 0;
-            padding: 10px;
+            padding: 5px;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            overflow: hidden; /* スマホでのスクロール防止 */
         }
 
         .container {
@@ -83,21 +84,21 @@
         }
 
         .scoreboard {
-            width: 120px;
-            padding: 15px;
+            width: 100px; /* 横幅を縮小 */
+            padding: 10px; /* パディングを縮小 */
             border: 2px solid var(--border-color);
             border-radius: 8px;
             background: #fff;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .scoreboard h3 { margin: 0 0 10px 0; font-size: 1.2em; }
-        .scoreboard .score { font-size: 2.5em; font-weight: bold; margin-bottom: 15px; }
+        .scoreboard h3 { margin: 0 0 8px 0; font-size: 1em; } /* フォントサイズ調整 */
+        .scoreboard .score { font-size: 2em; font-weight: bold; margin-bottom: 10px; } /* フォントサイズ調整 */
         #p1-scoreboard .score { color: var(--p1-color); }
         #p2-scoreboard .score { color: var(--p2-color); }
 
         .stamina-container {
             width: 100%;
-            height: 25px;
+            height: 20px; /* 高さを縮小 */
             background-color: #6c757d; /* 濃い灰色 (削れた部分の背景) */
             border-radius: 5px;
             overflow: hidden;
@@ -115,38 +116,39 @@
             text-align: center;
             color: white;
             font-weight: bold;
-            line-height: 25px;
-            font-size: 14px;
+            line-height: 20px; /* 高さに合わせる */
+            font-size: 12px; /* フォントサイズ調整 */
             text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
         }
         #p1-stamina { background-color: var(--p1-color); }
         #p2-stamina { background-color: var(--p2-color); }
-        .stamina-label { font-size: 0.8em; margin-top: 5px; }
+        .stamina-label { font-size: 0.7em; margin-top: 5px; } /* フォントサイズ調整 */
 
         #game-center-area {
             display: flex;
             flex-direction: column;
             align-items: center;
+            position: relative; /* カウントダウン表示のため */
         }
 
         #timer {
-            font-size: 2em;
+            font-size: 1.8em; /* フォントサイズ調整 */
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 5px; /* マージン調整 */
         }
 
         #game-board {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            grid-template-rows: repeat(7, 1fr);
-            width: 420px;
-            height: 420px;
-            max-width: 80vw;
-            max-height: 80vw;
+            grid-template-columns: repeat(8, 1fr); /* 8x8に変更 */
+            grid-template-rows: repeat(8, 1fr); /* 8x8に変更 */
+            width: 400px; /* サイズ調整 */
+            height: 400px; /* サイズ調整 */
+            max-width: 85vw; /* スマホでの最大幅調整 */
+            max-height: 85vw; /* スマホでの最大高調整 */
             border: 2px solid #333;
             background-color: var(--board-bg);
             position: relative;
-            touch-action: none; /* スワイプ操作で画面がスクロールしないように */
+            touch-action: none; 
         }
 
         .cell {
@@ -159,8 +161,8 @@
 
         .piece {
             position: absolute;
-            width: calc(100% / 7);
-            height: calc(100% / 7);
+            width: calc(100% / 8); /* 8x8に変更 */
+            height: calc(100% / 8); /* 8x8に変更 */
             border-radius: 50%;
             box-sizing: border-box;
             transition: top 0.15s ease-out, left 0.15s ease-out;
@@ -181,9 +183,31 @@
         .tile-p2 { background-color: var(--p2-tile-color); }
         .tile-blocker { background-color: var(--blocker-color); }
 
-        #exit-button { background-color: #dc3545; margin-top: 15px;}
+        #exit-button { background-color: #dc3545; margin-top: 10px;} /* マージン調整 */
         #exit-button:hover { background-color: #c82333; }
         
+        /* カウントダウン表示 */
+        #countdown-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: none; /* Initially hidden */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            font-size: 3em;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px black;
+        }
+        #countdown-overlay div { margin-top: 20px; font-size: 0.5em; }
+        .player-color-info { display: flex; align-items: center; margin-top: 10px !important; }
+        .player-color-swatch { width: 20px; height: 20px; border-radius: 50%; margin-right: 10px; border: 2px solid white;}
+
         /* 結果表示モーダル */
         #result-modal {
             position: fixed;
@@ -192,7 +216,7 @@
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.6);
-            display: none; /* Initially hidden */
+            display: none; 
             justify-content: center;
             align-items: center;
             z-index: 1000;
@@ -208,7 +232,7 @@
         #result-text { font-size: 2em; font-weight: bold; margin-bottom: 20px; }
 
         /* レスポンシブ対応 */
-        @media (max-width: 768px) {
+        @media (max-width: 700px) {
             #game-ui-container {
                 flex-direction: column;
                 align-items: center;
@@ -216,10 +240,10 @@
             .scoreboard {
                 width: 80%;
                 margin-bottom: 10px;
-                order: 1; /* スコアボードを下に */
+                order: 1; 
             }
             #game-center-area {
-                order: 0; /* ゲームボードを上に */
+                order: 0; 
             }
             #game-board {
                 width: 90vw;
@@ -272,14 +296,18 @@
                     <div class="stamina-label">スタミナ</div>
                     <div class="stamina-container">
                         <div id="p1-stamina-wrapper" class="stamina-bar-wrapper">
-                            <div id="p1-stamina" class="stamina-bar">20</div>
+                            <div id="p1-stamina" class="stamina-bar">30</div>
                         </div>
                     </div>
                 </div>
 
                 <div id="game-center-area">
-                    <div id="timer">40</div>
+                    <div id="timer">50</div>
                     <div id="game-board"></div>
+                    <div id="countdown-overlay">
+                        <span id="countdown-text"></span>
+                        <div id="countdown-player-info"></div>
+                    </div>
                 </div>
 
                 <div id="p2-scoreboard" class="scoreboard">
@@ -288,7 +316,7 @@
                     <div class="stamina-label">スタミナ</div>
                     <div class="stamina-container">
                         <div id="p2-stamina-wrapper" class="stamina-bar-wrapper">
-                            <div id="p2-stamina" class="stamina-bar">20</div>
+                            <div id="p2-stamina" class="stamina-bar">30</div>
                         </div>
                     </div>
                 </div>
@@ -436,9 +464,10 @@
             if (roomData.status === 'waiting') {
                 updateWaitingRoomUI(roomData);
             } else if (roomData.status === 'playing') {
-                // startGameがまだ呼ばれていなければ呼ぶ
                 if (screens.game.style.display !== 'block') {
-                    startGame(roomData);
+                    showScreen('game');
+                    setupGameBoard();
+                    startCountdown(roomData.game); // カウントダウン開始
                 }
                 updateGameUI(roomData.game);
             } else if (roomData.status === 'finished') {
@@ -465,7 +494,7 @@
                 if (numPlayers === maxPlayers) {
                     startButton.disabled = false;
                     startButton.textContent = 'ゲーム開始！';
-                    startButton.onclick = () => initializeGame(); // 開始処理を呼び出す
+                    startButton.onclick = () => initializeGame(); 
                 } else {
                     startButton.disabled = true;
                     startButton.textContent = `${maxPlayers - numPlayers}人待っています...`;
@@ -484,13 +513,14 @@
                 const p2_id = playerIds[1];
 
                 const initialBoard = [
-                    [1,1,1,0,0,0,0],
-                    [0,0,'b',0,0,0,0],
-                    [0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0],
-                    [0,0,0,0,'b',0,0],
-                    [0,0,0,0,2,2,2]
+                    [1,1,1,0,0,0,0,0],
+                    [0,0,0,0,0,0,0,0],
+                    [0,0,0,0,0,0,0,0],
+                    [0,0,0,'b',0,0,0,0],
+                    [0,0,0,0,'b',0,0,0],
+                    [0,0,0,0,0,0,0,0],
+                    [0,0,0,0,0,0,0,0],
+                    [0,0,0,0,0,2,2,2]
                 ];
 
                 roomRef.update({
@@ -500,28 +530,59 @@
                         playerMap: { p1: p1_id, p2: p2_id },
                         p1_name: roomData.players[p1_id].name,
                         p2_name: roomData.players[p2_id].name,
-                        stamina: { [p1_id]: 20, [p2_id]: 20 },
-                        maxStamina: { [p1_id]: 50, [p2_id]: 50 },
+                        stamina: { [p1_id]: 30, [p2_id]: 30 },
+                        maxStamina: { [p1_id]: 60, [p2_id]: 60 },
                         lastUpdate: firebase.database.ServerValue.TIMESTAMP,
-                        startTime: firebase.database.ServerValue.TIMESTAMP
+                        startTime: 0 // まだ開始しない
                     }
                 });
             });
         }
         
-        // ゲーム画面のセットアップ
-        function startGame(roomData) {
-            showScreen('game');
-            setupGameBoard();
-            setupDragListeners();
+        function startCountdown(gameData) {
+            const overlay = document.getElementById('countdown-overlay');
+            const countdownText = document.getElementById('countdown-text');
+            const playerInfo = document.getElementById('countdown-player-info');
 
+            playerInfo.innerHTML = `
+                <div class="player-color-info">
+                    <div class="player-color-swatch" style="background-color: var(--p1-color);"></div>
+                    <span>${gameData.p1_name}</span>
+                </div>
+                <div class="player-color-info">
+                    <div class="player-color-swatch" style="background-color: var(--p2-color);"></div>
+                    <span>${gameData.p2_name}</span>
+                </div>
+            `;
+            countdownText.textContent = "Ready...";
+            overlay.style.display = 'flex';
+
+            setTimeout(() => {
+                countdownText.textContent = "Go!";
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    // ホストがゲームの実際の開始時間を記録
+                    roomRef.once('value', snapshot => {
+                       const roomData = snapshot.val();
+                       if (roomData.hostId === myPlayerId) {
+                           roomRef.child('game/startTime').set(firebase.database.ServerValue.TIMESTAMP);
+                       }
+                       beginActualGame(roomData);
+                    });
+                }, 500); // 0.5秒後
+            }, 2000); // 2秒後
+        }
+        
+        // ゲーム画面のセットアップ
+        function beginActualGame(roomData) {
+            setupDragListeners();
             // タイマー処理
             const gameTimer = setInterval(() => {
                 roomRef.child('game/startTime').once('value', snap => {
                     const startTime = snap.val();
-                    if (!startTime) return;
+                    if (!startTime || startTime === 0) return;
                     const elapsed = (Date.now() - startTime) / 1000;
-                    const timeRemaining = Math.max(0, 40 - elapsed);
+                    const timeRemaining = Math.max(0, 50 - elapsed);
                     document.getElementById('timer').textContent = Math.ceil(timeRemaining);
                     
                     if (timeRemaining <= 0) {
@@ -534,20 +595,20 @@
             if (roomData.hostId === myPlayerId) {
                 const staminaInterval = setInterval(() => {
                     roomRef.child('game').transaction(gameData => {
-                        if (gameData && gameData.status !== 'finished' && gameData.startTime) {
+                        if (gameData && gameData.status !== 'finished' && gameData.startTime && gameData.startTime !== 0) {
                             const now = Date.now();
                             
-                            // 最大スタミナの計算 (ゲーム開始からの経過時間で正確に)
+                            // 最大スタミナの計算
                             const totalElapsedGameSeconds = Math.floor((now - gameData.startTime) / 1000);
-                            const newMaxStamina = Math.max(10, 50 - totalElapsedGameSeconds);
+                            const newMaxStamina = Math.max(10, 60 - totalElapsedGameSeconds);
 
-                            // スタミナ回復の計算 (前回更新時からの経過時間で)
+                            // スタミナ回復の計算
                             const lastUpdate = gameData.lastUpdate || now;
                             const elapsedSecondsSinceUpdate = (now - lastUpdate) / 1000;
 
                             for (const playerId in gameData.stamina) {
-                                const staminaToAdd = Math.floor(elapsedSecondsSinceUpdate / 0.3);
-                                gameData.maxStamina[playerId] = newMaxStamina; // 最大スタミナを更新
+                                const staminaToAdd = elapsedSecondsSinceUpdate * 2;
+                                gameData.maxStamina[playerId] = newMaxStamina;
                                 gameData.stamina[playerId] = Math.min(newMaxStamina, gameData.stamina[playerId] + staminaToAdd);
                             }
                             gameData.lastUpdate = now;
@@ -556,7 +617,7 @@
                     }).catch(err => {
                         if(err) console.error("Stamina update failed:", err);
                     });
-                }, 1000); // 1秒ごとに同期
+                }, 1000); 
                 gameIntervals.push(staminaInterval);
             }
 
@@ -567,8 +628,8 @@
         function setupGameBoard() {
             const boardEl = document.getElementById('game-board');
             boardEl.innerHTML = '';
-            for (let r = 0; r < 7; r++) {
-                for (let c = 0; c < 7; c++) {
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
                     const cell = document.createElement('div');
                     cell.classList.add('cell');
                     cell.dataset.row = r;
@@ -584,25 +645,24 @@
             const { board, playerMap, p1_name, p2_name, stamina, maxStamina } = gameData;
             
             const boardEl = document.getElementById('game-board');
-            // 既存のコマをすべて削除
             boardEl.querySelectorAll('.piece').forEach(p => p.remove());
             
             let p1Score = 0;
             let p2Score = 0;
 
-            for (let r = 0; r < 7; r++) {
-                for (let c = 0; c < 7; c++) {
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
                     const cell = boardEl.querySelector(`.cell[data-row='${r}'][data-col='${c}']`);
                     if (!cell) continue;
-                    cell.className = 'cell'; // Reset classes
+                    cell.className = 'cell'; 
                     const cellValue = board[r][c];
 
                     if (cellValue === 1 || cellValue === 'p1') {
-                        if (cellValue === 1) { // プレイヤー1のコマ
+                        if (cellValue === 1) { 
                            const piece = document.createElement('div');
                            piece.className = 'piece p1';
-                           piece.style.left = `${(c / 7) * 100}%`;
-                           piece.style.top = `${(r / 7) * 100}%`;
+                           piece.style.left = `${(c / 8) * 100}%`;
+                           piece.style.top = `${(r / 8) * 100}%`;
                            piece.dataset.row = r;
                            piece.dataset.col = c;
                            boardEl.appendChild(piece);
@@ -610,11 +670,11 @@
                          p1Score++;
                          cell.classList.add('tile-p1');
                     } else if (cellValue === 2 || cellValue === 'p2') {
-                        if (cellValue === 2) { // プレイヤー2のコマ
+                        if (cellValue === 2) {
                            const piece = document.createElement('div');
                            piece.className = 'piece p2';
-                           piece.style.left = `${(c / 7) * 100}%`;
-                           piece.style.top = `${(r / 7) * 100}%`;
+                           piece.style.left = `${(c / 8) * 100}%`;
+                           piece.style.top = `${(r / 8) * 100}%`;
                            piece.dataset.row = r;
                            piece.dataset.col = c;
                            boardEl.appendChild(piece);
@@ -628,6 +688,7 @@
             }
 
             // スコアボードの更新
+            if (!playerMap) return;
             const p1_id = playerMap.p1;
             const p2_id = playerMap.p2;
             document.getElementById('p1-name').textContent = p1_name;
@@ -641,7 +702,7 @@
                 const p1_stamina_wrapper = document.getElementById('p1-stamina-wrapper');
                 const p1_stamina_bar = document.getElementById('p1-stamina');
                 if (p1_stamina_wrapper && p1_stamina_bar && p1_stamina !== undefined && p1_max_stamina > 0) {
-                    p1_stamina_wrapper.style.width = `${(p1_max_stamina / 50) * 100}%`;
+                    p1_stamina_wrapper.style.width = `${(p1_max_stamina / 60) * 100}%`;
                     p1_stamina_bar.style.width = p1_max_stamina > 0 ? `${(p1_stamina / p1_max_stamina) * 100}%` : '0%';
                     p1_stamina_bar.textContent = Math.floor(p1_stamina);
                 }
@@ -651,13 +712,12 @@
                 const p2_stamina_wrapper = document.getElementById('p2-stamina-wrapper');
                 const p2_stamina_bar = document.getElementById('p2-stamina');
                 if (p2_stamina_wrapper && p2_stamina_bar && p2_stamina !== undefined && p2_max_stamina > 0) {
-                    p2_stamina_wrapper.style.width = `${(p2_max_stamina / 50) * 100}%`;
+                    p2_stamina_wrapper.style.width = `${(p2_max_stamina / 60) * 100}%`;
                     p2_stamina_bar.style.width = p2_max_stamina > 0 ? `${(p2_stamina / p2_max_stamina) * 100}%` : '0%';
                     p2_stamina_bar.textContent = Math.floor(p2_stamina);
                 }
             }
             
-            // 自分のコマに目印をつける
             document.querySelectorAll('.piece').forEach(p => {
                 const ownerId = p.classList.contains('p1') ? p1_id : p2_id;
                 p.classList.toggle('draggable', ownerId === myPlayerId);
@@ -671,21 +731,26 @@
 
             const onDragStart = (e) => {
                 if (!e.target.classList.contains('draggable')) return;
-                draggedPiece = e.target;
                 
-                const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
-                const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+                // ゲームが実際に始まっているか確認
+                roomRef.child('game/startTime').once('value', snap => {
+                    if (snap.val() === 0) return; // まだ始まっていない
 
-                startX = clientX;
-                startY = clientY;
-                startRow = parseInt(draggedPiece.dataset.row);
-                startCol = parseInt(draggedPiece.dataset.col);
+                    draggedPiece = e.target;
+                    const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
 
-                boardEl.addEventListener('mousemove', onDragMove);
-                boardEl.addEventListener('mouseup', onDragEnd);
-                boardEl.addEventListener('mouseleave', onDragEnd);
-                boardEl.addEventListener('touchmove', onDragMove, { passive: false });
-                boardEl.addEventListener('touchend', onDragEnd);
+                    startX = clientX;
+                    startY = clientY;
+                    startRow = parseInt(draggedPiece.dataset.row);
+                    startCol = parseInt(draggedPiece.dataset.col);
+
+                    boardEl.addEventListener('mousemove', onDragMove);
+                    boardEl.addEventListener('mouseup', onDragEnd);
+                    boardEl.addEventListener('mouseleave', onDragEnd);
+                    boardEl.addEventListener('touchmove', onDragMove, { passive: false });
+                    boardEl.addEventListener('touchend', onDragEnd);
+                });
             };
 
             const onDragMove = (e) => {
@@ -702,7 +767,7 @@
                 const dy = clientY - startY;
 
                 let direction = null;
-                const threshold = 20; // 感度調整
+                const threshold = 20; 
                 if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
                     if (Math.abs(dx) > Math.abs(dy)) {
                         direction = dx > 0 ? 'right' : 'left';
@@ -730,18 +795,14 @@
         // 移動リクエスト
         function requestMove(row, col, direction) {
             roomRef.child('game').transaction(gameData => {
-                if (!gameData) return;
+                if (!gameData || gameData.startTime === 0) return;
                 
                 const myRole = gameData.playerMap.p1 === myPlayerId ? 1 : 2;
                 const myTileType = myRole === 1 ? 'p1' : 'p2';
 
-                // 1. 操作対象が自分のコマか確認
                 if (gameData.board[row][col] !== myRole) return;
+                if (gameData.stamina[myPlayerId] < 6) return;
 
-                // 2. スタミナ確認
-                if (gameData.stamina[myPlayerId] < 10) return;
-
-                // 3. 移動ロジック
                 let r = row, c = col;
                 let dr = 0, dc = 0;
                 if (direction === 'up') dr = -1;
@@ -754,29 +815,26 @@
                 let nextR = r + dr;
                 let nextC = c + dc;
                 
-                // 隣が移動可能かチェック
-                if (nextR < 0 || nextR >= 7 || nextC < 0 || nextC >= 7 || !canMoveInto(gameData.board[nextR][nextC])) {
-                    return; // 動けないのでトランザクション中断
+                if (nextR < 0 || nextR >= 8 || nextC < 0 || nextC >= 8 || !canMoveInto(gameData.board[nextR][nextC])) {
+                    return; 
                 }
                 
-                gameData.board[r][c] = myTileType; // 元の場所をタイルにする
+                gameData.board[r][c] = myTileType; 
                 
                 while(true) {
                     let nextR = r + dr;
                     let nextC = c + dc;
                     
-                    if (nextR < 0 || nextR >= 7 || nextC < 0 || nextC >= 7 || !canMoveInto(gameData.board[nextR][nextC])) {
-                        // 障害物にぶつかったので、その手前で停止
+                    if (nextR < 0 || nextR >= 8 || nextC < 0 || nextC >= 8 || !canMoveInto(gameData.board[nextR][nextC])) {
                         gameData.board[r][c] = myRole;
                         break;
                     }
                     r = nextR;
                     c = nextC;
-                    gameData.board[r][c] = myTileType; // 軌跡をタイルにする
+                    gameData.board[r][c] = myTileType; 
                 }
 
-                // 4. スタミナ消費と更新時間
-                gameData.stamina[myPlayerId] -= 10;
+                gameData.stamina[myPlayerId] -= 6;
                 gameData.lastUpdate = firebase.database.ServerValue.TIMESTAMP;
 
                 return gameData;
@@ -791,7 +849,6 @@
             clearGameIntervals();
             if(!currentRoomId) return;
 
-            // ホストが結果を確定
             roomRef.once('value', snapshot => {
                 const roomData = snapshot.val();
                 if(roomData && roomData.hostId === myPlayerId && roomData.status === 'playing') {
@@ -807,8 +864,8 @@
             
             let p1Score = 0;
             let p2Score = 0;
-            for(let r=0; r<7; r++) {
-                for(let c=0; c<7; c++) {
+            for(let r=0; r < 8; r++) {
+                for(let c=0; c < 8; c++) {
                     const v = gameData.board[r][c];
                     if (v === 1 || v === 'p1') p1Score++;
                     if (v === 2 || v === 'p2') p2Score++;
@@ -858,8 +915,6 @@
             gameIntervals.forEach(clearInterval);
             gameIntervals = [];
         }
-
-
 
         // 初期画面表示
         showScreen('nameEntry');
