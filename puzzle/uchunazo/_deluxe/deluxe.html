@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ダンジョン探索ゲーム</title>
+    <!-- 修正: データ圧縮ライブラリ pako.js を削除 -->
+    <style>
+        :root {
+            --game-max-width: 800px;
+            /* 部屋画像の比率 (800x600) */
+            --game-aspect-ratio: 800 / 600;
+        }
+
+        body {
+            font-family: 'Segoe UI', Meiryo, sans-serif;
+            background-color: #000;
+            color: #e0e0e0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-wrapper {
+            position: relative;
+            /* 画面サイズに合わせて可変にし、アスペクト比を維持する */
+            width: 95vw;
+            max-width: var(--game-max-width);
+            max-height: 95vh;
+            aspect-ratio: var(--game-aspect-ratio);
+        }
+
+        /* --- 部屋の表示 --- */
+        #room-view {
+            width: 100%;
+            height: 100%;
+            background-image: url('room.png');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            position: relative;
+            /* 番号などのフォントサイズをコンテナサイズに連動させるため、JSでfont-sizeを設定 */
+        }
+
+        .doorway {
+            position: absolute;
+            cursor: pointer;
+            transition: filter 0.2s;
+        }
+        .doorway:hover {
+            filter: brightness(1.2);
+        }
+        .doorway.wall {
+            pointer-events: none; /* 壁はクリックできない */
+        }
+        .doorway img {
+            width: 100%;
+            height: 100%;
+        }
+        .room-number {
+            position: absolute;
+            background-color: rgba(0,0,0,0.7);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            border: 2px solid #fff;
+            width: 1.8em;
+            height: 1.8em;
+            top: -2.2em; 
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1em;
+        }
+
+        #doorway-front {
+            width: 15%;
+            height: 34.5%;
+            top: 42.7%;
+            left: 42.5%;
+        }
+        #doorway-front .room-number {
+            top: -2.7em;
+        }
+        #doorway-left {
+            width: 10.9%;
+            height: 65.8%;
+            top: 32%;
+            left: 2.4%;
+        }
+        #doorway-right {
+            width: 10.9%;
+            height: 65.8%;
+            top: 32%;
+            right: 2.4%;
+        }
+
+        /* --- 上部情報パネル --- */
+        #info-panel {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(22, 33, 62, 0.8);
+            border-radius: 10px;
+            padding: 5px 20px;
+            text-align: center;
+            z-index: 10;
+        }
+        #player-status { font-size: 1.1em; }
+        
+        #undo-button {
+            position: absolute;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 10;
+            width: 44px;
+            height: 44px;
+            padding: 8px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+        #undo-button:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        #undo-button svg {
+            width: 100%;
+            height: 100%;
+            stroke: #fff;
+            transform: rotate(-90deg);
+        }
+
+        #pause-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 44px;
+            height: 44px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 10;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        #pause-button:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        #pause-button svg {
+            width: 100%;
+            height: 100%;
+            stroke: #fff;
+        }
+
+
+        /* --- ゲームオーバーレイ --- */
+        #game-overlay, #pause-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column; 
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            z-index: 100;
+        }
+        #game-overlay.visible, #pause-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        #game-frame-container {
+            width: 95%;
+            height: 90%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #game-frame {
+            width: 100%; height: 100%;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            background-color: #000;
+        }
+        #close-game-button {
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            background-color: rgba(255,255,255,0.8);
+            color: #000;
+            border: none;
+            font-size: 2em;
+            cursor: pointer;
+            line-height: 50px;
+            text-align: center;
+            margin-top: 10px; 
+        }
+
+        /* --- 画面遷移エフェクト用 --- */
+        #transition-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #fff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 999;
+            transition: opacity 0.25s ease-in-out;
+        }
+        #transition-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        /* ALL CLEAR表示用 */
+        #all-clear-message {
+            color: #fff; 
+            text-align: center;
+        }
+        #all-clear-message h1 {
+            font-size: 5em;
+            margin: 0;
+            color: #4dff4d;
+            text-shadow: 0 0 15px #4dff4d, 0 0 25px #4dff4d;
+        }
+
+        .pause-content {
+            background-color: #16213e;
+            padding: 20px 30px;
+            border-radius: 10px;
+            border: 1px solid #0f3460;
+            width: 80%;
+            max-width: 500px;
+            text-align: center;
+        }
+        .pause-content h2 {
+            margin-top: 0;
+            color: #e94560;
+        }
+        .password-section {
+            margin: 20px 0;
+        }
+        .password-section label {
+            display: block;
+            margin-bottom: 5px;
+            text-align: left;
+        }
+        .password-section input, .password-section textarea {
+            width: 100%;
+            background-color: #0f1624;
+            border: 1px solid #533483;
+            color: #e0e0e0;
+            border-radius: 5px;
+            padding: 10px;
+            box-sizing: border-box;
+            font-size: 1em;
+            word-break: break-all;
+        }
+        .password-section textarea {
+            resize: none;
+            height: 80px;
+        }
+        .pause-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .pause-buttons button {
+            flex-grow: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.2s;
+        }
+        #load-button {
+            background-color: #28a745;
+            color: #fff;
+        }
+        #load-button:hover { background-color: #218838; }
+        #close-pause-button {
+            background-color: #6c757d;
+            color: #fff;
+        }
+        #close-pause-button:hover { background-color: #5a6268; }
+        #load-message {
+            margin-top: 10px;
+            color: #ffc107;
+            min-height: 1.2em;
+        }
+
+
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <div id="transition-overlay"></div>
+
+    <!-- 上部情報パネル -->
+    <div id="info-panel">
+        <div id="player-status">現在地: 0号室 | 向き: 北</div>
+    </div>
+    
+    <!-- 部屋の表示エリア -->
+    <div id="room-view">
+        <div id="doorway-left" class="doorway"></div>
+        <div id="doorway-front" class="doorway"></div>
+        <div id="doorway-right" class="doorway"></div>
+        <button id="undo-button">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 14 4 9l5-5"/>
+                <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/>
+            </svg>
+        </button>
+        <button id="pause-button">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="6" y1="4" x2="6" y2="20"></line>
+                <line x1="18" y1="4" x2="18" y2="20"></line>
+            </svg>
+        </button>
+    </div>
+
+    <!-- ゲーム表示用オーバーレイ -->
+    <div id="game-overlay">
+        <div id="game-frame-container"></div>
+        <button id="close-game-button">↓</button>
+    </div>
+
+    <div id="pause-overlay">
+        <div class="pause-content">
+            <h2>中断 / 再開</h2>
+            <div class="password-section">
+                <label for="password-input">パスワード入力</label>
+                <input type="text" id="password-input" placeholder="パスワードを入力してロード">
+            </div>
+            <div id="load-message"></div>
+            <div class="password-section">
+                <label for="password-display">現在のパスワード</label>
+                <textarea id="password-display" readonly></textarea>
+            </div>
+            <div class="pause-buttons">
+                <button id="load-button">Load</button>
+                <button id="close-pause-button">Resume</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- データ定義 ---
+    const mapData = [
+        [null, 24, null, 21, null, 17, null, 22, null, 25, null],
+        [null, 20, null, 16, null, 12, null, 18, null, 23, null],
+        [null, 15, null, 11, null,  7, null, 13, null, 19, null],
+        [null, 10, null,  6, null,  3, null,  8, null, 14, null],
+        [null,  5, null,  2, null,  1, null,  4, null,  9, null],
+        [null, null, null, null, null,  0, null, null, null, null, null],
+        [null, null, null, null, null, 26, null, null, null, null, null]
+    ];
+    
+    const rooms = {};
+    const roomCoords = {}; // 座標から部屋IDを引くためのマップ
+     mapData.forEach((row, r) => {
+        row.forEach((roomId, c) => {
+            if (roomId !== null) {
+                rooms[roomId] = { row: r, col: c };
+                roomCoords[`${r},${c}`] = roomId;
+            }
+        });
+    });
+
+    let player = { roomId: 0, direction: 'N' };
+    let playerHistory = [];
+    let playerPath = [0];
+    let clearedRooms = new Set([0]);
+
+    const directionVectors = { 'N': { row: -1, col: 0 }, 'E': { row: 0, col: 2 }, 'S': { row: 1, col: 0 }, 'W': { row: 0, col: -2 } };
+    const directionNames = {'N': '北', 'E': '東', 'S': '南', 'W': '西'};
+    const SECRET_KEY = 'DungeonQuestSecretKey'; // パスワードの難読化に使う鍵
+
+    // --- DOM要素 ---
+    const playerStatusDisplay = document.getElementById('player-status');
+    const roomView = document.getElementById('room-view');
+    const gameOverlay = document.getElementById('game-overlay');
+    const closeGameButton = document.getElementById('close-game-button');
+    const undoButton = document.getElementById('undo-button');
+    const transitionOverlay = document.getElementById('transition-overlay');
+    const gameWrapper = document.getElementById('game-wrapper');
+    const gameFrameContainer = document.getElementById('game-frame-container');
+    const pauseButton = document.getElementById('pause-button');
+    const pauseOverlay = document.getElementById('pause-overlay');
+    const closePauseButton = document.getElementById('close-pause-button');
+    const passwordInput = document.getElementById('password-input');
+    const passwordDisplay = document.getElementById('password-display');
+    const loadButton = document.getElementById('load-button');
+    const loadMessage = document.getElementById('load-message');
+
+    /** レスポンシブ対応: コンテナサイズに合わせてフォントサイズを調整 */
+    function adjustFontSize() {
+        const wrapperWidth = gameWrapper.offsetWidth;
+        const newFontSize = Math.max(10, wrapperWidth * 0.0225);
+        roomView.style.fontSize = `${newFontSize}px`;
+    }
+
+    /** UIを更新する */
+    function updateUI() {
+        const visibleDoors = getVisibleDoors();
+        const positions = { left: 'l', front: 'f', right: 'r' };
+        for (const pos in positions) {
+            const doorwayEl = document.getElementById(`doorway-${pos}`);
+            doorwayEl.innerHTML = '';
+            const roomId = visibleDoors[pos];
+            if (roomId !== null && roomId !== undefined) {
+                const isCleared = clearedRooms.has(roomId);
+                const shortPos = positions[pos];
+                let state;
+                if (isCleared) {
+                    if (roomId === 26) state = 'open_2';
+                    else state = playerPath.includes(roomId) ? 'open_1' : 'open_0';
+                } else {
+                    state = 'closed';
+                }
+                doorwayEl.className = `doorway`;
+                doorwayEl.dataset.roomId = roomId;
+                const img = document.createElement('img');
+                img.src = `door_${shortPos}_${state}.png`;
+                const numDiv = document.createElement('div');
+                numDiv.className = 'room-number';
+                numDiv.textContent = roomId;
+                doorwayEl.appendChild(img);
+                doorwayEl.appendChild(numDiv);
+            } else {
+                doorwayEl.className = 'doorway wall';
+                delete doorwayEl.dataset.roomId;
+            }
+        }
+        playerStatusDisplay.textContent = `現在地: ${player.roomId}号室 | 向き: ${directionNames[player.direction]}`;
+    }
+    
+    function getVisibleDoors() {
+        const currentPos = rooms[player.roomId];
+        const currentDirVec = directionVectors[player.direction];
+        const frontPos = { row: currentPos.row + currentDirVec.row, col: currentPos.col + currentDirVec.col };
+        const frontId = mapData[frontPos.row] ? mapData[frontPos.row][frontPos.col] : null;
+        let leftDir, rightDir;
+        if (player.direction === 'N') { leftDir = 'W'; rightDir = 'E'; }
+        else if (player.direction === 'E') { leftDir = 'N'; rightDir = 'S'; }
+        else if (player.direction === 'S') { leftDir = 'E'; rightDir = 'W'; } 
+        else if (player.direction === 'W') { leftDir = 'S'; rightDir = 'N'; }
+        const leftDirVec = directionVectors[leftDir];
+        const rightDirVec = directionVectors[rightDir];
+        const leftPos = { row: currentPos.row + leftDirVec.row, col: currentPos.col + leftDirVec.col };
+        const leftId = mapData[leftPos.row] ? mapData[leftPos.row][leftPos.col] : null;
+        const rightPos = { row: currentPos.row + rightDirVec.row, col: currentPos.col + rightDirVec.col };
+        const rightId = mapData[rightPos.row] ? mapData[rightPos.row][rightPos.col] : null;
+        return { left: leftId, front: frontId, right: rightId };
+    }
+
+    function showAllClear() {
+        gameFrameContainer.innerHTML = `<div id="all-clear-message"><h1>ALL CLEAR!</h1></div>`;
+        closeGameButton.style.display = 'none';
+        gameOverlay.classList.add('visible');
+    }
+
+    function showGame(options = {}) {
+        closeGameButton.style.display = 'block';
+        gameFrameContainer.innerHTML = '';
+        const newIframe = document.createElement('iframe');
+        newIframe.id = 'game-frame';
+        if (options.src) newIframe.src = options.src;
+        else if (options.srcdoc) newIframe.srcdoc = options.srcdoc;
+        gameFrameContainer.appendChild(newIframe);
+        gameOverlay.classList.add('visible');
+    }
+
+    function handleDoorClick(roomId) {
+        const isCleared = clearedRooms.has(roomId);
+        if (roomId === 26 && isCleared) {
+            showAllClear(); return;
+        }
+        if (roomId === 26 && !isCleared) {
+            showGame({ srcdoc: createFinalScreenHtml() }); return;
+        }
+        if (isCleared) {
+            transitionOverlay.classList.add('active');
+            setTimeout(() => {
+                playerHistory.push({ roomId: player.roomId, direction: player.direction });
+                const nextPos = rooms[roomId];
+                player.roomId = roomId;
+                const existingIndex = playerPath.indexOf(roomId);
+                if (existingIndex > -1) {
+                    playerPath = playerPath.slice(existingIndex + 1);
+                }
+                playerPath.push(roomId);
+                const dRow = nextPos.row - rooms[playerHistory[playerHistory.length-1].roomId].row;
+                const dCol = nextPos.col - rooms[playerHistory[playerHistory.length-1].roomId].col;
+                for(const [dir, vec] of Object.entries(directionVectors)) {
+                    if(vec.row === dRow && vec.col === dCol) {
+                        player.direction = dir; break;
+                    }
+                }
+                updateUI();
+                if (player.roomId === 0 && player.direction === 'S' && playerPath.length === 26) {
+                    setTimeout(() => { clearedRooms.add(26); updateUI(); }, 300);
+                }
+                transitionOverlay.classList.remove('active');
+            }, 250);
+        } else {
+            showGame({ src: `game${String(roomId).padStart(2, '0')}.html` });
+        }
+    }
+
+    function createFinalScreenHtml() {
+        const pathData = JSON.stringify(playerPath);
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    body { margin: 0; background-color: #0f1624; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    .final-container { display: flex; align-items: center; justify-content: center; gap: 30px; }
+    #final-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; width: 250px; }
+    .cell { width: 46px; height: 46px; background-color: #0f1624; border-radius: 4px; }
+    .cell.visible { background-color: #334155; }
+    .cell.path { background-color: #facc15; }
+    .cell.current { background-color: #f97316; }
+    #meter-wrapper { position: relative; width: 150px; height: 150px; display: flex; justify-content: center; align-items: center; }
+    #meter-svg { position: absolute; top: 0; left: 0; width: 150px; height: 150px; transform: rotate(-90deg); }
+    .meter-circle { fill: none; stroke-width: 10; }
+    .meter-bg { stroke: #334155; }
+    .meter-fg { stroke: #0ea5e9; }
+    .meter-fg.glow { stroke: #4dff4d; filter: drop-shadow(0 0 8px #4dff4d); }
+    #meter-text { position: relative; font-size: 2.5em; font-weight: bold; color: #e0e0e0; }
+</style>
+</head>
+<body>
+    <div class="final-container">
+        <div id="final-board"></div>
+        <div id="meter-wrapper">
+            <svg id="meter-svg" viewBox="0 0 100 100">
+                <circle class="meter-circle meter-bg" cx="50" cy="50" r="45" />
+                <circle id="meter-fg-circle" class="meter-circle meter-fg" cx="50" cy="50" r="45" />
+            </svg>
+            <div id="meter-text">0</div>
+        </div>
+    </div>
+<script>
+    window.onload = function() {
+        const path = ${pathData};
+        const finalBoardRoomMap = [ [24,21,17,22,25], [20,16,12,18,23], [15,11,7,13,19], [10,6,3,8,14], [5,2,1,4,9], [null,null,0,null,null] ];
+        const boardLayout = [ [1,1,1,1,1], [1,1,1,1,1], [1,1,1,1,1], [1,1,1,1,1], [1,1,1,1,1], [0,0,1,0,0] ];
+        const board = document.getElementById('final-board');
+        const currentRoom = path[path.length - 1];
+        const pathRooms = new Set(path.slice(0, -1));
+        boardLayout.forEach((row, r) => {
+            row.forEach((cell, c) => {
+                const div = document.createElement('div');
+                div.className = 'cell';
+                if (cell === 1) {
+                    div.classList.add('visible');
+                    const roomId = finalBoardRoomMap[r][c];
+                    if (roomId === currentRoom) { div.classList.add('current'); }
+                    else if (pathRooms.has(roomId)) { div.classList.add('path'); }
+                }
+                board.appendChild(div);
+            });
+        });
+        const meterText = document.getElementById('meter-text');
+        const meterCircle = document.getElementById('meter-fg-circle');
+        const count = path.length;
+        const maxCount = 26;
+        meterText.textContent = count;
+        const radius = 45;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (count / maxCount) * circumference;
+        meterCircle.style.strokeDasharray = circumference;
+        meterCircle.style.strokeDashoffset = offset;
+        if (count >= maxCount) { meterCircle.classList.add('glow'); }
+    };
+<\/script>
+</body>
+</html>`;
+    }
+
+    // --- 修正: 新しいセーブ・ロード機能 ---
+    
+    /** 文字列を暗号化する */
+    function encrypt(str, key) {
+        let result = '';
+        let prevCharCode = 0; // 初期化ベクトル
+        for (let i = 0; i < str.length; i++) {
+            const keyCharCode = key.charCodeAt(i % key.length);
+            const cipherStreamCode = (keyCharCode + prevCharCode) % 256;
+            const encryptedCharCode = str.charCodeAt(i) ^ cipherStreamCode;
+            result += String.fromCharCode(encryptedCharCode);
+            prevCharCode = encryptedCharCode;
+        }
+        return result;
+    }
+
+    /** 文字列を復号する */
+    function decrypt(str, key) {
+        let result = '';
+        let prevCharCode = 0; // 初期化ベクトル
+        for (let i = 0; i < str.length; i++) {
+            const keyCharCode = key.charCodeAt(i % key.length);
+            const cipherStreamCode = (keyCharCode + prevCharCode) % 256;
+            const decryptedCharCode = str.charCodeAt(i) ^ cipherStreamCode;
+            result += String.fromCharCode(decryptedCharCode);
+            prevCharCode = str.charCodeAt(i);
+        }
+        return result;
+    }
+
+
+    /** 現在のゲーム状態を短いパスワードに変換する */
+    function generatePassword() {
+        try {
+            // Part 1: クリア済みの部屋
+            let clearedBinary = '';
+            for (let i = 0; i <= 26; i++) {
+                clearedBinary += clearedRooms.has(i) ? '1' : '0';
+            }
+            const clearedNum = BigInt('0b' + clearedBinary);
+            const clearedBase36 = clearedNum.toString(36);
+
+            // Part 2: 一筆書きのルート
+            const moveMap = { 'N': 'u', 'S': 'd', 'E': 'r', 'W': 'l' };
+            let pathStr = '';
+            if (playerPath.length > 1) {
+                for (let i = 1; i < playerPath.length; i++) {
+                    const prevRoom = rooms[playerPath[i - 1]];
+                    const currentRoom = rooms[playerPath[i]];
+                    const dRow = currentRoom.row - prevRoom.row;
+                    const dCol = currentRoom.col - prevRoom.col;
+                    for (const [dir, vec] of Object.entries(directionVectors)) {
+                        if (vec.row === dRow && vec.col === dCol) {
+                            pathStr += moveMap[dir];
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // データを結合し、暗号化
+            const compactString = `${clearedBase36}|${pathStr}`;
+            const encrypted = encrypt(compactString, SECRET_KEY);
+            
+            return btoa(encrypted);
+
+        } catch (e) {
+            console.error("パスワードの生成に失敗しました:", e);
+            return "エラー: 生成できませんでした";
+        }
+    }
+
+    /** 短いパスワードからゲーム状態を復元する */
+    function loadFromPassword(password) {
+        if (!password) {
+            loadMessage.textContent = "パスワードを入力してください。";
+            return;
+        }
+        try {
+            const encrypted = atob(password);
+            const compactString = decrypt(encrypted, SECRET_KEY);
+            
+            if (compactString.indexOf('|') === -1) throw new Error("無効な形式です。");
+
+            const parts = compactString.split('|');
+            const clearedBase36 = parts[0];
+            const pathStr = parts[1];
+
+            // Part 1: クリア済みの部屋を復元
+            const clearedNum = BigInt('0x' + parseInt(clearedBase36, 36).toString(16));
+            const clearedBinary = clearedNum.toString(2).padStart(27, '0');
+            const newClearedRooms = new Set();
+            for (let i = 0; i < clearedBinary.length; i++) {
+                if (clearedBinary[i] === '1') {
+                    newClearedRooms.add(i);
+                }
+            }
+            
+            // Part 2: 一筆書きのルートを復元
+            const reverseMoveMap = { 'u': 'N', 'd': 'S', 'r': 'E', 'l': 'W' };
+            const newPath = [0];
+            let currentRoomId = 0;
+            for (const move of pathStr) {
+                const direction = reverseMoveMap[move];
+                if (!direction) throw new Error("無効な経路文字です。");
+                const currentPos = rooms[currentRoomId];
+                const vec = directionVectors[direction];
+                const nextPos = { row: currentPos.row + vec.row, col: currentPos.col + vec.col };
+                const nextRoomId = roomCoords[`${nextPos.row},${nextPos.col}`];
+                if (nextRoomId === undefined) throw new Error("無効な経路です。");
+                newPath.push(nextRoomId);
+                currentRoomId = nextRoomId;
+            }
+
+            // --- データが有効であれば、現在の状態に反映 ---
+            clearedRooms = newClearedRooms;
+            playerPath = newPath;
+            playerHistory = [];
+            player.roomId = playerPath[playerPath.length - 1];
+            if (playerPath.length > 1) {
+                const prevRoomId = playerPath[playerPath.length - 2];
+                const dRow = rooms[player.roomId].row - rooms[prevRoomId].row;
+                const dCol = rooms[player.roomId].col - rooms[prevRoomId].col;
+                for(const [dir, vec] of Object.entries(directionVectors)) {
+                    if(vec.row === dRow && vec.col === dCol) {
+                        player.direction = dir; break;
+                    }
+                }
+            } else {
+                player.direction = 'N';
+            }
+            
+            updateUI();
+            adjustFontSize();
+            pauseOverlay.classList.remove('visible');
+            loadMessage.textContent = "ロードしました。";
+
+        } catch (e) {
+            console.error("パスワードの読み込みに失敗しました:", e);
+            loadMessage.textContent = "パスワードが正しくありません。";
+        }
+    }
+
+    // --- イベントリスナー ---
+    roomView.addEventListener('click', (event) => {
+        const clickedDoorway = event.target.closest('.doorway');
+        if (clickedDoorway && clickedDoorway.dataset.roomId) {
+            handleDoorClick(parseInt(clickedDoorway.dataset.roomId, 10));
+        }
+    });
+
+    closeGameButton.addEventListener('click', () => {
+        gameOverlay.classList.remove('visible');
+        gameFrameContainer.innerHTML = '';
+        setTimeout(() => { updateUI(); }, 200);
+    });
+
+    window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (data && data.event === 'gameCleared') {
+            const clearedRoomId = parseInt(data.gameName.replace('game', ''), 10);
+            if (!isNaN(clearedRoomId)) clearedRooms.add(clearedRoomId);
+        }
+    });
+
+    undoButton.addEventListener('click', () => {
+        if (playerHistory.length > 0) {
+            transitionOverlay.classList.add('active');
+            setTimeout(() => {
+                const lastState = playerHistory.pop();
+                player.roomId = lastState.roomId;
+                player.direction = lastState.direction;
+                playerPath.pop();
+                updateUI();
+                transitionOverlay.classList.remove('active');
+            }, 250);
+        }
+    });
+    
+    pauseButton.addEventListener('click', () => {
+        loadMessage.textContent = '';
+        passwordInput.value = '';
+        passwordDisplay.value = generatePassword();
+        pauseOverlay.classList.add('visible');
+    });
+
+    closePauseButton.addEventListener('click', () => {
+        pauseOverlay.classList.remove('visible');
+    });
+    
+    loadButton.addEventListener('click', () => {
+        loadFromPassword(passwordInput.value);
+    });
+
+    // --- 初期化 ---
+    updateUI();
+    adjustFontSize();
+    window.addEventListener('resize', adjustFontSize);
+});
+</script>
+</body>
+</html>
+

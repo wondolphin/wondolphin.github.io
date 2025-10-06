@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- タイトルはファイル名に合わせて変更してください -->
+    <title>ゲーム19</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f4f8;
+            font-family: sans-serif;
+            color: #333;
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+            background-color: #fff;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            background-color: #28a745;
+            color: white;
+            transition: all 0.2s;
+        }
+        button:hover:not(:disabled) {
+            background-color: #218838;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #message {
+            margin-top: 20px;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #007bff;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- h1はファイル名に合わせて変更してください -->
+    <h1>ゲーム 19</h1>
+    <p>このボタンを押してクリアしてください。</p>
+    <button id="clear-button">クリア</button>
+    <div id="message">クリア！メインページに戻ります...</div>
+</div>
+
+<script>
+    const clearButton = document.getElementById('clear-button');
+    const message = document.getElementById('message');
+
+    clearButton.addEventListener('click', () => {
+        message.style.display = 'block';
+        clearButton.disabled = true;
+
+        // 親ページにクリア情報を送信
+        // gameNameはファイル名に合わせて変更してください
+        window.parent.postMessage({ event: 'gameCleared', gameName: 'game19' }, '*');
+    });
+</script>
+
+</body>
+</html>
