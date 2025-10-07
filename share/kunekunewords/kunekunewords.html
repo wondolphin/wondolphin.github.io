@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>くねくねワーズ</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4f7f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .title-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin: 0;
+        }
+
+        #help-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.3s;
+        }
+        #help-btn:hover {
+            background-color: #2980b9;
+        }
+        
+        #controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        #level-select, #reset-btn {
+            padding: 8px 12px;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            background-color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        
+        #reset-btn {
+             background-color: #e74c3c;
+             color: white;
+             border-color: #c0392b;
+        }
+        #reset-btn:hover {
+             background-color: #c0392b;
+        }
+
+
+        #game-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 40px;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        #board-container {
+            display: grid;
+            border: 2px solid #bdc3c7;
+            background-color: #ecf0f1;
+            padding: 5px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+
+        .cell {
+            width: 45px;
+            height: 45px;
+            margin: 2px;
+            background-color: transparent;
+            font-size: 22px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+
+        .cell.active {
+            background-color: #fff;
+            border: 1px solid #95a5a6;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .cell.dragging {
+            background-color: #3498db;
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+        }
+
+        #words-container {
+            width: 220px;
+            flex-shrink: 0;
+        }
+
+        #word-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .word-item {
+            padding: 12px;
+            margin: 8px 0;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+        }
+        
+        .word-item.selected {
+            background-color: #3498db;
+            color: #fff;
+        }
+
+        .word-item .check-mark {
+            color: #2ecc71;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 1.2em;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .word-item.checked .check-mark {
+            opacity: 1;
+        }
+
+        #clear-message {
+            font-size: 3em;
+            color: #e67e22;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            padding: 20px 40px;
+            margin-top: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            animation: bounce 1s ease;
+            display: none;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-30px); }
+            60% { transform: translateY(-15px); }
+        }
+        
+        #modal-container {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        #modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        
+        #modal-content h2 {
+            margin-top: 0;
+        }
+
+        #close-btn {
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        @media (max-width: 600px) {
+            #game-container {
+                flex-direction: column;
+                align-items: center;
+            }
+             #words-container {
+                order: -1;
+                width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="title-container">
+        <h1>くねくねワーズ</h1>
+        <button id="help-btn">？</button>
+    </div>
+
+    <div id="controls">
+        <select id="level-select"></select>
+        <button id="reset-btn">リセット</button>
+    </div>
+
+    <div id="game-container">
+        <div id="words-container">
+            <ul id="word-list"></ul>
+        </div>
+        <div id="board-container"></div>
+    </div>
+
+    <div id="clear-message">🎉クリア！🎉</div>
+
+    <div id="modal-container">
+        <div id="modal-content">
+            <span id="close-btn">&times;</span>
+            <h2>あそびかた</h2>
+            <p>1. 単語リストから単語をひとつ選びます。</p>
+            <p>2. 盤面のマスを、選んだ単語の文字数ぶん、縦横になぞってください。</p>
+            <p>3. 正しく単語を置けると、リストにチェックがつきます。</p>
+            <p>4. すべての単語にチェックをつけたらクリアです！</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 問題データ ---
+            const levels = [
+            {
+                    name: "レベル1：スイーツ",
+                    board: [
+                        '1110000',
+                        '0010000',
+                        '1111111',
+                        '0010000',
+                        '1110000'
+                    ],
+                    words: ["ちょこれーとけーき", "ふるーつたると"]
+                },
+                {
+                    name: "レベル2：くだもの",
+                    board: [
+                        '1000',
+                        '1100',
+                        '0111',
+                        '0110'
+                    ],
+                    words: ["りんご", "まんごー", "らずべりー"]
+                },
+                {
+                    name: "レベル3：のりもの",
+                    board: [
+                        '01110',
+                        '11011',
+                        '11111',
+                        '01010'
+                    ],
+                    words: [ "じどうしゃ", "どうろせいそうしゃ", "はしごしゃ"]
+                },
+                                {
+                    name: "レベル4：どうぶつ",
+                    board: [
+                        '101000',
+                        '111001',
+                        '001111',
+                        '001010'
+                    ],
+                    words: ["さる", "さめ", "かめ", "あしか", "だるめしあん", "めだか"]
+                }
+            ];
+
+            // --- DOM要素 ---
+            const boardContainer = document.getElementById('board-container');
+            const wordList = document.getElementById('word-list');
+            const clearMessage = document.getElementById('clear-message');
+            const levelSelect = document.getElementById('level-select');
+            const resetBtn = document.getElementById('reset-btn');
+            const helpBtn = document.getElementById('help-btn');
+            const modalContainer = document.getElementById('modal-container');
+            const closeBtn = document.getElementById('close-btn');
+
+            // --- ゲーム状態変数 ---
+            let currentLevelIndex = 0;
+            let currentWords = [];
+            let selectedWord = null;
+            let isDragging = false;
+            let draggedCells = [];
+            let cellInfo = {};
+
+            // --- ゲーム全体の初期化 ---
+            function setupApp() {
+                createLevelSelect();
+                addGlobalEventListeners();
+                initializeGame(0);
+            }
+            
+            // --- 特定レベルのゲームを準備 ---
+            function initializeGame(levelIndex) {
+                currentLevelIndex = levelIndex;
+                const level = levels[levelIndex];
+                currentWords = level.words;
+                selectedWord = null;
+                isDragging = false;
+                draggedCells = [];
+                cellInfo = {};
+                clearMessage.style.display = 'none';
+                createBoard(level.board);
+                createWordList(level.words);
+            }
+
+            function createBoard(boardData) {
+                boardContainer.innerHTML = '';
+                const numCols = boardData[0].length;
+                boardContainer.style.gridTemplateColumns = `repeat(${numCols}, auto)`;
+                boardData.forEach((rowStr, r) => {
+                    for (let c = 0; c < rowStr.length; c++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        cell.dataset.row = r;
+                        cell.dataset.col = c;
+                        if (rowStr[c] === '1') {
+                            cell.classList.add('active');
+                            cellInfo[`${r}-${c}`] = { char: '', words: new Set() };
+                        }
+                        boardContainer.appendChild(cell);
+                    }
+                });
+            }
+
+            function createWordList(words) {
+                wordList.innerHTML = '';
+                words.forEach(word => {
+                    const li = document.createElement('li');
+                    li.dataset.word = word;
+                    li.classList.add('word-item');
+                    const checkMark = document.createElement('span');
+                    checkMark.classList.add('check-mark');
+                    checkMark.textContent = '✔';
+                    li.appendChild(checkMark);
+                    const wordText = document.createTextNode(word);
+                    li.appendChild(wordText);
+                    li.addEventListener('click', () => selectWord(li));
+                    wordList.appendChild(li);
+                });
+            }
+
+            function createLevelSelect() {
+                levels.forEach((level, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = level.name;
+                    levelSelect.appendChild(option);
+                });
+            }
+
+            function addGlobalEventListeners() {
+                levelSelect.addEventListener('change', (e) => initializeGame(parseInt(e.target.value, 10)));
+                resetBtn.addEventListener('click', () => initializeGame(currentLevelIndex));
+                helpBtn.addEventListener('click', () => modalContainer.style.display = 'flex');
+                closeBtn.addEventListener('click', () => modalContainer.style.display = 'none');
+                modalContainer.addEventListener('click', (e) => {
+                    if (e.target === modalContainer) modalContainer.style.display = 'none';
+                });
+                boardContainer.addEventListener('mousedown', handleDragStart);
+                boardContainer.addEventListener('touchstart', handleDragStart, { passive: false });
+            }
+            
+            function selectWord(wordElement) {
+                const clickedWord = wordElement.dataset.word;
+                if (wordElement.classList.contains('selected')) {
+                    wordElement.classList.remove('selected');
+                    selectedWord = null;
+                } else {
+                    document.querySelectorAll('.word-item.selected').forEach(item => item.classList.remove('selected'));
+                    wordElement.classList.add('selected');
+                    selectedWord = clickedWord;
+                }
+            }
+            
+            function getCellFromEvent(e) {
+                const touch = e.touches ? e.touches[0] : e;
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (target?.classList.contains('cell') && target.classList.contains('active')) {
+                    return target;
+                }
+                return null;
+            }
+
+            // --- ドラッグ処理 ---
+            function handleDragStart(e) {
+                if (e.type === 'touchstart') e.preventDefault();
+                const cell = getCellFromEvent(e);
+                if (!cell) return;
+
+                isDragging = true;
+                draggedCells = [cell];
+                cell.classList.add('dragging');
+                
+                document.addEventListener('mousemove', handleDragMove);
+                document.addEventListener('mouseup', handleDragEnd);
+                document.addEventListener('touchmove', handleDragMove, { passive: false });
+                document.addEventListener('touchend', handleDragEnd);
+            }
+
+            function handleDragMove(e) {
+                if (e.type === 'touchmove') e.preventDefault();
+                if (!isDragging) return;
+
+                // 文字数オーバーを防止
+                if (selectedWord && draggedCells.length >= selectedWord.length) {
+                    return;
+                }
+
+                const cell = getCellFromEvent(e);
+                if (cell && !draggedCells.includes(cell)) {
+                    const lastCell = draggedCells[draggedCells.length - 1];
+                    const lastRow = parseInt(lastCell.dataset.row);
+                    const lastCol = parseInt(lastCell.dataset.col);
+                    const currentRow = parseInt(cell.dataset.row);
+                    const currentCol = parseInt(cell.dataset.col);
+                    const isAdjacent = Math.abs(lastRow - currentRow) + Math.abs(lastCol - currentCol) === 1;
+                    if (isAdjacent) {
+                        draggedCells.push(cell);
+                        cell.classList.add('dragging');
+                    }
+                }
+            }
+
+            function handleDragEnd() {
+                if (!isDragging) return;
+                isDragging = false;
+                
+                document.removeEventListener('mousemove', handleDragMove);
+                document.removeEventListener('mouseup', handleDragEnd);
+                document.removeEventListener('touchmove', handleDragMove);
+                document.removeEventListener('touchend', handleDragEnd);
+                
+                if (draggedCells.length > 0) {
+                    if (selectedWord) {
+                        placeWord();
+                    } else {
+                        eraseCells(); // 単語未選択時は消去処理
+                    }
+                }
+                document.querySelectorAll('.cell.dragging').forEach(c => c.classList.remove('dragging'));
+                draggedCells = [];
+            }
+
+
+            function uncheckAndCleanWord(wordToClean) {
+                const wordEl = document.querySelector(`.word-item[data-word="${wordToClean}"]`);
+                if (wordEl) wordEl.classList.remove('checked');
+                for (const key in cellInfo) {
+                    if(cellInfo[key]) cellInfo[key].words.delete(wordToClean);
+                }
+            }
+            
+            function placeWord() {
+                // --- 1. 上書き処理 ---
+                draggedCells.forEach((cell, index) => {
+                    const key = `${cell.dataset.row}-${cell.dataset.col}`;
+                    const newChar = selectedWord[index];
+                    const info = cellInfo[key];
+                    const oldChar = info.char;
+                    if (oldChar && oldChar !== newChar) {
+                        const wordsToClean = new Set(info.words);
+                        wordsToClean.forEach(word => uncheckAndCleanWord(word));
+                        info.words.clear();
+                    }
+                });
+                
+                // --- 2. 新しい文字をマスに表示 ---
+                draggedCells.forEach((cell, index) => {
+                    const key = `${cell.dataset.row}-${cell.dataset.col}`;
+                    const newChar = selectedWord[index];
+                    const info = cellInfo[key];
+                    cell.textContent = newChar;
+                    info.char = newChar;
+                });
+                
+                // --- 3. 単語が完成した場合のみ、チェックと関連付けを行う ---
+                if (draggedCells.length === selectedWord.length) {
+                    const wordEl = document.querySelector(`.word-item[data-word="${selectedWord}"]`);
+                    if (wordEl) {
+                        wordEl.classList.add('checked');
+                    }
+                    // マスと単語を関連付ける
+                    draggedCells.forEach((cell) => {
+                        const key = `${cell.dataset.row}-${cell.dataset.col}`;
+                        const info = cellInfo[key];
+                        info.words.add(selectedWord);
+                    });
+                }
+                
+                // --- 4. クリア判定 ---
+                checkGameClear();
+            }
+
+            // マスを消去する新機能
+            function eraseCells() {
+                draggedCells.forEach(cell => {
+                    const key = `${cell.dataset.row}-${cell.dataset.col}`;
+                    const info = cellInfo[key];
+                    const oldChar = info.char;
+
+                    // マスに何か文字が入っていた場合のみ処理
+                    if (oldChar) {
+                        const wordsToClean = new Set(info.words);
+                        wordsToClean.forEach(word => uncheckAndCleanWord(word));
+                        info.words.clear();
+                        cell.textContent = '';
+                        info.char = '';
+                    }
+                });
+                checkGameClear();
+            }
+            
+            function checkGameClear() {
+                if (currentWords.length === 0) return;
+                const allChecked = document.querySelectorAll('.word-item.checked').length === currentWords.length;
+                if (allChecked) {
+                    clearMessage.style.display = 'block';
+                } else {
+                    clearMessage.style.display = 'none';
+                }
+            }
+
+            // --- アプリケーション開始 ---
+            setupApp();
+        });
+    </script>
+</body>
+</html>
