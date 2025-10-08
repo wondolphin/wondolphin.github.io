@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>まっしぐライダー</title>
+    <style>
+        /* ページ全体のスタイル */
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* 上寄せに変更 */
+            background-color: #f0f8ff; /* 明るい空色 */
+            margin: 0;
+            padding-top: 1vh;
+            height: 100vh;
+            overflow: hidden; /* スクロールバーを防止 */
+        }
+
+        h1 {
+            color: #333;
+            margin: 0 0 1vh 0;
+        }
+
+        /* ゲームコンテナ */
+        #game-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start; /* 上揃え */
+            transform: scale(0.85); /* 全体を少し縮小 */
+            transform-origin: top center;
+        }
+
+        /* ゲームの世界（メイン画面） */
+        #game-world {
+            width: 800px;
+            height: 600px;
+            border: 2px solid #333;
+            position: relative; /* 子要素を絶対位置で配置するための基準 */
+            overflow: hidden; /* ワールド外にはみ出たものを隠す */
+            background-color: #e0f7fa; /* 薄いシアン */
+        }
+
+        /* ライダーの共通スタイル */
+        .rider {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            box-sizing: border-box;
+            transition: border 0.1s, opacity 0.1s;
+            cursor: move;
+        }
+        
+        #rider1 { background-color: #0077c2; /* 青 */ }
+        #rider2 { background-color: #e53935; /* 赤 */ }
+
+        /* ゴール */
+        #goal {
+            position: absolute;
+            font-size: 50px;
+            color: #ffc107;
+            cursor: move;
+            width: 50px; /* For drag calculation */
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ツールボックス（効果ブロック置き場） */
+        #toolbox {
+            border: 2px dashed #ccc;
+            padding: 10px;
+            width: 150px;
+            height: fit-content;
+            text-align: center;
+            background-color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #toolbox p {
+            font-weight: bold;
+            margin-top: 15px;
+            margin-bottom: 10px;
+        }
+
+        .toolbox-item {
+            cursor: grab;
+            margin: 5px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .toolbox-item.rider { width: 30px; height: 30px; }
+
+
+        /* 効果ブロックの共通スタイル */
+        .effect-block {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        /* 壁アイテムのスタイル */
+        .wall {
+            position: absolute;
+            background-color: #333;
+            cursor: move;
+        }
+        .h-wall { width: 100px; height: 20px; }
+        .v-wall { width: 20px; height: 100px; }
+
+
+        /* 個別アイテムのスタイル */
+        [data-type="jump"] { background-color: #4CAF50; }
+        [data-type="reverse"] { background-color: #9C27B0; }
+        [data-type="ghost"] { background-color: #9E9E9E; }
+        [data-type="warp"] { background-color: #E91E63; }
+        [data-type="destroyer"] { background-color: #FF4500; }
+        [data-type="rider1"] { background-color: #0077c2; }
+        [data-type="rider2"] { background-color: #e53935; }
+
+
+        /* ゲーム内に設置された効果ブロック */
+        .placed-block {
+            position: absolute;
+            cursor: move;
+            opacity: 0.9;
+        }
+
+        /* ドラッグ中のプレビュー用ゴースト */
+        #drag-ghost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.7;
+            box-sizing: border-box;
+        }
+
+        /* 操作パネル */
+        #controls {
+            margin-top: -30px;
+        }
+
+        button {
+            font-size: 24px; padding: 10px 20px; cursor: pointer; margin: 0 10px;
+            border-radius: 8px; border: none; color: white; transition: background-color 0.2s;
+        }
+
+        #play-button { background-color: #2196F3; }
+        #play-button.playing { background-color: #ff9800; }
+        #reset-button { background-color: #f44336; }
+
+        /* クリアメッセージ */
+        #clear-message {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white; display: flex; align-items: center; justify-content: center;
+            flex-direction: column; z-index: 100; cursor: pointer;
+        }
+        #clear-message h1 {
+            color: #ffc107; font-size: 8em; font-weight: bold; margin: 0;
+            text-shadow: 0 0 10px black, 0 0 25px black, 0 0 40px white;
+        }
+         #clear-message p { font-size: 1.5em; margin-top: 20px; color: white; }
+
+        /* 保存/ロード機能のスタイル */
+        #save-load-controls {
+            position: fixed; bottom: 20px; right: 20px; z-index: 10;
+            display: flex; flex-direction: column-reverse; align-items: flex-end;
+        }
+        #toggle-password-button {
+            background-color: #607D8B; font-size: 18px; padding: 8px 16px;
+        }
+        #password-section {
+            margin-bottom: 10px; padding: 15px; background-color: #ffffff;
+            border: 1px solid #ccc; border-radius: 8px; width: 350px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #password-section p { margin: 5px 0; font-size: 14px; text-align: left; }
+        #password-section textarea, #password-section input {
+            width: 95%; padding: 8px; margin-bottom: 10px;
+            font-family: monospace; border: 1px solid #ddd; border-radius: 4px;
+        }
+        #password-section textarea { resize: none; }
+        #load-button {
+            font-size: 16px; padding: 8px 18px; background-color: #009688;
+        }
+
+        /* 非表示クラス */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <h1>まっしぐライダー</h1>
+
+    <div id="game-container">
+        <!-- ゲーム世界のコンテナ -->
+        <div id="game-world">
+        </div>
+
+        <!-- ツールボックス -->
+        <div id="toolbox">
+            <p>プレイヤー</p>
+            <div class="toolbox-item rider" data-type="rider2" draggable="true"></div>
+            <p>効果ブロック</p>
+            <div class="toolbox-item effect-block" data-type="jump" draggable="true">🥾</div>
+            <div class="toolbox-item effect-block" data-type="reverse" draggable="true">⟷</div>
+            <div class="toolbox-item effect-block" data-type="ghost" draggable="true">👻</div>
+            <div class="toolbox-item effect-block" data-type="warp" draggable="true">🌀</div>
+            <div class="toolbox-item effect-block" data-type="destroyer" draggable="true">💣</div>
+            <p>壁</p>
+            <div class="toolbox-item h-wall" data-type="h-wall" draggable="true" style="background-color: #333;"></div>
+            <div class="toolbox-item v-wall" data-type="v-wall" draggable="true" style="background-color: #333;"></div>
+        </div>
+    </div>
+
+    <!-- 操作パネル -->
+    <div id="controls">
+        <button id="play-button">▶️</button>
+        <button id="reset-button">リセット</button>
+    </div>
+    
+    <!-- 保存/ロード パネル -->
+    <div id="save-load-controls">
+        <button id="toggle-password-button">パスワード</button>
+        <div id="password-section" class="hidden">
+            <p>現在のステージのパスワード:</p>
+            <textarea id="password-display" readonly rows="3"></textarea>
+            <p>パスワードを入力してロード:</p>
+            <input type="text" id="password-input" placeholder="ここにパスワードを貼り付け">
+            <button id="load-button">ロード</button>
+        </div>
+    </div>
+
+    <!-- クリアメッセージ -->
+    <div id="clear-message" class="hidden">
+        <h1>CLEAR!</h1>
+        <p>クリックして続ける</p>
+    </div>
+
+    <!-- ドラッグ中のゴースト要素 -->
+    <div id="drag-ghost" class="hidden"></div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM Elements ---
+        const gameWorld = document.getElementById('game-world');
+        const playButton = document.getElementById('play-button');
+        const resetButton = document.getElementById('reset-button');
+        const clearMessage = document.getElementById('clear-message');
+        const dragGhost = document.getElementById('drag-ghost');
+        const togglePasswordButton = document.getElementById('toggle-password-button');
+        const passwordSection = document.getElementById('password-section');
+        const passwordDisplay = document.getElementById('password-display');
+        const passwordInput = document.getElementById('password-input');
+        const loadButton = document.getElementById('load-button');
+
+        // --- Game State ---
+        let isPlaying = false;
+        let isCleared = false;
+        let gameLoopId;
+        let initialWorldState = "1:50:50;G:700:100"; // Default stage
+
+        // --- Player Objects ---
+        let players = [];
+        
+        // --- Physics & Game Constants ---
+        const GRAVITY = 0.2;
+        const TORQUE = 0.1;
+        const JUMP_FORCE = 7;
+        const MAX_VELOCITY_X = 5; 
+        const MAX_VELOCITY_Y = 8;
+        const SCALE = 0.85;
+
+        const TYPE_MAP = {
+            jump: 'j', reverse: 'r', ghost: 'g', warp: 'w', destroyer: 'd',
+            'h-wall': 'H', 'v-wall': 'V', rider1: '1', rider2: '2', goal: 'G'
+        };
+        const REVERSE_TYPE_MAP = Object.fromEntries(Object.entries(TYPE_MAP).map(([k, v]) => [v, k]));
+
+
+        // --- State Management Functions ---
+        function saveWorldState() {
+            initialWorldState = generatePassword();
+        }
+
+        function generatePassword() {
+            const parts = [];
+            gameWorld.querySelectorAll('.placed-block, .wall, .rider, #goal').forEach(el => {
+                const type = TYPE_MAP[el.dataset.type];
+                const x = Math.round(parseFloat(el.style.left));
+                const y = Math.round(parseFloat(el.style.top));
+                if (type && !isNaN(x) && !isNaN(y)) {
+                    parts.push(`${type}:${x}:${y}`);
+                }
+            });
+            return parts.join(';');
+        }
+
+        function loadWorld(password) {
+            gameWorld.innerHTML = '';
+            
+            if (!password) {
+                password = "1:50:50;G:700:100";
+            }
+            
+            const parts = password.split(';');
+            parts.forEach(part => {
+                const [typeCode, x, y] = part.split(':');
+                if (!typeCode || x === undefined || y === undefined) return;
+                
+                const type = REVERSE_TYPE_MAP[typeCode];
+                if (!type) return;
+
+                const el = document.createElement('div');
+                el.dataset.type = type;
+                el.style.left = `${x}px`;
+                el.style.top = `${y}px`;
+
+                let sourceEl = document.querySelector(`.toolbox-item[data-type="${type}"]`);
+                if (!sourceEl) {
+                    sourceEl = document.createElement('div');
+                    if (type === 'rider1') sourceEl.classList.add('rider');
+                    if (type === 'goal') sourceEl.classList.add('goal');
+                }
+
+
+                if (type === 'rider1') el.id = 'rider1';
+                if (type === 'rider2') el.id = 'rider2';
+                if (type === 'goal') el.id = 'goal';
+                if (!el.id) el.id = 'el-' + Date.now() + Math.random();
+
+                sourceEl.classList.forEach(c => {
+                    if (c !== 'toolbox-item') el.classList.add(c);
+                });
+
+                if (type === 'goal') el.textContent = '☆';
+                
+                if(type.includes('wall')) {
+                    el.classList.add('wall');
+                } else if(!type.includes('rider') && type !== 'goal') {
+                    el.classList.add('placed-block');
+                    el.textContent = sourceEl.textContent;
+                }
+                
+                gameWorld.appendChild(el);
+                makeDraggable(el);
+            });
+        }
+
+        function initializePlayers() {
+             players = [];
+            gameWorld.querySelectorAll('.rider').forEach(el => {
+                const initialX = parseFloat(el.style.left);
+                const initialY = parseFloat(el.style.top);
+                const torqueDir = el.id === 'rider1' ? 1 : -1;
+                el.style.display = 'block';
+                players.push({
+                    el: el,
+                    isFinished: false,
+                    state: { x: initialX, y: initialY, angle: 0 },
+                    velocity: { x: 0, y: 0 },
+                    effects: {
+                        torqueDirection: torqueDir, isGhost: false, ghostTimer: 0,
+                        isDestroyerMode: false, isGrounded: false, warpCooldown: 0,
+                        touchingReverseBlocks: new Set(), touchingDestroyerBlock: new Set(),
+                    }
+                });
+            });
+            
+            players.forEach(p => {
+                updatePlayerAppearance(p);
+                updatePlayerPosition(p);
+            });
+        }
+
+        // --- Reset Functions ---
+        function fullReset() {
+            initialWorldState = "1:50:50;G:700:100";
+            resetToStandby();
+        }
+
+        function resetToStandby() {
+            isPlaying = false;
+            playButton.textContent = '▶️';
+            playButton.classList.remove('playing');
+            passwordSection.classList.add('hidden');
+            
+            if (isCleared) {
+                 clearMessage.classList.add('hidden');
+                 isCleared = false;
+            }
+
+            loadWorld(initialWorldState);
+            initializePlayers();
+            
+            if (gameLoopId) {
+                cancelAnimationFrame(gameLoopId);
+                gameLoopId = null;
+            }
+        }
+        
+        // --- Update & Render ---
+        function updatePlayerAppearance(player) {
+            if (player.effects.isDestroyerMode) {
+                player.el.style.border = '3px solid red';
+                player.el.style.opacity = '1';
+            } else if (player.effects.isGhost) {
+                player.el.style.border = '2px dashed white';
+                player.el.style.opacity = '0.5';
+            } else {
+                player.el.style.border = 'none';
+                player.el.style.opacity = '1';
+            }
+        }
+
+        function updatePlayerPosition(player) {
+            player.el.style.left = `${player.state.x}px`;
+            player.el.style.top = `${player.state.y}px`;
+            player.el.style.transform = `rotate(${player.state.angle}deg)`;
+        }
+
+        // --- Main Game Loop ---
+        function gameLoop() {
+            if (!isPlaying || isCleared) return;
+            
+            players.forEach(player => {
+                if (!player.isFinished) {
+                    updatePlayer(player);
+                }
+            });
+
+            if (!isPlaying) return;
+            
+            const allFinished = players.length > 0 && players.every(p => p.isFinished);
+            
+            if (allFinished) {
+                isCleared = true;
+                isPlaying = false;
+                clearMessage.classList.remove('hidden');
+            }
+            
+            if(isPlaying) {
+                gameLoopId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function updatePlayer(player) {
+            if (checkGoal(player)) {
+                player.isFinished = true;
+                player.el.style.display = 'none';
+                return;
+            }
+
+            player.effects.isGrounded = false;
+            const nextTouchingReverseBlocks = new Set();
+            const nextTouchingDestroyerBlock = new Set();
+
+            if (player.effects.ghostTimer > 0) {
+                player.effects.ghostTimer--;
+                if (player.effects.ghostTimer === 0) {
+                    player.effects.isGhost = false;
+                    updatePlayerAppearance(player);
+                }
+            }
+            if (player.effects.warpCooldown > 0) player.effects.warpCooldown--;
+            
+            checkCollisions(player, nextTouchingReverseBlocks, nextTouchingDestroyerBlock);
+
+            player.velocity.y += GRAVITY;
+            if (player.effects.isGrounded) {
+                player.velocity.x += TORQUE * player.effects.torqueDirection;
+            }
+
+            player.velocity.x = Math.min(Math.max(player.velocity.x, -MAX_VELOCITY_X), MAX_VELOCITY_X);
+            player.velocity.y = Math.max(Math.min(player.velocity.y, MAX_VELOCITY_Y), -MAX_VELOCITY_Y);
+
+            player.state.x += player.velocity.x;
+            player.state.y += player.velocity.y;
+            player.state.angle += player.velocity.x * 2;
+
+
+            if (player.state.y > gameWorld.offsetHeight + player.el.offsetHeight) {
+                resetToStandby();
+                return;
+            }
+
+            updatePlayerPosition(player);
+            
+            player.effects.touchingReverseBlocks = nextTouchingReverseBlocks;
+            player.effects.touchingDestroyerBlock = nextTouchingDestroyerBlock;
+        }
+        
+        const getStyleNum = (elem, style) => parseFloat(elem.style[style]);
+
+        function checkCollisions(player, nextTouchingReverseBlocks, nextTouchingDestroyerBlock) {
+            const riderRect = {
+                left: player.state.x, top: player.state.y,
+                right: player.state.x + player.el.offsetWidth, bottom: player.state.y + player.el.offsetHeight,
+            };
+            
+            if (!player.effects.isGhost) {
+                gameWorld.querySelectorAll('.wall').forEach(wall => {
+                    const wallRect = {
+                        left: getStyleNum(wall, 'left'), top: getStyleNum(wall, 'top'),
+                        right: getStyleNum(wall, 'left') + wall.offsetWidth, bottom: getStyleNum(wall, 'top') + wall.offsetHeight,
+                    };
+                    if (isColliding(riderRect, wallRect)) {
+                        const overlap = {
+                            x: Math.min(riderRect.right, wallRect.right) - Math.max(riderRect.left, wallRect.left),
+                            y: Math.min(riderRect.bottom, wallRect.bottom) - Math.max(riderRect.top, wallRect.top)
+                        };
+                        if (overlap.y < overlap.x && overlap.y > 0) {
+                            if (player.velocity.y >= 0 && riderRect.bottom - overlap.y < wallRect.top + 5) {
+                                player.state.y = wallRect.top - player.el.offsetHeight;
+                                player.velocity.y = 0;
+                                player.effects.isGrounded = true;
+                            }
+                        } else if (overlap.x > 0) {
+                             const pushBack = (player.velocity.x > 0) ? -overlap.x : overlap.x;
+                             player.state.x += pushBack;
+                             player.velocity.x = 0;
+                        }
+                    }
+                });
+            }
+
+            gameWorld.querySelectorAll('.placed-block').forEach(block => {
+                 const blockRect = {
+                    left: getStyleNum(block, 'left'), top: getStyleNum(block, 'top'),
+                    right: getStyleNum(block, 'left') + block.offsetWidth, bottom: getStyleNum(block, 'top') + block.offsetHeight,
+                };
+                if (isColliding(riderRect, blockRect)) {
+                    if (player.effects.isDestroyerMode && block.dataset.type !== 'destroyer') {
+                        block.remove();
+                        player.effects.isDestroyerMode = false;
+                        updatePlayerAppearance(player);
+                        return;
+                    }
+
+                    const type = block.dataset.type;
+                    switch(type) {
+                        case 'jump': player.velocity.y = -JUMP_FORCE; break;
+                        case 'reverse': 
+                            nextTouchingReverseBlocks.add(block.id);
+                            if (!player.effects.touchingReverseBlocks.has(block.id)) {
+                                player.effects.torqueDirection *= -1; 
+                                player.velocity.x *= -1;
+                            }
+                            break;
+                        case 'ghost':
+                            player.effects.isGhost = true;
+                            player.effects.ghostTimer = 120;
+                            updatePlayerAppearance(player);
+                            break;
+                        case 'warp':
+                            if (player.effects.warpCooldown === 0) {
+                                const warpPoints = Array.from(gameWorld.querySelectorAll('.placed-block[data-type="warp"]'));
+                                if (warpPoints.length === 2) {
+                                    const target = warpPoints.find(p => p !== block);
+                                    player.state.x = getStyleNum(target, 'left');
+                                    player.state.y = getStyleNum(target, 'top');
+                                    player.effects.warpCooldown = 30;
+                                }
+                            }
+                            break;
+                        case 'destroyer':
+                            nextTouchingDestroyerBlock.add(block.id);
+                            if (!player.effects.isDestroyerMode) {
+                                player.effects.isDestroyerMode = true;
+                                updatePlayerAppearance(player);
+                            }
+                            break;
+                    }
+                }
+            });
+        }
+        
+        function checkGoal(player) {
+            const goalEl = document.getElementById('goal');
+            if (!goalEl) return false;
+            const goalRect = { left: getStyleNum(goalEl, 'left'), top: getStyleNum(goalEl, 'top'), right: getStyleNum(goalEl, 'left') + goalEl.offsetWidth, bottom: getStyleNum(goalEl, 'top') + goalEl.offsetHeight };
+            const riderRect = { left: player.state.x, top: player.state.y, right: player.state.x + player.el.offsetWidth, bottom: player.state.y + player.el.offsetHeight };
+            return isColliding(riderRect, goalRect);
+        }
+
+        function isColliding(rect1, rect2) {
+            return rect1.left < rect2.right && rect1.right > rect2.left && rect1.top < rect2.bottom && rect1.bottom > rect2.top;
+        }
+
+        // --- Event Listeners ---
+        playButton.addEventListener('click', () => {
+            if (isCleared) return;
+            
+            isPlaying = !isPlaying;
+
+            if (isPlaying) {
+                saveWorldState();
+                playButton.textContent = '⏹️';
+                playButton.classList.add('playing');
+                passwordSection.classList.add('hidden');
+                
+                initializePlayers();
+                
+                gameLoop();
+            } else {
+                resetToStandby();
+            }
+        });
+        resetButton.addEventListener('click', fullReset);
+        clearMessage.addEventListener('click', () => { if(isCleared) resetToStandby(); });
+
+        togglePasswordButton.addEventListener('click', () => {
+            if (isPlaying) return;
+            const isHidden = passwordSection.classList.toggle('hidden');
+            if (!isHidden) {
+                passwordDisplay.value = generatePassword();
+                passwordDisplay.select();
+            }
+        });
+
+        loadButton.addEventListener('click', () => {
+            if (isPlaying) return;
+            loadWorld(passwordInput.value.trim());
+            saveWorldState();
+            passwordInput.value = "";
+            passwordSection.classList.add('hidden');
+        });
+
+        // --- Drag & Drop ---
+        document.querySelectorAll('.toolbox-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                if (isPlaying) { e.preventDefault(); return; }
+                e.dataTransfer.setData('text/plain', item.dataset.type);
+                e.dataTransfer.setDragImage(new Image(), 0, 0); 
+                dragGhost.className = '';
+                item.classList.forEach(c => dragGhost.classList.add(c));
+                dragGhost.classList.remove('toolbox-item');
+
+                dragGhost.style.color = item.style.color;
+                dragGhost.textContent = item.textContent;
+                dragGhost.classList.remove('hidden');
+            });
+            item.addEventListener('dragend', () => dragGhost.classList.add('hidden'));
+        });
+
+        function makeDraggable(element) {
+            element.draggable = true;
+            element.addEventListener('dragstart', (e) => {
+                if (isPlaying) { e.preventDefault(); return; }
+                e.dataTransfer.setData('text/plain', 'move');
+                e.dataTransfer.setData('element-id', element.id);
+                e.dataTransfer.setDragImage(new Image(), 0, 0);
+                dragGhost.className = element.className;
+                dragGhost.classList.remove('hidden');
+                setTimeout(() => element.style.opacity = '0.5', 0);
+            });
+            element.addEventListener('dragend', (e) => {
+                element.style.opacity = '1';
+                dragGhost.classList.add('hidden');
+                if (e.dataTransfer.dropEffect === 'none') {
+                    if (element.id !== 'rider1' && element.id !== 'goal') {
+                        element.remove();
+                    }
+                }
+            });
+        }
+        
+        document.addEventListener('dragover', (e) => {
+            dragGhost.style.left = `${e.clientX - dragGhost.offsetWidth / 2}px`;
+            dragGhost.style.top = `${e.clientY - dragGhost.offsetHeight / 2}px`;
+        });
+        
+        gameWorld.addEventListener('dragover', (e) => { e.preventDefault(); });
+
+        gameWorld.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (isPlaying) return;
+
+            const type = e.dataTransfer.getData('text/plain');
+            const worldRect = gameWorld.getBoundingClientRect();
+            let x = (e.clientX - worldRect.left) / SCALE;
+            let y = (e.clientY - worldRect.top) / SCALE;
+
+            if (type === 'move') {
+                const id = e.dataTransfer.getData('element-id');
+                const el = document.getElementById(id);
+                if (el) {
+                    el.style.left = `${Math.max(0, Math.min(x - el.offsetWidth / 2, gameWorld.offsetWidth - el.offsetWidth))}px`;
+                    el.style.top = `${Math.max(0, Math.min(y - el.offsetHeight / 2, gameWorld.offsetHeight - el.offsetHeight))}px`;
+                }
+                return;
+            }
+            
+            const sourceEl = document.querySelector(`.toolbox-item[data-type="${type}"]`);
+            if(!sourceEl) return;
+            
+            if (type === 'rider2') {
+                const existing = document.getElementById('rider2');
+                if (existing) existing.remove();
+            }
+
+            const el = document.createElement('div');
+            el.dataset.type = type;
+            if (type === 'rider2') el.id = 'rider2';
+            if (!el.id) el.id = 'el-' + Date.now();
+
+            sourceEl.classList.forEach(c => {
+                if (c !== 'toolbox-item') el.classList.add(c);
+            });
+
+            if(type.includes('wall')) {
+                el.classList.add('wall');
+            } else if(!type.includes('rider') && type !== 'goal') {
+                el.classList.add('placed-block');
+            }
+            el.textContent = sourceEl.textContent;
+
+            el.style.left = `${Math.max(0, Math.min(x - sourceEl.offsetWidth / 2, gameWorld.offsetWidth - sourceEl.offsetWidth))}px`;
+            el.style.top = `${Math.max(0, Math.min(y - sourceEl.offsetHeight / 2, gameWorld.offsetHeight - sourceEl.offsetHeight))}px`;
+            
+            gameWorld.appendChild(el);
+            makeDraggable(el);
+        });
+
+        fullReset();
+    });
+    </script>
+</body>
+</html>
+
