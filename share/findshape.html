@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ずけいさがし</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://css.gg/css2?family=Mochiy+Pop+One&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Mochiy Pop One', sans-serif;
+            background-color: #f0f9ff;
+        }
+
+        /* 問題図の各ピースのスタイル */
+        #puzzle-svg polygon {
+            opacity: 1; 
+            fill: transparent; /* デフォルトの塗りは透明にする */
+            cursor: pointer;
+            transition: fill 0.2s ease-in-out, opacity 0.2s ease-in-out;
+        }
+
+        /* 選択されたピースのスタイル */
+        #puzzle-svg polygon.filled {
+            fill: #fbbf24; /* amber-400 */
+            opacity: 0.8;
+        }
+        
+        /* 正解時に、選択されたピースを黄色くする */
+        #puzzle-svg polygon.filled.cleared {
+            fill: #fde047; /* yellow-300 */
+            opacity: 1;
+        }
+
+        /* クリア時のアニメーション */
+        @keyframes glowing {
+            0% {
+                filter: drop-shadow(0 0 5px #fef08a);
+            }
+            50% {
+                filter: drop-shadow(0 0 20px #fde047);
+            }
+            100% {
+                filter: drop-shadow(0 0 5px #fef08a);
+            }
+        }
+
+        .glowing {
+            animation: glowing 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <h1 class="text-4xl md:text-5xl font-bold text-center text-blue-800 mb-8">ずけいさがし</h1>
+
+        <div class="flex flex-col lg:flex-row items-center justify-center gap-8 bg-white p-6 rounded-2xl shadow-lg">
+
+            <!-- 左側：探す形エリア -->
+            <div id="question-container" class="w-full lg:w-1/3 flex flex-col items-center p-4 border-2 border-dashed border-blue-300 rounded-xl bg-blue-50">
+                <h2 class="text-2xl font-semibold mb-4 text-blue-700">さがす かたち</h2>
+                <div id="question-svg-wrapper" class="w-48 h-48 md:w-64 md:h-64 flex justify-center items-center">
+                    <!-- 探す形のSVGデータ (JSで表示を切り替える) -->
+                    <svg id="q1" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
+                        <polygon points="387.68 192.57 312.6 192.57 312.6 192.57 312.6 192.57 275.05 127.54 237.51 192.57 237.51 192.57 162.42 192.57 199.96 257.6 162.42 322.63 237.51 322.63 275.05 387.66 312.6 322.63 387.68 322.63 350.14 257.6 387.68 192.57" fill="#d1d5db" stroke="#f97316" stroke-miterlimit="10" stroke-width="8"/>
+                    </svg>
+                    <svg id="q2" xmlns="http://www.w3.org/2000/svg" class="w-full h-full hidden">
+                        <polygon points="274.42 574.07 252.02 535.27 274.42 496.47 319.22 496.47 364.02 496.47 341.62 457.67 319.22 418.87 274.42 418.87 229.62 418.87 207.22 457.67 184.82 496.47 162.42 535.27 184.82 574.07 184.82 574.07 207.22 612.87 207.22 612.87 207.22 612.87 229.62 651.67 274.42 651.67 319.22 651.67 341.62 612.87 364.02 574.07 319.22 574.07 274.42 574.07" fill="#d1d5db" stroke="#f97316" stroke-miterlimit="10" stroke-width="8"/>
+                    </svg>
+                    <svg id="q3" xmlns="http://www.w3.org/2000/svg" class="w-full h-full hidden">
+                        <polygon points="692.97 243.17 663 191.27 633.04 243.17 573.12 243.17 543.16 191.27 513.19 243.17 483.23 295.06 513.19 346.96 573.12 346.96 633.04 346.96 692.97 346.96 722.93 295.06 692.97 243.17" fill="#d1d5db" stroke="#f97316" stroke-miterlimit="10" stroke-width="8"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- 右側：問題図エリア -->
+            <div id="puzzle-container" class="w-full lg:w-2/3">
+                <!-- 問題図のSVGデータ -->
+                <svg id="puzzle-svg" xmlns="http://www.w3.org/2000/svg" viewBox="270 115 770 550" class="w-full h-auto">
+                    <polygon id="area01" points="506.29 127.54 468.75 192.57 543.83 192.57 506.29 127.54" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area02" points="806.64 127.54 769.1 192.57 844.19 192.57 806.64 127.54" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area03" points="881.73 127.54 806.64 127.54 844.19 192.57 919.28 192.57 881.73 127.54" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area04" points="731.56 127.54 656.47 127.54 694.01 192.57 769.1 192.57 806.64 127.54 731.56 127.54" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area05" points="656.47 127.54 581.38 127.54 506.29 127.54 543.83 192.57 618.92 192.57 694.01 192.57 656.47 127.54" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area06" points="881.73 257.6 919.28 192.57 844.19 192.57 881.73 257.6" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area07" points="731.56 257.6 694.01 322.63 769.1 322.63 731.56 257.6" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area08" points="881.73 257.6 844.19 322.63 919.28 322.63 881.73 257.6" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area09" points="956.82 257.6 919.28 192.57 881.73 257.6 919.28 322.63 994.37 322.63 956.82 257.6" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area10" points="694.01 192.57 618.92 192.57 543.83 192.57 581.38 257.6 618.92 322.63 694.01 322.63 731.56 257.6 694.01 192.57" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area11" points="581.38 257.6 543.83 192.57 468.75 192.57 431.2 257.6 393.66 322.63 468.75 322.63 543.83 322.63 618.92 322.63 581.38 257.6" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area12" points="393.66 192.57 356.11 257.6 393.66 322.63 431.2 257.6 468.75 192.57 393.66 192.57" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area13" points="844.19 192.57 769.1 192.57 694.01 192.57 731.56 257.6 769.1 322.63 806.64 387.66 844.19 322.63 881.73 257.6 844.19 192.57" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area15" points="656.47 387.66 694.01 322.63 618.92 322.63 656.47 387.66" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area16" points="431.2 387.66 468.75 322.63 393.66 322.63 431.2 387.66" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area17" points="656.47 387.66 618.92 452.69 694.01 452.69 656.47 387.66" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area18" points="1028.86 387.66 992.84 325.27 994.37 322.63 919.28 322.63 881.73 387.66 919.28 452.69 994.37 452.69 992.84 450.05 1028.86 387.66" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area19" points="919.28 322.63 844.19 322.63 806.64 387.66 844.19 452.69 919.28 452.69 881.73 387.66 919.28 322.63" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area20" points="806.64 387.66 769.1 322.63 731.56 387.66 694.01 452.69 769.1 452.69 844.19 452.69 806.64 387.66" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area21" points="694.01 322.63 656.47 387.66 694.01 452.69 731.56 387.66 769.1 322.63 694.01 322.63" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area22" points="618.92 322.63 543.83 322.63 468.75 322.63 506.29 387.66 543.83 452.69 618.92 452.69 656.47 387.66 618.92 322.63" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area23" points="506.29 387.66 468.75 322.63 431.2 387.66 468.75 452.69 543.83 452.69 506.29 387.66" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area24" points="694.01 452.69 656.47 517.72 731.56 517.72 694.01 452.69" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area25" points="844.19 452.69 806.64 517.72 881.73 517.72 844.19 452.69" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area26" points="881.73 517.72 919.28 452.69 844.19 452.69 881.73 517.72" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area27" points="919.28 452.69 881.73 517.72 956.82 517.72 994.37 452.69 919.28 452.69" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area28" points="769.1 452.69 694.01 452.69 731.56 517.72 806.64 517.72 844.19 452.69 769.1 452.69" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area29" points="618.92 452.69 581.38 517.72 656.47 517.72 694.01 452.69 618.92 452.69" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area30" points="581.38 517.72 618.92 452.69 543.83 452.69 581.38 517.72" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area31" points="543.83 452.69 468.75 452.69 431.2 387.66 393.66 452.69 356.11 517.72 431.2 517.72 506.29 517.72 581.38 517.72 543.83 452.69" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area32" points="393.66 322.63 356.11 257.6 318.57 322.63 281.02 387.66 318.57 452.69 318.57 452.69 356.11 517.72 356.11 517.72 356.11 517.72 393.66 452.69 431.2 387.66 393.66 322.63" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area33" points="618.92 582.74 656.47 517.72 581.38 517.72 618.92 582.74" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area34" points="506.29 517.72 431.2 517.72 356.11 517.72 393.66 582.74 468.75 582.74 543.83 582.74 581.38 517.72 506.29 517.72" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area35" points="881.73 517.72 806.64 517.72 769.1 582.74 731.56 647.77 806.64 647.77 881.73 647.77 919.28 582.74 881.73 517.72" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area36" points="731.56 517.72 656.47 517.72 618.92 582.74 656.47 647.77 731.56 647.77 769.1 582.74 806.64 517.72 731.56 517.72" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/><polygon id="area37" points="618.92 582.74 581.38 517.72 543.83 582.74 468.75 582.74 393.66 582.74 431.2 647.77 506.29 647.77 581.38 647.77 656.47 647.77 618.92 582.74" stroke="#f7931e" stroke-miterlimit="10" stroke-width="5" stroke-linejoin="round"/>
+                </svg>
+            </div>
+
+        </div>
+        
+        <!-- 下部：ボタンとメッセージエリア -->
+        <div id="controls" class="text-center mt-6 h-16">
+            <button id="next-btn" class="hidden bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg transform hover:scale-105 transition-transform duration-200">
+                つぎのもんだいへ！
+            </button>
+            <p id="clear-message" class="hidden text-3xl font-bold text-yellow-500">ぜんぶクリア！おめでとう！</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // ゲームデータ
+            const questions = [
+                { id: 'q1', solution: new Set(['area02', 'area06', 'area07', 'area08', 'area13']) },
+                { id: 'q3', solution: new Set(['area24', 'area25', 'area35', 'area36']) },
+                { id: 'q2', solution: new Set(['area11', 'area12', 'area16', 'area30', 'area31', 'area32', 'area34']) }
+            ];
+            let currentQuestionIndex = 0;
+            let selectedAreas = new Set();
+            let isCleared = false;
+
+            // DOM要素
+            const puzzlePolygons = document.querySelectorAll('#puzzle-svg polygon');
+            const questionSvgs = questions.map(q => document.getElementById(q.id));
+            const nextButton = document.getElementById('next-btn');
+            const clearMessage = document.getElementById('clear-message');
+
+            /**
+             * "さがすかたち"のSVGをコンテナの中央に最適な大きさで表示するよう調整する
+             * @param {SVGElement} svg - 対象のSVG要素
+             */
+            const adjustQuestionSvgViewBox = (svg) => {
+                const polygon = svg.querySelector('polygon');
+                if (!polygon) return;
+
+                const pointsAttr = polygon.getAttribute('points').trim();
+                const coords = pointsAttr.split(/\s+/).map(Number);
+
+                if (coords.length < 2) return;
+
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+                for (let i = 0; i < coords.length; i += 2) {
+                    const x = coords[i];
+                    const y = coords[i+1];
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+
+                const width = maxX - minX;
+                const height = maxY - minY;
+
+                if (width === 0 || height === 0) return;
+
+                const paddingX = width * 0.15;
+                const paddingY = height * 0.15;
+                
+                const viewBoxX = minX - paddingX;
+                const viewBoxY = minY - paddingY;
+                const viewBoxWidth = width + paddingX * 2;
+                const viewBoxHeight = height + paddingY * 2;
+                
+                svg.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`);
+            };
+
+            // 問題を設定する関数
+            const setupQuestion = (index) => {
+                isCleared = false;
+                selectedAreas.clear();
+
+                questionSvgs.forEach((svg, i) => {
+                    const isCurrent = i === index;
+                    svg.classList.toggle('hidden', !isCurrent);
+                    svg.classList.remove('glowing', 'cleared');
+
+                    if (isCurrent) {
+                        adjustQuestionSvgViewBox(svg);
+                    }
+
+                    const poly = svg.querySelector('polygon');
+                    if (poly) poly.setAttribute('fill', '#d1d5db');
+                });
+                
+                puzzlePolygons.forEach(p => {
+                    p.classList.remove('filled', 'glowing', 'cleared');
+                });
+                
+                nextButton.classList.add('hidden');
+                clearMessage.classList.add('hidden');
+            };
+
+            // 正解をチェックする関数
+            const checkSolution = () => {
+                if (isCleared) return;
+                
+                const currentSolution = questions[currentQuestionIndex].solution;
+                
+                if (selectedAreas.size === currentSolution.size && [...selectedAreas].every(id => currentSolution.has(id))) {
+                    handleCorrect();
+                }
+            };
+            
+            // 正解時の処理
+            const handleCorrect = () => {
+                isCleared = true;
+                const currentQuestionSvg = questionSvgs[currentQuestionIndex];
+                currentQuestionSvg.classList.add('glowing');
+                const poly = currentQuestionSvg.querySelector('polygon');
+                if (poly) poly.setAttribute('fill', '#fde047');
+
+                selectedAreas.forEach(id => {
+                    const piece = document.getElementById(id);
+                    if (piece) {
+                        piece.classList.add('glowing', 'cleared');
+                    }
+                });
+
+                if (currentQuestionIndex < questions.length - 1) {
+                    nextButton.classList.remove('hidden');
+                } else {
+                    clearMessage.classList.remove('hidden');
+                }
+            };
+
+            // 問題図のピースがクリックされたときの処理
+            puzzlePolygons.forEach(polygon => {
+                polygon.addEventListener('click', () => {
+                    if (isCleared) return;
+
+                    const id = polygon.id;
+                    polygon.classList.toggle('filled');
+
+                    if (selectedAreas.has(id)) {
+                        selectedAreas.delete(id);
+                    } else {
+                        selectedAreas.add(id);
+                    }
+                    checkSolution();
+                });
+            });
+            
+            // 「次の問題へ」ボタンがクリックされたときの処理
+            nextButton.addEventListener('click', () => {
+                currentQuestionIndex++;
+                if (currentQuestionIndex < questions.length) {
+                    setupQuestion(currentQuestionIndex);
+                }
+            });
+
+            // ゲーム開始
+            setupQuestion(currentQuestionIndex);
+        });
+    </script>
+</body>
+</html>
+
