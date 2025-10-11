@@ -279,6 +279,7 @@
                 document.querySelectorAll('.clickable').forEach(el => {
                     el.style.pointerEvents = 'none';
                 });
+                window.parent.postMessage({ event: 'gameCleared', gameName: 'game13' }, '*');
                 
                 setTimeout(() => {
                     const overlay = document.getElementById('clear-overlay');
