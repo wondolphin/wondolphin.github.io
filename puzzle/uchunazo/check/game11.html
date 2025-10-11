@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>じゅんぐりピラミッド</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* カスタムスタイル */
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            touch-action: manipulation; /* スマホでのダブルタップズームを無効化 */
+        }
+        .lamp {
+            transition: all 0.3s ease;
+        }
+        .ball {
+            transition: all 0.3s ease; /* fill, stroke, stroke-widthなどをまとめてアニメーション */
+            cursor: pointer;
+        }
+        .ball.valid-move {
+            filter: url(#inner-glow); /* SVGフィルターを適用 */
+            /* stroke: #22d3ee; */ /* 枠線でのハイライトは停止 */
+            /* stroke-width: 4px; */
+            /* stroke-opacity: 0.9; */
+        }
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -20;
+            }
+        }
+        .clear-overlay {
+            animation: fadeIn 0.5s ease forwards, pulse 1.5s ease infinite 0.5s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-white flex flex-col items-center justify-center min-h-screen p-2 sm:p-4 overflow-hidden">
+
+    <div id="game-container" class="w-full max-w-2xl mx-auto flex flex-col items-center">
+        <!-- タイトル -->
+        <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold my-2 text-gray-200 tracking-wider">じゅんぐりピラミッド</h1>
+
+        <!-- 判定ランプ -->
+        <div id="lamps-container" class="flex justify-center space-x-4 sm:space-x-8 my-2 mb-0">
+            <!-- ランプセットがここに動的に生成されます -->
+        </div>
+
+        <!-- 盤面 -->
+        <div id="board-container" class="w-full max-w-md aspect-[8/5]">
+            <svg id="game-board" viewBox="-50 0 800 500" width="100%" height="100%"></svg>
+        </div>
+
+        <!-- リセットボタン -->
+        <button id="reset-button" class="px-8 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 active:bg-indigo-800 transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-100 mt-2">
+            リセット
+        </button>
+
+        <!-- クリア表示 -->
+        <div id="clear-overlay" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center cursor-pointer">
+            <span class="text-6xl sm:text-8xl md:text-9xl font-black text-yellow-300 clear-overlay" style="text-shadow: 0 0 20px yellow;">CLEAR!</span>
+        </div>
+    </div>
+
+    <script>
+        // DOM要素の取得
+        const boardElement = document.getElementById('game-board');
+        const lampsContainer = document.getElementById('lamps-container');
+        const resetButton = document.getElementById('reset-button');
+        const clearOverlay = document.getElementById('clear-overlay');
+
+        // ゲーム設定
+        const PLAYERS = {
+            1: { color: '#EF4444', name: 'red' },   // 赤
+            2: { color: '#3B82F6', name: 'blue' },  // 青
+            3: { color: '#22C55E', name: 'green' }, // 緑
+            4: { color: '#EAB308', name: 'yellow'}, // 黄
+        };
+        const EMPTY_COLOR = '#4B5563'; // 灰色
+        const LAMP_OFF_COLOR = '#374151'; // 暗い灰色
+        const BOARD_LAYOUT = [
+            { cells: 1, y: 115, startX: 350 },
+            { cells: 2, y: 184, startX: 310 },
+            { cells: 3, y: 253, startX: 270 },
+            { cells: 4, y: 322, startX: 230 },
+            { cells: 5, y: 391, startX: 190 },
+            { cells: 6, y: 460, startX: 150 }
+        ];
+        const BALL_RADIUS = 40;
+        const BALL_SPACING = 80;
+
+        // ゲーム状態
+        let state = {};
+
+        // 盤面の円の座標情報を生成
+        const mainBoardCoords = BOARD_LAYOUT.map((rowInfo, r) => {
+            return Array.from({ length: rowInfo.cells }, (_, c) => ({
+                r,
+                c,
+                cx: rowInfo.startX + c * BALL_SPACING,
+                cy: rowInfo.y,
+            }));
+        }).flat();
+
+        const boardCoords = mainBoardCoords;
+
+        // ゲームの初期化
+        function init() {
+            state = {
+                board: BOARD_LAYOUT.map(row => Array(row.cells).fill(0)),
+                currentPlayer: 1,
+                scores: { 1: 0, 2: 0, 3: 0, 4: 0 },
+                gameOver: false,
+            };
+            drawInitialBoard();
+            drawLamps();
+            update();
+        }
+        
+        // 初回描画（SVG要素の生成）
+        function drawInitialBoard() {
+            boardElement.innerHTML = '';
+
+            // 内側グロー効果のSVGフィルターを定義（再挑戦）
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            defs.innerHTML = `
+                <filter id="inner-glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <!-- 元の図形の形をぼかす -->
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="blur"/>
+                    
+                    <!-- ぼかした形を反転させる（これにより光が内側に向かう） -->
+                    <feComponentTransfer in="blur" result="invBlur">
+                        <feFuncA type="table" tableValues="1 0"/>
+                    </feComponentTransfer>
+                    
+                    <!-- 光の色を定義 -->
+                    <feFlood flood-color="#FFFFFF" flood-opacity="0.7" result="color"/>
+                    
+                    <!-- 反転させたぼかしをマスクにして、光の色を切り抜く -->
+                    <feComposite in="color" in2="invBlur" operator="in" result="clippedGlow"/>
+                    
+                    <!-- 切り抜いた光を、元の図形の内側だけに合成する -->
+                    <feComposite in="clippedGlow" in2="SourceGraphic" operator="in" result="innerGlow"/>
+                    
+                    <!-- 最後に、元の図形と内側の光を重ねて表示する -->
+                    <feMerge>
+                        <feMergeNode in="SourceGraphic"/>
+                        <feMergeNode in="innerGlow"/>
+                    </feMerge>
+                </filter>
+            `;
+            boardElement.appendChild(defs);
+
+            boardCoords.forEach(coord => {
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', coord.cx);
+                circle.setAttribute('cy', coord.cy);
+                circle.setAttribute('r', BALL_RADIUS);
+                circle.setAttribute('fill', EMPTY_COLOR);
+                circle.setAttribute('data-r', coord.r);
+                circle.setAttribute('data-c', coord.c);
+                circle.classList.add('ball');
+                boardElement.appendChild(circle);
+            });
+        }
+
+        // 判定ランプの生成
+        function drawLamps() {
+            lampsContainer.innerHTML = '';
+            Object.values(PLAYERS).forEach(player => {
+                const lampSet = document.createElement('div');
+                lampSet.className = 'flex items-center space-x-2 sm:space-x-3';
+                lampSet.style.borderBottom = `4px solid ${player.color}`;
+                lampSet.style.paddingBottom = '4px';
+                
+                for (let i = 0; i < 3; i++) {
+                    const lamp = document.createElement('div');
+                    lamp.className = 'lamp w-6 h-6 sm:w-7 sm:h-7 rounded-full';
+                    lamp.style.backgroundColor = LAMP_OFF_COLOR;
+                    lamp.dataset.colorName = player.name;
+                    lampSet.appendChild(lamp);
+                }
+                lampsContainer.appendChild(lampSet);
+            });
+        }
+        
+        // 状態に基づいて画面を更新
+        function update() {
+            updateBoardVisuals();
+            updateLampsVisuals();
+            
+            const validMoves = getValidMoves();
+            highlightValidMoves(validMoves);
+        }
+
+        // 盤面のボールの色を更新
+        function updateBoardVisuals() {
+            const circles = boardElement.querySelectorAll('circle');
+            circles.forEach(circle => {
+                const r = parseInt(circle.dataset.r);
+                const c = parseInt(circle.dataset.c);
+                const player = state.board[r][c];
+                circle.setAttribute('fill', player ? PLAYERS[player].color : EMPTY_COLOR);
+            });
+        }
+
+        // 判定ランプの点灯状態を更新
+        function updateLampsVisuals() {
+            Object.entries(state.scores).forEach(([playerId, score]) => {
+                const player = PLAYERS[playerId];
+                const playerLamps = lampsContainer.querySelectorAll(`[data-color-name="${player.name}"]`);
+                playerLamps.forEach((lamp, i) => {
+                    lamp.style.backgroundColor = i < score ? player.color : LAMP_OFF_COLOR;
+                    if (i < score) {
+                        lamp.style.boxShadow = `0 0 8px ${player.color}`;
+                    } else {
+                        lamp.style.boxShadow = 'none';
+                    }
+                });
+            });
+        }
+
+        // 配置可能なマスをハイライト
+        function highlightValidMoves(moves) {
+            const circles = boardElement.querySelectorAll('circle');
+            circles.forEach(circle => circle.classList.remove('valid-move'));
+            if (state.gameOver) return;
+            
+            moves.forEach(move => {
+                const circle = boardElement.querySelector(`[data-r="${move.r}"][data-c="${move.c}"]`);
+                if (circle) circle.classList.add('valid-move');
+            });
+        }
+
+        // 配置可能なマスを計算
+        function getValidMoves() {
+            if (state.gameOver) return [];
+            const moves = [];
+            for (let r = 0; r < state.board.length; r++) {
+                for (let c = 0; c < state.board[r].length; c++) {
+                    if (isValidMove(r, c)) {
+                        moves.push({ r, c });
+                    }
+                }
+            }
+            return moves;
+        }
+
+        // 特定のマスが配置可能か判定
+        function isValidMove(r, c) {
+            // すでにボールがある場合は不可
+            if (state.board[r][c] !== 0) return false;
+            // 最下段の場合、空いていれば常に可能
+            if (r === state.board.length - 1) return true;
+            // それ以外の段は、下の2つのボールが埋まっているかチェック
+            const isSupported = state.board[r + 1][c] !== 0 && state.board[r + 1][c + 1] !== 0;
+            return isSupported;
+        }
+
+        // マスがクリックされた時の処理
+        function handleCellClick(e) {
+            if (state.gameOver || !e.target.matches('.ball')) return;
+            const r = parseInt(e.target.dataset.r);
+            const c = parseInt(e.target.dataset.c);
+
+            const allValidMoves = getValidMoves();
+            const isMoveValid = allValidMoves.some(move => move.r === r && move.c === c);
+
+            if (!isMoveValid) return;
+
+            // ボールを置く
+            state.board[r][c] = state.currentPlayer;
+            
+            // スコアを更新
+            const maxLine = calculateMaxLineForPlayer(state.currentPlayer);
+            state.scores[state.currentPlayer] = Math.max(state.scores[state.currentPlayer], maxLine);
+            
+            // 画面更新
+            update();
+
+            // ゲームクリアの判定
+            const isWin = Object.values(state.scores).every(score => score >= 3);
+            if (isWin) {
+                state.gameOver = true;
+                window.parent.postMessage({ event: 'gameCleared', gameName: 'game11' }, '*');
+                highlightValidMoves([]); // ハイライトを消す
+                setTimeout(() => {
+                    clearOverlay.classList.remove('hidden');
+                }, 500);
+                return;
+            }
+
+            // 引き分けの判定
+            const isBoardFull = state.board.flat().every(cell => cell !== 0);
+            if (isBoardFull) {
+                state.gameOver = true;
+                highlightValidMoves([]);
+                return;
+            }
+            
+            // 次のプレイヤーへ
+            state.currentPlayer = (state.currentPlayer % 4) + 1;
+            
+            // 次のターンの有効な手をハイライト
+            highlightValidMoves(getValidMoves());
+        }
+
+        // プレイヤーの最長列を計算
+        function calculateMaxLineForPlayer(player) {
+            let maxLine = 0;
+            const isPlayerBall = (r, c) => state.board[r]?.[c] === player;
+
+            for (let r = 0; r < state.board.length; r++) {
+                for (let c = 0; c < state.board[r].length; c++) {
+                    if (!isPlayerBall(r, c)) continue;
+
+                    // → (水平)
+                    let count = 1;
+                    while(isPlayerBall(r, c + count)) count++;
+                    if (count > maxLine) maxLine = count;
+
+                    // ↘ (斜め右下)
+                    count = 1;
+                    while(isPlayerBall(r + count, c + count)) count++;
+                    if (count > maxLine) maxLine = count;
+
+                    // ↙ (斜め左下)
+                    count = 1;
+                    while(isPlayerBall(r + count, c)) count++;
+                    if (count > maxLine) maxLine = count;
+                }
+            }
+            return Math.min(maxLine, 3);
+        }
+        
+        // イベントリスナーの設定
+        boardElement.addEventListener('click', handleCellClick);
+        resetButton.addEventListener('click', init);
+        clearOverlay.addEventListener('click', () => {
+            clearOverlay.classList.add('hidden');
+        });
+
+        // ゲーム開始
+        init();
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

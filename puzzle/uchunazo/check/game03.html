@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Independent Order</title>
+    <style>
+        :root {
+            --board-size: min(65vmin, 420px);
+            --cell-size: calc(var(--board-size) / 7);
+            --gap-size: calc(var(--board-size) / 100);
+            --bg-color: #1a1a2e;
+            --cell-bg: #16213e;
+            --light-off: #0f3460;
+            --light-on-glow: #c3e88d;
+            --selected-glow: #53bf9d;
+            --dimmed-color: #c0c0c0;
+            --font-color: #e3e3e3;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--font-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .game-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: clamp(5px, 1.5vmin, 12px);
+            width: 95vw;
+            max-width: 500px;
+        }
+
+        h1 {
+            font-size: clamp(1.5rem, 7vmin, 3rem);
+            margin: 0;
+            color: var(--font-color);
+            text-shadow: 0 0 10px var(--light-on-glow), 0 0 20px var(--light-on-glow);
+            letter-spacing: 2px;
+        }
+
+        .lights-container {
+            display: flex;
+            justify-content: center;
+            gap: calc(var(--gap-size) * 3);
+        }
+
+        .light {
+            width: calc(var(--cell-size) * 0.5);
+            height: calc(var(--cell-size) * 0.5);
+            background-color: var(--light-off);
+            border-radius: 50%;
+            border: 2px solid #000;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        .light.on {
+            background-color: var(--light-on-glow);
+            box-shadow: 0 0 10px var(--light-on-glow), 0 0 20px var(--light-on-glow), inset 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(7, var(--cell-size));
+            grid-template-rows: repeat(7, var(--cell-size));
+            gap: var(--gap-size);
+            background-color: #000;
+            padding: var(--gap-size);
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .cell {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: var(--cell-bg);
+            border-radius: 5px;
+            font-size: calc(var(--cell-size) * 0.5);
+            font-weight: bold;
+            color: var(--font-color);
+            user-select: none;
+            cursor: default;
+            transition: all 0.3s ease;
+        }
+
+        .cell.light-on {
+            cursor: pointer;
+            background-color: var(--light-on-glow);
+            color: #fff;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px var(--light-on-glow);
+            animation: pulse 1.5s infinite;
+        }
+
+        .cell.selected {
+            background-color: var(--selected-glow);
+            color: #fff;
+            transform: scale(1.1);
+            box-shadow: 0 0 20px var(--selected-glow);
+            z-index: 2;
+        }
+        
+        .cell.dimmed {
+            background-color: #2a2a3e;
+            color: var(--dimmed-color);
+            opacity: 0.4;
+            transform: scale(0.95);
+        }
+
+        .clear-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(3rem, 15vw, 8rem);
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px var(--selected-glow), 0 0 20px var(--selected-glow), 0 0 40px var(--selected-glow);
+            cursor: pointer;
+            z-index: 10;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s, visibility 0.5s;
+            animation: clear-text-anim 2s ease-in-out;
+        }
+
+        .clear-message.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #reset-button {
+            padding: clamp(6px, 1.2vmin, 10px) clamp(18px, 3.5vmin, 28px);
+            font-size: clamp(0.9rem, 2.5vmin, 1.1rem);
+            font-weight: bold;
+            color: var(--font-color);
+            background-color: var(--cell-bg);
+            border: 2px solid var(--selected-glow);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+        }
+
+        #reset-button:hover {
+            background-color: var(--selected-glow);
+            color: var(--bg-color);
+            box-shadow: 0 0 15px var(--selected-glow);
+            transform: translateY(-2px);
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 15px var(--light-on-glow); }
+            50% { box-shadow: 0 0 25px var(--light-on-glow); }
+            100% { box-shadow: 0 0 15px var(--light-on-glow); }
+        }
+
+        @keyframes clear-text-anim {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>Independent Order</h1>
+        <div class="lights-container" id="lights-container"></div>
+        <div class="board" id="board"></div>
+        <button id="reset-button">リセット</button>
+    </div>
+
+    <div class="clear-message" id="clear-message">CLEAR!</div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const boardElement = document.getElementById('board');
+            const lightsContainer = document.getElementById('lights-container');
+            const clearMessageElement = document.getElementById('clear-message');
+            const resetButton = document.getElementById('reset-button');
+
+            const BOARD_SIZE = 7;
+            // 盤面のデータを更新
+            const boardData = [
+[	2,	3,	4,	1,	3,	2,	3	],
+[	6,	5,	6,	5,	6,	5,	4	],
+[	3,	4,	5,	6,	5,	2,	5	],
+[	1,	2,	3,	7,	4,	1,	2	],
+[	3,	5,	4,	3,	5,	6,	3	],
+[	4,	6,	5,	2,	4,	2,	4	],
+[	2,	3,	2,	1,	3,	1,	2	]
+            ];
+
+            let currentStep;
+            let dimmedRows;
+            let dimmedCols;
+            let selectedCells;
+
+            function initGame() {
+                // 状態をリセット
+                currentStep = 1;
+                dimmedRows = new Set();
+                dimmedCols = new Set();
+                selectedCells = [];
+                
+                // HTML要素をクリア
+                boardElement.innerHTML = '';
+                lightsContainer.innerHTML = '';
+                clearMessageElement.classList.remove('show');
+
+                // ライトを生成
+                for (let i = 0; i < BOARD_SIZE; i++) {
+                    const light = document.createElement('div');
+                    light.classList.add('light');
+                    lightsContainer.appendChild(light);
+                }
+
+                // 盤面を生成
+                boardData.forEach((rowData, r) => {
+                    rowData.forEach((cellValue, c) => {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        cell.dataset.row = r;
+                        cell.dataset.col = c;
+                        cell.dataset.value = cellValue;
+                        cell.textContent = cellValue;
+                        cell.addEventListener('click', handleCellClick);
+                        boardElement.appendChild(cell);
+                    });
+                });
+                
+                updateBoardState();
+            }
+
+            function handleCellClick(event) {
+                const cell = event.currentTarget;
+                if (!cell.classList.contains('light-on')) {
+                    return; // 選択不可能なセルは無視
+                }
+
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+
+                // 選択されたセルを記録
+                selectedCells.push({ row, col });
+
+                // 行と列を暗くするリストに追加
+                dimmedRows.add(row);
+                dimmedCols.add(col);
+
+                // ステップを進める
+                currentStep++;
+                
+                updateLights();
+                updateBoardState();
+
+                // クリア判定
+                if (currentStep > BOARD_SIZE) {
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game03' }, '*');
+                    setTimeout(() => {
+                        clearMessageElement.classList.add('show');
+                    }, 500); // アニメーションが終わるのを少し待つ
+                }
+            }
+            
+            function updateBoardState() {
+                const cells = boardElement.querySelectorAll('.cell');
+                cells.forEach(cell => {
+                    const row = parseInt(cell.dataset.row);
+                    const col = parseInt(cell.dataset.col);
+                    const value = parseInt(cell.dataset.value);
+
+                    // クラスをリセット
+                    cell.classList.remove('light-on', 'selected', 'dimmed');
+
+                    const isDimmed = dimmedRows.has(row) || dimmedCols.has(col);
+                    // 過去に選択されたセルかどうかを判定
+                    const isSelectedCell = selectedCells.some(coord => coord.row === row && coord.col === col);
+
+                    if (isSelectedCell) {
+                        cell.classList.add('selected');
+                    } else if (isDimmed) {
+                        cell.classList.add('dimmed');
+                    } else if (value === currentStep) {
+                        cell.classList.add('light-on');
+                    }
+                });
+            }
+
+            function updateLights() {
+                const lights = lightsContainer.querySelectorAll('.light');
+                lights.forEach((light, index) => {
+                    if (index < currentStep - 1) {
+                        light.classList.add('on');
+                    } else {
+                        light.classList.remove('on');
+                    }
+                });
+            }
+
+            // クリアメッセージをクリックしたらゲームをリセット
+            clearMessageElement.addEventListener('click', initGame);
+            // リセットボタンにイベントを追加
+            resetButton.addEventListener('click', initGame);
+
+            // ゲーム開始
+            initGame();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Checker (Deluxe)</title>
+    <style>
+        /* deluxe.html からのコアスタイル */
+        :root {
+            --game-max-width: 800px;
+            --game-aspect-ratio: 800 / 600;
+        }
+
+        body {
+            font-family: 'Segoe UI', Meiryo, sans-serif;
+            background-color: #000;
+            color: #e0e0e0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 95vw;
+            max-width: var(--game-max-width);
+            max-height: 95vh;
+            aspect-ratio: var(--game-aspect-ratio);
+        }
+
+        /* --- 部屋の表示エリア (ボタン選択画面として使用) --- */
+        #room-view {
+            width: 100%;
+            height: 100%;
+            background-image: url('room.png');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* --- ゲーム選択画面 --- */
+        #game-selection {
+            width: 85%;
+            max-width: 650px;
+            padding: 20px;
+            box-sizing: border-box;
+            background-color: rgba(0,0,0,0.75);
+            border-radius: 15px;
+            border: 1px solid #555;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        #game-selection h1 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #fff;
+            text-align: center;
+            font-size: 1.8em;
+        }
+        #button-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+            gap: 15px;
+        }
+        .game-button {
+            padding: 15px 5px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            border: 2px solid #aaa;
+            border-radius: 10px;
+            background-color: #333;
+            color: #eee;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        .game-button:hover {
+            background-color: #555;
+            transform: scale(1.05);
+        }
+
+        /* --- ゲームオーバーレイ (deluxe.htmlから流用) --- */
+        #game-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column; 
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            z-index: 100;
+        }
+        #game-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        #game-content-wrapper {
+            position: relative;
+            width: 85vmin;
+            height: 85vmin;
+            max-width: 90vh;
+            max-height: 90vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #game-number-display {
+            position: relative;
+            background-color: rgba(0,0,0,0.7);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            border: 2px solid #fff;
+            width: 40px;
+            height: 40px;
+            font-size: 1.2em;
+            z-index: 1;
+            margin-bottom: 15px;
+        }
+
+        #game-frame-container {
+            width: 90%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #game-frame {
+            width: 100%; height: 100%;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            background-color: #000;
+        }
+        #close-game-button {
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            background-color: rgba(255,255,255,0.8);
+            color: #000;
+            border: none;
+            font-size: 2em;
+            cursor: pointer;
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <!-- ボタン選択画面 -->
+    <div id="room-view">
+        <div id="game-selection">
+            <h1>Game Checker</h1>
+            <div id="button-grid"></div>
+        </div>
+    </div>
+
+    <!-- ゲーム表示用オーバーレイ -->
+    <div id="game-overlay">
+        <div id="game-content-wrapper">
+            <div id="game-number-display"></div>
+            <div id="game-frame-container">
+                <iframe id="game-frame"></iframe>
+            </div>
+        </div>
+        <button id="close-game-button">↓</button>
+    </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const gameSelection = document.getElementById('game-selection');
+    const buttonGrid = document.getElementById('button-grid');
+    const gameOverlay = document.getElementById('game-overlay');
+    const gameNumberDisplay = document.getElementById('game-number-display');
+    const gameFrame = document.getElementById('game-frame');
+    const closeGameButton = document.getElementById('close-game-button');
+
+    // 1から26までのゲーム選択ボタンを生成
+    for (let i = 1; i <= 26; i++) {
+        const button = document.createElement('button');
+        button.textContent = i;
+        button.classList.add('game-button');
+
+        // ボタンがクリックされた時の処理
+        button.addEventListener('click', () => {
+            const gameId = i;
+            // 26番だけは特別扱いしない（もしあればgame26.htmlを読み込む）
+            const gameNumber = String(gameId).padStart(2, '0');
+            const gameUrl = `game${gameNumber}.html`;
+
+            // ゲーム番号を表示
+            gameNumberDisplay.textContent = gameId;
+            
+            // iframeにゲームを読み込む
+            gameFrame.src = gameUrl;
+
+            // ゲームオーバーレイを表示
+            gameOverlay.classList.add('visible');
+        });
+        buttonGrid.appendChild(button);
+    }
+
+    // 閉じるボタンがクリックされた時の処理
+    closeGameButton.addEventListener('click', () => {
+        // iframeの読み込みを停止
+        gameFrame.src = 'about:blank';
+
+        // ゲームオーバーレイを非表示に
+        gameOverlay.classList.remove('visible');
+    });
+});
+</script>
+</body>
+</html>
+

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>フルーツバスケット</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f8ff;
+            color: #333;
+        }
+
+        h1 {
+            color: #4682b4;
+            margin-bottom: 20px;
+        }
+
+        #game-container {
+            width: 90vmin;
+            max-width: 500px;
+            aspect-ratio: 1 / 1;
+            position: relative;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .circle-group {
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .circle-group:hover {
+            transform: scale(1.1);
+        }
+
+        .circle-shape {
+            stroke-width: 6; /* 枠線を太くして見やすくする */
+            fill: #ffffff; /* 円の塗りつぶしは白に固定 */
+        }
+        
+        .connector-line {
+            stroke: #a9a9a9;
+            stroke-width: 3;
+            stroke-linecap: round;
+        }
+
+        .lines-group {
+            /* アニメーション用のスタイル */
+            transition: transform 0.2s ease-in-out; /* 回転を速くする */
+            transform-origin: 0 0; /* 回転の中心をSVGの中心(0,0)に設定 */
+        }
+
+        /* クリアメッセージ用のスタイル */
+        #clear-message {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 15vmin;
+            font-weight: bold;
+            cursor: pointer;
+            visibility: hidden; /* 初期状態では非表示 */
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 10;
+        }
+
+        #clear-message.show {
+            visibility: visible;
+            opacity: 1;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>フルーツバスケット</h1>
+    <div id="game-container">
+        <svg id="game-svg" viewBox="-150 -150 300 300"></svg>
+        <div id="clear-message">CLEAR!</div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const svg = document.getElementById('game-svg');
+            const clearMessage = document.getElementById('clear-message');
+            const SVG_NS = "http://www.w3.org/2000/svg";
+            
+            // 0:黒, 1:紫, 2:赤, 3:黄, 4:緑, 5:水色, 6:藍色
+            const colors = ['#333333', '#9b59b6', '#e74c3c', '#f1c40f', '#2ecc71', '#3498db', '#483D8B'];
+            
+            let isCleared = false;
+            let blockInput = false; // アニメーション中の操作をブロックするフラグ
+
+            // ゲームの状態管理
+            const state = {
+                circles: {},
+                linePath: ['o', 'b', 'c', 'd', 'e', 'f', 'a', 'o'],
+                colorIndexPath: [] // initializeGameで動的に生成
+            };
+
+            // 初期化処理
+            function initializeGame() {
+                isCleared = false;
+                blockInput = false;
+                clearMessage.classList.remove('show');
+                
+                const center = { x: 0, y: 0 };
+                const radius = 100;
+                const circleRadius = 25;
+                const ids = ['a', 'b', 'c', 'd', 'e', 'f'];
+
+                // 目標の色と初期配置を定義
+                const targetColorMap = { o: 0, a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 };
+                const initialColorMap = { o: 0, a: 5, b: 4, c: 1, d: 6, e: 3, f: 2 };
+                
+                // 円o (中央) のデータを設定
+                state.circles['o'] = {
+                    id: 'o', x: center.x, y: center.y, r: circleRadius,
+                    colorIndex: initialColorMap['o'], targetColorIndex: targetColorMap['o']
+                };
+                
+                // 周囲の円のデータを設定
+                ids.forEach((id, i) => {
+                    const angle = (i * 60 - 90) * (Math.PI / 180); 
+                    state.circles[id] = {
+                        id: id, x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle), r: circleRadius,
+                        colorIndex: initialColorMap[id], targetColorIndex: targetColorMap[id]
+                    };
+                });
+                
+                // バグ修正：現在の色配置に合わせてcolorIndexPathを正しく初期化する
+                state.linePath = ['o', 'b', 'c', 'd', 'e', 'f', 'a', 'o'];
+                state.colorIndexPath = state.linePath.map(id => state.circles[id].colorIndex);
+
+                drawGame();
+            }
+
+            function drawGame() {
+                svg.innerHTML = '';
+                const linesGroup = document.createElementNS(SVG_NS, 'g');
+                linesGroup.classList.add('lines-group'); // アニメーション用クラス
+                const circlesGroup = document.createElementNS(SVG_NS, 'g');
+                svg.appendChild(linesGroup);
+                svg.appendChild(circlesGroup);
+
+                drawLines(linesGroup);
+                drawCircles(circlesGroup);
+            }
+
+            function drawLines(parent) {
+                for (let i = 0; i < state.linePath.length - 1; i++) {
+                    const fromId = state.linePath[i];
+                    const toId = state.linePath[i + 1];
+                    const fromCircle = state.circles[fromId];
+                    const toCircle = state.circles[toId];
+                    const line = document.createElementNS(SVG_NS, 'line');
+                    line.setAttribute('x1', fromCircle.x);
+                    line.setAttribute('y1', fromCircle.y);
+                    line.setAttribute('x2', toCircle.x);
+                    line.setAttribute('y2', toCircle.y);
+                    line.classList.add('connector-line');
+                    parent.appendChild(line);
+                }
+            }
+
+            function drawCircles(parent) {
+                Object.values(state.circles).forEach(circleData => {
+                    const group = document.createElementNS(SVG_NS, 'g');
+                    group.classList.add('circle-group');
+                    group.dataset.id = circleData.id;
+                    
+                    const shape = document.createElementNS(SVG_NS, 'circle');
+                    shape.setAttribute('cx', circleData.x);
+                    shape.setAttribute('cy', circleData.y);
+                    shape.setAttribute('r', circleData.r);
+                    shape.classList.add('circle-shape');
+                    shape.setAttribute('stroke', colors[circleData.targetColorIndex]);
+                    group.appendChild(shape);
+
+                    const squareSize = circleData.r * Math.sqrt(2) * 0.85;
+                    const square = document.createElementNS(SVG_NS, 'rect');
+                    square.setAttribute('x', circleData.x - squareSize / 2);
+                    square.setAttribute('y', circleData.y - squareSize / 2);
+                    square.setAttribute('width', squareSize);
+                    square.setAttribute('height', squareSize);
+                    square.setAttribute('fill', colors[circleData.colorIndex]);
+                    square.setAttribute('transform', `rotate(45 ${circleData.x} ${circleData.y})`);
+                    square.style.pointerEvents = 'none';
+                    group.appendChild(square);
+
+                    parent.appendChild(group);
+                    group.addEventListener('click', () => handleCircleClick(circleData.id));
+                });
+            }
+            
+            async function handleCircleClick(clickedId) {
+                if (blockInput) return;
+                blockInput = true;
+
+                if (isCleared) {
+                    isCleared = false; // クリア状態を解除してゲーム再開
+                }
+
+                // 色の再配置
+                const currentLinePathRing = state.linePath.slice(0, -1);
+                const currentColorIndexPathRing = state.colorIndexPath.slice(0, -1);
+                const startIndex = currentLinePathRing.indexOf(clickedId);
+                const newColorIndexes = {};
+
+                for (let i = 0; i < currentLinePathRing.length; i++) {
+                    const circleId = currentLinePathRing[(startIndex + i) % currentLinePathRing.length];
+                    const colorIndex = currentColorIndexPathRing[i];
+                    newColorIndexes[circleId] = colorIndex;
+                }
+                Object.values(state.circles).forEach(c => c.colorIndex = newColorIndexes[c.id]);
+                drawGame(); // 色の変更を即時反映
+
+                await new Promise(resolve => setTimeout(resolve, 200));
+
+                // 線の回転アニメーション
+                const linesGroup = svg.querySelector('.lines-group');
+                if (linesGroup) {
+                    linesGroup.style.transform = 'rotate(60deg)';
+                    await new Promise(resolve => {
+                        const onEnd = () => { linesGroup.removeEventListener('transitionend', onEnd); resolve(); };
+                        linesGroup.addEventListener('transitionend', onEnd);
+                    });
+                }
+                
+                // 線のつながり方と色の並び順を更新
+                const outerCirclesPath = state.linePath.slice(1, -1);
+                outerCirclesPath.push(outerCirclesPath.shift());
+                state.linePath = ['o', ...outerCirclesPath, 'o'];
+                state.colorIndexPath = state.linePath.map(id => state.circles[id].colorIndex);
+
+                drawGame(); // 最終状態を描画
+                checkClear();
+                blockInput = false;
+            }
+
+            function checkClear() {
+                if(isCleared) return;
+                const isMatch = Object.values(state.circles).every(c => {
+                    if (c.id === 'o') return true; 
+                    return c.colorIndex === c.targetColorIndex;
+                });
+
+                if (isMatch) {
+                    isCleared = true;
+                    setTimeout(() => {
+                        clearMessage.classList.add('show');
+                    }, 500);
+                }
+            }
+
+            clearMessage.addEventListener('click', () => {
+                clearMessage.classList.remove('show');
+            });
+
+            initializeGame();
+        });
+    </script>
+</body>
+</html>
+

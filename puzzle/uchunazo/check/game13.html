@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>押し合いへし合い</title>
+    <style>
+        :root {
+            /* 修正: vminを使用してレスポンシブに */
+            --hex-size: 7vmin;
+            --piece-diameter: calc(var(--hex-size) * 0.7);
+            --board-bg: #e6f0ff;
+            --hex-bg: #f8f9fa;
+            --hex-stroke: #a9c0de;
+            --hex-hover-bg: #d0e0ff;
+            --piece-color: #4a5568; /* unlit: dark grey-blue */
+            --piece-lit-color: #22d3ee; /* lit: bright cyan */
+            --piece-lit-shadow: 0 0 15px #22d3ee;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: var(--board-bg);
+            color: #333;
+            text-align: center;
+            /* 修正: 端に余白を追加 */
+            padding: 1rem;
+            box-sizing: border-box;
+            overflow: hidden; /* はみ出しを完全に防止 */
+        }
+
+        h1 {
+            /* 修正: vminを使用してレスポンシブに */
+            margin-bottom: 2vmin;
+            font-size: 6vmin;
+            color: #2c5282;
+        }
+
+        #game-board {
+            position: relative;
+            /* 修正: vminと少し大きめのマージン */
+            width: calc(var(--hex-size) * 11);
+            height: calc(var(--hex-size) * 11);
+        }
+        
+        #hex-grid-container, #piece-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #piece-container {
+            pointer-events: none;
+        }
+        
+        .hex-polygon {
+            fill: var(--hex-bg);
+            stroke: var(--hex-stroke);
+            stroke-width: 2;
+            transition: fill 0.2s;
+        }
+
+        .hex-polygon.clickable {
+            cursor: pointer;
+        }
+
+        .hex-polygon.clickable:hover {
+            fill: var(--hex-hover-bg);
+        }
+
+        .piece {
+            position: absolute;
+            width: var(--piece-diameter);
+            height: var(--piece-diameter);
+            background-color: var(--piece-color);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0);
+            pointer-events: none;
+        }
+
+        .piece.visible {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .piece.lit {
+            background-color: var(--piece-lit-color);
+            box-shadow: var(--piece-lit-shadow);
+        }
+        
+        #clear-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: none; align-items: center; justify-content: center;
+            z-index: 1000;
+            cursor: pointer;
+        }
+        
+        #clear-text {
+            /* 修正: vminを使用してレスポンシブに */
+            font-size: 12vmin;
+            color: white;
+            font-weight: bold;
+            text-shadow: 0 0 25px #fff, 0 0 40px var(--piece-lit-color);
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>押し合いへし合い</h1>
+    <div id="game-board"></div>
+    
+    <div id="clear-overlay">
+        <div id="clear-text">CLEAR!</div>
+    </div>
+
+
+    <script>
+    window.onload = () => {
+        // 修正: getPropertyValueから直接値を取得
+        const HEX_SIZE_VMIN = 7;
+        const HEX_SIZE = (Math.min(window.innerWidth, window.innerHeight) * HEX_SIZE_VMIN) / 100;
+        
+        const BOARD_RADIUS = 3;
+
+        const gameBoard = document.getElementById('game-board');
+        const boardState = new Map();
+        
+        const SVG_NS = "http://www.w3.org/2000/svg";
+
+        const CUBE_DIRECTIONS = [
+            { q: 1, r: 0, s: -1 }, { q: 0, r: 1, s: -1 }, { q: -1, r: 1, s: 0 },
+            { q: -1, r: 0, s: 1 }, { q: 0, r: -1, s: 1 }, { q: 1, r: -1, s: 0 },
+        ];
+        
+        function getHexCenterInPixels(q, r) {
+            const x = HEX_SIZE * (3 / 2 * q);
+            const y = HEX_SIZE * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
+            const boardCenter = { 
+                x: gameBoard.offsetWidth / 2,
+                y: gameBoard.offsetHeight / 2
+            };
+            return { x: x + boardCenter.x, y: y + boardCenter.y };
+        }
+        
+        function cubeDistance(q, r, s) {
+            return (Math.abs(q) + Math.abs(r) + Math.abs(s)) / 2;
+        }
+        
+        function getHexPolygonPoints(centerX, centerY, size) {
+            const points = [];
+            for (let i = 0; i < 6; i++) {
+                const angle_deg = 60 * i; // Flat top
+                const angle_rad = Math.PI / 180 * angle_deg;
+                const pointX = centerX + size * Math.cos(angle_rad);
+                const pointY = centerY + size * Math.sin(angle_rad);
+                points.push(`${pointX},${pointY}`);
+            }
+            return points.join(' ');
+        }
+
+        function init() {
+            gameBoard.innerHTML = '';
+            boardState.clear();
+            
+            const svgContainer = document.createElementNS(SVG_NS, 'svg');
+            svgContainer.id = 'hex-grid-container';
+            const pieceContainer = document.createElement('div');
+            pieceContainer.id = 'piece-container';
+            gameBoard.appendChild(svgContainer);
+            gameBoard.appendChild(pieceContainer);
+
+            for (let q = -BOARD_RADIUS; q <= BOARD_RADIUS; q++) {
+                for (let r = -BOARD_RADIUS; r <= BOARD_RADIUS; r++) {
+                    const s = -q - r;
+                    if (Math.abs(s) <= BOARD_RADIUS) {
+                        const dist = cubeDistance(q, r, s);
+                        const key = `${q},${r},${s}`;
+
+                        const isPieceOnThirdRing = dist === 3 && (q === 0 || r === 0 || s === 0);
+                        const hasPiece = (dist === 0 || dist === 2 || isPieceOnThirdRing);
+                        
+                        const isClickable = dist <= 2;
+                        const isGoal = dist <= 2;
+                        
+                        const state = { q, r, s, dist, hasPiece, isClickable, isGoal, hexEl: null, pieceEl: null };
+                        boardState.set(key, state);
+
+                        const center = getHexCenterInPixels(q, r);
+                        
+                        if (isClickable) {
+                            const polygon = document.createElementNS(SVG_NS, 'polygon');
+                            polygon.setAttribute('points', getHexPolygonPoints(center.x, center.y, HEX_SIZE));
+                            polygon.classList.add('hex-polygon', 'clickable');
+                            polygon.addEventListener('click', () => handleHexClick(q, r, s));
+                            svgContainer.appendChild(polygon);
+                            state.hexEl = polygon;
+                        }
+                        
+                        const pieceEl = document.createElement('div');
+                        pieceEl.classList.add('piece');
+                        pieceEl.style.left = `${center.x}px`;
+                        pieceEl.style.top = `${center.y}px`;
+                        pieceContainer.appendChild(pieceEl);
+                        state.pieceEl = pieceEl;
+                    }
+                }
+            }
+            updateView();
+            checkWinCondition();
+        }
+
+        function handleHexClick(q, r, s) {
+            const neighbors = [];
+            for (const dir of CUBE_DIRECTIONS) {
+                const nq = q + dir.q;
+                const nr = r + dir.r;
+                const ns = s + dir.s;
+                const key = `${nq},${nr},${ns}`;
+                if (boardState.has(key)) {
+                    neighbors.push(boardState.get(key));
+                }
+            }
+
+            if (neighbors.length === 6) {
+                const pieceStates = neighbors.map(n => n.hasPiece);
+                for (let i = 0; i < 6; i++) {
+                    neighbors[i].hasPiece = pieceStates[(i + 5) % 6];
+                }
+            }
+            
+            updateView();
+            checkWinCondition();
+        }
+
+        function updateView() {
+            for (const state of boardState.values()) {
+                if (state.pieceEl) {
+                    const pieceShouldBeVisible = state.hasPiece;
+                    const pieceShouldBeLit = pieceShouldBeVisible && state.isGoal;
+                    state.pieceEl.classList.toggle('visible', pieceShouldBeVisible);
+                    state.pieceEl.classList.toggle('lit', pieceShouldBeLit);
+                }
+            }
+        }
+
+        function checkWinCondition() {
+            let totalPieces = 0;
+            let litPieces = 0;
+
+            for (const state of boardState.values()) {
+                if (state.hasPiece) {
+                    totalPieces++;
+                    if (state.isGoal) {
+                        litPieces++;
+                    }
+                }
+            }
+
+            if (totalPieces === 19 && totalPieces === litPieces) {
+                document.querySelectorAll('.clickable').forEach(el => {
+                    el.style.pointerEvents = 'none';
+                });
+                
+                setTimeout(() => {
+                    const overlay = document.getElementById('clear-overlay');
+                    overlay.style.display = 'flex';
+                    overlay.addEventListener('click', () => {
+                        overlay.style.display = 'none';
+                    }, { once: true });
+                }, 500);
+            }
+        }
+        
+        // 修正: リサイズ時にも再描画
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                // CSS変数を再計算してinitを呼び出す
+                const newHexSize = (Math.min(window.innerWidth, window.innerHeight) * HEX_SIZE_VMIN) / 100;
+                document.documentElement.style.setProperty('--hex-size-recalc', `${newHexSize}px`);
+                init();
+            }, 250);
+        });
+
+        init();
+    };
+    </script>
+</body>
+</html>
+

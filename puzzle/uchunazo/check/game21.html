@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>10 Digits</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントを読み込む */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation; /* ダブルタップによるズームを無効化 */
+        }
+
+        /* ランプの共通スタイル */
+        .lamp {
+            width: 2.2rem; /* 2.5remから変更 */
+            height: 2.2rem; /* 2.5remから変更 */
+            border-radius: 9999px;
+            transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2) inset;
+        }
+
+        /* レスポンシブ対応: 画面が小さい場合はランプも小さくする */
+        @media (max-width: 480px) {
+            .lamp {
+                width: 1.8rem;
+                height: 1.8rem;
+            }
+        }
+        
+        /* ON状態のランプのスタイル */
+        .lamp.on {
+            background-color: #fef08a; /* yellow-200 */
+            box-shadow: 0 0 15px #fef08a, 0 0 25px #facc15;
+        }
+        
+        /* ON状態の入力ランプのスタイル (青色で上書き) */
+        .input-lamp.on {
+            background-color: #93c5fd; /* blue-300 */
+            box-shadow: 0 0 15px #93c5fd, 0 0 25px #3b82f6; /* blue-500 */
+        }
+        
+        /* 入力ランプのホバーエフェクト */
+        .input-lamp:not(.disabled) {
+            cursor: pointer;
+        }
+
+        /* 判定ランプを囲む円のスタイル */
+        .circle-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 3.0rem; 
+            height: 3.0rem; 
+            border: 2px solid #fef08a; /* yellow-200 */
+            box-shadow: 0 0 8px #fef08a;
+            border-radius: 9999px;
+            pointer-events: none; /* クリックイベントを透過させる */
+        }
+        
+        @media (max-width: 480px) {
+            .circle-indicator {
+                width: 2.3rem;
+                height: 2.3rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md mx-auto">
+        
+        <!-- タイトル -->
+        <h1 class="text-4xl md:text-5xl font-bold text-center mb-8 text-yellow-300 tracking-wider">10 Digits</h1>
+
+        <!-- 判定ランプ -->
+        <div class="mb-8 p-4 bg-gray-800 rounded-lg shadow-inner">
+            <div id="result-lamps-container" class="flex justify-center items-center space-x-2">
+                <!-- JSで生成 -->
+            </div>
+        </div>
+        
+        <!-- 入力ランプ -->
+        <div class="mb-10 p-4 bg-gray-800 rounded-lg shadow-inner">
+            <div id="input-lamps-container" class="flex justify-center space-x-2">
+                <!-- JSで生成 -->
+            </div>
+        </div>
+        
+        <!-- 判定ボタン -->
+        <div class="text-center">
+            <!-- w-40 を追加してボタンの幅を固定 -->
+            <button id="judge-button" class="w-40 bg-gray-600 text-gray-400 font-bold py-3 px-10 rounded-lg transition-all duration-200 cursor-not-allowed text-xl" disabled>
+                判定
+            </button>
+        </div>
+
+    </div>
+
+    <!-- クリアメッセージ -->
+    <div id="clear-message" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden cursor-pointer">
+        <h2 class="text-7xl md:text-9xl font-bold text-yellow-300 animate-pulse">CLEAR!</h2>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const resultLampsContainer = document.getElementById('result-lamps-container');
+            const inputLampsContainer = document.getElementById('input-lamps-container');
+            const judgeButton = document.getElementById('judge-button');
+            const clearMessage = document.getElementById('clear-message');
+
+            const LAMP_COUNT = 10;
+            const REQUIRED_ON_COUNT = 3;
+            const CIRCLED_DIGITS = [3, 5, 8]; // 円で囲む数字
+
+            let inputStates = Array(LAMP_COUNT).fill(0);
+            let gameState = 'input'; // 'input' または 'judged'
+
+            // ランプの初期化
+            function initializeLamps() {
+                // 判定ランプ (9, 8, ..., 0)
+                for (let i = 0; i < LAMP_COUNT; i++) {
+                    const digit = LAMP_COUNT - 1 - i;
+                    const lampWrapper = document.createElement('div');
+                    lampWrapper.className = 'relative flex items-center justify-center';
+                    
+                    const lamp = document.createElement('div');
+                    lamp.className = 'lamp bg-gray-700 result-lamp';
+                    lamp.dataset.digit = digit;
+                    lampWrapper.appendChild(lamp);
+
+                    if (CIRCLED_DIGITS.includes(digit)) {
+                        const circle = document.createElement('div');
+                        circle.className = 'circle-indicator';
+                        lampWrapper.appendChild(circle);
+                    }
+                    resultLampsContainer.appendChild(lampWrapper);
+                }
+
+                // 入力ランプ
+                for (let i = 0; i < LAMP_COUNT; i++) {
+                    const lamp = document.createElement('div');
+                    lamp.className = 'lamp bg-gray-700 input-lamp';
+                    lamp.dataset.index = i;
+                    lamp.addEventListener('click', () => handleInputLampClick(i, lamp));
+                    inputLampsContainer.appendChild(lamp);
+                }
+            }
+            
+            // 入力ランプのクリック処理
+            function handleInputLampClick(index, lampElement) {
+                const currentOnCount = inputStates.filter(state => state === 1).length;
+
+                if (inputStates[index] === 0 && currentOnCount >= REQUIRED_ON_COUNT) {
+                    // 3つ以上はONにできない
+                    return;
+                }
+                
+                inputStates[index] = 1 - inputStates[index]; // 0と1をトグル
+                lampElement.classList.toggle('on');
+                
+                // 判定後に入力ランプを操作した場合、リセット状態に戻す
+                if (gameState === 'judged') {
+                    gameState = 'input';
+                    // 判定ランプをすべて消灯
+                    document.querySelectorAll('.result-lamp.on').forEach(l => l.classList.remove('on'));
+                }
+
+                updateJudgeButton();
+            }
+
+            // 判定ボタンの状態更新
+            function updateJudgeButton() {
+                const currentOnCount = inputStates.filter(state => state === 1).length;
+
+                if (gameState === 'judged') {
+                    judgeButton.textContent = 'リセット';
+                    judgeButton.disabled = false;
+                    judgeButton.className = 'w-40 bg-blue-500 text-white font-bold py-3 px-10 rounded-lg transition-all duration-200 cursor-pointer hover:bg-blue-400 text-xl';
+                    return;
+                }
+
+                judgeButton.textContent = '判定';
+                if (currentOnCount === REQUIRED_ON_COUNT) {
+                    judgeButton.disabled = false;
+                    judgeButton.className = 'w-40 bg-yellow-500 text-gray-900 font-bold py-3 px-10 rounded-lg transition-all duration-200 cursor-pointer hover:bg-yellow-400 text-xl';
+                } else {
+                    judgeButton.disabled = true;
+                    judgeButton.className = 'w-40 bg-gray-600 text-gray-400 font-bold py-3 px-10 rounded-lg transition-all duration-200 cursor-not-allowed text-xl';
+                }
+            }
+            
+            // 判定処理
+            function performJudge() {
+                // 2進数文字列に変換
+                const binaryString = inputStates.join('');
+                // 10進数に変換
+                const decimalValue = parseInt(binaryString, 2);
+                
+                // 10進数を文字列にして、重複しない数字の配列を作成
+                const digits = [...new Set(String(decimalValue).split(''))];
+
+                // 判定ランプを更新
+                const resultLamps = document.querySelectorAll('.result-lamp');
+                resultLamps.forEach(lamp => {
+                    if (digits.includes(lamp.dataset.digit)) {
+                        lamp.classList.add('on');
+                    } else {
+                        lamp.classList.remove('on');
+                    }
+                });
+
+                // ゲーム状態を「判定済み」に更新
+                gameState = 'judged';
+                updateJudgeButton();
+
+                // クリア判定
+                const isClear = CIRCLED_DIGITS.every(digit => digits.includes(String(digit)));
+                if (isClear) {
+                    setTimeout(() => {
+                        clearMessage.classList.remove('hidden');
+                    }, 500);
+                }
+            }
+
+            // ゲームをリセットする処理
+            function resetGame() {
+                // 判定ランプをすべて消灯
+                document.querySelectorAll('.result-lamp.on').forEach(l => l.classList.remove('on'));
+                
+                // 入力ランプをすべて消灯
+                document.querySelectorAll('.input-lamp.on').forEach(l => l.classList.remove('on'));
+                inputStates.fill(0);
+
+                // ゲーム状態をリセット
+                gameState = 'input';
+                updateJudgeButton();
+            }
+
+            // イベントリスナーの設定
+            judgeButton.addEventListener('click', () => {
+                if (judgeButton.disabled) return;
+                
+                if (gameState === 'input') {
+                    performJudge();
+                } else { // gameState === 'judged'
+                    resetGame();
+                }
+            });
+
+            clearMessage.addEventListener('click', () => {
+                clearMessage.classList.add('hidden');
+            });
+
+            // 初期化実行
+            initializeLamps();
+        });
+    </script>
+</body>
+</html>
+
+
+
