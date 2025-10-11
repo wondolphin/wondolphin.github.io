@@ -49,7 +49,7 @@
         <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold my-2 text-gray-200 tracking-wider">じゅんぐりピラミッド</h1>
 
         <!-- 判定ランプ -->
-        <div id="lamps-container" class="flex justify-center space-x-4 sm:space-x-8 my-2 mb-0">
+        <div id="lamps-container" class="flex flex-wrap justify-center gap-x-4 sm:gap-x-6 gap-y-2 my-2 mb-0">
             <!-- ランプセットがここに動的に生成されます -->
         </div>
 
@@ -289,7 +289,6 @@
             const isWin = Object.values(state.scores).every(score => score >= 3);
             if (isWin) {
                 state.gameOver = true;
-                window.parent.postMessage({ event: 'gameCleared', gameName: 'game11' }, '*');
                 highlightValidMoves([]); // ハイライトを消す
                 setTimeout(() => {
                     clearOverlay.classList.remove('hidden');
@@ -352,6 +351,7 @@
     </script>
 </body>
 </html>
+
 
 
 
