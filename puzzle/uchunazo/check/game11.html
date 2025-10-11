@@ -49,7 +49,7 @@
         <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold my-2 text-gray-200 tracking-wider">じゅんぐりピラミッド</h1>
 
         <!-- 判定ランプ -->
-        <div id="lamps-container" class="flex flex-wrap justify-center gap-x-4 sm:gap-x-6 gap-y-2 my-2 mb-0">
+        <div id="lamps-container" class="flex justify-center gap-x-2 sm:gap-x-4 md:gap-x-6 my-2 mb-0">
             <!-- ランプセットがここに動的に生成されます -->
         </div>
 
@@ -176,13 +176,13 @@
             lampsContainer.innerHTML = '';
             Object.values(PLAYERS).forEach(player => {
                 const lampSet = document.createElement('div');
-                lampSet.className = 'flex items-center space-x-2 sm:space-x-3';
+                lampSet.className = 'flex items-center space-x-1 sm:space-x-2 md:space-x-3';
                 lampSet.style.borderBottom = `4px solid ${player.color}`;
                 lampSet.style.paddingBottom = '4px';
                 
                 for (let i = 0; i < 3; i++) {
                     const lamp = document.createElement('div');
-                    lamp.className = 'lamp w-6 h-6 sm:w-7 sm:h-7 rounded-full';
+                    lamp.className = 'lamp w-4 h-4 sm:w-6 sm:h-6 md:w-7 md:h-7 rounded-full';
                     lamp.style.backgroundColor = LAMP_OFF_COLOR;
                     lamp.dataset.colorName = player.name;
                     lampSet.appendChild(lamp);
@@ -351,6 +351,7 @@
     </script>
 </body>
 </html>
+
 
 
 
