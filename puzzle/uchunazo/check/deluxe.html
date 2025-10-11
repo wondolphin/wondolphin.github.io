@@ -177,22 +177,32 @@
         #game-display-area {
             display: flex;
             flex-direction: column;
+            justify-content: space-between;
             align-items: center;
-            width: 95vmin;
-            height: 95vmin;
+            aspect-ratio: 3 / 4;
+            height: 95vh;
+            max-width: calc(95vh * 3 / 4);
+        }
+        @media (orientation: landscape) {
+            #game-display-area {
+                width: 95vw;
+                height: auto;
+                max-width: none;
+                max-height: 95vh;
+            }
         }
 
         #game-frame-container {
             width: 100%;
-            flex: 1;
-            min-height: 0;
+            flex-grow: 1;
             display: flex;
             justify-content: center;
             align-items: center;
+            min-height: 0;
         }
         #game-frame {
+            width: 100%;
             aspect-ratio: 5 / 6;
-            max-width: 100%;
             max-height: 100%;
             border: 2px solid #fff;
             border-radius: 10px;
