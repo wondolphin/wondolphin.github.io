@@ -1,77 +1,362 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- タイトルはファイル名に合わせて変更してください -->
-    <title>ゲーム06</title>
-    <style>
-        body {
-            display: flex;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mystery Slot</title>
+<style>
+    body {
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        background-color: #1a1a2e; /* 神秘的なダークブルー */
+        margin: 0;
+        color: #e0e0e0;
+        overflow: hidden; /* スクロールバーを隠す */
+    }
+
+    /* 新しく追加したラッパー要素のスタイル */
+    #main-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100vw;
+        height: 100vh;
+    }
+
+    #game-container {
+        background-color: #16213e;
+        border-radius: 15px;
+        padding: clamp(15px, 4vw, 30px); /* 画面サイズに応じて変化 */
+        box-shadow: 0 0 35px rgba(0, 255, 255, 0.2); /* サイバーな輝き */
+        border: 1px solid #0f3460;
+        text-align: center;
+    }
+
+    h1 {
+        margin-top: 0;
+        color: #e94560; /* アクセントカラー */
+        text-shadow: 0 0 10px #e94560;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: clamp(24px, 5vw, 32px); /* 画面サイズに応じて変化 */
+    }
+
+    .slot-machine {
+        display: flex;
+        justify-content: center;
+        gap: clamp(5px, 1.5vw, 15px); /* 画面サイズに応じて変化 */
+        margin: clamp(15px, 4vh, 30px) 0; /* 画面サイズに応じて変化 */
+    }
+
+    .slot-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: clamp(5px, 1.5vh, 10px); /* 画面サイズに応じて変化 */
+    }
+
+    .lamp {
+        width: clamp(20px, 4vw, 30px); /* 画面サイズに応じて変化 */
+        height: clamp(20px, 4vw, 30px); /* 画面サイズに応じて変化 */
+        background-color: #4a4a4a; /* OFFの色 */
+        border-radius: 50%;
+        border: 2px solid #2a2a2a;
+        transition: background-color 0.3s, box-shadow 0.3s;
+    }
+
+    .lamp.on {
+        background-color: #00ffff; /* ONの色 (シアン) */
+        box-shadow: 0 0 15px #00ffff, 0 0 20px #00ffff;
+    }
+
+    /* 数字1-6用のシンプルなデザイン */
+    .number-display {
+        width: clamp(40px, 10vw, 80px); /* 画面サイズに応じて変化 */
+        height: clamp(55px, 14vw, 100px); /* 画面サイズに応じて変化 */
+        border: 2px solid #533483; /* 神秘的なパープル */
+        border-radius: clamp(5px, 1.5vw, 10px); /* 画面サイズに応じて変化 */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: clamp(24px, 6vw, 48px); /* 画面サイズに応じて変化 */
+        font-weight: bold;
+        color: #e0e0e0; /* よりシンプルなオフホワイト */
+        background-color: #0f1624;
+        text-shadow: none; /* 影を削除 */
+        font-family: 'Courier New', Courier, monospace; /* 他のテキストとフォントを合わせる */
+        transition: all 0.3s; /* スムーズな変化のため */
+    }
+
+    /* 「7」専用の特別なデザイン */
+    .number-display.lucky-seven {
+        /* font-familyは .number-display から継承されます */
+        color: #ffd700; /* 鮮やかな金色に変更 */
+        font-weight: 900;
+        font-size: clamp(28px, 7vw, 54px); /* 画面サイズに応じて変化 */
+        text-shadow:
+             0 0 15px #ffd700, /* 金色の光彩 */
+             0 0 25px #fff7b3; /* 薄い金色の光彩 */
+    }
+
+
+    .display-button {
+        width: clamp(35px, 6.5vw, 50px); /* 画面サイズに応じて変化 */
+        height: clamp(35px, 6.5vw, 50px); /* 画面サイズに応じて変化 */
+        font-size: clamp(12px, 2vw, 16px); /* 画面サイズに応じて変化 */
+        cursor: pointer;
+        border: 2px solid #e94560;
+        border-radius: 50%; /* 丸いボタン */
+        background-color: #533483;
+        color: white;
+        transition: background-color 0.2s, box-shadow 0.2s;
+    }
+
+    .display-button:hover:not(:disabled) {
+        background-color: #e94560;
+        box-shadow: 0 0 15px #e94560;
+    }
+
+    .display-button:disabled {
+        background-color: #2a2a2a;
+        border-color: #4a4a4a;
+        cursor: not-allowed;
+    }
+
+    #reset-button {
+        width: clamp(50px, 8vw, 60px); /* 画面サイズに応じて変化 */
+        height: clamp(50px, 8vw, 60px); /* 画面サイズに応じて変化 */
+        cursor: pointer;
+        border: 2px solid #00ffff;
+        border-radius: 8px; /* 四角いボタン */
+        background-color: #533483;
+        transition: background-color 0.2s, box-shadow 0.2s;
+    }
+
+    #reset-button:hover {
+        background-color: #00ffff;
+        box-shadow: 0 0 15px #00ffff;
+    }
+
+    #clear-message {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.85);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        color: white;
+        cursor: pointer;
+        z-index: 1000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s;
+    }
+
+    #clear-message.visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    #clear-message h1 {
+        font-size: 10vw;
+        color: #00ffff;
+        text-shadow: 0 0 20px #00ffff, 0 0 30px #fff;
+        margin: 0;
+    }
+
+    /* --- スマートフォンなど狭い画面向けの表示設定 --- */
+    @media (max-width: 768px) {
+        .slot-machine {
+            flex-wrap: wrap; /* 画面が狭い場合は折り返す */
             justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f4f8;
-            font-family: sans-serif;
-            color: #333;
         }
-        .container {
-            text-align: center;
-            padding: 40px;
-            background-color: #fff;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        
+        #reset-button {
+            margin-top: 15px;
         }
-        button {
-            padding: 15px 30px;
-            font-size: 18px;
-            cursor: pointer;
-            border: none;
-            border-radius: 8px;
-            background-color: #28a745;
-            color: white;
-            transition: all 0.2s;
+        
+        #clear-message h1 {
+            font-size: 15vw;
         }
-        button:hover:not(:disabled) {
-            background-color: #218838;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #message {
-            margin-top: 20px;
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #007bff;
-            display: none;
-        }
-    </style>
+    }
+</style>
 </head>
 <body>
 
-<div class="container">
-    <!-- h1はファイル名に合わせて変更してください -->
-    <h1>ゲーム 6</h1>
-    <p>このボタンを押してクリアしてください。</p>
-    <button id="clear-button">クリア</button>
-    <div id="message">クリア！メインページに戻ります...</div>
+<div id="main-wrapper"> <!-- このラッパーを追加 -->
+    <div id="game-container">
+        <h1>Mystery Slot</h1>
+        <div class="slot-machine">
+            <!-- スロットエリア (JavaScriptで生成) -->
+        </div>
+        <button id="reset-button"></button>
+    </div>
 </div>
 
+<div id="clear-message">
+    <h1>CLEAR!</h1>
+</div>
+
+
 <script>
-    const clearButton = document.getElementById('clear-button');
-    const message = document.getElementById('message');
+    document.addEventListener('DOMContentLoaded', () => {
+        const slotMachine = document.querySelector('.slot-machine');
+        const resetButton = document.getElementById('reset-button');
+        const clearMessage = document.getElementById('clear-message');
+        const SLOT_COUNT = 7;
 
-    clearButton.addEventListener('click', () => {
-        message.style.display = 'block';
-        clearButton.disabled = true;
+        let lamps = [];
+        let numberDisplays = [];
+        let displayButtons = [];
 
-        // 親ページにクリア情報を送信
-        // gameNameはファイル名に合わせて変更してください
-        window.parent.postMessage({ event: 'gameCleared', gameName: 'game06' }, '*');
+        // 各エリアの最後の数字を記憶する配列。リセットしても維持される。
+        let lastNumbersPerSlot = new Array(SLOT_COUNT).fill(null);
+        
+        // 「ターン」内で何回ボタンが押されたかをカウント
+        let pressCountInTurn = 0;
+
+        // ゲームロード時に7が表示される特別なスロットのインデックス
+        let luckySevenIndex;
+
+        // ゲームのUIを生成
+        function createSlots() {
+            for (let i = 0; i < SLOT_COUNT; i++) {
+                const slotArea = document.createElement('div');
+                slotArea.className = 'slot-area';
+
+                const lamp = document.createElement('div');
+                lamp.className = 'lamp';
+                lamps.push(lamp);
+
+                const numberDisplay = document.createElement('div');
+                numberDisplay.className = 'number-display';
+                numberDisplays.push(numberDisplay);
+
+                const displayButton = document.createElement('button');
+                displayButton.className = 'display-button';
+                displayButton.textContent = ''; // テキストを削除
+                displayButton.dataset.index = i;
+                displayButtons.push(displayButton);
+                
+                displayButton.addEventListener('click', handleDisplayButtonClick);
+
+                slotArea.appendChild(lamp);
+                slotArea.appendChild(numberDisplay);
+                slotArea.appendChild(displayButton);
+                slotMachine.appendChild(slotArea);
+            }
+        }
+
+        // 表示ボタンが押されたときの処理
+        function handleDisplayButtonClick(event) {
+            const button = event.target;
+            const index = parseInt(button.dataset.index, 10);
+
+            button.disabled = true;
+            pressCountInTurn++;
+
+            let newNumber;
+            const previousNumber = lastNumbersPerSlot[index];
+
+            if (previousNumber === null) {
+                // このスロットで数字が表示されるのがゲーム全体で初めての場合
+                if (index === luckySevenIndex) {
+                    // このスロットが「ラッキー7」スロットであれば、7を表示
+                    newNumber = 7;
+                } else {
+                    // それ以外のスロットは、1から7のランダムな数字
+                    let randomNumber;
+                    do {
+                        randomNumber = Math.floor(Math.random() * SLOT_COUNT) + 1;
+                    } while (randomNumber === 7); // 7は最初luckySevenIndexにしか出ないようにする
+                    newNumber = randomNumber;
+                }
+            } else {
+                // 2回目以降の場合：(最後の数字 + ターンの順番) を計算
+                const sum = previousNumber + pressCountInTurn;
+
+                // 1-7の範囲に収まるように計算 (例: 8は1に, 14は7になる)
+                newNumber = ((sum - 1) % SLOT_COUNT) + 1;
+            }
+
+            // 計算結果を記録し、画面に表示
+            lastNumbersPerSlot[index] = newNumber;
+            const currentDisplay = numberDisplays[index];
+            currentDisplay.textContent = newNumber;
+
+            // 数字に応じてスタイルを切り替える
+            if (newNumber === 7) {
+                currentDisplay.classList.add('lucky-seven');
+            } else {
+                currentDisplay.classList.remove('lucky-seven');
+            }
+
+            updateLamp(index, newNumber);
+            checkClearCondition();
+        }
+
+        // ランプの状態を更新
+        function updateLamp(index, number) {
+            if (number === 7) {
+                lamps[index].classList.add('on');
+            } else {
+                lamps[index].classList.remove('on');
+            }
+        }
+
+        // クリア条件をチェック
+        function checkClearCondition() {
+            // 全てのランプがONになっているか確認
+            const isAllSeven = lamps.every(lamp => lamp.classList.contains('on'));
+            if (isAllSeven) {
+                window.parent.postMessage({ event: 'gameCleared', gameName: 'game06' }, '*');
+                clearMessage.classList.add('visible');
+            }
+        }
+
+        // ゲームをリセット（ターンをリセット）
+        function resetGame() {
+            // ターン内のカウントのみリセット
+            pressCountInTurn = 0;
+
+            // 表示を空にし、特別なスタイルを削除
+            numberDisplays.forEach(display => {
+                display.textContent = '';
+                display.classList.remove('lucky-seven');
+            });
+
+            // ボタンを再度押せるようにする
+            displayButtons.forEach(button => {
+                button.disabled = false;
+            });
+            
+            // ランプを消灯
+            lamps.forEach(lamp => {
+                lamp.classList.remove('on');
+            });
+            
+            hideClearMessage();
+        }
+
+        // クリアメッセージを非表示
+        function hideClearMessage() {
+            clearMessage.classList.remove('visible');
+        }
+
+        // イベントリスナーを設定
+        resetButton.addEventListener('click', resetGame);
+        clearMessage.addEventListener('click', hideClearMessage);
+
+        // ゲーム開始
+        // ラッキー7スロットを最初に決定
+        luckySevenIndex = Math.floor(Math.random() * SLOT_COUNT);
+        createSlots();
+        resetGame();
     });
 </script>
 
 </body>
 </html>
+

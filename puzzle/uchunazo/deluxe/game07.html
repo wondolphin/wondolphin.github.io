@@ -3,75 +3,264 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- タイトルはファイル名に合わせて変更してください -->
-    <title>ゲーム07</title>
+    <title>さまよう７円</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
         body {
+            font-family: 'Inter', sans-serif;
+        }
+        .game-container {
             display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f4f8;
-            font-family: sans-serif;
-            color: #333;
+            flex-direction: column;
+            height: 100%;
+            max-height: 98vh; /* 画面ギリギリにならないように調整 */
         }
-        .container {
+        .value-display {
+            width: 2.5em; /* 数値表示部分の幅を調整 */
             text-align: center;
-            padding: 40px;
-            background-color: #fff;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        button {
-            padding: 15px 30px;
-            font-size: 18px;
-            cursor: pointer;
-            border: none;
-            border-radius: 8px;
-            background-color: #28a745;
-            color: white;
-            transition: all 0.2s;
-        }
-        button:hover:not(:disabled) {
-            background-color: #218838;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #message {
-            margin-top: 20px;
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #007bff;
-            display: none;
+        .op-btn-sm {
+             width: 2.5rem; /* 2.5rem */
+             height: 2rem; /* 2rem */
+             display: flex;
+             justify-content: center;
+             align-items: center;
         }
     </style>
 </head>
-<body>
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center p-2">
 
-<div class="container">
-    <!-- h1はファイル名に合わせて変更してください -->
-    <h1>ゲーム 7</h1>
-    <p>このボタンを押してクリアしてください。</p>
-    <button id="clear-button">クリア</button>
-    <div id="message">クリア！メインページに戻ります...</div>
-</div>
+    <div class="w-full max-w-md mx-auto bg-white rounded-xl shadow-lg p-4 game-container">
+        <h1 class="text-xl font-bold text-center mb-2 text-gray-700 flex-shrink-0">さまよう７円</h1>
+        
+        <!-- ゲーム盤面 SVG -->
+        <div id="game-board" class="flex-grow flex justify-center items-center min-h-0 w-full">
+            <svg id="grid-svg" class="w-full h-full" viewBox="-200 -200 400 400" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
 
-<script>
-    const clearButton = document.getElementById('clear-button');
-    const message = document.getElementById('message');
+        <!-- 操作UI -->
+        <div class="max-w-md mx-auto mt-4 flex-shrink-0">
+            <div id="numeric-controls" class="flex justify-center items-center gap-1 sm:gap-2">
+                <!-- JavaScriptでUIを生成 -->
+            </div>
+        </div>
+    </div>
 
-    clearButton.addEventListener('click', () => {
-        message.style.display = 'block';
-        clearButton.disabled = true;
+    <!-- クリアメッセージ -->
+    <div id="clear-message" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 cursor-pointer">
+        <div class="text-white text-8xl font-bold animate-pulse">
+            CLEAR!
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const HEX_SIZE = 30; // ヘックスの半径
+            const SVG_NS = "http://www.w3.org/2000/svg";
+            const svg = document.getElementById('grid-svg');
+            const MAX_RING = 3;
 
-        // 親ページにクリア情報を送信
-        // gameNameはファイル名に合わせて変更してください
-        window.parent.postMessage({ event: 'gameCleared', gameName: 'game07' }, '*');
-    });
-</script>
+            // 時計回りに60度回転させた方向の定義
+            const directions = {
+                'n':  { q: 1,  r: -1 },
+                'ne': { q: 1,  r: 0 },
+                'se': { q: 0,  r: 1 },
+                's':  { q: -1, r: 1 },
+                'sw': { q: -1, r: 0 },
+                'nw': { q: 0,  r: -1 },
+            };
+            
+            // ワープポイントの対応表
+            const warpPoints = {
+                '4,-4': { q: 0, r: 3 }, '3,-4': { q: -1, r: 3 }, '2,-4': { q: -2, r: 3 }, '1,-4': { q: -3, r: 3 },
+                '0,-4': { q: 3, r: 0 }, '-1,-3': { q: 2, r: 1 }, '-2,-2': { q: 1, r: 2 }, '-3,-1': { q: 0, r: 3 },
+                '-4,0': { q: 3, r: -3 }, '-4,1': { q: 3, r: -2 }, '-4,2': { q: 3, r: -1 }, '-4,3': { q: 3, r: 0 },
+                '-4,4': { q: 0, r: -3 }, '4,-1': { q: -3, r: 2 }, '4,-2': { q: -3, r: 1 }, '4,-3': { q: -3, r: 0 }
+            };
 
+            function hexToPixel(q, r) {
+                const x = HEX_SIZE * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r);
+                const y = HEX_SIZE * (3. / 2 * r);
+                return { x, y };
+            }
+
+            function getHexCorner(centerX, centerY, i) {
+                const angleDeg = 60 * i + 30;
+                const angleRad = Math.PI / 180 * angleDeg;
+                return { x: centerX + HEX_SIZE * Math.cos(angleRad), y: centerY + HEX_SIZE * Math.sin(angleRad) };
+            }
+            
+            function getHexDistance(q1, r1, q2, r2) {
+                const dq = q1 - q2;
+                const dr = r1 - r2;
+                return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2;
+            }
+
+            // --- グリッド描画 ---
+            const hexesToDraw = [];
+            for (let q = -MAX_RING; q <= MAX_RING; q++) {
+                for (let r = -MAX_RING; r <= MAX_RING; r++) {
+                    if (getHexDistance(0, 0, q, r) <= MAX_RING) {
+                        hexesToDraw.push({ q, r });
+                    }
+                }
+            }
+            
+            const gridGroup = document.createElementNS(SVG_NS, 'g');
+            hexesToDraw.forEach(({ q, r }) => {
+                const { x, y } = hexToPixel(q, r);
+                const polygon = document.createElementNS(SVG_NS, 'polygon');
+                let points = '';
+                for (let i = 0; i < 6; i++) {
+                    points += `${getHexCorner(x, y, i).x},${getHexCorner(x, y, i).y} `;
+                }
+                polygon.setAttribute('points', points);
+                const fillColor = (r === 0) ? '#fed7aa' : '#f0f9ff';
+                polygon.setAttribute('fill', fillColor);
+                polygon.setAttribute('stroke', '#93c5fd');
+                polygon.setAttribute('stroke-width', '1');
+                gridGroup.appendChild(polygon);
+            });
+            svg.appendChild(gridGroup);
+
+            // --- 枠画像の追加 ---
+            const frameImage = document.createElementNS(SVG_NS, 'image');
+            frameImage.setAttribute('href', 'waku.png');
+            frameImage.setAttribute('x', '-185');
+            frameImage.setAttribute('y', '-185');
+            frameImage.setAttribute('width', '369');
+            frameImage.setAttribute('height', '369');
+            svg.appendChild(frameImage);
+
+            // --- UI生成 (コンパクト版) ---
+            const controlsContainer = document.getElementById('numeric-controls');
+            const controlLabels = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+            const initialValues = [1, 4, 3, 2, 3, 5, 2];
+
+            controlLabels.forEach((label, index) => {
+                const controlEl = document.createElement('div');
+                controlEl.className = 'flex flex-col items-center';
+                controlEl.innerHTML = `
+                    <button data-label="${label}" data-op="1" class="op-btn-sm rounded-t-md bg-gray-200 hover:bg-gray-300">+</button>
+                    <span id="value-${label}" class="value-display font-mono text-base bg-gray-50 py-1">${initialValues[index]}</span>
+                    <button data-label="${label}" data-op="-1" class="op-btn-sm rounded-b-md bg-gray-200 hover:bg-gray-300">-</button>
+                `;
+                controlsContainer.appendChild(controlEl);
+            });
+
+            const resultMarkersGroup = document.createElementNS(SVG_NS, 'g');
+            svg.appendChild(resultMarkersGroup);
+            const clearMessage = document.getElementById('clear-message');
+
+            clearMessage.addEventListener('click', () => {
+                clearMessage.classList.add('hidden');
+            });
+            
+            function areSetsEqual(arr1, arr2) {
+                if (arr1.length !== arr2.length) return false;
+                const pathSet = new Set(arr1.map(c => `${c.q},${c.r}`));
+                if (pathSet.size !== arr2.length) return false;
+
+                const key1 = [...pathSet].sort().join('|');
+                const key2 = arr2.map(c => `${c.q},${c.r}`).sort().join('|');
+                return key1 === key2;
+            }
+
+            // --- Check処理を関数化 ---
+            function runCheck() {
+                resultMarkersGroup.innerHTML = ''; // 前回の結果をクリア
+
+                const steps = controlLabels.map(label => {
+                    return parseInt(document.getElementById(`value-${label}`).textContent);
+                });
+
+                let currentQ = -1;
+                let currentR = 2;
+                const pathCoords = [];
+                const moveDirections = ['n', 'nw', 'n', 'nw', 'n', 'nw', 'n'];
+
+                for (let i = 0; i < steps.length; i++) {
+                    const numSteps = steps[i];
+                    const directionKey = moveDirections[i];
+                    const move = directions[directionKey];
+
+                    for (let step = 0; step < numSteps; step++) {
+                        let nextQ = currentQ + move.q;
+                        let nextR = currentR + move.r;
+
+                        if (getHexDistance(0, 0, nextQ, nextR) > MAX_RING) {
+                            const warpKey = `${nextQ},${nextR}`;
+                            const warpTo = warpPoints[warpKey];
+                            if (warpTo) {
+                                nextQ = warpTo.q;
+                                nextR = warpTo.r;
+                            } else {
+                                break; 
+                            }
+                        }
+                        currentQ = nextQ;
+                        currentR = nextR;
+                    }
+                    pathCoords.push({ q: currentQ, r: currentR });
+                }
+
+                // 結果を朱色の円で表示
+                pathCoords.forEach(coord => {
+                    if (getHexDistance(0, 0, coord.q, coord.r) <= MAX_RING) {
+                        const { x, y } = hexToPixel(coord.q, coord.r);
+                        const marker = document.createElementNS(SVG_NS, 'circle');
+                        marker.setAttribute('cx', x);
+                        marker.setAttribute('cy', y);
+                        marker.setAttribute('r', HEX_SIZE * 0.5);
+                        marker.setAttribute('fill', 'rgba(239, 68, 68, 0.7)');
+                        marker.setAttribute('stroke', '#b91c1c');
+                        marker.setAttribute('stroke-width', '2');
+                        resultMarkersGroup.appendChild(marker);
+                    }
+                });
+
+                // クリア判定
+                const targetCoords = [
+                    {q: -3, r: 0}, {q: -2, r: 0}, {q: -1, r: 0}, {q: 0, r: 0},
+                    {q: 1, r: 0}, {q: 2, r: 0}, {q: 3, r: 0}
+                ];
+
+                if (areSetsEqual(pathCoords, targetCoords)) {
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game07' }, '*');
+                    setTimeout(() => {
+                        clearMessage.classList.remove('hidden');
+                    }, 500);
+                }
+            }
+
+            // --- UI操作イベント ---
+            controlsContainer.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (!button) return;
+                
+                const label = button.dataset.label;
+                const op = parseInt(button.dataset.op);
+                const display = document.getElementById(`value-${label}`);
+                let currentValue = parseInt(display.textContent);
+
+                if (currentValue === 1 && op === -1) {
+                    return; // 1未満にはしない
+                }
+                
+                currentValue += op;
+                display.textContent = currentValue;
+                runCheck(); // 数値操作のたびに処理を実行
+            });
+
+            // --- 初期表示 ---
+            runCheck();
+        });
+    </script>
 </body>
 </html>
+

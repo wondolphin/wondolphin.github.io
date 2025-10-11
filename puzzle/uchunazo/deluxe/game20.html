@@ -3,75 +3,600 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- タイトルはファイル名に合わせて変更してください -->
-    <title>ゲーム20</title>
+    <title>ときどき言うことを聞く２人</title>
     <style>
-        body {
+        :root {
+            /* 色の変数を定義 */
+            --border-color: #ccc;
+            --bg-color: #f0f0f0;
+            --cell-bg: #fff;
+            --goal-border-color: #aaaaaa;
+            --block-color: #5d5d5d;
+            --player1-color: #5b8def;
+            --player2-color: #ef5b5b;
+        }
+
+        /* 基本的なページスタイル */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            color: #333;
+            overflow: hidden; /* スクロールバーを非表示に */
+        }
+
+        /* 全ての要素を囲むラッパー */
+        #app-wrapper {
+            display: grid;
+            grid-template-rows: auto 1fr auto; /* 上からタイトル、ゲーム盤エリア、操作ボタン */
+            height: 100vh;
+            width: 100vw;
+            box-sizing: border-box;
+            padding: 15px;
+            gap: 15px; /* 各要素間の余白 */
+        }
+
+        h1 {
+            grid-row: 1;
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            margin: 0;
+            text-align: center;
+        }
+
+        /* ゲーム盤を中央に配置するためのラッパー */
+        #game-container-wrapper {
+            grid-row: 2;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f4f8;
-            font-family: sans-serif;
-            color: #333;
+            width: 100%;
+            height: 100%;
+            min-height: 0; /* グリッド内でのflexアイテムのサイズ計算を正常化 */
         }
-        .container {
-            text-align: center;
-            padding: 40px;
+
+        /* ゲーム盤面のコンテナ */
+        #game-container {
+            /* 利用可能なスペース内で最大の正方形を維持 */
+            aspect-ratio: 1 / 1;
+            height: 100%; /* 高さをコンテナに合わせ、aspect-ratioで幅を決定 */
+            max-width: 100%;
+            max-height: 100%;
+
+            padding: 10px;
             background-color: #fff;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            overflow: hidden; 
+            box-sizing: border-box;
         }
-        button {
-            padding: 15px 30px;
-            font-size: 18px;
-            cursor: pointer;
+
+        #game-board {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            background-color: var(--border-color);
+            gap: 1px;
+            position: relative;
+            overflow: visible;
+        }
+        
+        #game-board-wrapper {
+             grid-column: 1 / -1;
+             grid-row: 1 / -1;
+             position: relative;
+             width: 100%;
+             height: 100%;
+             overflow: visible;
+        }
+
+        .cell {
+            background-color: var(--cell-bg);
+        }
+
+        /* プレイヤー、ブロック、ゴールの共通スタイル */
+        .piece, .goal-marker {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: calc(100% / 6);
+            height: calc(100% / 6);
+            box-sizing: border-box;
+            will-change: transform;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .piece { z-index: 2; }
+        .goal-marker { z-index: 1; }
+
+        .goal-marker-inner {
+            width: 70%;
+            height: 70%;
+            border-radius: 50%;
+            border: 3px dashed var(--goal-border-color);
+            box-sizing: border-box;
+        }
+
+        .piece-inner {
+            width: 80%;
+            height: 80%;
+        }
+
+        .block {
+             transition: opacity 0.5s ease-in-out;
+        }
+
+        .block .piece-inner {
+            background-color: var(--block-color);
+            border-radius: 10%;
+        }
+
+        .player1 .piece-inner, .player2 .piece-inner {
+            border-radius: 50%;
+            width: 70%;
+            height: 70%;
+            border: 3px solid rgba(0,0,0,0.2);
+        }
+
+        .player1 .piece-inner { background-color: var(--player1-color); }
+        .player2 .piece-inner { background-color: var(--player2-color); }
+
+        /* 操作ボタンのラッパー */
+        #controls-wrapper {
+            grid-row: 3;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 方向ボタンのグリッド */
+        #controls {
+            display: grid;
+            grid-template-areas:
+                ". up ."
+                "left down right";
+            gap: 5px;
+            position: relative; /* リセットボタンを配置する基準 */
+        }
+
+        /* ★ 方向ボタン専用のスタイル */
+        .direction-btn {
+            width: clamp(50px, 10vw, 60px);
+            height: clamp(50px, 10vw, 60px);
+            font-size: 24px;
             border: none;
-            border-radius: 8px;
-            background-color: #28a745;
+            border-radius: 10px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            user-select: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #reset {
+            width: clamp(50px, 10vw, 60px);
+            height: clamp(50px, 10vw, 60px);
+            font-size: 24px;
+            border: none;
+            border-radius: 10px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s;
+            
+            position: absolute; 
+            top: 50%;
+            left: 100%;
+            transform: translateY(-50%);
+            margin-left: 20px; 
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        
+        #reset svg {
+            width: 100%;
+            height: 100%;
+            stroke: #333;
+        }
+
+        .direction-btn:active {
+            background-color: #e0e0e0;
+            transform: scale(0.95);
+        }
+
+        /* ★ リセットボタンは押しても背景色が変わるだけで、動かないようにする */
+        #reset:active {
+            background-color: #e0e0e0;
+            transform: translateY(-50%); /* 位置を維持 */
+        }
+
+        #up { grid-area: up; }
+        #down { grid-area: down; }
+        #left { grid-area: left; }
+        #right { grid-area: right; }
+
+        /* クリアメッセージ */
+        #clear-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
             color: white;
-            transition: all 0.2s;
-        }
-        button:hover:not(:disabled) {
-            background-color: #218838;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #message {
-            margin-top: 20px;
-            font-size: 1.5em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(3rem, 15vw, 6rem);
             font-weight: bold;
-            color: #007bff;
-            display: none;
+            cursor: pointer;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
         }
+        
+        #clear-message p {
+            animation: celebrate 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+        }
+
+        @keyframes celebrate {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
     </style>
 </head>
 <body>
+    <div id="app-wrapper">
+        <h1>ときどき言うことを聞く２人</h1>
+        <div id="game-container-wrapper">
+            <div id="game-container">
+                <div id="game-board">
+                    <div id="game-board-wrapper"></div>
+                </div>
+            </div>
+        </div>
+        <div id="controls-wrapper">
+            <div id="controls">
+                <!-- ★ class="direction-btn" を追加 -->
+                <button id="up" class="direction-btn">↑</button>
+                <button id="left" class="direction-btn">←</button>
+                <button id="right" class="direction-btn">→</button>
+                <button id="down" class="direction-btn">↓</button>
+                <button id="reset">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                        <path d="M3 3v5h5"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
 
-<div class="container">
-    <!-- h1はファイル名に合わせて変更してください -->
-    <h1>ゲーム 1</h1>
-    <p>このボタンを押してクリアしてください。</p>
-    <button id="clear-button">クリア</button>
-    <div id="message">クリア！メインページに戻ります...</div>
-</div>
+    <div id="clear-message" style="display: none;">
+        <p>CLEAR!</p>
+    </div>
 
-<script>
-    const clearButton = document.getElementById('clear-button');
-    const message = document.getElementById('message');
+    <script>
+        // --- 定数とグローバル変数 ---
+        const BOARD_SIZE = 6;
+        const initialLayout = [
+            ['.', 'b', '.', 'b', '.', 'b'],
+            ['.', '1', '2', '.', '.', '.'],
+            ['.', '.', '.', '.', '.', '.'],
+            ['b', '.', 'b', '.', 'b', '.'],
+            ['.', '.', '.', 'g', 'g', '.'],
+            ['.', '.', '.', '.', '.', '.']
+        ];
 
-    clearButton.addEventListener('click', () => {
-        message.style.display = 'block';
-        clearButton.disabled = true;
+        let players = [];
+        let blocks = [];
+        let goals = [];
+        let goalElements = []; // ゴールのDOM要素を保持する配列
+        let gameCleared = false;
+        let isMoving = false; // アニメーション中の多重操作を防ぐフラグ
 
-        // 親ページにクリア情報を送信
-        // gameNameはファイル名に合わせて変更してください
-        window.parent.postMessage({ event: 'gameCleared', gameName: 'game20' }, '*');
-    });
-</script>
+        // --- DOM要素の取得 ---
+        const gameBoard = document.getElementById('game-board');
+        const boardWrapper = document.getElementById('game-board-wrapper');
+        const clearMessageElement = document.getElementById('clear-message');
 
+        /**
+         * ゲームの初期化
+         */
+        function init() {
+            // 状態をリセット
+            players = [];
+            blocks = [];
+            goals = [];
+            goalElements = [];
+            gameCleared = false;
+            isMoving = false;
+            boardWrapper.innerHTML = '';
+            
+            // 古い背景セルを削除
+            while (gameBoard.firstChild && gameBoard.firstChild !== boardWrapper) {
+                gameBoard.removeChild(gameBoard.firstChild);
+            }
+
+            // 盤面の背景セルを生成
+            const backgroundFragment = document.createDocumentFragment();
+            for(let y=0; y < BOARD_SIZE; y++){
+                for(let x=0; x < BOARD_SIZE; x++){
+                    const cellEl = document.createElement('div');
+                    cellEl.classList.add('cell');
+                    cellEl.style.gridColumn = `${x + 1}`;
+                    cellEl.style.gridRow = `${y + 1}`;
+                    backgroundFragment.appendChild(cellEl);
+                }
+            }
+            gameBoard.insertBefore(backgroundFragment, boardWrapper);
+
+
+            // プレイヤー、ブロック、ゴールのオブジェクトとDOM要素を生成
+            const piecesFragment = document.createDocumentFragment();
+            initialLayout.forEach((row, y) => {
+                row.forEach((cell, x) => {
+                    let el = null;
+                    if (cell === '1' || cell === '2' || cell === 'b') {
+                        el = document.createElement('div');
+                        el.classList.add('piece');
+                        const innerEl = document.createElement('div');
+                        innerEl.classList.add('piece-inner');
+                        el.appendChild(innerEl);
+
+                        if (cell === '1') {
+                            el.classList.add('player1');
+                            players.push({ id: 1, x, y, el });
+                        } else if (cell === '2') {
+                            el.classList.add('player2');
+                            players.push({ id: 2, x, y, el });
+                        } else if (cell === 'b') {
+                            el.classList.add('block');
+                            el.style.opacity = '0'; // ★ ブロックを最初非表示に
+                            blocks.push({ x, y, el });
+                        }
+                    } else if (cell === 'g') {
+                        goals.push({ x, y });
+                        el = document.createElement('div');
+                        el.classList.add('goal-marker');
+                        const innerEl = document.createElement('div');
+                        innerEl.classList.add('goal-marker-inner');
+                        el.appendChild(innerEl);
+                        goalElements.push({ x, y, el });
+                    }
+
+                    if (el) {
+                        piecesFragment.appendChild(el);
+                    }
+                });
+            });
+            boardWrapper.appendChild(piecesFragment);
+            
+            // プレイヤーの順序をIDでソートして固定
+            players.sort((a,b) => a.id - b.id);
+            
+            // 初回描画を少し遅らせて、レイアウト計算を確実にする
+            requestAnimationFrame(() => render());
+        }
+
+        /**
+         * 現在の状態を画面に描画
+         */
+        function render() {
+            const cellSize = gameBoard.clientWidth / BOARD_SIZE;
+            if (cellSize === 0) return; // まだサイズが計算されていない場合は何もしない
+            [...players, ...blocks, ...goalElements].forEach(p => {
+                p.el.style.transform = `translate(${p.x * cellSize}px, ${p.y * cellSize}px)`;
+            });
+        }
+        
+        /**
+         * 移動処理
+         * @param {number} dx - X方向の移動量 (-1, 0, or 1)
+         * @param {number} dy - Y方向の移動量 (-1, 0, or 1)
+         */
+        async function handleMove(dx, dy) {
+            if (isMoving) return; 
+            isMoving = true;
+
+            const currentPositions = new Map();
+            const nextPositions = new Map();
+            const allPieces = [...players, ...blocks];
+
+            allPieces.forEach(p => {
+                currentPositions.set(p, { x: p.x, y: p.y });
+                nextPositions.set(p, { x: p.x, y: p.y });
+            });
+
+            // 1. 全てのブロックの移動先を計算
+            blocks.forEach(block => {
+                const currentPos = currentPositions.get(block);
+                nextPositions.set(block, {
+                    x: (currentPos.x + dx + BOARD_SIZE) % BOARD_SIZE,
+                    y: (currentPos.y + dy + BOARD_SIZE) % BOARD_SIZE
+                });
+            });
+
+            // 2. プレイヤーが押されるかどうかを連鎖的に解決
+            let pushedInLoop;
+            do {
+                pushedInLoop = false;
+                players.forEach(player => {
+                    const playerNextPos = nextPositions.get(player);
+
+                    // playerの移動予定地に、他の駒が移動してくるかチェック
+                    const pusher = allPieces.find(p => {
+                        if (p === player) return false; // 自分自身は対象外
+                        const pNextPos = nextPositions.get(p);
+                        return pNextPos.x === playerNextPos.x && pNextPos.y === playerNextPos.y;
+                    });
+
+                    if (pusher) {
+                        // 押されるので、プレイヤーの移動先を更新
+                        const newPlayerPos = {
+                            x: (playerNextPos.x + dx + BOARD_SIZE) % BOARD_SIZE,
+                            y: (playerNextPos.y + dy + BOARD_SIZE) % BOARD_SIZE
+                        };
+                        
+                        // 位置が実際に変わった場合のみフラグを立てる
+                        if (newPlayerPos.x !== playerNextPos.x || newPlayerPos.y !== playerNextPos.y) {
+                            nextPositions.set(player, newPlayerPos);
+                            pushedInLoop = true;
+                        }
+                    }
+                });
+            } while (pushedInLoop);
+
+            // ★ プレイヤーが動いたかどうかをここで判定
+            const playerHasMoved = players.some(p => {
+                const oldPos = currentPositions.get(p);
+                const newPos = nextPositions.get(p);
+                return oldPos.x !== newPos.x || oldPos.y !== newPos.y;
+            });
+
+            // 3. アニメーションを実行
+            const animationPromises = [];
+            const cellSize = gameBoard.clientWidth / BOARD_SIZE;
+
+            allPieces.forEach(p => {
+                const oldPos = currentPositions.get(p);
+                const newPos = nextPositions.get(p);
+                if (oldPos.x !== newPos.x || oldPos.y !== newPos.y) {
+                    animationPromises.push(animatePiece(p, oldPos, newPos, { dx, dy }, cellSize));
+                }
+            });
+
+            if (animationPromises.length > 0) {
+                await Promise.all(animationPromises);
+            }
+
+            // 4. 状態を更新
+            allPieces.forEach(p => {
+                const newPos = nextPositions.get(p);
+                p.x = newPos.x;
+                p.y = newPos.y;
+                p.el.style.transition = ''; // transitionをクリア
+            });
+
+            // ★ プレイヤーが動いた時だけクリア判定
+            if (playerHasMoved) {
+                checkClear();
+            }
+            isMoving = false;
+        }
+        
+        /**
+         * オブジェクトをアニメーションさせる
+         */
+        function animatePiece(piece, oldPos, newPos, dir, cellSize) {
+            return new Promise(resolve => {
+                const isWarpX = Math.abs(newPos.x - oldPos.x) > 1;
+                const isWarpY = Math.abs(newPos.y - oldPos.y) > 1;
+
+                // プレイヤーがワープする場合の特別な演出
+                if (players.includes(piece) && (isWarpX || isWarpY)) {
+                    piece.el.style.transition = 'transform 0.15s ease-in';
+                    piece.el.style.transform = `translate(${(oldPos.x + dir.dx) * cellSize}px, ${(oldPos.y + dir.dy) * cellSize}px)`;
+
+                    setTimeout(() => {
+                        piece.el.style.transition = 'none';
+                        const oppositeX = (newPos.x - dir.dx + BOARD_SIZE) % BOARD_SIZE;
+                        const oppositeY = (newPos.y - dir.dy + BOARD_SIZE) % BOARD_SIZE;
+                        
+                        requestAnimationFrame(() => {
+                             piece.el.style.transform = `translate(${oppositeX * cellSize}px, ${oppositeY * cellSize}px)`;
+                            requestAnimationFrame(() => {
+                                piece.el.style.transition = 'transform 0.15s ease-out';
+                                piece.el.style.transform = `translate(${newPos.x * cellSize}px, ${newPos.y * cellSize}px)`;
+                                piece.el.addEventListener('transitionend', resolve, { once: true });
+                            });
+                        });
+                    }, 150);
+                } else { // 通常の移動
+                    piece.el.style.transition = 'transform 0.2s ease';
+                    piece.el.style.transform = `translate(${newPos.x * cellSize}px, ${newPos.y * cellSize}px)`;
+                    piece.el.addEventListener('transitionend', resolve, { once: true });
+                }
+            });
+        }
+
+
+        /**
+         * クリア条件を満たしているかチェック
+         */
+        function checkClear() {
+            if (gameCleared) return; // 既にクリア済みの場合は何もしない
+
+            const player1OnGoal = goals.some(g => g.x === players[0].x && g.y === players[0].y);
+            const player2OnGoal = goals.some(g => g.x === players[1].x && g.y === players[1].y);
+            const playersOverlap = players[0].x === players[1].x && players[0].y === players[1].y;
+
+            if (player1OnGoal && player2OnGoal && !playersOverlap) {
+                gameCleared = true;
+                window.parent.postMessage({ event: 'gameCleared', gameName: 'game20' }, '*');
+                
+                // ★ ブロックを表示する
+                blocks.forEach(b => {
+                    b.el.style.opacity = '1';
+                });
+
+                setTimeout(() => {
+                    clearMessageElement.style.display = 'flex';
+                    requestAnimationFrame(() => clearMessageElement.style.opacity = '1');
+                }, 500);
+            }
+        }
+
+        // --- イベントリスナーの設定 ---
+        document.getElementById('up').addEventListener('click', () => handleMove(0, -1));
+        document.getElementById('down').addEventListener('click', () => handleMove(0, 1));
+        document.getElementById('left').addEventListener('click', () => handleMove(-1, 0));
+        document.getElementById('right').addEventListener('click', () => handleMove(1, 0));
+        document.getElementById('reset').addEventListener('click', init);
+
+        document.addEventListener('keydown', e => {
+            switch (e.key) {
+                case 'ArrowUp': e.preventDefault(); handleMove(0, -1); break;
+                case 'ArrowDown': e.preventDefault(); handleMove(0, 1); break;
+                case 'ArrowLeft': e.preventDefault(); handleMove(-1, 0); break;
+                case 'ArrowRight': e.preventDefault(); handleMove(1, 0); break;
+            }
+        });
+
+        clearMessageElement.addEventListener('click', () => {
+            clearMessageElement.style.opacity = '0';
+            setTimeout(() => {
+                 clearMessageElement.style.display = 'none';
+                 gameCleared = false; // ★ ゲームをリセットせず、操作可能にする
+            }, 300);
+        });
+
+        // ウィンドウリサイズ時に再描画
+        window.addEventListener('resize', () => {
+            if(!isMoving){
+                render();
+            }
+        });
+
+        // ゲーム開始
+        init();
+    </script>
 </body>
 </html>
+

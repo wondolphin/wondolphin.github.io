@@ -3,75 +3,387 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- タイトルはファイル名に合わせて変更してください -->
-    <title>ゲーム19</title>
+    <title>あちこち 4 Lights</title>
     <style>
+        :root {
+            --board-bg-color: #0d1a3e;
+            --grid-line-color: rgba(68, 114, 196, 0.3);
+            --main-line-color: #5b9bd5;
+            --switch-off-color: #2f455c;
+            --switch-on-color: #588080;
+            --target-off-color: #1e2b44;
+            
+            --light-red: #ff4136;
+            --light-green: #2ecc40;
+            --light-blue: #0074d9;
+            --light-white: #ffffff;
+
+            /* Use vmin for responsive scaling based on the smaller viewport dimension */
+            --cell-size: 5vmin;
+            --gap-size: 0.5vmin;
+            --border-width: 0.4vmin;
+            --main-line-width: 0.5vmin;
+            --grid-line-width: 0.1vmin;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+
         body {
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: sans-serif;
+        }
+
+        #game-title {
+            color: white;
+            font-family: sans-serif;
+            margin-bottom: 2vmin;
+            font-weight: normal;
+            font-size: 4vmin;
+            text-shadow: 0 0 10px var(--main-line-color);
+        }
+
+        #game-container {
+            position: relative;
+            padding: 2vmin;
+            background-color: var(--board-bg-color);
+            border-radius: 10px;
+        }
+
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(15, var(--cell-size));
+            grid-template-rows: repeat(13, var(--cell-size));
+            gap: var(--gap-size);
+            position: relative;
+            z-index: 2;
+        }
+        
+        #background-lines {
+            position: absolute;
+            top: 2vmin;
+            left: 2vmin;
+            width: calc(15 * var(--cell-size) + 14 * var(--gap-size));
+            height: calc(13 * var(--cell-size) + 12 * var(--gap-size));
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            box-sizing: border-box;
+            transition: background-color 0.2s, box-shadow 0.2s;
+        }
+        
+        .switch {
+            background-color: var(--switch-off-color);
+            cursor: pointer;
+        }
+        .switch.on { background-color: var(--switch-on-color); }
+        
+        .light { border-radius: 50%; }
+        .light-red { background-color: var(--light-red); box-shadow: 0 0 15px var(--light-red); }
+        .light-white { background-color: var(--light-white); box-shadow: 0 0 15px var(--light-white); }
+        .light-blue { background-color: var(--light-blue); box-shadow: 0 0 15px var(--light-blue); }
+        .light-green { background-color: var(--light-green); box-shadow: 0 0 15px var(--light-green); }
+
+        .target { background-color: var(--target-off-color); border-radius: 50%; }
+        .target-special { border-radius: 50%; background-color: var(--target-off-color); }
+        .target-special-red { border: var(--border-width) solid var(--light-red); }
+        .target-special-white { border: var(--border-width) solid var(--light-white); }
+        .target-special-blue { border: var(--border-width) solid var(--light-blue); }
+        .target-special-green { border: var(--border-width) solid var(--light-green); }
+
+        #clear-message {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 8vmin;
+            font-weight: bold;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f4f8;
-            font-family: sans-serif;
-            color: #333;
-        }
-        .container {
-            text-align: center;
-            padding: 40px;
-            background-color: #fff;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        button {
-            padding: 15px 30px;
-            font-size: 18px;
+            z-index: 100;
             cursor: pointer;
-            border: none;
-            border-radius: 8px;
-            background-color: #28a745;
-            color: white;
-            transition: all 0.2s;
-        }
-        button:hover:not(:disabled) {
-            background-color: #218838;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #message {
-            margin-top: 20px;
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #007bff;
-            display: none;
+            text-shadow: 0 0 20px #fff;
         }
     </style>
 </head>
 <body>
+    <h1 id="game-title">あちこち 4 Lights</h1>
+    <div id="game-container">
+        <svg id="background-lines"></svg>
+        <div id="game-board"></div>
+        <div id="clear-message" style="display: none;">CLEAR!</div>
+    </div>
 
-<div class="container">
-    <!-- h1はファイル名に合わせて変更してください -->
-    <h1>ゲーム 19</h1>
-    <p>このボタンを押してクリアしてください。</p>
-    <button id="clear-button">クリア</button>
-    <div id="message">クリア！メインページに戻ります...</div>
-</div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const boardElement = document.getElementById('game-board');
+            const svgElement = document.getElementById('background-lines');
+            const clearMessageElement = document.getElementById('clear-message');
+            
+            const layout = [
+                ['lw', '.', 't',  '.', 'tw', '.', 'tg', '.', 'tr', '.', 'tb', '.', 't',  '.', 'lr'],
+                ['.', 's1', '.', 's2', '.', 's2', '.', 's2', '.', 's2', '.', 's2', '.', 's1', '.' ],
+                ['t',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', 't' ],
+                ['.', 's3', '.',  '.', '.', 's3', '.',  '.', '.', 's3', '.',  '.', '.', 's3', '.' ],
+                ['t',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', 't' ],
+                ['.', 's3', '.',  '.', '.', 's3', '.',  '.', '.', 's3', '.',  '.', '.', 's3', '.' ],
+                ['t',  '.', 's2', '.', 's2', '.', 's2', '.', 's2', '.', 's2', '.', 's2', '.', 't' ],
+                ['.', 's3', '.',  '.', '.', 's3', '.',  '.', '.', 's3', '.',  '.', '.', 's3', '.' ],
+                ['t',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', 't' ],
+                ['.', 's3', '.',  '.', '.', 's3', '.',  '.', '.', 's3', '.',  '.', '.', 's3', '.' ],
+                ['t',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', '.',  '.', 't' ],
+                ['.', 's1', '.', 's2', '.', 's2', '.', 's2', '.', 's2', '.', 's2', '.', 's1', '.' ],
+                ['lg', '.', 't',  '.', 't',  '.', 't',  '.', 't',  '.', 't',  '.', 't',  '.', 'lb']
+            ];
 
-<script>
-    const clearButton = document.getElementById('clear-button');
-    const message = document.getElementById('message');
+            const boardCells = [];
+            const colorMap = {
+                red: [255, 65, 54],
+                green: [46, 204, 64],
+                blue: [0, 116, 217],
+                white: [255, 255, 255]
+            };
 
-    clearButton.addEventListener('click', () => {
-        message.style.display = 'block';
-        clearButton.disabled = true;
+            layout.forEach((row, i) => {
+                const rowCells = [];
+                row.forEach((cellType, j) => {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    if (cellType.startsWith('s')) {
+                        cell.classList.add('switch');
+                        cell.dataset.switchType = cellType;
 
-        // 親ページにクリア情報を送信
-        // gameNameはファイル名に合わせて変更してください
-        window.parent.postMessage({ event: 'gameCleared', gameName: 'game19' }, '*');
-    });
-</script>
+                        // Set initial ON state for specific switches
+                        if ((i === 9 && j === 5) || (i === 9 && j === 9) ||
+                            (i === 7 && j === 5) || (i === 7 && j === 9)) {
+                            cell.classList.add('on');
+                        }
 
+                        cell.addEventListener('click', () => {
+                            cell.classList.toggle('on');
+                            updateGameBoard();
+                        });
+                    } else {
+                         switch (cellType) {
+                            case 't': cell.classList.add('target'); break;
+                            case 'lr': cell.classList.add('light', 'light-red'); break;
+                            case 'lw': cell.classList.add('light', 'light-white'); break;
+                            case 'lb': cell.classList.add('light', 'light-blue'); break;
+                            case 'lg': cell.classList.add('light', 'light-green'); break;
+                            case 'tr': cell.classList.add('target-special', 'target-special-red'); break;
+                            case 'tw': cell.classList.add('target-special', 'target-special-white'); break;
+                            case 'tb': cell.classList.add('target-special', 'target-special-blue'); break;
+                            case 'tg': cell.classList.add('target-special', 'target-special-green'); break;
+                        }
+                    }
+                    boardElement.appendChild(cell);
+                    rowCells.push(cell);
+                });
+                boardCells.push(rowCells);
+            });
+            
+            function updateGameBoard() {
+                // 1. Reset all dynamic lights and hit data
+                boardCells.forEach((row, i) => {
+                    row.forEach((cell, j) => {
+                        cell.dataset.hitColors = '';
+                        cell.style.backgroundColor = '';
+                        cell.style.boxShadow = '';
+                        const type = layout[i][j];
+                        if (type.startsWith('s') && !cell.classList.contains('on')) {
+                             cell.style.backgroundColor = 'var(--switch-off-color)';
+                        } else if (type.startsWith('s') && cell.classList.contains('on')) {
+                             cell.style.backgroundColor = 'var(--switch-on-color)';
+                        }
+                    });
+                });
+
+                // 2. Trace all four lasers
+                traceLaser({ i: 0,  j: 0  }, { di: 1,  dj: 1  }, 'white');
+                traceLaser({ i: 0,  j: 14 }, { di: 1,  dj: -1 }, 'red');
+                traceLaser({ i: 12, j: 0  }, { di: -1, dj: 1  }, 'green');
+                traceLaser({ i: 12, j: 14 }, { di: -1, dj: -1 }, 'blue');
+
+                // 3. Apply blended colors
+                applyBlendedColors();
+
+                // 4. Check for clear condition
+                checkClearCondition();
+            }
+
+            function traceLaser(startPos, initialDir, color) {
+                let i = startPos.i; let j = startPos.j;
+                let di = initialDir.di; let dj = initialDir.dj;
+
+                for (let step = 0; step < 100; step++) { // Loop guard
+                    i += di; j += dj;
+                    if (i < 0 || i >= 13 || j < 0 || j >= 15) break;
+
+                    const cell = boardCells[i][j];
+                    const cellType = layout[i][j];
+                    
+                    const applyHit = (targetCell) => {
+                        let hitColors = targetCell.dataset.hitColors ? targetCell.dataset.hitColors.split(',') : [];
+                        if (!hitColors.includes(color)) {
+                            hitColors.push(color);
+                            targetCell.dataset.hitColors = hitColors.join(',');
+                        }
+                    };
+
+                    if (cellType.startsWith('s')) {
+                        if (cell.classList.contains('on')) {
+                            applyHit(cell);
+                            const type = cell.dataset.switchType;
+                            if (type === 's1') { di *= -1; dj *= -1; }
+                            else if (type === 's2') { di *= -1; }
+                            else if (type === 's3') { dj *= -1; }
+                        }
+                    } else if (cellType.startsWith('t')) {
+                        applyHit(cell);
+                        break; 
+                    } else if (['lr', 'lg', 'lb', 'lw'].includes(cellType)) {
+                        break;
+                    }
+                }
+            }
+
+            function getBlendedColor(colors) {
+                // Special case: Red + Blue = Magenta
+                if (colors.length === 2 && colors.includes('red') && colors.includes('blue')) {
+                    return 'rgb(255, 0, 255)'; // Vibrant Magenta
+                }
+
+                const hasWhite = colors.includes('white');
+                const otherColors = colors.filter(c => c !== 'white');
+
+                if (hasWhite) {
+                    if (otherColors.length === 0) {
+                        return 'rgb(255, 255, 255)'; // Just white
+                    }
+                    
+                    const otherRgb = otherColors.reduce((acc, color) => {
+                        const rgb = colorMap[color];
+                        if (rgb) { acc[0] += rgb[0]; acc[1] += rgb[1]; acc[2] += rgb[2]; }
+                        return acc;
+                    }, [0, 0, 0]);
+
+                    const finalRgb = [
+                        Math.round((otherRgb[0] + 255) / 2),
+                        Math.round((otherRgb[1] + 255) / 2),
+                        Math.round((otherRgb[2] + 255) / 2)
+                    ];
+                    
+                    return `rgb(${Math.min(255, finalRgb[0])}, ${Math.min(255, finalRgb[1])}, ${Math.min(255, finalRgb[2])})`;
+
+                } else {
+                    const finalRgb = colors.reduce((acc, color) => {
+                        const rgb = colorMap[color];
+                        if (rgb) { acc[0] += rgb[0]; acc[1] += rgb[1]; acc[2] += rgb[2]; }
+                        return acc;
+                    }, [0, 0, 0]);
+                    return `rgb(${Math.min(255, finalRgb[0])}, ${Math.min(255, finalRgb[1])}, ${Math.min(255, finalRgb[2])})`;
+                }
+            }
+
+            function applyBlendedColors() {
+                boardCells.forEach((row) => {
+                    row.forEach((cell) => {
+                        if (cell.dataset.hitColors) {
+                            const colors = cell.dataset.hitColors.split(',');
+                            const blendedColor = getBlendedColor(colors);
+                            cell.style.backgroundColor = blendedColor;
+                            cell.style.boxShadow = `0 0 10px ${blendedColor}`;
+                        }
+                    });
+                });
+            }
+
+            function checkClearCondition() {
+                const twColor = boardCells[0][4].dataset.hitColors || '';
+                const tgColor = boardCells[0][6].dataset.hitColors || '';
+                const trColor = boardCells[0][8].dataset.hitColors || '';
+                const tbColor = boardCells[0][10].dataset.hitColors || '';
+
+                if (trColor === 'red' && tbColor === 'blue' && twColor === 'white' && tgColor === 'green') {
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game19' }, '*');
+                    setTimeout(() => {
+                        clearMessageElement.style.display = 'flex';
+                    }, 500);
+                }
+            }
+            
+            clearMessageElement.addEventListener('click', () => { clearMessageElement.style.display = 'none'; });
+            
+            function drawLines() {
+                // Clear previous lines
+                while (svgElement.firstChild) {
+                    svgElement.removeChild(svgElement.firstChild);
+                }
+
+                // Reliably get computed pixel values from the DOM
+                const cellSize = boardCells[0][0].getBoundingClientRect().width;
+                const gap = parseFloat(getComputedStyle(boardElement).gap);
+                
+                const rootStyles = getComputedStyle(document.documentElement);
+                const vminValue = Math.min(window.innerWidth, window.innerHeight) / 100;
+                const mainLineWidth = parseFloat(rootStyles.getPropertyValue('--main-line-width')) * vminValue;
+                const gridLineWidth = parseFloat(rootStyles.getPropertyValue('--grid-line-width')) * vminValue;
+
+                const cellAndGap = cellSize + gap;
+                const offset = cellSize / 2;
+
+                function createLine(x1, y1, x2, y2, color, width) {
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', x1); line.setAttribute('y1', y1); line.setAttribute('x2', x2);
+                    line.setAttribute('y2', y2); line.setAttribute('stroke', color); line.setAttribute('stroke-width', width);
+                    line.setAttribute('stroke-linecap', 'round');
+                    return line;
+                }
+                const mainLineColor = rootStyles.getPropertyValue('--main-line-color').trim();
+                const gridLineColor = rootStyles.getPropertyValue('--grid-line-color').trim();
+                const mainLines = [
+                    { r1: 1, c1: 1, r2: 1, c2: 13 }, { r1: 6, c1: 1, r2: 6, c2: 13 }, { r1: 11, c1: 1, r2: 11, c2: 13 },
+                    { r1: 1, c1: 1, r2: 11, c2: 1 }, { r1: 1, c1: 5, r2: 11, c2: 5 }, { r1: 1, c1: 9, r2: 11, c2: 9 }, { r1: 1, c1: 13, r2: 11, c2: 13 },
+                ];
+                mainLines.forEach(p => { svgElement.appendChild(createLine(p.c1 * cellAndGap + offset, p.r1 * cellAndGap + offset, p.c2 * cellAndGap + offset, p.r2 * cellAndGap + offset, mainLineColor, mainLineWidth)); });
+                
+                const gridStartRow1 = 3, gridEndRow1 = 11, gridStartCol1 = 3, gridEndCol1 = 13;
+                const lineOffset = gap / 2;
+                const r_start = gridStartRow1 - 1, r_end = gridEndRow1 - 1, c_start = gridStartCol1 - 1, c_end = gridEndCol1 - 1;
+                const gridX1 = c_start * cellAndGap - lineOffset, gridX2 = (c_end + 1) * cellAndGap - lineOffset;
+                const gridY1 = r_start * cellAndGap - lineOffset, gridY2 = (r_end + 1) * cellAndGap - lineOffset;
+                for (let c = c_start; c <= c_end + 1; c++) { 
+                    const x = c * cellAndGap - lineOffset;
+                    svgElement.appendChild(createLine(x, gridY1, x, gridY2, gridLineColor, gridLineWidth)); 
+                }
+                for (let r = r_start; r <= r_end + 1; r++) { 
+                    const y = r * cellAndGap - lineOffset;
+                    svgElement.appendChild(createLine(gridX1, y, gridX2, y, gridLineColor, gridLineWidth)); 
+                }
+            }
+
+            // Initial and resize drawing
+            drawLines();
+            updateGameBoard();
+            window.addEventListener('resize', drawLines);
+        });
+    </script>
 </body>
 </html>
+

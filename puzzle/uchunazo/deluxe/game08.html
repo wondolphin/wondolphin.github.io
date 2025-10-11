@@ -3,75 +3,304 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- タイトルはファイル名に合わせて変更してください -->
-    <title>ゲーム08</title>
+    <title>赤青ランプ</title>
     <style>
+        :root {
+            /* 全体のサイズを80vminに縮小 */
+            --board-size: 80vmin;
+            --gap-size: 5px;
+            
+            /* ONの時の色 (彩度を上げる) */
+            --blue-on-color: #00bfff;
+            --red-on-color: #ff3355;
+
+            /* OFFの時の色 (彩度を上げる) */
+            --blue-off-color-dark: #114466;
+            --blue-off-color-light: #337799;
+            --red-off-color-dark: #661122;
+            --red-off-color-light: #993344;
+
+            /* 線の色 */
+            --line-color: #444;
+        }
+
         body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a2f3a;
+            color: #fff;
+            font-family: sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            margin: 0;
-            background-color: #f0f4f8;
-            font-family: sans-serif;
-            color: #333;
+            overflow: hidden;
         }
+
         .container {
-            text-align: center;
-            padding: 40px;
-            background-color: #fff;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
         }
-        button {
-            padding: 15px 30px;
-            font-size: 18px;
-            cursor: pointer;
-            border: none;
-            border-radius: 8px;
-            background-color: #28a745;
-            color: white;
-            transition: all 0.2s;
-        }
-        button:hover:not(:disabled) {
-            background-color: #218838;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #message {
-            margin-top: 20px;
-            font-size: 1.5em;
+
+        h1 {
+            font-size: clamp(24px, 5vw, 48px);
+            margin: 0;
             font-weight: bold;
-            color: #007bff;
-            display: none;
+            color: #eee;
+        }
+
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            width: var(--board-size);
+            height: var(--board-size);
+            max-width: 500px; /* 最大サイズも少し小さく */
+            max-height: 500px;
+            gap: var(--gap-size);
+            background-color:#112121;
+            padding: var(--gap-size);
+            border-radius: 10px;
+            box-sizing: border-box;
+        }
+
+        .cell {
+            width: 100%;
+            height: 100%;
+            /* ランプを中央に配置するため */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* 線の描画のため */
+            position: relative;
+        }
+
+        /* --- 接続線のスタイル --- */
+        .cell.has-right-neighbor::after,
+        .cell.has-down-neighbor::before {
+            content: '';
+            background-color: var(--line-color);
+            position: absolute;
+            z-index: 0; /* ランプより後ろに描画 */
+        }
+        /* 横線 */
+        .cell.has-right-neighbor::after {
+            width: 100%;
+            height: 4px;
+            top: 50%;
+            left: 50%;
+            transform: translateY(-50%);
+        }
+        /* 縦線 */
+        .cell.has-down-neighbor::before {
+            width: 4px;
+            height: 100%;
+            left: 50%;
+            top: 50%;
+            transform: translateX(-50%);
+        }
+
+
+        .lamp {
+            /* セルより小さくして「こぶり」な感じに */
+            width: 75%;
+            height: 75%;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            /* 内側の影で立体感を出す */
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.4);
+            border: 1px solid rgba(0,0,0,0.5);
+            /* 線より手前に表示 */
+            position: relative;
+            z-index: 1;
+            background-color: #1a1a1a; /* 線がはみ出さないように */
+        }
+
+        /* --- OFFの時のスタイル --- */
+        .lamp.blue {
+            background: radial-gradient(circle at 30% 30%, var(--blue-off-color-light), var(--blue-off-color-dark));
+        }
+
+        .lamp.red {
+            background: radial-gradient(circle at 30% 30%, var(--red-off-color-light), var(--red-off-color-dark));
+        }
+
+        /* --- ONの時のスタイル --- */
+        .lamp.blue.on {
+            /* グラデーションで光沢を表現 */
+            background: radial-gradient(circle at 30% 30%, #adefff, var(--blue-on-color));
+            /* 外側の光と内側の影を調整 */
+            box-shadow: 0 0 15px var(--blue-on-color), inset 2px 2px 5px rgba(0,0,0,0.2);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        .lamp.red.on {
+            background: radial-gradient(circle at 30% 30%, #ffadad, var(--red-on-color));
+            box-shadow: 0 0 15px var(--red-on-color), inset 2px 2px 5px rgba(0,0,0,0.2);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        #clear-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(40px, 10vw, 100px);
+            font-weight: bold;
+            color: #ffdd00;
+            cursor: pointer;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        #clear-message.show {
+            opacity: 1;
+            visibility: visible;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <!-- h1はファイル名に合わせて変更してください -->
-    <h1>ゲーム 8</h1>
-    <p>このボタンを押してクリアしてください。</p>
-    <button id="clear-button">クリア</button>
-    <div id="message">クリア！メインページに戻ります...</div>
-</div>
+    <div class="container">
+        <h1>赤青ランプ</h1>
+        <div id="game-board"></div>
+    </div>
 
-<script>
-    const clearButton = document.getElementById('clear-button');
-    const message = document.getElementById('message');
+    <div id="clear-message">
+        <p>CLEAR!</p>
+    </div>
 
-    clearButton.addEventListener('click', () => {
-        message.style.display = 'block';
-        clearButton.disabled = true;
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const boardLayout = [
+                ['x', 'x', 1, 2, 'x', 'x'],
+                ['x', 'x', 1, 1, 'x', 'x'],
+                [2, 1, 2, 1, 1, 1],
+                [1, 1, 1, 2, 1, 2],
+                ['x', 'x', 1, 1, 'x', 'x'],
+                ['x', 'x', 2, 1, 'x', 'x']
+            ];
 
-        // 親ページにクリア情報を送信
-        // gameNameはファイル名に合わせて変更してください
-        window.parent.postMessage({ event: 'gameCleared', gameName: 'game08' }, '*');
-    });
-</script>
+            const gameBoard = document.getElementById('game-board');
+            const clearMessage = document.getElementById('clear-message');
+            let previousLamp = null;
+            let totalLamps = 0;
+
+            // --- 盤面の生成 ---
+            boardLayout.forEach((row, r) => {
+                row.forEach((cell, c) => {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.classList.add('cell');
+
+                    if (cell !== 'x') {
+                        totalLamps++;
+                        const lampDiv = document.createElement('div');
+                        lampDiv.classList.add('lamp');
+                        lampDiv.dataset.row = r;
+                        lampDiv.dataset.col = c;
+                        lampDiv.dataset.type = cell;
+                        lampDiv.classList.add(cell === 1 ? 'blue' : 'red');
+                        lampDiv.addEventListener('click', handleLampClick);
+                        cellDiv.appendChild(lampDiv);
+                    }
+                    gameBoard.appendChild(cellDiv);
+                });
+            });
+
+            // --- 接続線の描画クラスを追加 ---
+            const cells = document.querySelectorAll('#game-board .cell');
+            boardLayout.forEach((row, r) => {
+                row.forEach((cell, c) => {
+                    if (cell !== 'x') {
+                        const currentCellIndex = r * 6 + c;
+                        const currentCellDiv = cells[currentCellIndex];
+
+                        // 右にランプがあれば横線クラスを追加
+                        if (c < 5 && boardLayout[r][c + 1] !== 'x') {
+                            currentCellDiv.classList.add('has-right-neighbor');
+                        }
+
+                        // 下にランプがあれば縦線クラスを追加
+                        if (r < 5 && boardLayout[r + 1][c] !== 'x') {
+                            currentCellDiv.classList.add('has-down-neighbor');
+                        }
+                    }
+                });
+            });
+
+
+            // --- ランプクリック時の処理 ---
+            function handleLampClick(event) {
+                const currentLamp = event.target;
+                if (currentLamp.classList.contains('on')) return; // ONのランプは操作不可
+
+                let isValidMove = false;
+
+                if (!previousLamp) {
+                    isValidMove = true; // 最初の1手
+                } else {
+                    const prevType = parseInt(previousLamp.dataset.type);
+                    const prevRow = parseInt(previousLamp.dataset.row);
+                    const prevCol = parseInt(previousLamp.dataset.col);
+                    const currentRow = parseInt(currentLamp.dataset.row);
+                    const currentCol = parseInt(currentLamp.dataset.col);
+
+                    // 青ランプのルール: 同じ行か同じ列
+                    if (prevType === 1 && (prevRow === currentRow || prevCol === currentCol)) {
+                        isValidMove = true;
+                    }
+                    // 赤ランプのルール: 斜め
+                    if (prevType === 2 && Math.abs(prevRow - currentRow) === Math.abs(prevCol - currentCol)) {
+                        isValidMove = true;
+                    }
+                }
+
+                // --- ON/OFFの処理 ---
+                if (!isValidMove) {
+                    // 条件を満たさないのでリセット
+                    const allOnLamps = document.querySelectorAll('.lamp.on');
+                    allOnLamps.forEach(lamp => lamp.classList.remove('on'));
+                }
+
+                currentLamp.classList.add('on');
+                previousLamp = currentLamp;
+
+                checkClear();
+            }
+
+            // --- クリア判定 ---
+            function checkClear() {
+                const onLampsCount = document.querySelectorAll('.lamp.on').length;
+                if (onLampsCount === totalLamps) {
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game08' }, '*');
+                    setTimeout(() => {
+                        clearMessage.classList.add('show');
+                    }, 500);
+                }
+            }
+            
+            // --- クリアメッセージを消す処理 ---
+            clearMessage.addEventListener('click', () => {
+                clearMessage.classList.remove('show');
+                 // メッセージを消した後にゲームをリセットする場合は下のコメントを外してください
+                /*
+                document.querySelectorAll('.lamp.on').forEach(lamp => lamp.classList.remove('on'));
+                previousLamp = null;
+                */
+            });
+        });
+    </script>
 
 </body>
 </html>
+

@@ -3,75 +3,492 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- タイトルはファイル名に合わせて変更してください -->
-    <title>ゲーム05</title>
+    <title>ぬるーく</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --board-size: 81vmin; /* 90vminから81vminに変更 */
+            /* Color Palette Change */
+            --piece-color: #d35400; /* Dark Orange */
+            --painted-color: #fdebd0; /* Light Orange */
+            --block-color: #34495e; /* Dark Blue-Gray */
+            --floor-color: #ecf0f1; /* Light Gray */
+            --border-color: #bdc3c7; /* Medium Gray */
+            --background-color: #f4f7f6;
+        }
+
         body {
+            margin: 0;
+            padding: 2vmin; /* Add padding around the content */
+            box-sizing: border-box; /* Include padding in the element's total width and height */
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: var(--background-color);
             display: flex;
             justify-content: center;
             align-items: center;
+            width: 100vw;
             height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Wrapper to contain the whole game and center it */
+        #game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5vmin;
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: clamp(2rem, 6vmin, 3.5rem);
             margin: 0;
-            background-color: #f0f4f8;
-            font-family: sans-serif;
-            color: #333;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
         }
-        .container {
-            text-align: center;
-            padding: 40px;
+
+        #game-container {
+            width: var(--board-size);
+            height: var(--board-size);
+            position: relative;
+        }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            width: 100%;
+            height: 100%;
+            border: 2px solid var(--border-color);
+            box-sizing: border-box;
             background-color: #fff;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 12px; /* Rounded corners */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1), 0 3px 6px rgba(0,0,0,0.1); /* Richer shadow */
+            padding: 5px; /* Inner padding */
+            gap: 5px; /* Gap between cells */
         }
-        button {
-            padding: 15px 30px;
-            font-size: 18px;
+
+        .cell {
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            border: none; /* Removed individual borders for a cleaner look */
+            border-radius: 6px;
+        }
+
+        .floor {
+            background-color: var(--floor-color);
+        }
+
+        .painted {
+            background-color: var(--painted-color);
+            transition: background-color 0.3s;
+        }
+
+        .block {
+            background-color: var(--block-color);
+        }
+
+        .piece {
+            position: absolute;
+            /* Sizing is now handled by JavaScript for accuracy */
+            border-radius: 50%;
+            top: 0;
+            left: 0;
+            transform: translate(-50%, -50%);
             cursor: pointer;
-            border: none;
-            border-radius: 8px;
-            background-color: #28a745;
+            transition: top 0.3s ease-out, left 0.3s ease-out;
+            z-index: 10;
+            background-color: var(--piece-color);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2), inset 0 2px 3px rgba(255,255,255,0.2); /* 3D effect */
+        }
+
+        .piece.no-transition {
+            transition: none;
+        }
+
+        .arrows {
+            position: absolute;
+            /* Sizing is now handled by JavaScript for accuracy */
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            pointer-events: none;
+        }
+        .arrow {
+            position: absolute;
+            width: 35%;
+            height: 35%;
+            background-color: rgba(44, 62, 80, 0.7);
+            cursor: pointer;
+            pointer-events: all;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            opacity: 0.2;
+            transition: opacity 0.2s, background-color 0.2s;
+        }
+        .arrow.active {
+            opacity: 1;
+        }
+        .arrow.active:hover {
+            background-color: rgba(44, 62, 80, 1.0);
+        }
+
+        .up { top: 0; left: 32.5%; }
+        .down { bottom: 0; left: 32.5%; transform: rotate(180deg); }
+        .left { left: 0; top: 32.5%; transform: rotate(-90deg); }
+        .right { right: 0; top: 32.5%; transform: rotate(90deg); }
+
+        @keyframes fadeInZoom {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        #clear-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
             color: white;
-            transition: all 0.2s;
-        }
-        button:hover:not(:disabled) {
-            background-color: #218838;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #message {
-            margin-top: 20px;
-            font-size: 1.5em;
+            font-size: clamp(4rem, 15vmin, 8rem);
             font-weight: bold;
-            color: #007bff;
-            display: none;
+            z-index: 100;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        #clear-message.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        #clear-message.show > span {
+            animation: fadeInZoom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
     </style>
 </head>
 <body>
+    <div id="game-wrapper">
+        <h1>ぬるーく</h1>
+        <div id="game-container">
+            <div id="board"></div>
+            <!-- コマや矢印はJSでここに追加されます -->
+        </div>
+    </div>
 
-<div class="container">
-    <!-- h1はファイル名に合わせて変更してください -->
-    <h1>ゲーム 5</h1>
-    <p>このボタンを押してクリアしてください。</p>
-    <button id="clear-button">クリア</button>
-    <div id="message">クリア！メインページに戻ります...</div>
-</div>
+    <div id="clear-message"><span>CLEAR!</span></div>
 
-<script>
-    const clearButton = document.getElementById('clear-button');
-    const message = document.getElementById('message');
+    <script>
+        const boardElement = document.getElementById('board');
+        const gameContainer = document.getElementById('game-container');
+        const clearMessage = document.getElementById('clear-message');
 
-    clearButton.addEventListener('click', () => {
-        message.style.display = 'block';
-        clearButton.disabled = true;
+        const NUM_ROWS = 6;
+        const NUM_COLS = 6;
 
-        // 親ページにクリア情報を送信
-        // gameNameはファイル名に合わせて変更してください
-        window.parent.postMessage({ event: 'gameCleared', gameName: 'game05' }, '*');
-    });
-</script>
+        const initialBoardLayout = [
+            [1, 1, 0, 0, 1, 1],
+            [1, 0, 0, 0, 0, 1],
+            [0, 1, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [2, 0, 0, 0, 0, 2]
+        ];
 
+        let boardData = [];
+        let pieces = [];
+        let selectedPieceId = null;
+        let arrowsElement = null;
+        let isMoving = false;
+        let isGameCleared = false; // Flag to check if the game has been cleared
+
+        function createBoard() {
+            boardElement.innerHTML = '';
+            boardData = [];
+            pieces = [];
+            let pieceIdCounter = 0;
+            
+            for (let r = 0; r < NUM_ROWS; r++) {
+                boardData[r] = [];
+                for (let c = 0; c < NUM_COLS; c++) {
+                    const cellType = initialBoardLayout[r][c];
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+
+                    let type, painted = false;
+                    if (cellType === 1) {
+                        type = 'block';
+                        cell.classList.add('block');
+                    } else {
+                        type = 'floor';
+                        cell.classList.add('floor');
+                        if (cellType === 2) {
+                            painted = true;
+                            pieces.push({ id: pieceIdCounter++, r: r, c: c });
+                        }
+                    }
+                    boardData[r][c] = { type, painted };
+                    boardElement.appendChild(cell);
+                }
+            }
+            updatePaintedCells();
+        }
+        
+        function createPieces() {
+            document.querySelectorAll('.piece').forEach(el => el.remove());
+            pieces.forEach(p => {
+                const pieceElement = document.createElement('div');
+                pieceElement.classList.add('piece', 'no-transition');
+                pieceElement.dataset.id = p.id;
+                p.element = pieceElement;
+
+                pieceElement.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (isMoving) return; 
+                    selectPiece(p.id);
+                });
+
+                gameContainer.appendChild(pieceElement);
+            });
+            updateAllPiecePositions();
+
+            // Allow the browser to paint the initial positions, then remove the class
+            // to enable transitions for future moves.
+            setTimeout(() => {
+                document.querySelectorAll('.piece.no-transition').forEach(el => {
+                    el.classList.remove('no-transition');
+                });
+            }, 50); // A small delay is safer to ensure rendering
+        }
+        
+        function updateAllPiecePositions() {
+            const firstCell = boardElement.querySelector(".cell");
+            if (!firstCell) return;
+            const cellRect = firstCell.getBoundingClientRect();
+            const cellWidth = cellRect.width;
+
+            // Update size and position for pieces
+            pieces.forEach(p => {
+                if(p.element) {
+                    // Update size based on actual cell dimensions
+                    p.element.style.width = `${cellWidth * 0.75}px`;
+                    p.element.style.height = `${cellWidth * 0.75}px`;
+
+                    // Update position
+                    const pos = getCellCenter(p.r, p.c);
+                    if (pos) {
+                        p.element.style.left = `${pos.x}px`;
+                        p.element.style.top = `${pos.y}px`;
+                    }
+                }
+            });
+
+            // Update arrows if they exist
+            if (selectedPieceId !== null && pieces[selectedPieceId]) {
+                updateArrowsPosition(pieces[selectedPieceId]);
+            }
+        }
+
+        function getCellCenter(r, c) {
+            const cellElement = boardElement.querySelector(`[data-r='${r}'][data-c='${c}']`);
+            if (!cellElement) return null;
+
+            const boardRect = boardElement.getBoundingClientRect();
+            const cellRect = cellElement.getBoundingClientRect();
+
+            // Calculate center relative to the game container's top-left corner
+            const x = cellRect.left - boardRect.left + (cellRect.width / 2);
+            const y = cellRect.top - boardRect.top + (cellRect.height / 2);
+            
+            return { x, y };
+        }
+
+        function selectPiece(id) {
+            if (selectedPieceId === id) {
+                selectedPieceId = null;
+                removeArrows();
+                return;
+            }
+            selectedPieceId = id;
+            const piece = pieces[id];
+            createOrUpdateArrows(piece);
+        }
+
+        function createOrUpdateArrows(piece) {
+            if (!arrowsElement) {
+                arrowsElement = document.createElement('div');
+                arrowsElement.classList.add('arrows');
+                const directions = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] };
+                for (const [dir, [dr, dc]] of Object.entries(directions)) {
+                    const arrow = document.createElement('div');
+                    arrow.classList.add('arrow', dir);
+                    arrow.dataset.dr = dr;
+                    arrow.dataset.dc = dc;
+                    arrow.addEventListener('click', (e) => {
+                         e.stopPropagation();
+                         if(arrow.classList.contains('active')){
+                            movePiece(dr, dc);
+                         }
+                    });
+                    arrowsElement.appendChild(arrow);
+                }
+                gameContainer.appendChild(arrowsElement);
+            }
+            updateArrowsPosition(piece);
+            updateArrowStates(piece);
+        }
+        
+        function updateArrowsPosition(piece){
+            if (!arrowsElement) return;
+
+            const firstCell = boardElement.querySelector(".cell");
+            if (!firstCell) return;
+            const cellWidth = firstCell.getBoundingClientRect().width;
+            
+            arrowsElement.style.width = `${cellWidth}px`;
+            arrowsElement.style.height = `${cellWidth}px`;
+            
+            const pos = getCellCenter(piece.r, piece.c);
+            if (pos) {
+                arrowsElement.style.left = `${pos.x}px`;
+                arrowsElement.style.top = `${pos.y}px`;
+            }
+        }
+
+        function updateArrowStates(piece) {
+             arrowsElement.querySelectorAll('.arrow').forEach(arrow => {
+                const dr = parseInt(arrow.dataset.dr);
+                const dc = parseInt(arrow.dataset.dc);
+                const nextR = piece.r + dr;
+                const nextC = piece.c + dc;
+                
+                if (isValidMove(nextR, nextC)) {
+                    arrow.classList.add('active');
+                } else {
+                    arrow.classList.remove('active');
+                }
+            });
+        }
+        
+        function isValidMove(r, c){
+            return r >= 0 && r < NUM_ROWS && c >= 0 && c < NUM_COLS &&
+                   boardData[r][c].type !== 'block' &&
+                   !pieces.some(p => p.r === r && p.c === c);
+        }
+
+        function removeArrows() {
+            if (arrowsElement) {
+                arrowsElement.remove();
+                arrowsElement = null;
+            }
+        }
+
+        function movePiece(dr, dc) {
+            if (isMoving) return;
+            isMoving = true;
+            
+            const piece = pieces[selectedPieceId];
+            let { r, c } = piece;
+            
+            removeArrows();
+            
+            boardData[r][c].painted = true;
+
+            const path = [];
+            let finalR = r;
+            let finalC = c;
+
+            while (true) {
+                const nextR = finalR + dr;
+                const nextC = finalC + dc;
+                if (!isValidMove(nextR, nextC)) {
+                    break;
+                }
+                finalR = nextR;
+                finalC = nextC;
+                path.push({r: finalR, c: finalC});
+            }
+
+            path.forEach(pos => {
+                boardData[pos.r][pos.c].painted = true;
+            });
+
+            piece.r = finalR;
+            piece.c = finalC;
+            
+            updateAllPiecePositions();
+
+            setTimeout(() => {
+                updatePaintedCells();
+                checkClearCondition();
+                selectedPieceId = null;
+                isMoving = false;
+            }, 300); 
+        }
+        
+        function updatePaintedCells() {
+            for (let r = 0; r < NUM_ROWS; r++) {
+                for (let c = 0; c < NUM_COLS; c++) {
+                    const cell = boardElement.querySelector(`[data-r='${r}'][data-c='${c}']`);
+                    if (cell && boardData[r][c].type !== 'block') {
+                        if (boardData[r][c].painted) {
+                            cell.classList.add('painted');
+                        } else {
+                            cell.classList.remove('painted');
+                        }
+                    }
+                }
+            }
+        }
+
+        function checkClearCondition() {
+            if (isGameCleared) return;
+
+            const totalFloors = boardData.flat().filter(d => d.type === 'floor').length;
+            const paintedFloors = boardData.flat().filter(d => d.type === 'floor' && d.painted).length;
+            
+            if (totalFloors > 0 && totalFloors === paintedFloors) {
+                isGameCleared = true;
+                window.parent.postMessage({ event: 'gameCleared', gameName: 'game05' }, '*');
+                setTimeout(() => {
+                    clearMessage.classList.add('show');
+                }, 500);
+            }
+        }
+        
+        function resetGame() {
+            isGameCleared = false;
+            clearMessage.classList.remove('show');
+            createBoard();
+            createPieces();
+        }
+
+        document.addEventListener('click', () => {
+            if (isMoving) return;
+            selectedPieceId = null;
+            removeArrows();
+        });
+
+        clearMessage.addEventListener('click', resetGame);
+
+        window.addEventListener('resize', updateAllPiecePositions);
+
+        // --- Initialize Game ---
+        createBoard();
+        createPieces();
+    </script>
 </body>
 </html>
+

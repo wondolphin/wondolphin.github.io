@@ -3,75 +3,480 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- タイトルはファイル名に合わせて変更してください -->
-    <title>ゲーム01</title>
+    <title>Reversible Lamp</title>
     <style>
+        /* 全体のスタイル */
         body {
+            background-color: #333;
+            color: #fff;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            user-select: none; /* テキスト選択を無効化 */
+            /* iframe内でも高さを100%にするための設定 */
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 中央配置用のメインラッパー */
+        #main-wrapper {
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f4f8;
-            font-family: sans-serif;
-            color: #333;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
         }
-        .container {
+
+        /* ゲームコンテナ */
+        #game-container {
             text-align: center;
-            padding: 40px;
-            background-color: #fff;
+            padding: 2vmin;
+            background-color: #444;
             border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            width: 80vmin; /* 横幅を少し狭くして縦のスペースを確保 */
+            max-width: 450px;
+            height: 95vmin;
+            max-height: 800px;
+            box-sizing: border-box;
+
+            /* Flexboxレイアウトで要素を縦に配置し、スペースを配分 */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* 上下に要素を配置し、間を均等に空ける */
+            align-items: center; /* 子要素を中央揃えにする */
         }
-        button {
-            padding: 15px 30px;
-            font-size: 18px;
+
+        h1 {
+            font-size: clamp(16px, 4.5vmin, 24px); /* 画面サイズに応じてフォントサイズを調整 */
+            margin: 0;
+        }
+
+        /* ゲーム盤 */
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr); /* 7列、可変幅 */
+            gap: 1vmin;
+            padding: 1.5vmin;
+            background-color: #2a2a2a;
+            border-radius: 10px;
+            border: 2px solid #555;
+            aspect-ratio: 1 / 1; /* 常に正方形を保つ */
+            width: 90%; /* 親要素の90%の幅に設定 */
+        }
+
+        /* コマのスタイル */
+        .piece {
+            width: 100%;
+            padding-bottom: 100%; /* 正方形を維持 */
+            height: 0;
+            position: relative;
+            border-radius: 50%;
             cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .piece.white {
+            z-index: 1; /* 白いコマを手前に表示 */
+        }
+
+        .piece-inner {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+        }
+
+        .piece.white .piece-inner {
+            background-color: #f0f0f0;
+            box-shadow: inset 0 -4px 6px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.4);
+        }
+        
+        .piece.white:hover {
+            transform: scale(1.05);
+        }
+
+        .piece.black .piece-inner {
+            background-color: #1a1a1a;
+            box-shadow: inset 0 4px 6px rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.4);
+            cursor: default; /* 黒コマはカーソルを変える */
+        }
+
+        /* 選択されたコマ（光る） */
+        .piece.selected {
+            z-index: 2; /* 選択中のコマを最前面に */
+        }
+        .piece.selected .piece-inner {
+            box-shadow: 0 0 1.5vmin 0.5vmin #00ffff, inset 0 -4px 6px rgba(0,0,0,0.2);
+            transform: scale(1.1);
+        }
+
+        /* 震えるアニメーション */
+        .shake {
+            animation: shake-animation 0.4s;
+        }
+
+        @keyframes shake-animation {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+        
+        /* ゲージ */
+        #gauge-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 0;
+            width: 90%; /* 親要素の90%の幅に設定 */
+        }
+        
+        #progress-bar {
+            width: 100%;
+            height: 2.5vmin;
+            max-height: 20px;
+            background-color: #2a2a2a;
+            border-radius: 10px;
+            border: 1px solid #555;
+            overflow: hidden;
+        }
+
+        #progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #00c6ff, #0072ff); /* シアンのグラデーション */
+            box-shadow: 0 0 10px #00c6ff;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+
+        /* 操作ボタン */
+        #controls {
+            display: flex;
+            justify-content: center;
+            gap: 3vmin;
+            margin: 0;
+        }
+        
+        #controls button {
+            background-color: #555;
+            color: #fff;
             border: none;
             border-radius: 8px;
-            background-color: #28a745;
+            padding: 1.2vmin 2.4vmin;
+            font-size: clamp(12px, 2.5vmin, 16px);
+            cursor: pointer;
+            transition: background-color 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        #controls button:hover {
+            background-color: #666;
+        }
+
+        #controls button:active {
+            transform: translateY(1px);
+        }
+        
+        /* クリアメッセージ */
+        #clear-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: none; /* 最初は非表示 */
+            flex-direction: column; /* 子要素を縦に並べる */
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        #clear-text {
+            font-size: 10vmin;
+            color: #00ffff;
+            text-shadow: 0 0 20px #00ffff;
+            animation: clear-fadein 1s;
+        }
+        
+        @keyframes clear-fadein {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* シェアボタン */
+        #share-button {
+            background-color: #1DA1F2; /* Xのブランドカラー */
             color: white;
-            transition: all 0.2s;
-        }
-        button:hover:not(:disabled) {
-            background-color: #218838;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #message {
-            margin-top: 20px;
-            font-size: 1.5em;
+            padding: 1.5vmin 3vmin;
+            border-radius: 30px;
+            text-decoration: none;
+            font-size: clamp(14px, 3vmin, 20px);
             font-weight: bold;
-            color: #007bff;
-            display: none;
+            margin-top: 4vmin;
+            opacity: 0; /* 最初は非表示 */
+            transition: opacity 0.5s ease-in-out, transform 0.2s;
+            pointer-events: none; /* 非表示時はクリック不可 */
+            cursor: pointer;
         }
+        
+        #share-button.visible {
+            opacity: 1;
+            pointer-events: auto; /* 表示されたらクリック可能に */
+            animation: button-pop-in 0.5s ease-out;
+        }
+
+        #share-button:hover {
+            background-color: #0c85d0;
+        }
+        #share-button:active {
+            transform: scale(0.95);
+        }
+
+        @keyframes button-pop-in {
+            from {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
     </style>
 </head>
 <body>
+    <div id="main-wrapper">
+        <div id="game-container">
+            <h1>Reversible Lamp</h1>
+            <div id="game-board"></div>
+            <div id="gauge-container">
+                <div id="progress-bar">
+                    <div id="progress-fill"></div>
+                </div>
+            </div>
+            <div id="controls">
+                <button id="undo-btn">一手戻る</button>
+                <button id="reset-btn">リセット</button>
+            </div>
+        </div>
+    </div>
 
-<div class="container">
-    <!-- h1はファイル名に合わせて変更してください -->
-    <h1>ゲーム 1</h1>
-    <p>このボタンを押してクリアしてください。</p>
-    <button id="clear-button">クリア</button>
-    <div id="message">クリア！メインページに戻ります...</div>
-</div>
+    <div id="clear-message">
+        <span id="clear-text">CLEAR!</span>
+        <a href="https://twitter.com/intent/tweet?text=%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Freversible_lamp%2Findex.html" target="_blank" id="share-button">喜びをXでシェアする</a>
+    </div>
 
-<script>
-    const clearButton = document.getElementById('clear-button');
-    const message = document.getElementById('message');
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初期盤面データ
+            const initialBoardData = [
+                "1010001",
+                "0101010",
+                "0010101",
+                "0101010",
+                "1010100",
+                "0101010",
+                "1000101"
+            ];
 
-    clearButton.addEventListener('click', () => {
-        message.style.display = 'block';
-        clearButton.disabled = true;
+            // ゲームの状態
+            let boardState;
+            let moveHistory;
+            let firstSelection = null;
+            let isProcessing = false;
 
-        // 親ページにクリア情報を送信
-        // gameNameはファイル名に合わせて変更してください
-        window.parent.postMessage({ event: 'gameCleared', gameName: 'game01' }, '*');
-    });
-</script>
+            const gameBoardElement = document.getElementById('game-board');
+            const progressFillElement = document.getElementById('progress-fill');
+            const clearMessageElement = document.getElementById('clear-message');
+            const shareButton = document.getElementById('share-button');
+            const undoBtn = document.getElementById('undo-btn');
+            const resetBtn = document.getElementById('reset-btn');
 
+            /**
+             * ゲームを初期化またはリセットする関数
+             */
+            const initializeGame = () => {
+                // deep copy
+                boardState = initialBoardData.map(row => row.split('').map(Number));
+                moveHistory = [];
+                firstSelection = null;
+                isProcessing = false;
+                clearMessageElement.style.display = 'none';
+                shareButton.classList.remove('visible'); // シェアボタンも隠す
+                updateGame();
+            };
+            
+            /**
+             * 盤面を描画する関数
+             */
+            const renderBoard = () => {
+                gameBoardElement.innerHTML = '';
+                boardState.forEach((row, rowIndex) => {
+                    row.forEach((cell, colIndex) => {
+                        const piece = document.createElement('div');
+                        const pieceInner = document.createElement('div');
+                        
+                        piece.classList.add('piece');
+                        pieceInner.classList.add('piece-inner');
+                        
+                        piece.classList.add(cell === 1 ? 'white' : 'black');
+                        piece.dataset.row = rowIndex;
+                        piece.dataset.col = colIndex;
+
+                        if (cell === 1) { // 白いコマのみクリックイベントを追加
+                            piece.addEventListener('click', handlePieceClick);
+                        }
+
+                        piece.appendChild(pieceInner);
+                        gameBoardElement.appendChild(piece);
+                    });
+                });
+            };
+
+            /**
+             * コマがクリックされたときの処理
+             * @param {Event} event 
+             */
+            const handlePieceClick = (event) => {
+                if (isProcessing) return;
+
+                const piece = event.currentTarget;
+                const row = parseInt(piece.dataset.row);
+                const col = parseInt(piece.dataset.col);
+
+                if (!firstSelection) {
+                    firstSelection = { row, col, element: piece };
+                    piece.classList.add('selected');
+                } else {
+                    if (firstSelection.row === row && firstSelection.col === col) {
+                        firstSelection.element.classList.remove('selected');
+                        firstSelection = null;
+                        return;
+                    }
+
+                    const secondSelection = { row, col, element: piece };
+                    piece.classList.add('selected');
+                    isProcessing = true;
+
+                    if (firstSelection.row === secondSelection.row || firstSelection.col === secondSelection.col) {
+                         // 操作前の状態を履歴に保存
+                        moveHistory.push(JSON.parse(JSON.stringify(boardState)));
+
+                        setTimeout(() => {
+                            flipPieces(firstSelection, secondSelection);
+                            firstSelection = null;
+                            updateGame();
+                            isProcessing = false;
+                        }, 300);
+                    } else {
+                        setTimeout(() => {
+                            firstSelection.element.classList.add('shake');
+                            secondSelection.element.classList.add('shake');
+                        }, 100);
+
+                        setTimeout(() => {
+                            firstSelection.element.classList.remove('selected', 'shake');
+                            secondSelection.element.classList.remove('selected', 'shake');
+                            firstSelection = null;
+                            isProcessing = false;
+                        }, 500);
+                    }
+                }
+            };
+            
+            /**
+             * 一手戻る処理
+             */
+            const handleUndo = () => {
+                if (moveHistory.length === 0 || isProcessing) return;
+                
+                boardState = moveHistory.pop();
+                if (firstSelection) {
+                    firstSelection.element.classList.remove('selected');
+                    firstSelection = null;
+                }
+                updateGame();
+            };
+
+            /**
+             * 2つのコマとその間のコマをひっくり返す
+             * @param {{row: number, col: number}} sel1
+             * @param {{row: number, col: number}} sel2
+             */
+            const flipPieces = (sel1, sel2) => {
+                if (sel1.row === sel2.row) {
+                    const row = sel1.row;
+                    const startCol = Math.min(sel1.col, sel2.col);
+                    const endCol = Math.max(sel1.col, sel2.col);
+                    for (let c = startCol; c <= endCol; c++) {
+                        boardState[row][c] = 1 - boardState[row][c];
+                    }
+                } else {
+                    const col = sel1.col;
+                    const startRow = Math.min(sel1.row, sel2.row);
+                    const endRow = Math.max(sel1.row, sel2.row);
+                    for (let r = startRow; r <= endRow; r++) {
+                        boardState[r][col] = 1 - boardState[r][col];
+                    }
+                }
+            };
+
+            /**
+             * ゲージの更新とクリア判定
+             */
+            const updateGame = () => {
+                renderBoard();
+
+                let blackCount = 0;
+                let totalCount = 0;
+                boardState.forEach(row => {
+                    row.forEach(cell => {
+                        if (cell === 0) blackCount++;
+                        totalCount++;
+                    });
+                });
+
+                const percentage = totalCount > 0 ? (blackCount / totalCount) * 100 : 0;
+                progressFillElement.style.width = `${percentage}%`;
+
+                if (blackCount === totalCount) {
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game01' }, '*');
+                    setTimeout(() => {
+                        clearMessageElement.style.display = 'flex';
+                        /*
+                        // 1.5秒後にシェアボタンを表示
+                        setTimeout(() => {
+                            shareButton.classList.add('visible');
+                        }, 1500);
+                        */
+                    }, 500);
+                }
+            };
+
+            // イベントリスナーの設定
+            resetBtn.addEventListener('click', initializeGame);
+            undoBtn.addEventListener('click', handleUndo);
+            clearMessageElement.addEventListener('click', () => {
+                clearMessageElement.style.display = 'none';
+                shareButton.classList.remove('visible'); // メッセージを消すときにボタンも隠す
+            });
+            shareButton.addEventListener('click', (event) => {
+                event.stopPropagation(); // ボタンクリックでメッセージが消えないようにする
+            });
+            
+            // ゲーム初期化
+            initializeGame();
+        });
+    </script>
 </body>
 </html>
+

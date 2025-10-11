@@ -2,76 +2,328 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- タイトルはファイル名に合わせて変更してください -->
-    <title>ゲーム23</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ナゾ条件迷路</title>
     <style>
+        /* ページの基本スタイル */
         body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom right, #e0eafc, #cfdef3); /* 背景グラデーション */
+            touch-action: none; /* スマートフォンでの画面スクロールを無効化 */
+            -webkit-user-select: none; /* テキスト選択を無効化 */
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        h1 {
+            color: #1d3557; /* 深い青色 */
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        /* ゲーム全体のコンテナ */
+        #game-container {
+            position: relative;
+            padding: 10px;
+            background-color: #c1d1e0;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column; /* ボタンを下に配置 */
+            justify-content: center;
+            align-items: center;
+            gap: 15px; /* 盤面とボタンの間隔 */
+        }
+        
+        #grid-board {
+            display: grid;
+            grid-template-columns: repeat(7, clamp(35px, 8vw, 45px));
+            grid-template-rows: repeat(7, clamp(35px, 8vw, 45px));
+            gap: 2px;
+            background-color: transparent;
+            border-radius: 4px;
+        }
+
+        /* 個々のマス */
+        .cell {
+            background-color: #f7f9fc;
+            transition: background-color 0.1s ease-in-out;
+            position: relative;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        
+        /* スタートとゴールのマス */
+        .start-cell {
+            background-color: #98fb98; /* 緑 */
+            cursor: default;
+        }
+        .goal-cell {
+            background-color: #98fb98; /* 緑 */
+            cursor: default;
+        }
+
+        /* 非表示のマス */
+        .empty-cell {
+            background-color: transparent;
+            cursor: default;
+        }
+
+        /* 通過したマス (ONの状態) */
+        .cell.lit {
+            background-color: #8ecae6; /* 明るい青 */
+            box-shadow: inset 0 0 8px #219ebc;
+        }
+
+        /* クリアしたマス */
+        .cell.cleared {
+            background-color: #98fb98; /* 緑 */
+            box-shadow: none;
+        }
+
+        /* エラー（数字が重複した）マス */
+        .cell.error {
+            animation: blink-error 0.25s infinite alternate;
+        }
+
+        @keyframes blink-error {
+            from { background-color: #f7dc6f; }
+            to { background-color: #ff595e; } /* 明るい赤色 */
+        }
+        
+        #check-button {
+            padding: 10px 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: white;
+            background-color: #457b9d;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+
+        #check-button:hover:not(:disabled) {
+            background-color: #1d3557;
+            transform: translateY(-2px);
+        }
+
+        #check-button:disabled {
+            background-color: #a8dadc;
+            cursor: not-allowed;
+        }
+
+        /* クリアメッセージ */
+        #clear-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(29, 53, 87, 0.85);
+            color: white;
+            font-size: clamp(2.5rem, 10vw, 5rem);
+            font-weight: bold;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f4f8;
-            font-family: sans-serif;
-            color: #333;
-        }
-        .container {
-            text-align: center;
-            padding: 40px;
-            background-color: #fff;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        button {
-            padding: 15px 30px;
-            font-size: 18px;
             cursor: pointer;
-            border: none;
-            border-radius: 8px;
-            background-color: #28a745;
-            color: white;
-            transition: all 0.2s;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s;
+            z-index: 20;
         }
-        button:hover:not(:disabled) {
-            background-color: #218838;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #message {
-            margin-top: 20px;
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #007bff;
-            display: none;
+
+        #clear-message.show {
+            visibility: visible;
+            opacity: 1;
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <!-- h1はファイル名に合わせて変更してください -->
-    <h1>ゲーム 1</h1>
-    <p>このボタンを押してクリアしてください。</p>
-    <button id="clear-button">クリア</button>
-    <div id="message">クリア！メインページに戻ります...</div>
-</div>
+    <h1>ナゾ条件迷路</h1>
+    <div id="game-container">
+        <div id="grid-board"></div>
+        <button id="check-button" disabled>check</button>
+    </div>
+    <div id="clear-message">CLEAR!</div>
 
-<script>
-    const clearButton = document.getElementById('clear-button');
-    const message = document.getElementById('message');
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // HTML要素の取得
+        const gridBoard = document.getElementById('grid-board');
+        const clearMessage = document.getElementById('clear-message');
+        const checkButton = document.getElementById('check-button');
 
-    clearButton.addEventListener('click', () => {
-        message.style.display = 'block';
-        clearButton.disabled = true;
+        // 定数
+        const ROWS = 7;
+        const COLS = 5; // プレイエリアの列数
+        const GRID_COLS = COLS + 2; // 表示上のグリッド列数 (スタート/ゴール含む)
+        const GRID_VALUES = [
+            [1, 8, 3, 4, 5], [2, 3, 4, 11, 6], [11, 12, 5, 6, 7],
+            [4, 9, 10, 7, 9], [8, 1, 9, 8, 13], [5, 4, 10, 1, 2],
+            [6, 7, 11, 12, 13]
+        ];
 
-        // 親ページにクリア情報を送信
-        // gameNameはファイル名に合わせて変更してください
-        window.parent.postMessage({ event: 'gameCleared', gameName: 'game23' }, '*');
+        let cells = [];
+        let isCleared = false; // クリア状態を管理するフラグ
+
+        // 盤面を初期化
+        function initializeGame() {
+            gridBoard.innerHTML = '';
+            cells = [];
+            for (let r = 0; r < ROWS; r++) {
+                cells[r] = [];
+                for (let c = 0; c < GRID_COLS; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    if (r === 0 && c === 0) {
+                        cell.classList.add('start-cell');
+                    } else if (r === ROWS - 1 && c === GRID_COLS - 1) {
+                        cell.classList.add('goal-cell');
+                    } else if (c > 0 && c <= COLS) {
+                        cell.dataset.value = GRID_VALUES[r][c-1];
+                        cell.addEventListener('click', () => toggleCell(cell));
+                    } else {
+                        cell.classList.add('empty-cell');
+                    }
+
+                    gridBoard.appendChild(cell);
+                    cells[r][c] = cell;
+                }
+            }
+            resetGame();
+        }
+
+        function toggleCell(cell) {
+            if (isCleared) return; // クリア後は操作不可にする
+            cell.classList.toggle('lit');
+            updateCheckButtonState();
+        }
+
+        // スタートからゴールまで繋がっているかチェック
+        function isPathConnected() {
+            const startCell = cells[0][0];
+            const goalCell = cells[ROWS - 1][GRID_COLS - 1];
+            
+            const queue = [startCell];
+            const visited = new Set();
+            visited.add(`${startCell.dataset.row}-${startCell.dataset.col}`);
+
+            while (queue.length > 0) {
+                const current = queue.shift();
+                if (current === goalCell) return true;
+
+                const r = parseInt(current.dataset.row);
+                const c = parseInt(current.dataset.col);
+
+                const neighbors = [[r-1, c], [r+1, c], [r, c-1], [r, c+1]];
+
+                for (const [nr, nc] of neighbors) {
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < GRID_COLS) {
+                        const neighborCell = cells[nr][nc];
+                        const key = `${nr}-${nc}`;
+                        // スタート、ゴール、またはONになっているマスを通れる
+                        if (!visited.has(key) && (neighborCell.classList.contains('lit') || neighborCell === goalCell)) {
+                            visited.add(key);
+                            queue.push(neighborCell);
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        
+        function updateCheckButtonState() {
+            checkButton.disabled = !isPathConnected();
+        }
+
+        function checkPath() {
+            // ONになっているすべてのマスを取得
+            const litCellsNodeList = document.querySelectorAll('.cell.lit');
+            const litCells = Array.from(litCellsNodeList);
+            if (litCells.length === 0) return;
+
+            const valuesToCheck = litCells
+                .filter(cell => cell.dataset.value)
+                .map(cell => parseInt(cell.dataset.value));
+
+            const valueCounts = valuesToCheck.reduce((acc, val) => { (acc[val] = (acc[val] || 0) + 1); return acc; }, {});
+            const duplicates = Object.keys(valueCounts).filter(val => valueCounts[val] > 1).map(Number);
+
+            if (duplicates.length > 0) {
+                handleFailure(litCells, duplicates);
+            } else {
+                handleSuccess();
+            }
+        }
+        
+        // ゲームをリセット
+        function resetGame() {
+            isCleared = false; // クリア状態をリセット
+            document.querySelectorAll('.cell.lit, .cell.error, .cell.cleared').forEach(cell => {
+                cell.classList.remove('lit', 'error', 'cleared');
+            });
+            updateCheckButtonState();
+        }
+        
+        // エラー状態のみリセット
+        function resetErrors() {
+             document.querySelectorAll('.cell.error').forEach(cell => {
+                cell.classList.remove('error');
+            });
+        }
+        
+        function handleSuccess() {
+            isCleared = true; // クリア状態にする
+            window.parent.postMessage({ event: 'gameCleared', gameName: 'game23' }, '*');
+            checkButton.disabled = true; // チェックボタンを非アクティブ化
+
+            const litCells = document.querySelectorAll('.cell.lit');
+            litCells.forEach(cell => {
+                cell.classList.remove('lit');
+                cell.classList.add('cleared');
+            });
+            
+            setTimeout(() => {
+                clearMessage.classList.add('show');
+            }, 1000);
+        }
+
+        function handleFailure(litCells, duplicates) {
+            litCells.forEach(cell => {
+                if (duplicates.includes(parseInt(cell.dataset.value))) {
+                    cell.classList.add('error');
+                }
+            });
+            setTimeout(resetErrors, 1000);
+        }
+
+        function hideClearMessage() {
+            clearMessage.classList.remove('show');
+            // resetGame()を呼ばないことで、クリア状態を維持
+        }
+
+        // イベントリスナー
+        checkButton.addEventListener('click', checkPath);
+        clearMessage.addEventListener('click', hideClearMessage);
+        window.addEventListener('resize', initializeGame);
+
+        initializeGame();
     });
-</script>
+    </script>
 
 </body>
 </html>
+

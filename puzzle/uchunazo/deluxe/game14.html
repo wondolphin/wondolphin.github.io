@@ -3,75 +3,359 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- タイトルはファイル名に合わせて変更してください -->
-    <title>ゲーム14</title>
+    <title>9 panels</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Fredoka+One&display=swap" rel="stylesheet">
     <style>
+        :root {
+            /* --- 画面サイズに対する比率を少し控えめにし、余白を確保 --- */
+            --board-size: min(300px, 65vw, 60vh);
+            --cell-size: calc(var(--board-size) / 3);
+            --result-area-size: min(50px, 11vw, 10vh);
+            --gap: min(10px, 2vw, 2vh);
+
+            --border-color: #555;
+            --cell-bg: #e0e0e0;
+            --cell-shadow-light: #ffffff;
+            --cell-shadow-dark: #b0b0b0;
+
+            --correct-color-text: #ffeb3b;
+            --correct-color-bg: #4CAF50;
+            --correct-glow: #ffdd57;
+
+            --error-color-text: #ffffff;
+            --error-color-bg: #F44336;
+            --error-negative-bg: #3498db;
+
+            --select-color-glow: #00ffff;
+            --clear-color: #FFD700;
+        }
+
         body {
+            font-family: 'Fredoka One', cursive;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh; /* 縦が短い画面でもスクロールしないように */
             margin: 0;
-            background-color: #f0f4f8;
-            font-family: sans-serif;
-            color: #333;
+            background: linear-gradient(135deg, #2c3e50, #4ca1af);
+            color: #eee;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            overflow: hidden;
+            padding: 1rem; /* body自体にも少しだけ余白を */
+            box-sizing: border-box;
         }
-        .container {
+        
+        /* --- 全体を囲むコンテナを追加 --- */
+        .wrapper {
+            background-color: rgba(0, 0, 0, 0.25);
+            padding: min(30px, 5vh, 5vw);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: min(2.8em, 9vw, 7vh);
+            letter-spacing: 0.1em;
+            margin: 0 0 min(30px, 4vh) 0; /* 上マージンを削除し、下マージンを確保 */
+            color: #fff;
+            text-shadow: 4px 4px 0px #000, 
+                         6px 6px 0px #333;
             text-align: center;
-            padding: 40px;
-            background-color: #fff;
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-columns: var(--result-area-size) var(--board-size);
+            grid-template-rows: var(--result-area-size) var(--board-size);
+            gap: var(--gap);
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: var(--gap);
             border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
-        button {
-            padding: 15px 30px;
-            font-size: 18px;
-            cursor: pointer;
-            border: none;
-            border-radius: 8px;
-            background-color: #28a745;
-            color: white;
-            transition: all 0.2s;
+
+        .column-results {
+            grid-column: 2 / 3;
+            grid-row: 1 / 2;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
         }
-        button:hover:not(:disabled) {
-            background-color: #218838;
+
+        .row-results {
+            grid-column: 1 / 2;
+            grid-row: 2 / 3;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-direction: column;
         }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #message {
-            margin-top: 20px;
-            font-size: 1.5em;
+
+        .result {
+            font-size: min(1.2em, 4vw, 3.5vh);
             font-weight: bold;
-            color: #007bff;
-            display: none;
+            width: calc(var(--cell-size) - var(--gap));
+            height: calc(var(--result-area-size) - var(--gap));
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3), 
+                        inset -2px -2px 5px rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+            background-color: #333;
+            color: #ccc;
         }
+
+        .result.correct {
+            background-color: var(--correct-color-bg);
+            color: var(--correct-color-text);
+            font-size: min(1.8em, 6vw, 5vh);
+            text-shadow: 0 0 15px var(--correct-glow);
+            box-shadow: 0 0 20px var(--correct-glow), inset 0 0 10px var(--correct-color-text);
+        }
+
+        .result.error {
+            background-color: var(--error-color-bg);
+            color: var(--error-color-text);
+            font-size: min(1.4em, 4.5vw, 4vh);
+            box-shadow: 0 0 10px rgba(255,0,0,0.5), inset 2px 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        .result.error-negative {
+            background-color: var(--error-negative-bg);
+            color: var(--error-color-text);
+            font-size: min(1.4em, 4.5vw, 4vh);
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.5), inset 2px 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .board {
+            grid-column: 2 / 3;
+            grid-row: 2 / 3;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8), inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+            background-color: var(--cell-bg);
+            cursor: pointer;
+            transition: all 0.2s ease-out;
+            box-shadow: inset 4px 4px 8px var(--cell-shadow-dark), 
+                        inset -4px -4px 8px var(--cell-shadow-light);
+            border-radius: 8px;
+        }
+
+        .cell:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3),
+                        inset 4px 4px 8px var(--cell-shadow-dark), 
+                        inset -4px -4px 8px var(--cell-shadow-light);
+        }
+
+        .cell.selected {
+            box-shadow: 0 0 15px 5px var(--select-color-glow),
+                        inset 0 0 10px var(--select-color-glow);
+            transform: scale(1.05);
+            background-color: #d1ffff;
+            z-index: 10;
+        }
+        
+        .clear-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: var(--clear-color);
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10vw;
+            font-weight: bold;
+            text-shadow: 
+                0 0 10px var(--clear-color), 0 0 20px var(--clear-color), 0 0 30px var(--clear-color),
+                0 0 40px #fff, 0 0 50px #fff;
+            cursor: pointer;
+            z-index: 100;
+            animation: clearGlow 1.5s infinite alternate;
+        }
+
+        @keyframes clearGlow {
+            from { text-shadow: 0 0 10px var(--clear-color), 0 0 20px var(--clear-color); }
+            to { text-shadow: 0 0 20px var(--clear-color), 0 0 30px #fff, 0 0 50px #fff; }
+        }
+
     </style>
 </head>
 <body>
 
-<div class="container">
-    <!-- h1はファイル名に合わせて変更してください -->
-    <h1>ゲーム 1</h1>
-    <p>このボタンを押してクリアしてください。</p>
-    <button id="clear-button">クリア</button>
-    <div id="message">クリア！メインページに戻ります...</div>
-</div>
+    <main class="wrapper">
+        <h1>9 panels</h1>
 
-<script>
-    const clearButton = document.getElementById('clear-button');
-    const message = document.getElementById('message');
+        <div class="game-container">
+            <div class="column-results">
+                <div id="col-res-0" class="result"></div>
+                <div id="col-res-1" class="result"></div>
+                <div id="col-res-2" class="result"></div>
+            </div>
+            <div class="row-results">
+                <div id="row-res-0" class="result"></div>
+                <div id="row-res-1" class="result"></div>
+                <div id="row-res-2" class="result"></div>
+            </div>
+            <div class="board" id="board"></div>
+        </div>
+    </main>
 
-    clearButton.addEventListener('click', () => {
-        message.style.display = 'block';
-        clearButton.disabled = true;
+    <div class="clear-overlay" id="clear-message">
+        CLEAR!
+    </div>
 
-        // 親ページにクリア情報を送信
-        // gameNameはファイル名に合わせて変更してください
-        window.parent.postMessage({ event: 'gameCleared', gameName: 'game14' }, '*');
-    });
-</script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const boardElement = document.getElementById('board');
+            const clearMessageElement = document.getElementById('clear-message');
+            const magicNumber = 15;
+            let numbers; // init関数で初期化
+            
+            let selectedCell = null;
+            let isSwapping = false; // Flag to prevent clicks during swap animation
+
+            function init() {
+                // 指定された初期配置を設定
+                numbers = [
+                    [9, 8, 3],
+                    [1, 2, 6],
+                    [7, 5, 4]
+                ];
+                renderBoard();
+                updateResults();
+            }
+
+            function renderBoard() {
+                boardElement.innerHTML = '';
+                for (let i = 0; i < 3; i++) {
+                    for (let j = 0; j < 3; j++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        cell.dataset.row = i;
+                        cell.dataset.col = j;
+                        cell.addEventListener('click', onCellClick);
+                        boardElement.appendChild(cell);
+                    }
+                }
+            }
+
+            function onCellClick(event) {
+                if (isSwapping) return; // Prevent clicks during swap
+
+                const clickedCell = event.target;
+
+                if (!selectedCell) {
+                    // Select first cell
+                    selectedCell = clickedCell;
+                    selectedCell.classList.add('selected');
+                } else {
+                    // Select second cell
+                    if (selectedCell !== clickedCell) {
+                        isSwapping = true;
+                        clickedCell.classList.add('selected');
+
+                        setTimeout(() => {
+                            swapNumbers(selectedCell, clickedCell);
+                            updateResults();
+                            checkWin();
+                            
+                            // Deselect both cells
+                            selectedCell.classList.remove('selected');
+                            clickedCell.classList.remove('selected');
+                            selectedCell = null;
+                            isSwapping = false;
+                        }, 300);
+                    } else {
+                        // Deselect if the same cell is clicked again
+                        selectedCell.classList.remove('selected');
+                        selectedCell = null;
+                    }
+                }
+            }
+            
+            function swapNumbers(cell1, cell2) {
+                const { row: r1, col: c1 } = cell1.dataset;
+                const { row: r2, col: c2 } = cell2.dataset;
+                [numbers[r1][c1], numbers[r2][c2]] = [numbers[r2][c2], numbers[r1][c1]];
+            }
+            
+            function updateResults() {
+                let allCorrect = true;
+
+                // Check rows
+                for (let i = 0; i < 3; i++) {
+                    const rowSum = numbers[i][0] + numbers[i][1] + numbers[i][2];
+                    const diff = rowSum - magicNumber;
+                    if (!updateResultElement(document.getElementById(`row-res-${i}`), diff)) {
+                        allCorrect = false;
+                    }
+                }
+
+                // Check columns
+                for (let j = 0; j < 3; j++) {
+                    const colSum = numbers[0][j] + numbers[1][j] + numbers[2][j];
+                    const diff = colSum - magicNumber;
+                    if (!updateResultElement(document.getElementById(`col-res-${j}`), diff)) {
+                        allCorrect = false;
+                    }
+                }
+                return allCorrect;
+            }
+            
+            function updateResultElement(element, diff) {
+                element.classList.remove('correct', 'error', 'error-negative');
+                if (diff === 0) {
+                    element.textContent = '◯';
+                    element.classList.add('correct');
+                    return true;
+                } else {
+                    element.textContent = (diff > 0 ? '+' : '') + diff;
+                    if (diff > 0) {
+                        element.classList.add('error'); // プラスの誤差
+                    } else {
+                        element.classList.add('error-negative'); // マイナスの誤差
+                    }
+                    return false;
+                }
+            }
+
+            function checkWin() {
+                if (updateResults()) {
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game14' }, '*');
+                    clearMessageElement.style.display = 'flex';
+                }
+            }
+
+            clearMessageElement.addEventListener('click', () => {
+                clearMessageElement.style.display = 'none';
+                init(); // Start a new game after clearing
+            });
+
+            init();
+        });
+    </script>
 
 </body>
 </html>
+
