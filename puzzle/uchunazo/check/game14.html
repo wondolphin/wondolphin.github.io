@@ -7,12 +7,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Fredoka+One&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* --- どんな画面サイズでも収まるように、可変かつ上限のあるサイズ指定に変更 --- */
-            --board-size: min(300px, 70vw, 65vh);
+            /* --- 画面サイズに対する比率を少し控えめにし、余白を確保 --- */
+            --board-size: min(300px, 65vw, 60vh);
             --cell-size: calc(var(--board-size) / 3);
-            --result-area-size: min(50px, 12vw, 11vh);
+            --result-area-size: min(50px, 11vw, 10vh);
             --gap: min(10px, 2vw, 2vh);
-            /* --- ここまで修正 --- */
 
             --border-color: #555;
             --cell-bg: #e0e0e0;
@@ -25,7 +24,7 @@
 
             --error-color-text: #ffffff;
             --error-color-bg: #F44336;
-            --error-negative-bg: #3498db; /* 水色の変数を追加 */
+            --error-negative-bg: #3498db;
 
             --select-color-glow: #00ffff;
             --clear-color: #FFD700;
@@ -34,30 +33,38 @@
         body {
             font-family: 'Fredoka One', cursive;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh; /* 縦が短い画面でもスクロールしないように */
             margin: 0;
             background: linear-gradient(135deg, #2c3e50, #4ca1af);
             color: #eee;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
             overflow: hidden;
-            padding: 0 10px; /* 左右の基本的な余白を追加 */
+            padding: 1rem; /* body自体にも少しだけ余白を */
             box-sizing: border-box;
+        }
+        
+        /* --- 全体を囲むコンテナを追加 --- */
+        .wrapper {
+            background-color: rgba(0, 0, 0, 0.25);
+            padding: min(30px, 5vh, 5vw);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         h1 {
             font-family: 'Press Start 2P', cursive;
-            /* --- フォントサイズも可変に --- */
-            font-size: min(3em, 10vw, 8vh);
+            font-size: min(2.8em, 9vw, 7vh);
             letter-spacing: 0.1em;
-            /* --- マージンも可変に --- */
-            margin-bottom: min(30px, 4vh);
+            margin: 0 0 min(30px, 4vh) 0; /* 上マージンを削除し、下マージンを確保 */
             color: #fff;
-            text-shadow: 5px 5px 0px #000, 
-                         7px 7px 0px #333;
-            text-align: center; /* 複数行になった場合も中央揃え */
+            text-shadow: 4px 4px 0px #000, 
+                         6px 6px 0px #333;
+            text-align: center;
         }
 
         .game-container {
@@ -68,7 +75,7 @@
             background-color: rgba(0, 0, 0, 0.4);
             padding: var(--gap);
             border-radius: 15px;
-            box-shadow: 0 0 30px rgba(0,0,0,0.7);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
 
         .column-results {
@@ -89,10 +96,10 @@
         }
 
         .result {
-            font-size: 1.2em;
+            font-size: min(1.2em, 4vw, 3.5vh);
             font-weight: bold;
-            width: calc(var(--cell-size) - 10px);
-            height: calc(var(--result-area-size) - 10px);
+            width: calc(var(--cell-size) - var(--gap));
+            height: calc(var(--result-area-size) - var(--gap));
             display: flex;
             justify-content: center;
             align-items: center;
@@ -107,7 +114,7 @@
         .result.correct {
             background-color: var(--correct-color-bg);
             color: var(--correct-color-text);
-            font-size: 1.8em;
+            font-size: min(1.8em, 6vw, 5vh);
             text-shadow: 0 0 15px var(--correct-glow);
             box-shadow: 0 0 20px var(--correct-glow), inset 0 0 10px var(--correct-color-text);
         }
@@ -115,14 +122,14 @@
         .result.error {
             background-color: var(--error-color-bg);
             color: var(--error-color-text);
-            font-size: 1.4em;
+            font-size: min(1.4em, 4.5vw, 4vh);
             box-shadow: 0 0 10px rgba(255,0,0,0.5), inset 2px 2px 5px rgba(0,0,0,0.3);
         }
         
         .result.error-negative {
             background-color: var(--error-negative-bg);
             color: var(--error-color-text);
-            font-size: 1.4em;
+            font-size: min(1.4em, 4.5vw, 4vh);
             box-shadow: 0 0 10px rgba(52, 152, 219, 0.5), inset 2px 2px 5px rgba(0,0,0,0.3);
         }
 
@@ -192,57 +199,27 @@
             to { text-shadow: 0 0 20px var(--clear-color), 0 0 30px #fff, 0 0 50px #fff; }
         }
 
-        /* --- スマホ表示対応 (画面が狭い場合に特に最適化) --- */
-        @media (max-width: 480px) {
-            :root {
-                --board-size: 70vw;
-                --result-area-size: 10vw;
-                --gap: 2vw;
-            }
-
-            h1 {
-                font-size: 10vw;
-                letter-spacing: 0;
-                margin-bottom: 20px;
-                text-shadow: 3px 3px 0px #000, 
-                             4px 4px 0px #333;
-            }
-            
-            .result {
-                font-size: 3.5vw;
-            }
-
-            .result.correct {
-                font-size: 5vw;
-            }
-
-            .result.error, .result.error-negative {
-                font-size: 4vw;
-            }
-
-            .clear-overlay {
-                font-size: 15vw;
-            }
-        }
     </style>
 </head>
 <body>
 
-    <h1>9 panels</h1>
+    <main class="wrapper">
+        <h1>9 panels</h1>
 
-    <div class="game-container">
-        <div class="column-results">
-            <div id="col-res-0" class="result"></div>
-            <div id="col-res-1" class="result"></div>
-            <div id="col-res-2" class="result"></div>
+        <div class="game-container">
+            <div class="column-results">
+                <div id="col-res-0" class="result"></div>
+                <div id="col-res-1" class="result"></div>
+                <div id="col-res-2" class="result"></div>
+            </div>
+            <div class="row-results">
+                <div id="row-res-0" class="result"></div>
+                <div id="row-res-1" class="result"></div>
+                <div id="row-res-2" class="result"></div>
+            </div>
+            <div class="board" id="board"></div>
         </div>
-        <div class="row-results">
-            <div id="row-res-0" class="result"></div>
-            <div id="row-res-1" class="result"></div>
-            <div id="row-res-2" class="result"></div>
-        </div>
-        <div class="board" id="board"></div>
-    </div>
+    </main>
 
     <div class="clear-overlay" id="clear-message">
         CLEAR!
@@ -365,7 +342,6 @@
 
             function checkWin() {
                 if (updateResults()) {
-                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game14' }, '*');
                     clearMessageElement.style.display = 'flex';
                 }
             }
