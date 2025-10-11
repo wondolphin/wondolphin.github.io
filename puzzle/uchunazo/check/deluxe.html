@@ -177,26 +177,23 @@
         #game-display-area {
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
             align-items: center;
-            aspect-ratio: 3 / 4; /* 横3 : 縦4 */
-            height: 95vh;
-            max-width: 95vw;
+            width: 95vmin;
+            height: 95vmin;
         }
 
         #game-frame-container {
             width: 100%;
-            flex-grow: 1;
+            flex: 1;
+            min-height: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 0;
         }
         #game-frame {
-            /* 修正: height: 100% -> max-height: 100% */
-            max-height: 100%;
-            aspect-ratio: 5 / 6; /* 横5 : 縦6 */
+            aspect-ratio: 5 / 6;
             max-width: 100%;
+            max-height: 100%;
             border: 2px solid #fff;
             border-radius: 10px;
             background-color: #000;
@@ -215,6 +212,7 @@
             align-items: center;
             line-height: 1;
             flex-shrink: 0;
+            margin-top: 10px;
         }
 
         /* --- 画面遷移エフェクト用 --- */
@@ -271,7 +269,6 @@
             cursor: pointer;
         }
 
-        /* 修正: 中断画面のスタイル */
         .pause-content {
             background-color: #16213e;
             padding: 20px 30px;
@@ -392,7 +389,6 @@
 
     <!-- ゲーム表示用オーバーレイ -->
     <div id="game-overlay">
-        <!-- 修正: 新しいHTML構造 -->
         <div id="game-display-area">
             <div id="game-frame-container"></div>
             <button id="close-game-button">↓</button>
