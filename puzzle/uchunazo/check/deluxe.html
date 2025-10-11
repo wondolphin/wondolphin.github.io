@@ -100,8 +100,6 @@
             top: 31%;
             right: 1.5%;
         }
-
-        /* --- 上部情報パネル (削除) --- */
         
         #undo-button {
             position: absolute;
@@ -186,23 +184,6 @@
             max-width: 95vw;
         }
 
-        #game-number-display {
-            position: relative;
-            background-color: rgba(0,0,0,0.7);
-            color: #fff;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            border: 2px solid #fff;
-            width: 40px;
-            height: 40px;
-            font-size: 1.2em;
-            z-index: 1;
-            flex-shrink: 0;
-        }
-
         #game-frame-container {
             width: 100%;
             flex-grow: 1;
@@ -213,20 +194,20 @@
         }
         #game-frame {
             height: 100%;
-            aspect-ratio: 4 / 5; /* 横4 : 縦5 */
+            aspect-ratio: 5 / 6; /* 横5 : 縦6 */
             max-width: 100%;
             border: 2px solid #fff;
             border-radius: 10px;
             background-color: #000;
         }
         #close-game-button {
-            width: 50px;
-            height: 50px;
+            width: clamp(40px, 8vmin, 50px);
+            height: clamp(40px, 8vmin, 50px);
             border-radius: 50%;
             background-color: rgba(255,255,255,0.8);
             color: #000;
             border: none;
-            font-size: 2em;
+            font-size: clamp(1.5em, 4vmin, 2em);
             cursor: pointer;
             display: flex;
             justify-content: center;
@@ -289,6 +270,7 @@
             cursor: pointer;
         }
 
+        /* 修正: 中断画面のスタイル */
         .pause-content {
             background-color: #16213e;
             padding: 20px 30px;
@@ -411,7 +393,6 @@
     <div id="game-overlay">
         <!-- 修正: 新しいHTML構造 -->
         <div id="game-display-area">
-            <div id="game-number-display"></div>
             <div id="game-frame-container"></div>
             <button id="close-game-button">↓</button>
         </div>
@@ -483,7 +464,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const transitionOverlay = document.getElementById('transition-overlay');
     const gameWrapper = document.getElementById('game-wrapper');
     const gameFrameContainer = document.getElementById('game-frame-container');
-    const gameNumberDisplay = document.getElementById('game-number-display');
     const pauseButton = document.getElementById('pause-button');
     const pauseOverlay = document.getElementById('pause-overlay');
     const closePauseButton = document.getElementById('close-pause-button');
@@ -533,7 +513,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 delete doorwayEl.dataset.roomId;
             }
         }
-        // playerStatusDisplayの更新を削除
     }
     
     function getVisibleDoors() {
@@ -605,7 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="next-button-placeholder"></div>
                     </div>`;
                 closeGameButton.style.display = 'none';
-                gameNumberDisplay.style.display = 'none';
+                
                 gameOverlay.classList.add('visible');
                 
                 setTimeout(() => {
@@ -628,13 +607,6 @@ document.addEventListener('DOMContentLoaded', () => {
         closeGameButton.style.display = 'flex';
         gameFrameContainer.innerHTML = '';
 
-        if (options.roomId) {
-            gameNumberDisplay.textContent = options.roomId;
-            gameNumberDisplay.style.display = 'flex';
-        } else {
-            gameNumberDisplay.style.display = 'none';
-        }
-
         const newIframe = document.createElement('iframe');
         newIframe.id = 'game-frame';
         if (options.src) newIframe.src = options.src;
@@ -649,7 +621,7 @@ document.addEventListener('DOMContentLoaded', () => {
             startAllClearSequence(); return;
         }
         if (roomId === 26 && !isCleared) {
-            showGame({ srcdoc: createFinalScreenHtml(), roomId: 26 }); return;
+            showGame({ srcdoc: createFinalScreenHtml() }); return;
         }
         if (isCleared) {
             transitionOverlay.classList.remove('slow');
@@ -678,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 transitionOverlay.classList.remove('active');
             }, 250);
         } else {
-            showGame({ src: `game${String(roomId).padStart(2, '0')}.html`, roomId: roomId });
+            showGame({ src: `game${String(roomId).padStart(2, '0')}.html` });
         }
     }
 
