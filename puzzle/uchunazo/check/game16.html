@@ -37,9 +37,9 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 flex flex-col items-center justify-center h-screen overflow-hidden p-2">
+<body class="bg-gray-100 flex flex-col items-center justify-center h-screen overflow-hidden">
 
-    <div class="w-full h-full mx-auto text-center relative flex flex-col">
+    <div class="w-full h-full mx-auto text-center relative flex flex-col p-2">
         
         <!-- ヘッダーエリア (タイトル & スコア) -->
         <div class="flex-shrink-0" id="header">
@@ -55,7 +55,7 @@
 
         <!-- ゲームの描画エリア (可変) -->
         <div class="flex-1 w-full flex items-center justify-center min-h-0">
-             <div id="game-container" class="aspect-square bg-white rounded-lg shadow-xl overflow-hidden" style="width: 100%; height: 100%;">
+             <div id="game-container" class="aspect-square bg-white rounded-lg shadow-xl overflow-hidden">
                 <canvas id="gameCanvas" class="w-full h-full"></canvas>
             </div>
         </div>
@@ -76,6 +76,7 @@
         const clearOverlay = document.getElementById('clearOverlay');
         const header = document.getElementById('header');
         const gameContainer = document.getElementById('game-container');
+        const mainContainer = document.querySelector('.w-full.h-full');
 
         // ゲームの設定
         const NUM_SWITCHES = 10;
@@ -100,8 +101,10 @@
         function init() {
             // ヘッダーの高さを考慮してゲームコンテナの最大サイズを動的に設定
             const headerHeight = header.offsetHeight;
-            const availableHeight = window.innerHeight - headerHeight - 30; // 30pxは上下の余白分
-            const availableWidth = window.innerWidth - 20; // 20pxは左右の余白分
+            const mainPadding = parseFloat(getComputedStyle(mainContainer).paddingTop) * 2;
+            
+            const availableHeight = window.innerHeight - headerHeight - mainPadding;
+            const availableWidth = window.innerWidth - mainPadding;
             
             const size = Math.min(availableWidth, availableHeight);
             gameContainer.style.width = `${size}px`;
