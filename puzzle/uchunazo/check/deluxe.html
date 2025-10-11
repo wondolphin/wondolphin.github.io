@@ -177,33 +177,22 @@
         #game-display-area {
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
             align-items: center;
+            justify-content: flex-start; /* 上寄せにする */
             aspect-ratio: 3 / 4;
             height: 95vh;
-            max-width: calc(95vh * 3 / 4);
-        }
-        @media (orientation: landscape) {
-            #game-display-area {
-                width: 95vw;
-                height: auto;
-                max-width: none;
-                max-height: 95vh;
-            }
+            max-width: 95vw; /* はみ出さないように */
         }
 
         #game-frame-container {
             width: 100%;
-            flex-grow: 1;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 0;
         }
         #game-frame {
             width: 100%;
-            aspect-ratio: 9 / 10;
-            max-height: 100%;
+            aspect-ratio: 5 / 6;
             border: 2px solid #fff;
             border-radius: 10px;
             background-color: #000;
@@ -222,7 +211,7 @@
             align-items: center;
             line-height: 1;
             flex-shrink: 0;
-            margin-top: 10px;
+            margin-top: 15px; /* iframeとの間隔 */
         }
 
         /* --- 画面遷移エフェクト用 --- */
@@ -279,6 +268,7 @@
             cursor: pointer;
         }
 
+        /* 修正: 中断画面のスタイル */
         .pause-content {
             background-color: #16213e;
             padding: 20px 30px;
