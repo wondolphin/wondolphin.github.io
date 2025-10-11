@@ -39,23 +39,24 @@
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center h-screen overflow-hidden">
 
-    <div class="w-full h-full max-w-2xl mx-auto text-center relative flex flex-col p-2 sm:p-4">
+    <div class="w-full h-full mx-auto text-center relative flex flex-col p-2">
         
         <!-- ヘッダーエリア (タイトル & スコア) -->
         <div class="flex-shrink-0">
-            <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800">テン×テン</h1>
-            <div class="bg-white rounded-lg shadow-lg p-2 sm:p-4 my-2 sm:my-4">
-                <p id="score" class="text-4xl sm:text-5xl font-bold">0</p>
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">テン×テン</h1>
+            <div class="bg-white rounded-lg shadow-lg p-2 my-2">
+                <p id="score" class="text-4xl font-bold">0</p>
                 <!-- スコアゲージ -->
-                <div class="w-full h-2 sm:h-3 mt-3">
+                <div class="w-full h-2 sm:h-3 mt-2">
                     <div id="scoreGauge" class="h-full rounded-full mx-auto" style="width: 0%; transition: width 0.5s ease-out, background-color 0.3s ease-in-out;"></div>
                 </div>
             </div>
         </div>
 
         <!-- ゲームの描画エリア (可変) -->
-        <div class="flex-1 w-full flex items-center justify-center min-h-0">
-             <div class="aspect-square bg-white rounded-lg shadow-xl overflow-hidden max-w-full max-h-full">
+<div class="flex-1 w-full flex items-center justify-center min-h-0">
+    <div class="aspect-square bg-white rounded-lg shadow-xl overflow-hidden"
+         style="width: min(90vmin, calc(100vh - 220px));">
                 <canvas id="gameCanvas" class="w-full h-full"></canvas>
             </div>
         </div>
@@ -95,15 +96,16 @@
         let animationStartTime = 0;
         
         // 初期化処理
-        function init() {
-            const parent = canvas.parentElement;
-            canvasSize = Math.min(parent.clientWidth, parent.clientHeight);
-            canvas.width = canvasSize;
-            canvas.height = canvasSize;
-            switchRadius = canvasSize * SWITCH_RADIUS_RATIO;
-            calculateSwitchPositions();
-            draw();
-        }
+function init() {
+    const parent = canvas.parentElement;
+    const size = Math.min(parent.clientWidth, parent.clientHeight);
+    canvas.width = size;
+    canvas.height = size;
+    canvasSize = size;
+    switchRadius = canvasSize * SWITCH_RADIUS_RATIO;
+    calculateSwitchPositions();
+    draw();
+}
 
         function calculateSwitchPositions() {
             switchPositions = [];
