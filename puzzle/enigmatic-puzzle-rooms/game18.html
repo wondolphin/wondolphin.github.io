@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ニコニコガーデン</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 基本的なスタイル */
+        body {
+            touch-action: manipulation; /* ダブルタップによるズームを無効化 */
+            font-family: sans-serif;
+            overflow: hidden; /* スクロールバーを非表示 */
+        }
+        /* ランプが点灯した時のスタイル */
+        .lamp.on {
+            background-color: #4ade80; /* green-400 */
+            box-shadow: 0 0 10px #4ade80, 0 0 20px #4ade80;
+        }
+        /* 花が隣接してNGになった時のスタイルは不要になったため削除 */
+        
+        /* クリアメッセージのスタイル */
+        #clear-message {
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 5vw;
+            font-weight: bold;
+            text-shadow: 0 0 15px #fff, 0 0 25px #fff;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        /* 画面サイズに応じたレスポンシブ対応 */
+        @media (min-width: 640px) {
+            #clear-message {
+                font-size: 4rem; /* PCではフォントサイズを固定 */
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-white flex items-center justify-center h-screen">
+
+    <div class="flex flex-col items-center justify-center p-2 sm:p-4">
+        <!-- タイトル -->
+        <h1 class="text-3xl sm:text-4xl font-bold mb-4 text-yellow-200" style="text-shadow: 0 0 8px #fde047;">ニコニコガーデン</h1>
+
+        <!-- ゲームエリア -->
+        <div id="game-container" class="grid grid-cols-[auto_1fr_auto] grid-rows-[auto_auto] gap-1.5 sm:gap-2">
+
+            <!-- 左上の角（対角線ランプエリア） -->
+            <div class="flex justify-center items-center p-1">
+                <div id="diag-lamp-1" class="lamp w-4 h-4 sm:w-6 sm:h-6 rounded-full bg-gray-600 transition-all duration-300 transform -rotate-45"></div>
+            </div>
+
+            <!-- 列ランプ（上） -->
+            <div id="col-lamps" class="grid grid-cols-6 gap-1.5 sm:gap-2">
+                 <!-- JavaScriptで生成 -->
+            </div>
+
+            <!-- 右上の角（対角線ランプエリア） -->
+             <div class="flex justify-center items-center p-1">
+                <div id="diag-lamp-2" class="lamp w-4 h-4 sm:w-6 sm:h-6 rounded-full bg-gray-600 transition-all duration-300 transform rotate-45"></div>
+            </div>
+
+            <!-- 行ランプ（左） -->
+            <div id="row-lamps" class="grid grid-rows-6 gap-1.5 sm:gap-2 justify-items-center">
+                 <!-- JavaScriptで生成 -->
+            </div>
+
+            <!-- 6x6盤面 -->
+            <div id="board" class="grid grid-cols-6 gap-1.5 sm:gap-2 bg-green-900/50 p-1.5 sm:p-2 rounded-lg">
+                <!-- JavaScriptで生成 -->
+            </div>
+
+            <!-- 右下の角（スペーサー）-->
+            <div></div>
+        </div>
+    </div>
+
+    <!-- クリアメッセージ -->
+    <div id="clear-message" class="absolute inset-0 z-10 hidden items-center justify-center cursor-pointer">
+        <p>CLEAR!</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const BOARD_SIZE = 6;
+            const boardElement = document.getElementById('board');
+            const colLampsElement = document.getElementById('col-lamps');
+            const rowLampsElement = document.getElementById('row-lamps');
+            const diagLamp1 = document.getElementById('diag-lamp-1');
+            const diagLamp2 = document.getElementById('diag-lamp-2');
+            const clearMessage = document.getElementById('clear-message');
+
+            let boardState = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
+
+            // ゲームの初期化
+            function initializeGame() {
+                // 盤面のマスを生成
+                for (let r = 0; r < BOARD_SIZE; r++) {
+                    for (let c = 0; c < BOARD_SIZE; c++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell', 'w-10', 'h-10', 'sm:w-14', 'sm:h-14', 'bg-green-800/70', 'rounded', 'cursor-pointer', 'flex', 'items-center', 'justify-center', 'select-none', 'transition-colors');
+                        cell.dataset.row = r;
+                        cell.dataset.col = c;
+                        
+                        const flowerImg = document.createElement('img');
+                        flowerImg.classList.add('flower-img', 'w-full', 'h-full', 'object-contain', 'hidden');
+                        cell.appendChild(flowerImg);
+
+                        cell.addEventListener('click', () => onCellClick(r, c));
+                        boardElement.appendChild(cell);
+                    }
+                }
+                
+                // 上下のランプを生成
+                for (let i = 0; i < BOARD_SIZE; i++) {
+                    const colLamp = document.createElement('div');
+                    colLamp.classList.add('lamp', 'col-lamp', 'w-10', 'h-4', 'sm:w-14', 'sm:h-6', 'bg-gray-600', 'rounded-full', 'mx-auto', 'transition-all', 'duration-300');
+                    colLamp.dataset.col = i;
+                    colLampsElement.appendChild(colLamp);
+
+                    const rowLamp = document.createElement('div');
+                    rowLamp.classList.add('lamp', 'row-lamp', 'w-4', 'h-10', 'sm:w-6', 'sm:h-14', 'bg-gray-600', 'rounded-full', 'my-auto', 'transition-all', 'duration-300');
+                    rowLamp.dataset.row = i;
+                    rowLampsElement.appendChild(rowLamp);
+                }
+            }
+
+            // マスをクリックしたときの処理
+            function onCellClick(row, col) {
+                boardState[row][col] = boardState[row][col] === 1 ? 0 : 1;
+                checkGameState();
+            }
+
+            // ゲームの状態をチェックして描画を更新
+            function checkGameState() {
+                let isGameClear = true;
+                const ngState = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(false));
+                let noAdjacentFlowers = true;
+
+                // 1. NG判定（隣接する花）
+                for (let r = 0; r < BOARD_SIZE; r++) {
+                    for (let c = 0; c < BOARD_SIZE; c++) {
+                        if (boardState[r][c] === 1) {
+                            // 下方向
+                            if (r + 1 < BOARD_SIZE && boardState[r + 1][c] === 1) {
+                                ngState[r][c] = true;
+                                ngState[r + 1][c] = true;
+                                noAdjacentFlowers = false;
+                            }
+                            // 右方向
+                            if (c + 1 < BOARD_SIZE && boardState[r][c + 1] === 1) {
+                                ngState[r][c] = true;
+                                ngState[r][c + 1] = true;
+                                noAdjacentFlowers = false;
+                            }
+                        }
+                    }
+                }
+
+                // 2. ランプ判定
+                // 列ランプ
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    let sum = 0;
+                    for (let r = 0; r < BOARD_SIZE; r++) {
+                        sum += boardState[r][c];
+                    }
+                    const lamp = document.querySelector(`.col-lamp[data-col='${c}']`);
+                    updateLamp(lamp, sum === 2, () => isGameClear = false);
+                }
+
+                // 行ランプ
+                for (let r = 0; r < BOARD_SIZE; r++) {
+                    const sum = boardState[r].reduce((a, b) => a + b, 0);
+                    const lamp = document.querySelector(`.row-lamp[data-row='${r}']`);
+                    updateLamp(lamp, sum === 2, () => isGameClear = false);
+                }
+                
+                // 対角線ランプ
+                let diag1Sum = 0;
+                let diag2Sum = 0;
+                for (let i = 0; i < BOARD_SIZE; i++) {
+                    diag1Sum += boardState[i][i];
+                    diag2Sum += boardState[i][BOARD_SIZE - 1 - i];
+                }
+                updateLamp(diagLamp1, diag1Sum === 2, () => isGameClear = false);
+                updateLamp(diagLamp2, diag2Sum === 2, () => isGameClear = false);
+
+                // 3. 画面描画
+                renderBoard(ngState);
+
+                // 4. クリア判定
+                if (isGameClear && noAdjacentFlowers) {
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game18' }, '*');
+                    setTimeout(() => {
+                        clearMessage.style.display = 'flex';
+                    }, 500);
+                }
+            }
+            
+            // ランプの状態更新ヘルパー
+            function updateLamp(lampElement, condition, onFail) {
+                if (condition) {
+                    lampElement.classList.add('on');
+                } else {
+                    lampElement.classList.remove('on');
+                    onFail();
+                }
+            }
+
+            // 盤面の状態をDOMに反映
+            function renderBoard(ngState) {
+                for (let r = 0; r < BOARD_SIZE; r++) {
+                    for (let c = 0; c < BOARD_SIZE; c++) {
+                        const cell = document.querySelector(`.cell[data-row='${r}'][data-col='${c}']`);
+                        const flowerImg = cell.querySelector('.flower-img');
+
+                        if (boardState[r][c] === 1) {
+                            flowerImg.classList.remove('hidden');
+                            if (ngState[r][c]) {
+                                flowerImg.src = 'donnyori.png';
+                            } else {
+                                flowerImg.src = 'nikkori.png';
+                            }
+                        } else {
+                            flowerImg.classList.add('hidden');
+                        }
+                    }
+                }
+            }
+            
+            // クリアメッセージをクリックしたら非表示にする
+            clearMessage.addEventListener('click', () => {
+                clearMessage.style.display = 'none';
+            });
+
+            initializeGame();
+        });
+    </script>
+</body>
+</html>
+
+
+

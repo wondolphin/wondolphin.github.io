@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SWITCH</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ボタンとランプに共通の基本スタイル */
+        .base-circle {
+            /* 基本サイズを画面幅(vw)に連動させ、最小/最大サイズを設定 */
+            width: 5vw;
+            height: 5vw;
+            min-width: 24px;  /* どんなに画面が小さくても24px以下にはしない */
+            min-height: 24px;
+            max-width: 40px;  /* どんなに画面が大きくても40px以上にはしない */
+            max-height: 40px;
+            
+            border-radius: 9999px; /* full circle */
+            transition: all 0.2s ease-in-out;
+            border-width: 2px;
+        }
+
+        /* 以前あったメディアクエリは不要になったため削除 */
+
+        /* 操作ボタンのスタイル */
+        .switch {
+            cursor: pointer;
+        }
+        .switch-on {
+            background-color: #3b82f6; /* blue-500 */
+            border-color: #1d4ed8; /* blue-700 */
+            box-shadow: 0 0 10px 2px rgba(59, 130, 246, 0.5);
+        }
+        .switch-off {
+            background-color: #4b5563; /* gray-600 */
+            border-color: #1f2937; /* gray-800 */
+        }
+
+        /* 結果ランプのスタイル */
+        .lamp {
+            cursor: default;
+        }
+        .lamp-on {
+            background-color: #fbbf24; /* amber-400 */
+            border-color: #f59e0b; /* amber-500 */
+            box-shadow: 
+                0 0 8px #fbbf24,  /* Immediate glow */
+                0 0 20px #f59e0b, /* Medium glow */
+                0 0 35px #d97706; /* Outer glow */
+        }
+        .lamp-off {
+            background-color: #374151; /* gray-700 */
+            border-color: #1f2937; /* gray-800 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 font-sans">
+    
+    <main class="flex items-center justify-center min-h-screen p-2">
+        <div class="w-full max-w-lg bg-gray-800 p-4 md:p-6 rounded-xl shadow-2xl shadow-black/50">
+            <header class="text-center mb-4 md:mb-8">
+                <!-- 文字サイズも画面幅に連動させる -->
+                <h1 class="text-[8vw] md:text-5xl font-bold text-gray-200 tracking-widest">SWITCH</h1>
+            </header>
+            
+            <!-- ボタン間の垂直方向の余白を調整 -->
+            <div id="amida-controls" class="space-y-1 mb-6 md:mb-8"></div>
+            
+            <div id="result" class="flex w-full">
+                <!-- 結果ランプがここに表示されます -->
+            </div>
+        </div>
+    </main>
+
+    <div id="clear-overlay" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center cursor-pointer z-50 p-4">
+        <!-- 文字サイズも画面幅に連動させる -->
+        <h2 class="text-[12vw] md:text-8xl font-bold text-white tracking-widest text-center" style="text-shadow: 0 0 15px #fff, 0 0 25px #0ff, 0 0 45px #0ff;">CLEAR!</h2>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const controlsContainer = document.getElementById('amida-controls');
+            const resultContainer = document.getElementById('result');
+            const clearOverlay = document.getElementById('clear-overlay');
+
+            const initialLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+            const targetState = ['B', 'G', 'E', 'H', 'F', 'D', 'A', 'C'];
+
+            const amidaState = [
+                [1, 0, 0, 0],
+                [0, 1, 0],
+                [0, 0, 0, 1],
+                [0, 1, 0],
+                [0, 0, 0, 0],
+                [1, 0, 0],
+                [0, 0, 0, 1]
+            ];
+
+            function calculateAmida() {
+                let positions = [...initialLabels];
+                amidaState.forEach((row, rowIndex) => {
+                    const isOddRow = (rowIndex + 1) % 2 !== 0;
+                    row.forEach((bar, barIndex) => {
+                        if (bar === 1) {
+                            let pos1, pos2;
+                            if (isOddRow) {
+                                pos1 = barIndex * 2;
+                                pos2 = pos1 + 1;
+                            } else {
+                                pos1 = barIndex * 2 + 1;
+                                pos2 = pos1 + 1;
+                            }
+                            [positions[pos1], positions[pos2]] = [positions[pos2], positions[pos1]];
+                        }
+                    });
+                });
+                return positions;
+            }
+
+            function updateResult() {
+                const finalPositions = calculateAmida();
+                resultContainer.innerHTML = '';
+                const allCorrect = JSON.stringify(finalPositions) === JSON.stringify(targetState);
+
+                // 15列のグリッドに基づいてランプを配置
+                for (let col = 1; col <= 15; col++) {
+                    const slotDiv = document.createElement('div');
+                    slotDiv.className = 'w-[calc(100%/15)] flex justify-center';
+
+                    // ランプは奇数番目の列に配置
+                    if (col % 2 !== 0) {
+                        const lampIndex = Math.floor(col / 2);
+                        const lamp = document.createElement('div');
+                        const isCorrect = allCorrect || (finalPositions[lampIndex] === targetState[lampIndex]);
+                        const statusClass = isCorrect ? 'lamp-on' : 'lamp-off';
+                        lamp.className = `base-circle lamp ${statusClass}`;
+                        slotDiv.appendChild(lamp);
+                    }
+                    resultContainer.appendChild(slotDiv);
+                }
+                
+                if (allCorrect) {
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game22' }, '*');
+                    clearOverlay.style.display = 'flex';
+                }
+            }
+            
+            function createButton(rowIndex, barIndex) {
+                const button = document.createElement('button');
+                const bar = amidaState[rowIndex][barIndex];
+                const statusClass = bar === 1 ? 'switch-on' : 'switch-off';
+                button.className = `base-circle switch ${statusClass}`;
+                
+                button.addEventListener('click', () => {
+                    amidaState[rowIndex][barIndex] = amidaState[rowIndex][barIndex] === 1 ? 0 : 1;
+                    renderControls();
+                    updateResult();
+                });
+                return button;
+            }
+
+            function renderControls() {
+                controlsContainer.innerHTML = '';
+                amidaState.forEach((row, rowIndex) => {
+                    const rowDiv = document.createElement('div');
+                    // 行の高さを固定せず、中の要素に合わせるように変更
+                    rowDiv.className = 'flex items-center';
+                    const isOddRow = (rowIndex + 1) % 2 !== 0;
+
+                    for (let col = 1; col <= 15; col++) {
+                        const slotDiv = document.createElement('div');
+                        slotDiv.className = 'w-[calc(100%/15)] flex justify-center';
+                        let barIndex = -1;
+
+                        if (isOddRow) {
+                            if (col === 2) barIndex = 0;
+                            else if (col === 6) barIndex = 1;
+                            else if (col === 10) barIndex = 2;
+                            else if (col === 14) barIndex = 3;
+                        } else { // Even row
+                            if (col === 4) barIndex = 0;
+                            else if (col === 8) barIndex = 1;
+                            else if (col === 12) barIndex = 2;
+                        }
+
+                        if (barIndex !== -1 && row[barIndex] !== undefined) {
+                            const button = createButton(rowIndex, barIndex);
+                            slotDiv.appendChild(button);
+                        }
+                        rowDiv.appendChild(slotDiv);
+                    }
+                    controlsContainer.appendChild(rowDiv);
+                });
+            }
+
+            clearOverlay.addEventListener('click', () => {
+                clearOverlay.style.display = 'none';
+            });
+
+            renderControls();
+            updateResult();
+        });
+    </script>
+</body>
+</html>
+
