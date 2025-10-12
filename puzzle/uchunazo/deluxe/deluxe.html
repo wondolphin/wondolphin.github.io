@@ -178,7 +178,6 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            /* 修正: justify-content を center に */
             justify-content: center; 
             aspect-ratio: 3 / 4;
             height: 95vh;
@@ -193,7 +192,6 @@
         }
         #game-frame {
             width: 100%;
-            /* 修正: aspect-ratio を 1 / 1 に */
             aspect-ratio: 1 / 1;
             border: 2px solid #fff;
             border-radius: 10px;
@@ -349,9 +347,13 @@
             border-radius: 50%;
             color: white;
             font-size: 24px;
-            line-height: 32px;
             cursor: pointer;
             font-weight: bold;
+            /* 修正: Flexboxで中央揃え */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            line-height: 1; /* line-heightをリセット */
         }
         #close-pause-button:hover { background-color: #5a6268; }
 
@@ -405,7 +407,8 @@
                 <label for="password-input">パスワード入力</label>
                 <input type="text" id="password-input" placeholder="パスワードを入力してロード">
                 <div id="load-button-wrapper">
-                    <button id="load-button">Load</button>
+                    <!-- 修正: ボタン名を変更 -->
+                    <button id="load-button">ロード</button>
                 </div>
             </div>
             <div id="load-message"></div>
@@ -472,6 +475,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadMessage = document.getElementById('load-message');
     const copyButton = document.getElementById('copy-button');
     const copyMessage = document.getElementById('copy-message');
+
+    // 修正: 画像のプリロード
+    const imagesToPreload = [];
+    const posShort = ['l', 'f', 'r'];
+    const states = ['closed', 'open_0', 'open_1', 'open_2'];
+    posShort.forEach(pos => {
+        states.forEach(state => {
+            if (state === 'open_2' && pos === 'f') {
+                imagesToPreload.push(`door_f_open_2.png`);
+            } else if (state !== 'open_2') {
+                imagesToPreload.push(`door_${pos}_${state}.png`);
+            }
+        });
+    });
+    imagesToPreload.push('room.png', 'clear.png');
+    imagesToPreload.forEach(src => {
+        const img = new Image();
+        img.src = src;
+    });
+
 
     /** レスポンシブ対応 */
     function adjustFontSize() {
