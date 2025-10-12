@@ -36,11 +36,6 @@
 
         .circle-group {
             cursor: pointer;
-            transition: transform 0.2s ease;
-        }
-
-        .circle-group:hover {
-            transform: scale(1.1);
         }
 
         .circle-shape {
@@ -264,7 +259,6 @@
 
                 if (isMatch) {
                     isCleared = true;
-                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game17' }, '*');
                     setTimeout(() => {
                         clearMessage.classList.add('show');
                     }, 500);
