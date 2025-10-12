@@ -212,6 +212,28 @@
         let isMoving = false;
         let isGameCleared = false; // Flag to check if the game has been cleared
 
+        function handleCellClick(clickedR, clickedC) {
+            // コマが選択されていない、または移動中の場合は何もしない
+            if (selectedPieceId === null || isMoving) {
+                return;
+            }
+
+            const piece = pieces[selectedPieceId];
+            const pieceR = piece.r;
+            const pieceC = piece.c;
+
+            const dr = clickedR - pieceR;
+            const dc = clickedC - pieceC;
+
+            // クリックされたのが隣接マス（上下左右）か判定
+            if (Math.abs(dr) + Math.abs(dc) === 1) {
+                // その方向への移動が有効かチェック
+                if (isValidMove(pieceR + dr, pieceC + dc)) {
+                    movePiece(dr, dc);
+                }
+            }
+        }
+
         function createBoard() {
             boardElement.innerHTML = '';
             boardData = [];
@@ -226,6 +248,9 @@
                     cell.classList.add('cell');
                     cell.dataset.r = r;
                     cell.dataset.c = c;
+
+                    // 各セルにクリックイベントを追加
+                    cell.addEventListener('click', () => handleCellClick(r, c));
 
                     let type, painted = false;
                     if (cellType === 1) {
