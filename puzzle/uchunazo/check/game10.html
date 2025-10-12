@@ -435,6 +435,7 @@
                 if (isClear && !isGameLocked) {
                     isGameLocked = true;
                     setControlsEnabled(false);
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game10' }, '*');
                     
                     // Wait for the final move animation to finish before starting clear sequence.
                     setTimeout(() => {
