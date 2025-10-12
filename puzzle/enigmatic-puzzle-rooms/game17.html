@@ -259,6 +259,7 @@
 
                 if (isMatch) {
                     isCleared = true;
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game17' }, '*');
                     setTimeout(() => {
                         clearMessage.classList.add('show');
                     }, 500);
