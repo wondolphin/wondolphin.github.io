@@ -659,7 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     playerPath = playerPath.slice(existingIndex + 1);
                 }
                 playerPath.push(roomId);
-                console.log(`デバッグ: 部屋移動。playerPath:`, JSON.stringify(playerPath));
+                //console.log(`デバッグ: 部屋移動。playerPath:`, JSON.stringify(playerPath));
                 const dRow = nextPos.row - rooms[playerHistory[playerHistory.length-1].roomId].row;
                 const dCol = nextPos.col - rooms[playerHistory[playerHistory.length-1].roomId].col;
                 for(const [dir, vec] of Object.entries(directionVectors)) {
@@ -879,7 +879,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 player.direction = 'N';
             }
 
-            console.log(`デバッグ: ロード完了。playerPath:`, JSON.stringify(playerPath));
+            //console.log(`デバッグ: ロード完了。playerPath:`, JSON.stringify(playerPath));
             updateUI();
             adjustFontSize();
             pauseOverlay.classList.remove('visible');
@@ -929,7 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 player.roomId = lastState.roomId;
                 player.direction = lastState.direction;
                 
-                console.log(`デバッグ: 引き返しました。playerPath:`, JSON.stringify(playerPath));
+                //console.log(`デバッグ: 引き返しました。playerPath:`, JSON.stringify(playerPath));
                 updateUI();
                 transitionOverlay.classList.remove('active');
             }, 250);
@@ -960,7 +960,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- 初期化 ---
-    console.log(`デバッグ: 初期状態。playerPath:`, JSON.stringify(playerPath));
+    //console.log(`デバッグ: 初期状態。playerPath:`, JSON.stringify(playerPath));
     updateUI();
     adjustFontSize();
     window.addEventListener('resize', adjustFontSize);
