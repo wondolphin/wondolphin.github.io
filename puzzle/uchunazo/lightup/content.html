@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Line Light Puzzle</title>
+    <style>
+        :root {
+            --board-bg: #1a1d21;
+            --cell-bg: #2c3038;
+            --wall-color: #434955;
+            --player-color: #00e5ff;
+            --target-color: #6a7384;
+            --lit-target-color: #ffcc00;
+            --control-bg: #3d5a80;
+            --control-hover-bg: #5a7ea8;
+            --laser-color: rgba(0, 229, 255, 0.5);
+        }
+
+        /* Basic setup for centering the game */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--board-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: sans-serif;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        /* The main square wrapper */
+        #wrapper {
+            display: grid;
+            grid-template-rows: 7fr 3fr;
+            gap: 1vmin;
+            padding: 1vmin;
+            box-sizing: border-box;
+            background-color: var(--wall-color);
+            border-radius: 10px;
+        }
+
+        /* Container to correctly size the square board */
+        #board-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 0; /* Fix for flexbox sizing issues */
+            position: relative;
+        }
+
+        /* Game board styling */
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            gap: 1vmin;
+            height: 100%;
+            max-width: 100%;
+            aspect-ratio: 1 / 1;
+        }
+
+        /* Individual cell styling */
+        .cell {
+            background-color: var(--cell-bg);
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s ease;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Player, target, and lit target styles using pseudo-elements */
+        .player::after, .target::after {
+            content: '';
+            display: block;
+            box-sizing: border-box;
+            border-radius: 50%;
+            z-index: 2;
+        }
+
+        .player::after {
+            width: 70%;
+            height: 70%;
+            background-color: var(--player-color);
+        }
+
+        .target::after {
+            width: 60%;
+            height: 60%;
+            border: 0.8vmin solid var(--target-color);
+            transition: border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .lit.target::after {
+            background-color: var(--lit-target-color);
+            border-color: var(--lit-target-color);
+            animation: glow 1.8s infinite ease-in-out;
+        }
+        
+        /* Glow animation for lit targets */
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 4px 0px var(--lit-target-color); }
+            50% { box-shadow: 0 0 12px 6px var(--lit-target-color); }
+        }
+        
+        /* Laser container and ray styling */
+        #laser-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .laser-ray {
+            position: absolute;
+            background-color: var(--laser-color);
+            border-radius: 2px;
+        }
+
+
+        /* Control pad styling */
+        #controls {
+            display: grid;
+            grid-template-areas:
+                ". up ."
+                "left . right"
+                ". down .";
+            grid-template-columns: 1fr 1fr 1fr; /* Make columns flexible */
+            grid-template-rows: 1fr 1fr 1fr;    /* Make rows flexible */
+            gap: 1vmin;
+            min-height: 0; /* Prevent content from stretching the grid row */
+            min-width: 0;
+        }
+
+        .control-btn {
+            background-color: var(--control-bg);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.1s ease;
+            width: 100%;
+            height: 100%;
+            min-width: 0; /* Prevent content from breaking grid layout */
+            min-height: 0; /* Prevent content from breaking grid layout */
+        }
+
+        .control-btn:hover {
+            background-color: var(--control-hover-bg);
+        }
+
+        .control-btn svg {
+            width: 50%;
+            height: 50%;
+            fill: #ffffff; /* Changed */
+        }
+        
+        /* Assigning buttons to grid areas */
+        #btn-up { grid-area: up; }
+        #btn-left { grid-area: left; }
+        #btn-right { grid-area: right; }
+        #btn-down { grid-area: down; }
+
+        /* Clear message overlay */
+        #clear-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-size: 10vmin;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        #clear-message.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Share button container */
+        #share-container {
+            position: fixed;
+            bottom: 15%; /* Changed */
+            left: 0;
+            width: 100%;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 101; /* Changed */
+            opacity: 0;
+            transition: opacity 0.5s ease 0.2s; /* Add a slight delay */
+            pointer-events: none;
+        }
+
+        #share-container.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        #share-button {
+            background-color: #000000; /* Changed */
+            color: white;
+            padding: 1.5vmin 3vmin;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 2.5vmin;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+
+        #share-button:hover {
+            transform: scale(1.05);
+            background-color: #333333; /* Changed */
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="wrapper">
+        <div id="board-container">
+            <div id="game-board"></div>
+            <div id="laser-container"></div>
+        </div>
+        <div id="controls">
+            <div id="btn-up" class="control-btn">
+                <svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>
+            </div>
+            <div id="btn-left" class="control-btn">
+                <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg>
+            </div>
+            <div id="btn-right" class="control-btn">
+                <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"></path></svg>
+            </div>
+            <div id="btn-down" class="control-btn">
+                <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"></path></svg>
+            </div>
+        </div>
+    </div>
+
+    <div id="clear-message">CLEAR!</div>
+
+    <div id="share-container">
+        <a href="https://twitter.com/intent/tweet?text=%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Flightup%2Findex.html" target="_blank" id="share-button">喜びをXでシェアする</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Game State and Constants ---
+            const BOARD_SIZE = 6;
+            const initialBoardLayout = [
+                '001001',
+                '000000',
+                '000100',
+                '00pp00',
+                '000001',
+                '100100',
+            ];
+
+            let players = [];
+            let targets = [];
+            let isGameCleared = false;
+            let hasBeenClearedOnce = false; // Flag for entering "post-clear" mode
+            let isCelebrationActive = false; // To show message only once per solution
+            let cellElements = []; // 2D array to store cell DOM elements
+
+            // --- DOM Elements ---
+            const wrapper = document.getElementById('wrapper');
+            const gameBoard = document.getElementById('game-board');
+            const clearMessage = document.getElementById('clear-message');
+            const laserContainer = document.getElementById('laser-container');
+            const shareContainer = document.getElementById('share-container');
+
+            // --- Game Logic Functions ---
+
+            /**
+             * Initializes the game state from the initial layout.
+             */
+            function setupGame() {
+                players = [];
+                targets = [];
+                initialBoardLayout.forEach((row, y) => {
+                    row.split('').forEach((char, x) => {
+                        if (char === 'p') {
+                            players.push({ x, y });
+                        } else if (char === '1') {
+                            targets.push({ x, y });
+                        }
+                    });
+                });
+                renderBoard();
+            }
+
+            /**
+             * Renders the entire game board based on the current state.
+             */
+            function renderBoard() {
+                gameBoard.innerHTML = '';
+                cellElements = []; // Reset the cell elements array
+                for (let y = 0; y < BOARD_SIZE; y++) {
+                    const rowElements = [];
+                    for (let x = 0; x < BOARD_SIZE; x++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        if (targets.some(t => t.x === x && t.y === y)) {
+                            cell.classList.add('target');
+                        }
+                        rowElements.push(cell);
+                        gameBoard.appendChild(cell);
+                    }
+                    cellElements.push(rowElements);
+                }
+                
+                updateLitTargets();
+
+                // Once cleared for the first time, always show players and lasers
+                if (hasBeenClearedOnce) {
+                    players.forEach(p => {
+                        cellElements[p.y][p.x].classList.add('player');
+                    });
+                    drawLaserBeams(players);
+                } else {
+                    laserContainer.innerHTML = '';
+                }
+            }
+            
+            /**
+             * Draws laser rays from player positions, stopping at targets.
+             * @param {object[]} positions - Array of player positions to draw from.
+             */
+            function drawLaserBeams(positions) {
+                laserContainer.innerHTML = '';
+                const containerRect = laserContainer.getBoundingClientRect();
+                
+                if (containerRect.width === 0 || !cellElements.length) return;
+                
+                const boardRect = gameBoard.getBoundingClientRect();
+                const cellWidth = boardRect.width / BOARD_SIZE;
+                const beamWidth = Math.max(2, cellWidth * 0.1);
+
+                positions.forEach(player => {
+                    // Find endpoints, stopping at the first target
+                    let endUp = -1, endDown = BOARD_SIZE, endLeft = -1, endRight = BOARD_SIZE;
+
+                    targets.forEach(target => {
+                        if (target.x === player.x) { // Vertical alignment
+                            if (target.y < player.y) endUp = Math.max(endUp, target.y);
+                            else endDown = Math.min(endDown, target.y);
+                        }
+                        if (target.y === player.y) { // Horizontal alignment
+                            if (target.x < player.x) endLeft = Math.max(endLeft, target.x);
+                            else endRight = Math.min(endRight, target.x);
+                        }
+                    });
+
+                    const playerCellRect = cellElements[player.y][player.x].getBoundingClientRect();
+                    const cx = (playerCellRect.left - containerRect.left) + playerCellRect.width / 2;
+                    const cy = (playerCellRect.top - containerRect.top) + playerCellRect.height / 2;
+
+                    // Calculate pixel coordinates for rays, ending at center of target
+                    let upY, downY, leftX, rightX;
+                    
+                    if (endUp === -1) {
+                        upY = boardRect.top - containerRect.top;
+                    } else {
+                        const endCellRect = cellElements[endUp][player.x].getBoundingClientRect();
+                        upY = (endCellRect.top - containerRect.top) + endCellRect.height / 2;
+                    }
+                    
+                    if (endDown === BOARD_SIZE) {
+                        downY = boardRect.bottom - containerRect.top;
+                    } else {
+                        const endCellRect = cellElements[endDown][player.x].getBoundingClientRect();
+                        downY = (endCellRect.top - containerRect.top) + endCellRect.height / 2;
+                    }
+
+                    if (endLeft === -1) {
+                        leftX = boardRect.left - containerRect.left;
+                    } else {
+                        const endCellRect = cellElements[player.y][endLeft].getBoundingClientRect();
+                        leftX = (endCellRect.left - containerRect.left) + endCellRect.width / 2;
+                    }
+
+                    if (endRight === BOARD_SIZE) {
+                        rightX = boardRect.right - containerRect.left;
+                    } else {
+                        const endCellRect = cellElements[player.y][endRight].getBoundingClientRect();
+                        rightX = (endCellRect.left - containerRect.left) + endCellRect.width / 2;
+                    }
+
+
+                    // Create ray elements
+                    const rays = [
+                        { left: cx - beamWidth / 2, top: upY, width: beamWidth, height: cy - upY }, // Up
+                        { left: cx - beamWidth / 2, top: cy, width: beamWidth, height: downY - cy }, // Down
+                        { left: leftX, top: cy - beamWidth / 2, width: cx - leftX, height: beamWidth }, // Left
+                        { left: cx, top: cy - beamWidth / 2, width: rightX - cx, height: beamWidth }  // Right
+                    ];
+
+                    rays.forEach(r => {
+                        if (r.width > 0 && r.height > 0) {
+                            const rayEl = document.createElement('div');
+                            rayEl.className = 'laser-ray';
+                            rayEl.style.left = `${r.left}px`;
+                            rayEl.style.top = `${r.top}px`;
+                            rayEl.style.width = `${r.width}px`;
+                            rayEl.style.height = `${r.height}px`;
+                            laserContainer.appendChild(rayEl);
+                        }
+                    });
+                });
+            }
+            
+            /**
+             * Checks if there's a clear line of sight between a target and any player.
+             * @param {object} target - The target to check.
+             * @param {object[]} players - Array of player positions.
+             * @param {object[]} allTargets - Array of all target positions.
+             * @returns {boolean} - True if there is a clear line of sight.
+             */
+            function hasClearLineOfSight(target, players, allTargets) {
+                for (const player of players) {
+                    if (player.y === target.y) { // Same row
+                        const startX = Math.min(player.x, target.x);
+                        const endX = Math.max(player.x, target.x);
+                        if (!allTargets.some(other => other.y === target.y && other.x > startX && other.x < endX)) return true;
+                    }
+                    if (player.x === target.x) { // Same col
+                        const startY = Math.min(player.y, target.y);
+                        const endY = Math.max(player.y, target.y);
+                        if (!allTargets.some(other => other.x === target.x && other.y > startY && other.y < endY)) return true;
+                    }
+                }
+                return false;
+            }
+
+            /**
+             * Checks which targets should be lit and updates their styles.
+             */
+            function updateLitTargets() {
+                let litCount = 0;
+                targets.forEach(target => {
+                    const isLit = hasClearLineOfSight(target, players, targets);
+                    const cell = cellElements[target.y][target.x];
+                    if (isLit) {
+                        cell.classList.add('lit');
+                        litCount++;
+                    } else {
+                        cell.classList.remove('lit');
+                    }
+                });
+                
+                isGameCleared = (litCount === targets.length);
+
+                if (isGameCleared && !isCelebrationActive) {
+                    hasBeenClearedOnce = true; // Set the flag to permanently show players/lasers
+                    isCelebrationActive = true;
+                    setTimeout(() => {
+                        clearMessage.classList.add('show');
+                        // Show share button 1 second after the clear message
+                        setTimeout(() => {
+                            shareContainer.classList.add('show');
+                        }, 1000);
+                    }, 500);
+                }
+            }
+
+            /**
+             * Checks if a given coordinate is a valid, passable position.
+             * @param {number} x - The x-coordinate.
+             * @param {number} y - The y-coordinate.
+             * @returns {boolean} - True if the position is passable.
+             */
+            function isPassable(x, y) {
+                if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) return false;
+                if (targets.some(t => t.x === x && t.y === y)) return false;
+                return true;
+            }
+
+            /**
+             * Moves players based on the given delta (dx, dy).
+             * @param {number} dx - Change in x-coordinate.
+             * @param {number} dy - Change in y-coordinate.
+             */
+            function movePlayers(dx, dy) {
+                const [p1, p2] = players;
+                const p1Next = { x: p1.x + dx, y: p1.y + dy };
+                const p2Next = { x: p2.x + dx, y: p2.y + dy };
+
+                const p1CanMoveAlone = isPassable(p1Next.x, p1Next.y);
+                const p2CanMoveAlone = isPassable(p2Next.x, p2Next.y);
+
+                let p1Moves = false, p2Moves = false;
+                
+                if (p1CanMoveAlone && p2CanMoveAlone) {
+                    const crossCollision = (p1Next.x === p2.x && p1Next.y === p2.y) && (p2Next.x === p1.x && p2Next.y === p1.y);
+                    const headOnCollision = p1Next.x === p2Next.x && p1Next.y === p2Next.y;
+                    if (!crossCollision && !headOnCollision) {
+                        p1Moves = p2Moves = true;
+                    }
+                } else if (p1CanMoveAlone && (p1Next.x !== p2.x || p1Next.y !== p2.y)) {
+                    p1Moves = true;
+                } else if (p2CanMoveAlone && (p2Next.x !== p1.x || p2Next.y !== p1.y)) {
+                    p2Moves = true;
+                }
+
+                if (p1Moves) players[0] = p1Next;
+                if (p2Moves) players[1] = p2Next;
+
+                if (p1Moves || p2Moves) {
+                    renderBoard();
+                    // After rendering, isGameCleared is updated.
+                    // If the board is no longer cleared, hide the popups and reset the celebration flag.
+                    if (!isGameCleared && isCelebrationActive) {
+                        clearMessage.classList.remove('show');
+                        shareContainer.classList.remove('show');
+                        isCelebrationActive = false;
+                    }
+                }
+            }
+
+
+            // --- UI and Event Listeners ---
+
+            /**
+             * Resizes the wrapper to be a square based on the smaller window dimension.
+             */
+            function resizeWrapper() {
+                const size = Math.min(window.innerWidth, window.innerHeight) * 0.95;
+                wrapper.style.width = `${size}px`;
+                wrapper.style.height = `${size}px`;
+                if (hasBeenClearedOnce) { 
+                    setTimeout(() => drawLaserBeams(players), 0);
+                }
+            }
+
+            // Keyboard controls
+            document.addEventListener('keydown', (e) => {
+                // If clear message is shown, block keyboard controls
+                if (clearMessage.classList.contains('show')) {
+                    return;
+                }
+                switch (e.key) {
+                    case 'ArrowUp': case 'w': movePlayers(0, -1); break;
+                    case 'ArrowDown': case 's': movePlayers(0, 1); break;
+                    case 'ArrowLeft': case 'a': movePlayers(-1, 0); break;
+                    case 'ArrowRight': case 'd': movePlayers(1, 0); break;
+                }
+            });
+
+            // On-screen button controls
+            document.getElementById('btn-up').addEventListener('click', () => movePlayers(0, -1));
+            document.getElementById('btn-down').addEventListener('click', () => movePlayers(0, 1));
+            document.getElementById('btn-left').addEventListener('click', () => movePlayers(-1, 0));
+            document.getElementById('btn-right').addEventListener('click', () => movePlayers(1, 0));
+            
+            // Hide clear message on click
+            clearMessage.addEventListener('click', () => {
+                clearMessage.classList.remove('show');
+                shareContainer.classList.remove('show');
+                isCelebrationActive = false; // Allow celebration to happen again
+            });
+
+            // Initial setup on window load and resize
+            window.addEventListener('resize', resizeWrapper);
+            resizeWrapper();
+            setupGame();
+        });
+    </script>
+</body>
+</html>
+
