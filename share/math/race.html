@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最速ゴールは誰だ？</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            touch-action: none; /* スマホでのダブルタップによるズームを無効化 */
+        }
+        .text-shadow {
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+        }
+        .modal-bg {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="bg-emerald-950 text-white flex flex-col h-screen p-4">
+
+    <div class="w-full max-w-5xl mx-auto flex flex-col h-full">
+        <div class="flex-shrink-0">
+            <h1 id="title" class="text-3xl md:text-4xl font-bold text-center mb-2 text-shadow text-yellow-300">最速ゴールは誰だ？</h1>
+            <p id="instruction" class="text-center text-lg mb-2 text-gray-300">先にゴールするキャラクターをタップして選んでね！</p>
+        </div>
+        
+        <div class="flex-grow relative bg-emerald-900 rounded-lg shadow-2xl overflow-hidden border-4 border-yellow-400">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+    </div>
+
+    <!-- 結果表示モーダル -->
+    <div id="resultModal" class="hidden fixed inset-0 modal-bg flex items-center justify-center">
+        <div class="bg-gray-800 border-4 border-yellow-400 rounded-lg p-8 text-center shadow-2xl transform transition-all scale-95">
+            <h2 id="resultTitle" class="text-5xl font-bold mb-4"></h2>
+            <p id="resultMessage" class="text-xl mb-6"></p>
+            <button id="resetButton" class="bg-yellow-500 text-gray-900 font-bold py-3 px-8 rounded-lg hover:bg-yellow-400 transition-colors text-2xl shadow-lg">もう一度遊ぶ</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const title = document.getElementById('title');
+        const instruction = document.getElementById('instruction');
+        const resultModal = document.getElementById('resultModal');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultMessage = document.getElementById('resultMessage');
+        const resetButton = document.getElementById('resetButton');
+
+        // --- ゲーム設定 ---
+        const GRID_ROWS = 5;
+        const GRID_COLS = 8;
+        const BASE_SPEED = 4; // 基準となる速さ
+
+        const playerA = {
+            name: "A",
+            color: "#3b82f6", // blue-500
+            routeData: ["02","4","12","6","13","6","14","6","15","2","16","4","17","4","27","4","37","4","47"],
+            pos: { x: 0, y: 0 },
+            progress: 0, // レース中の進捗
+            path: [], // ピクセル座標の経路
+            totalTime: 0 // ゴールまでの総時間
+        };
+
+        const playerB = {
+            name: "B",
+            color: "#ef4444", // red-500
+            routeData: ["01","4","11","4","21","6","22","4","23","4","24","4","25","4","26","4","36","4","46"],
+            pos: { x: 0, y: 0 },
+            progress: 0,
+            path: [],
+            totalTime: 0
+        };
+
+        const players = [playerA, playerB];
+        let cellSize, offsetX, offsetY;
+        let particles = [];
+        let gameState = 'waiting'; // 'waiting', 'racing', 'finished'
+        let selectedPlayer = null;
+        let winner = null;
+        let animationFrameId;
+
+        // --- 初期化処理 ---
+        function init() {
+            resizeCanvas();
+            parseRoutes();
+            calculateGoalTimes();
+            createParticles();
+            
+            gameState = 'waiting';
+            selectedPlayer = null;
+            winner = null;
+            players.forEach(p => {
+                p.progress = 0;
+                p.pos = { ...p.path[0].start };
+            });
+
+            instruction.textContent = '先にゴールするキャラクターをタップして選んでね！';
+            resultModal.classList.add('hidden');
+            
+            // アニメーションループを開始
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        // --- Canvasのリサイズ ---
+        function resizeCanvas() {
+            const parent = canvas.parentElement;
+            canvas.width = parent.clientWidth;
+            canvas.height = parent.clientHeight;
+            
+            // 正方形のグリッドにするための計算
+            const cellWidthBasedOnCanvas = canvas.width / GRID_COLS;
+            const cellHeightBasedOnCanvas = canvas.height / GRID_ROWS;
+            cellSize = Math.min(cellWidthBasedOnCanvas, cellHeightBasedOnCanvas);
+
+            const gridActualWidth = cellSize * GRID_COLS;
+            const gridActualHeight = cellSize * GRID_ROWS;
+            offsetX = (canvas.width - gridActualWidth) / 2;
+            offsetY = (canvas.height - gridActualHeight) / 2;
+        }
+
+        // --- グリッド座標をピクセル座標に変換 ---
+        function gridToPixel(row, col) {
+            return {
+                x: offsetX + col * cellSize + cellSize / 2,
+                y: offsetY + row * cellSize + cellSize / 2
+            };
+        }
+        
+        // --- ルートデータを解析してピクセル経路とセグメント情報を設定 ---
+        function parseRoutes() {
+            players.forEach(player => {
+                player.path = [];
+                let cumulativeDistance = 0; // 累積距離を追跡
+                for (let i = 0; i < player.routeData.length - 1; i += 2) {
+                    const startCoords = player.routeData[i];
+                    const speed = parseInt(player.routeData[i+1]);
+                    const endCoords = player.routeData[i+2];
+
+                    const startPos = gridToPixel(parseInt(startCoords[0]), parseInt(startCoords[1]));
+                    const endPos = gridToPixel(parseInt(endCoords[0]), parseInt(endCoords[1]));
+                    
+                    const dx = endPos.x - startPos.x;
+                    const dy = endPos.y - startPos.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    cumulativeDistance += distance; // 累積距離を更新
+
+                    player.path.push({
+                        start: startPos,
+                        end: endPos,
+                        speed: speed,
+                        distance: distance,
+                        cumulativeDistance: cumulativeDistance, // 累積距離をセグメントに保存
+                        dx: dx,
+                        dy: dy
+                    });
+                }
+            });
+        }
+        
+        // --- ゴールまでの時間を事前に計算 ---
+        function calculateGoalTimes() {
+            players.forEach(player => {
+                player.totalTime = 0;
+                player.path.forEach(segment => {
+                    const relativeSpeed = segment.speed / BASE_SPEED;
+                    if (relativeSpeed > 0) {
+                        player.totalTime += segment.distance / relativeSpeed;
+                    }
+                });
+            });
+        }
+
+        // --- 速さを表現するパーティクルを生成 ---
+        function createParticles() {
+            particles = [];
+            players.forEach(player => {
+                player.path.forEach(segment => {
+                    // 速さに応じてパーティクルの数を変える
+                    const numParticles = Math.round(segment.speed * 2);
+                    for (let i = 0; i < numParticles; i++) {
+                        particles.push({
+                            segment: segment,
+                            progress: i / numParticles, // 等間隔で配置
+                            speed: (segment.speed / BASE_SPEED) * 0.01 // パーティクルの移動速度
+                        });
+                    }
+                });
+            });
+        }
+
+        // --- 描画処理 ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            drawRoutes();
+            drawParticles();
+            drawStartAndGoal();
+            drawPlayers();
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.lineWidth = 1;
+
+            // 水平線を0.5マスずらして描画
+            for (let i = 0; i < GRID_ROWS; i++) {
+                ctx.beginPath();
+                const y = offsetY + (i + 0.5) * cellSize;
+                ctx.moveTo(offsetX, y);
+                ctx.lineTo(offsetX + GRID_COLS * cellSize, y);
+                ctx.stroke();
+            }
+
+            // 垂直線を0.5マスずらして描画
+            for (let i = 0; i < GRID_COLS; i++) {
+                ctx.beginPath();
+                const x = offsetX + (i + 0.5) * cellSize;
+                ctx.moveTo(x, offsetY);
+                ctx.lineTo(x, offsetY + GRID_ROWS * cellSize);
+                ctx.stroke();
+            }
+        }
+        
+        function getSpeedColor(speed) {
+            switch (speed) {
+                case 6: return "#ef4444"; // red-500
+                case 4: return "#f97316"; // orange-500
+                case 2: return "#22c55e"; // green-500
+                default: return "#6b7280"; // gray-500
+            }
+        }
+
+        function drawRoutes() {
+            ctx.lineWidth = 8; // 道を太くする
+            ctx.lineCap = "round";
+
+            players.forEach(player => {
+                player.path.forEach(segment => {
+                    ctx.strokeStyle = getSpeedColor(segment.speed);
+                    ctx.beginPath();
+                    ctx.moveTo(segment.start.x, segment.start.y);
+                    ctx.lineTo(segment.end.x, segment.end.y);
+                    ctx.stroke();
+                });
+            });
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                const x = p.segment.start.x + p.segment.dx * p.progress;
+                const y = p.segment.start.y + p.segment.dy * p.progress;
+                ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        
+        function drawStartAndGoal() {
+            players.forEach(player => {
+                // Start
+                const startPos = player.path[0].start;
+                ctx.fillStyle = player.color;
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(startPos.x, startPos.y, cellSize * 0.15, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Goal
+                const goalPos = player.path[player.path.length - 1].end;
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.font = `${cellSize * 0.4}px sans-serif`;
+                ctx.fillText("🏁", goalPos.x, goalPos.y);
+            });
+        }
+
+        function drawPlayers() {
+             players.forEach(player => {
+                ctx.fillStyle = player.color;
+                ctx.strokeStyle = "white";
+                ctx.lineWidth = 3;
+
+                ctx.beginPath();
+                ctx.arc(player.pos.x, player.pos.y, cellSize * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                
+                ctx.fillStyle = "white";
+                ctx.font = `bold ${cellSize * 0.25}px sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(player.name, player.pos.x, player.pos.y);
+            });
+        }
+        
+        // --- ゲームループ ---
+        function update() {
+            // Particle animation
+            particles.forEach(p => {
+                p.progress += p.speed;
+                if (p.progress >= 1) {
+                    p.progress = 0;
+                }
+            });
+
+            if (gameState !== 'racing') return;
+
+            let raceFinishedThisFrame = false;
+
+            for (const player of players) {
+                const totalDistance = player.path[player.path.length - 1].cumulativeDistance;
+
+                // 既にゴールしているか、または他の誰かがゴール済みの場合は動きを止める
+                if (player.progress >= totalDistance || winner) {
+                    continue;
+                }
+
+                // 現在のセグメントを累積距離で正しく見つける
+                const currentSegment = player.path.find(segment => player.progress < segment.cumulativeDistance);
+                
+                if (currentSegment) {
+                    // 進行度を更新
+                    const relativeSpeed = currentSegment.speed / BASE_SPEED;
+                    player.progress += relativeSpeed * 2; // 速度の調整値
+
+                    // ゴールしたかチェック
+                    if (player.progress >= totalDistance) {
+                        player.progress = totalDistance; // ゴール地点にスナップ
+                        player.pos = player.path[player.path.length - 1].end;
+                        
+                        // このフレームで最初のゴール者であれば、勝者とする
+                        if (!winner) {
+                            winner = player;
+                            raceFinishedThisFrame = true;
+                        }
+                    } else {
+                        // 新しい位置を計算
+                        const currentSegmentIndex = player.path.indexOf(currentSegment);
+                        const distanceBeforeSegment = currentSegmentIndex > 0 ? player.path[currentSegmentIndex - 1].cumulativeDistance : 0;
+                        const progressInSegment = player.progress - distanceBeforeSegment;
+                        const ratio = progressInSegment / currentSegment.distance;
+                        
+                        player.pos.x = currentSegment.start.x + currentSegment.dx * ratio;
+                        player.pos.y = currentSegment.start.y + currentSegment.dy * ratio;
+                    }
+                }
+            }
+
+            if (raceFinishedThisFrame) {
+                endGame();
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- ゲームフロー制御 ---
+        function startGame() {
+            if (gameState !== 'waiting' || !selectedPlayer) return;
+            gameState = 'racing';
+            instruction.textContent = "レーススタート！";
+        }
+
+        function endGame() {
+            gameState = 'finished';
+
+            // エラーを防ぐために、winnerがnullでないことを確認
+            if (!winner) {
+                console.error("Winner could not be determined.");
+                instruction.textContent = 'レース終了！勝者を決定できませんでした。';
+                return;
+            }
+
+            instruction.textContent = `勝者はプレイヤー${winner.name}！`;
+            
+            if (selectedPlayer === winner) {
+                resultTitle.textContent = "🎉 正解！ 🎉";
+                resultTitle.className = "text-5xl font-bold mb-4 text-yellow-400";
+                resultMessage.textContent = `おめでとう！あなたの予想通り、プレイヤー${winner.name}が勝ちました！`;
+            } else {
+                resultTitle.textContent = "😭 残念... 😭";
+                resultTitle.className = "text-5xl font-bold mb-4 text-blue-400";
+                resultMessage.textContent = `プレイヤー${winner.name}が先にゴールしました。`;
+            }
+            resultModal.classList.remove('hidden');
+            setTimeout(() => {
+                resultModal.querySelector('div').classList.remove('scale-95');
+            }, 10);
+        }
+
+        // --- イベントリスナー ---
+        function handleCanvasClick(event) {
+            if (gameState !== 'waiting') return;
+
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (event.clientX - rect.left) * scaleX;
+            const y = (event.clientY - rect.top) * scaleY;
+            
+            players.forEach(player => {
+                const startPos = player.path[0].start;
+                const distance = Math.sqrt(Math.pow(x - startPos.x, 2) + Math.pow(y - startPos.y, 2));
+                if (distance < cellSize * 0.3) {
+                    selectedPlayer = player;
+                    instruction.textContent = `プレイヤー${player.name}を選択！レースを開始します...`;
+                    // 選択されたキャラを少し大きくするなどのフィードバック
+                    setTimeout(startGame, 1000);
+                }
+            });
+        }
+
+        window.addEventListener('resize', init);
+        canvas.addEventListener('click', handleCanvasClick);
+        resetButton.addEventListener('click', init);
+
+        // --- 初期化実行 ---
+        init();
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字ブロックゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://css.gg/css2?family=Inter:wght@400;500;700&family=M+PLUS+Rounded+1c:wght@700&display=swap" rel="stylesheet">
+    <style>
+        /* カスタムスタイル */
+        body {
+            font-family: 'Inter', 'M PLUS Rounded 1c', sans-serif;
+            touch-action: manipulation; /* ダブルタップによるズームを無効化 */
+        }
+        .lane-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: space-around;
+            padding: 1rem 0.5rem;
+            gap: 0.5rem;
+            position: relative;
+        }
+        .lane {
+            display: flex;
+            flex-direction: column;
+            width: 23%;
+            height: 100%;
+            background-color: #f0f4f8;
+            border-radius: 0.75rem;
+            position: relative;
+            padding-top: 5rem; /* ブロックのスペースを確保 */
+            overflow: hidden;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .lane:hover {
+            background-color: #e2e8f0;
+        }
+        .block {
+            position: absolute;
+            top: 0.75rem;
+            width: 80%;
+            left: 10%;
+            padding: 0.75rem 0.5rem;
+            border-radius: 0.5rem;
+            font-weight: 700;
+            text-align: center;
+            color: white;
+            background: linear-gradient(145deg, #4a5568, #2d3748);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            font-size: 1.25rem;
+            z-index: 10;
+        }
+        .numbers-stack {
+            display: flex;
+            flex-direction: column-reverse; /* 上から0,1,2..とデータを持つが、表示は下から積む */
+            gap: 2px;
+            padding: 0.5rem;
+            width: 100%;
+            height: 100%;
+        }
+        .number-slot {
+            height: 10%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            font-size: 0.8rem;
+            padding: 0 2px;
+            transition: background-color 0.3s, opacity 0.3s;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        .number-slot.filled {
+             background-color: #4299e1;
+             box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        .flying-item.overkill {
+            background-color: #ef4444; /* red-500 */
+        }
+    </style>
+</head>
+<body class="bg-gray-200 text-gray-800 flex flex-col h-screen select-none">
+
+    <!-- スタート画面 -->
+    <div id="start-screen" class="flex flex-col items-center justify-center h-full w-full max-w-2xl mx-auto bg-white shadow-lg p-8">
+        <h1 class="text-4xl font-bold mb-8">数字ブロックゲーム</h1>
+        <p class="mb-8 text-lg">難易度を選択してください</p>
+        <div class="flex gap-4">
+            <button id="beginner-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-lg text-2xl">初級</button>
+            <button id="advanced-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-lg text-2xl">上級</button>
+        </div>
+    </div>
+
+    <!-- ゲーム画面全体 (最初は非表示) -->
+    <div id="game-container" class="hidden relative flex flex-col h-full w-full max-w-2xl mx-auto bg-white shadow-lg">
+        <!-- 4つのレーン -->
+        <div id="lanes-container" class="lane-container">
+            <!-- レーンはJavaScriptで生成されます -->
+        </div>
+
+        <!-- 操作パネル -->
+        <div id="controls" class="flex items-center justify-between p-4 bg-gray-100 border-t border-gray-300">
+            <!-- Left: Next Number -->
+            <div class="text-center w-28">
+                <p class="text-xs text-gray-500">NEXT</p>
+                <div id="next-number" class="w-14 h-14 bg-gray-300 text-gray-700 flex items-center justify-center rounded-md font-bold transition-all mx-auto"></div>
+            </div>
+
+            <!-- Center: Current Number -->
+            <div class="text-center">
+                <p class="text-xs text-gray-500">配置する数字</p>
+                <div id="current-number" class="w-20 h-20 bg-blue-500 text-white flex items-center justify-center rounded-lg shadow-md font-bold transition-all mx-auto"></div>
+            </div>
+
+            <!-- Right: Go Button -->
+            <div class="w-28 flex justify-end">
+                <button id="go-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-lg shadow-lg transform transition active:scale-95 text-2xl">
+                    Go!
+                </button>
+            </div>
+        </div>
+        
+        <!-- 結果表示モーダル -->
+        <div id="result-modal" class="hidden absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
+            <div class="bg-white p-8 rounded-lg shadow-2xl text-center">
+                <h2 class="text-4xl font-bold mb-4 text-yellow-500">Game Clear!</h2>
+                <p class="text-2xl mb-4">得点: <span id="score-result" class="font-bold text-blue-600">0</span></p>
+                <p class="text-lg mb-2">Go! 回数: <span id="go-count-result" class="font-bold">0</span></p>
+                <p class="text-lg mb-6">オーバーキル: <span id="overkill-count-result" class="font-bold">0</span></p>
+                <button id="restart-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-xl">
+                    もう一度プレイ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const startScreen = document.getElementById('start-screen');
+            const gameContainer = document.getElementById('game-container');
+            const beginnerButton = document.getElementById('beginner-button');
+            const advancedButton = document.getElementById('advanced-button');
+
+            const lanesContainer = document.getElementById('lanes-container');
+            const currentNumberEl = document.getElementById('current-number');
+            const nextNumberEl = document.getElementById('next-number');
+            const goButton = document.getElementById('go-button');
+            
+            const resultModal = document.getElementById('result-modal');
+            const goCountResultEl = document.getElementById('go-count-result');
+            const overkillCountResultEl = document.getElementById('overkill-count-result');
+            const scoreResultEl = document.getElementById('score-result');
+            const restartButton = document.getElementById('restart-button');
+
+            const LANE_COUNT = 4;
+            const LANE_CAPACITY = 10;
+            let blocks, initialBlocks, currentNumber, nextNumber, placementsCount, initialAverage, overkillCount, goCount, gameMode, lanesData, isProcessing = false;
+
+            const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+            function generateNumber(n) {
+                const minPercent = Math.max(8, 30 - 4 * n);
+                const maxPercent = Math.max(28, 50 - 4 * n);
+                const minNum = Math.max(1, Math.round(initialAverage * (minPercent / 100)));
+                const maxNum = Math.max(1, Math.round(initialAverage * (maxPercent / 100)));
+                const targetValue = (minNum > maxNum) ? minNum : getRandomInt(minNum, maxNum);
+
+                if (gameMode === 'advanced') {
+                    const sqrtTarget = Math.sqrt(targetValue);
+                    let factor1 = getRandomInt(Math.max(2, Math.floor(sqrtTarget) - 3), Math.floor(sqrtTarget) + 3);
+                    let factor2 = Math.round(targetValue / factor1);
+                    if (factor1 < 2) factor1 = 2;
+                    if (factor2 < 2) factor2 = 2;
+                    return { text: `${factor1}×${factor2}`, value: factor1 * factor2 };
+                } else {
+                    return { text: targetValue.toString(), value: targetValue };
+                }
+            }
+
+            function startGame(mode) {
+                gameMode = mode;
+                startScreen.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
+                initializeGame();
+            }
+
+            function initializeGame() {
+                lanesContainer.innerHTML = '';
+                blocks = [];
+                initialBlocks = [];
+                lanesData = Array.from({ length: LANE_COUNT }, () => Array(LANE_CAPACITY).fill(null));
+                placementsCount = 0;
+                overkillCount = 0;
+                goCount = 0;
+                isProcessing = false;
+                goButton.disabled = false;
+                resultModal.classList.add('hidden');
+                
+                let initialSum = 0;
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    const initialValue = getRandomInt(100, 999);
+                    blocks.push(initialValue);
+                    initialBlocks.push(initialValue);
+                    initialSum += initialValue;
+                    
+                    const lane = document.createElement('div');
+                    lane.className = 'lane';
+                    lane.dataset.laneIndex = i;
+                    lane.addEventListener('click', () => handleLaneClick(i));
+
+                    const block = document.createElement('div');
+                    block.className = 'block';
+                    block.id = `block-${i}`;
+                    
+                    const numbersStack = document.createElement('div');
+                    numbersStack.className = 'numbers-stack';
+                    numbersStack.id = `stack-${i}`;
+                    
+                    for (let j = 0; j < LANE_CAPACITY; j++) {
+                        const slot = document.createElement('div');
+                        slot.className = 'number-slot';
+                        slot.dataset.rowIndex = j;
+                        numbersStack.appendChild(slot);
+                    }
+                    
+                    lane.appendChild(block);
+                    lane.appendChild(numbersStack);
+                    lanesContainer.appendChild(lane);
+                }
+                
+                initialAverage = initialSum / LANE_COUNT;
+                currentNumber = generateNumber(1);
+                nextNumber = generateNumber(2);
+
+                updateUI();
+                renderAllLanes();
+            }
+            
+            function renderAllLanes() {
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    const stack = document.getElementById(`stack-${i}`);
+                    for (let j = 0; j < LANE_CAPACITY; j++) {
+                        const slot = stack.querySelector(`[data-row-index='${j}']`);
+                        const data = lanesData[i][j];
+                        if (data) {
+                            slot.textContent = data.text;
+                            slot.classList.add('filled');
+                        } else {
+                            slot.textContent = '';
+                            slot.classList.remove('filled');
+                        }
+                    }
+                }
+            }
+
+            function updateUI() {
+                blocks.forEach((value, index) => {
+                    document.getElementById(`block-${index}`).textContent = value;
+                });
+                currentNumberEl.textContent = currentNumber.text;
+                nextNumberEl.textContent = nextNumber.text;
+
+                const baseCurrent = "w-20 h-20 bg-blue-500 text-white flex items-center justify-center rounded-lg shadow-md font-bold transition-all";
+                const baseNext = "w-14 h-14 bg-gray-300 text-gray-700 flex items-center justify-center rounded-md font-bold transition-all";
+                if (gameMode === 'advanced') {
+                    currentNumberEl.className = `${baseCurrent} text-xl`;
+                    nextNumberEl.className = `${baseNext} text-base`;
+                } else {
+                    currentNumberEl.className = `${baseCurrent} text-3xl`;
+                    nextNumberEl.className = `${baseNext} text-xl`;
+                }
+            }
+            
+            function isGameEnd() {
+                return blocks.every(value => value === 0);
+            }
+            
+            function showResults() {
+                const overkillPenalty = overkillCount * Math.max(0, 30 - placementsCount) * 9;
+                const goPenalty = Math.max(0, goCount - 1) * 70;
+                let score = Math.max(0, 1000 - overkillPenalty - goPenalty);
+                
+                scoreResultEl.textContent = Math.round(score);
+                goCountResultEl.textContent = goCount;
+                overkillCountResultEl.textContent = overkillCount;
+                resultModal.classList.remove('hidden');
+            }
+
+            async function handleLaneClick(laneIndex) {
+                if (!currentNumber || isProcessing) return;
+                isProcessing = true;
+                
+                const pushedOutNumbers = [];
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    const topNumber = lanesData[i][LANE_CAPACITY - 1];
+                    if (topNumber) {
+                        pushedOutNumbers.push({ laneIndex: i, rowIndex: LANE_CAPACITY - 1, number: topNumber });
+                    }
+                }
+
+                if (pushedOutNumbers.length > 0) {
+                    await animateLaunches(pushedOutNumbers);
+                }
+
+                if (isGameEnd()) {
+                    const finalLaunchNumbers = [];
+                    for (let i = 0; i < LANE_COUNT; i++) {
+                        for (let j = 0; j < LANE_CAPACITY - 1; j++) {
+                            if (lanesData[i][j]) {
+                                finalLaunchNumbers.push({ laneIndex: i, rowIndex: j, number: lanesData[i][j] });
+                            }
+                        }
+                    }
+                    if (finalLaunchNumbers.length > 0) {
+                        await animateLaunches(finalLaunchNumbers);
+                    }
+                    showResults();
+                    isProcessing = false;
+                    return;
+                }
+
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    for (let j = LANE_CAPACITY - 1; j > 0; j--) {
+                        lanesData[i][j] = lanesData[i][j - 1];
+                    }
+                    lanesData[i][0] = null;
+                }
+
+                const currentSumInLane = lanesData[laneIndex].reduce((acc, item) => acc + (item ? item.value : 0), 0);
+                if (currentSumInLane >= blocks[laneIndex]) {
+                    overkillCount++;
+                }
+                lanesData[laneIndex][0] = currentNumber;
+                
+                placementsCount++;
+                currentNumber = nextNumber;
+                nextNumber = generateNumber(placementsCount + 2);
+                
+                renderAllLanes();
+                updateUI();
+                isProcessing = false;
+            }
+
+            async function handleGoButtonClick() {
+                if (isProcessing) return;
+                isProcessing = true;
+                goButton.disabled = true;
+                goCount++;
+
+                const numbersToLaunch = [];
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    for(let j=0; j < LANE_CAPACITY; j++){
+                        if(lanesData[i][j]){
+                            numbersToLaunch.push({ laneIndex: i, rowIndex: j, number: lanesData[i][j] });
+                        }
+                    }
+                }
+
+                if (numbersToLaunch.length === 0) {
+                    goCount--;
+                    goButton.disabled = false;
+                    isProcessing = false;
+                    return;
+                }
+
+                await animateLaunches(numbersToLaunch);
+                
+                lanesData = Array.from({ length: LANE_COUNT }, () => Array(LANE_CAPACITY).fill(null));
+                
+                renderAllLanes();
+                updateUI();
+
+                if(!isGameEnd()){
+                    goButton.disabled = false;
+                }
+                isProcessing = false;
+            }
+
+            function animateLaunches(numbersToLaunch) {
+                return new Promise(resolve => {
+                    const animationDuration = 700;
+                    let animationsCompleted = 0;
+                    const damageMap = new Map();
+
+                    if (numbersToLaunch.length === 0) {
+                        resolve(); return;
+                    }
+                    
+                    const visualOverkillMap = new Map();
+                    for(let i=0; i<LANE_COUNT; i++){
+                        const laneNumbers = numbersToLaunch.filter(n => n.laneIndex === i).sort((a,b) => b.rowIndex - a.rowIndex);
+                        let runningSum = 0;
+                        let overkillThresholdPassed = false;
+                        
+                        if (blocks[i] === 0) {
+                            overkillThresholdPassed = true;
+                        }
+
+                        laneNumbers.forEach(item => {
+                            if(overkillThresholdPassed){
+                                visualOverkillMap.set(`${i}-${item.rowIndex}`, true);
+                            }
+                            runningSum += item.number.value;
+                            if(!overkillThresholdPassed && runningSum > blocks[i]){
+                                overkillThresholdPassed = true;
+                            }
+                        });
+                    }
+
+                    numbersToLaunch.forEach(({ laneIndex, rowIndex, number }) => {
+                        const currentDamage = damageMap.get(laneIndex) || 0;
+                        damageMap.set(laneIndex, currentDamage + number.value);
+
+                        const stack = document.getElementById(`stack-${laneIndex}`);
+                        const slot = stack.querySelector(`[data-row-index='${rowIndex}']`);
+                        
+                        slot.textContent = '';
+                        slot.classList.remove('filled');
+
+                        const flyingItem = document.createElement('div');
+                        flyingItem.className = 'number-slot filled flying-item';
+                        flyingItem.textContent = number.text;
+                        if(visualOverkillMap.get(`${laneIndex}-${rowIndex}`)) {
+                             flyingItem.classList.add('overkill');
+                        }
+                        
+                        const slotRect = slot.getBoundingClientRect();
+                        const containerRect = lanesContainer.getBoundingClientRect();
+                        
+                        flyingItem.style.position = 'absolute';
+                        flyingItem.style.left = `${slotRect.left - containerRect.left}px`;
+                        flyingItem.style.top = `${slotRect.top - containerRect.top}px`;
+                        flyingItem.style.width = `${slotRect.width}px`;
+                        flyingItem.style.height = `${slotRect.height}px`;
+                        lanesContainer.appendChild(flyingItem);
+
+                        const opacityDuration = 100;
+                        const opacityDelay = animationDuration - opacityDuration;
+                        flyingItem.style.transition = `transform ${animationDuration / 1000}s linear, opacity ${opacityDuration / 1000}s ${opacityDelay / 1000}s`;
+
+                        requestAnimationFrame(() => {
+                            const blockEl = document.getElementById(`block-${laneIndex}`);
+                            const blockRect = blockEl.getBoundingClientRect();
+                            const targetY = blockRect.bottom - containerRect.top;
+                            flyingItem.style.transform = `translateY(-${slotRect.top - containerRect.top - targetY}px)`;
+                            flyingItem.style.opacity = '0';
+                        });
+
+                        setTimeout(() => {
+                            flyingItem.remove();
+                            animationsCompleted++;
+                            if (animationsCompleted === numbersToLaunch.length) {
+                                for(const [laneIdx, totalDamage] of damageMap.entries()) {
+                                    blocks[laneIdx] = Math.max(0, blocks[laneIdx] - totalDamage);
+                                }
+                                updateUI();
+                                if (isGameEnd() && resultModal.classList.contains('hidden')) {
+                                    showResults();
+                                }
+                                resolve();
+                            }
+                        }, animationDuration);
+                    });
+                });
+            }
+
+            beginnerButton.addEventListener('click', () => startGame('beginner'));
+            advancedButton.addEventListener('click', () => startGame('advanced'));
+            goButton.addEventListener('click', handleGoButtonClick);
+            restartButton.addEventListener('click', () => {
+                resultModal.classList.add('hidden');
+                gameContainer.classList.add('hidden');
+                startScreen.classList.remove('hidden');
+            });
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>計算パズルゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: none;
+        }
+        .pop-font {
+            font-family: 'Mochiy Pop One', sans-serif;
+        }
+        .number-candidate, .number-slot, .result-number {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            border-radius: 0.75rem;
+            user-select: none;
+        }
+        .number-candidate {
+             cursor: grab;
+        }
+        .number-slot {
+            border: 2px dashed #9ca3af;
+            background-color: #f3f4f6;
+        }
+        .operator, .paren {
+            width: 40px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+        }
+        .dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+        .drag-over {
+            background-color: #d1fae5;
+            border-color: #10b981;
+        }
+        .animated-item {
+            position: absolute;
+            transition: all 0.5s ease-in-out;
+            z-index: 50;
+        }
+        /* 結果が分数の場合のフォントサイズ調整 */
+        .fraction {
+            font-size: 1.5rem;
+            line-height: 1.2;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div id="game-container" class="w-full max-w-3xl mx-auto p-6 bg-white rounded-2xl shadow-lg text-center">
+        <!-- ステージ選択 -->
+        <div class="mb-6">
+            <label for="stage-select" class="text-lg text-gray-600 mr-2 pop-font">ステージ選択:</label>
+            <select id="stage-select" class="p-2 rounded-lg border-2 border-gray-300 pop-font">
+            </select>
+        </div>
+        
+        <!-- 目標値 -->
+        <div class="mb-8">
+            <h1 class="text-2xl text-gray-600 mb-2 pop-font">目標の数字</h1>
+            <p id="target-value" class="text-6xl font-bold text-indigo-600 pop-font"></p>
+        </div>
+
+        <!-- アニメーション用のコンテナ -->
+        <div id="animation-container" class="relative h-28">
+            <!-- 計算式 -->
+            <div id="formula-container" class="flex justify-center items-center gap-1 absolute inset-0">
+                <!-- JavaScriptで動的に生成 -->
+            </div>
+        </div>
+
+        <!-- 候補の数字 -->
+        <div class="mt-8">
+            <div id="candidates-container" class="flex justify-center items-center gap-4 bg-gray-200 p-4 rounded-xl min-h-[112px]">
+                 <!-- JavaScriptで動的に生成 -->
+            </div>
+        </div>
+        
+        <!-- メッセージとリセットボタン -->
+        <div class="mt-8 h-16 flex flex-col items-center justify-center">
+            <p id="message" class="text-3xl font-bold pop-font h-8"></p>
+            <button id="reset-btn" class="mt-4 bg-rose-500 text-white font-bold py-2 px-6 rounded-lg shadow-md hover:bg-rose-600 transition-transform transform hover:scale-105 opacity-0 hidden">もう一度挑戦！</button>
+        </div>
+    </div>
+
+    <script>
+        // --- ステージデータ ---
+        const stages = [
+            { target: 22, formula: ['slot', '×', 'slot', '+', 'slot', '×', 'slot'], candidates: [2, 3, 4, 5] },
+            { target: 10, formula: ['(', 'slot', '+', 'slot', ')', '×', 'slot', '-', 'slot'], candidates: [2, 3, 4, 10] },
+            { target: 10, formula: ['slot', '+', 'slot', '×', 'slot', '÷', 'slot'], candidates: [1, 2, 3, 6] },
+            { target: {n: 1, d: 2}, formula: ['slot', '÷', '(', 'slot', '+', 'slot', ')'], candidates: [3, 4, 2] },
+            { target: 197, formula: ['slot', '×', 'slot', '-', 'slot'], candidates: [13,14,15,16]},
+            { target: 1, formula: ['(', 'slot', '+', 'slot', ')', '÷', '(', 'slot', '+', 'slot', ')'], candidates: [1, 2, 3, 4]},
+            { target: 1, formula: ['slot', '-', 'slot', '×', 'slot'], candidates: [2, 3, 5, 7] }
+        ];
+        let currentStageIndex = 0;
+
+        // --- DOM要素 ---
+        const stageSelect = document.getElementById('stage-select');
+        const targetValueEl = document.getElementById('target-value');
+        const formulaContainer = document.getElementById('formula-container');
+        const candidatesContainer = document.getElementById('candidates-container');
+        const animationContainer = document.getElementById('animation-container');
+        const messageEl = document.getElementById('message');
+        const resetBtn = document.getElementById('reset-btn');
+
+        let draggedElement = null;
+        let filledSlots = 0;
+
+        // --- 分数計算ヘルパー ---
+        const Fraction = {
+            gcd: (a, b) => b === 0 ? a : Fraction.gcd(b, a % b),
+            simplify: (f) => {
+                const common = Fraction.gcd(Math.abs(f.n), f.d);
+                return { n: f.n / common, d: f.d / common };
+            },
+            create: (n) => ({ n, d: 1 }),
+            toString: (f) => f.d === 1 ? `${f.n}` : `<span class="fraction">${f.n}<br>—<br>${f.d}</span>`,
+            add: (f1, f2) => Fraction.simplify({ n: f1.n * f2.d + f2.n * f1.d, d: f1.d * f2.d }),
+            subtract: (f1, f2) => Fraction.simplify({ n: f1.n * f2.d - f2.n * f1.d, d: f1.d * f2.d }),
+            multiply: (f1, f2) => Fraction.simplify({ n: f1.n * f2.n, d: f1.d * f2.d }),
+            divide: (f1, f2) => Fraction.simplify({ n: f1.n * f2.d, d: f1.d * f2.n }),
+            equals: (f1, f2) => f1.n * f2.d === f2.n * f1.d,
+        };
+
+        // --- ゲーム初期化 ---
+        function initGame() {
+            const stage = stages[currentStageIndex];
+            
+            // UIリセット
+            formulaContainer.innerHTML = '';
+            candidatesContainer.innerHTML = '';
+            animationContainer.querySelectorAll('.animated-item').forEach(el => el.remove());
+            messageEl.textContent = '';
+            messageEl.className = 'text-3xl font-bold pop-font h-8';
+            resetBtn.classList.add('hidden', 'opacity-0');
+            formulaContainer.style.opacity = '1';
+
+            filledSlots = 0;
+
+            // 目標値設定
+            targetValueEl.innerHTML = typeof stage.target === 'number'
+                ? stage.target
+                : Fraction.toString(stage.target);
+
+            // 計算式生成
+            stage.formula.forEach((item, index) => {
+                let el;
+                if (item === 'slot') {
+                    el = document.createElement('div');
+                    el.classList.add('number-slot');
+                    el.dataset.index = index;
+                } else if (['+', '-', '×', '÷'].includes(item)) {
+                    el = document.createElement('div');
+                    el.classList.add('operator', 'text-gray-700', 'font-bold', 'pop-font');
+                    el.textContent = item;
+                    el.dataset.index = index;
+                } else { // 括弧
+                    el = document.createElement('div');
+                    el.classList.add('paren', 'text-gray-500', 'font-bold', 'pop-font');
+                    el.textContent = item;
+                    el.dataset.index = index;
+                }
+                formulaContainer.appendChild(el);
+            });
+
+            // 候補数字生成
+            stage.candidates.forEach((num, index) => {
+                const numberEl = document.createElement('div');
+                numberEl.classList.add('number-candidate', 'bg-sky-400', 'text-white', 'font-bold', 'shadow-md');
+                numberEl.textContent = num;
+                numberEl.dataset.value = num;
+                numberEl.draggable = true;
+                candidatesContainer.appendChild(numberEl);
+            });
+            
+            addDragAndDropListeners();
+        }
+        
+        function addDragAndDropListeners() {
+            // ... (ドラッグ＆ドロップのロジックは変更なし)
+            document.addEventListener('dragstart', (e) => {
+                if (e.target.classList.contains('number-candidate')) {
+                    draggedElement = e.target;
+                    setTimeout(() => e.target.classList.add('dragging'), 0);
+                }
+            });
+
+            document.addEventListener('dragend', (e) => {
+                if (draggedElement) {
+                   draggedElement.classList.remove('dragging');
+                   draggedElement = null;
+                }
+            });
+
+            formulaContainer.querySelectorAll('.number-slot').forEach(slot => {
+                slot.addEventListener('dragover', e => { e.preventDefault(); if (!slot.hasChildNodes()) slot.classList.add('drag-over'); });
+                slot.addEventListener('dragleave', e => slot.classList.remove('drag-over'));
+                slot.addEventListener('drop', e => {
+                    e.preventDefault();
+                    slot.classList.remove('drag-over');
+                    if (draggedElement && !slot.hasChildNodes()) {
+                        const originalParent = draggedElement.parentElement;
+                        slot.appendChild(draggedElement);
+                        
+                        if(originalParent !== candidatesContainer && originalParent.classList.contains('number-slot')){
+                           // スロット間の移動
+                        } else {
+                            filledSlots++;
+                        }
+                        
+                        const totalSlots = stages[currentStageIndex].formula.filter(item => item === 'slot').length;
+                        if (filledSlots === totalSlots) {
+                            startCalculation();
+                        }
+                    }
+                });
+            });
+            
+            candidatesContainer.addEventListener('dragover', e => e.preventDefault());
+            candidatesContainer.addEventListener('drop', e => {
+                e.preventDefault();
+                if (draggedElement && draggedElement.parentElement.classList.contains('number-slot')) {
+                    candidatesContainer.appendChild(draggedElement);
+                    filledSlots--;
+                }
+            });
+        }
+        
+        async function startCalculation() {
+            // 1. 計算用の要素と式の配列を作成
+            const stage = stages[currentStageIndex];
+            const animatedItems = [];
+            const formula = [];
+
+            Array.from(formulaContainer.children).forEach(el => {
+                const rect = el.getBoundingClientRect();
+                const containerRect = animationContainer.getBoundingClientRect();
+                const clone = el.cloneNode(true);
+                clone.classList.add('animated-item');
+                clone.style.left = `${rect.left - containerRect.left}px`;
+                clone.style.top = `${rect.top - containerRect.top}px`;
+                
+                if (el.classList.contains('number-slot')) {
+                    const child = el.firstChild;
+                    clone.innerHTML = child.textContent; // innerHTML to support fraction
+                    clone.dataset.value = child.dataset.value;
+                    clone.classList.remove('number-slot', 'border-2', 'border-dashed');
+                    clone.classList.add(...child.classList, 'result-number');
+                    formula.push(Fraction.create(parseInt(child.dataset.value)));
+                } else {
+                    formula.push(el.textContent);
+                }
+                animationContainer.appendChild(clone);
+                animatedItems.push(clone);
+            });
+            
+            formulaContainer.style.opacity = '0';
+
+            // 2. 計算実行
+            const finalResult = await evaluate(formula, animatedItems);
+            
+            // 3. 結果判定
+            const resultEl = animatedItems[0];
+            const targetFraction = typeof stage.target === 'number'
+                ? Fraction.create(stage.target)
+                : stage.target;
+
+            await sleep(400);
+
+            if (Fraction.equals(finalResult, targetFraction)) {
+                messageEl.textContent = '正解！';
+                messageEl.classList.add('text-green-500');
+                resultEl.classList.add('bg-green-500', 'border-green-500');
+            } else {
+                messageEl.textContent = `残念...`;
+                messageEl.classList.add('text-red-500');
+                resultEl.classList.add('bg-red-500', 'border-red-500');
+            }
+            
+            resetBtn.classList.remove('hidden');
+            setTimeout(() => resetBtn.classList.remove('opacity-0'), 100);
+        }
+        
+        async function evaluate(formula, items) {
+            // 括弧の処理
+            while (formula.includes(')')) {
+                const end = formula.indexOf(')');
+                const start = formula.lastIndexOf('(', end);
+                
+                const subFormula = formula.slice(start + 1, end);
+                const subItems = items.slice(start + 1, end);
+                const result = await evaluate(subFormula, subItems);
+
+                // アニメーション: 括弧と中身を結果にまとめる
+                const resultEl = subItems[0];
+                const parenStartEl = items[start];
+                const parenEndEl = items[end];
+                
+                resultEl.style.left = parenStartEl.style.left;
+                await sleep(400);
+
+                parenStartEl.hidden = true;
+                parenEndEl.hidden = true;
+                
+                // 配列の更新
+                formula.splice(start, end - start + 1, result);
+                items.splice(start, end - start + 1, resultEl);
+            }
+
+            // 乗算・除算
+            await processOperators(formula, items, ['×', '÷']);
+            // 加算・減算
+            await processOperators(formula, items, ['+', '-']);
+            
+            return formula[0];
+        }
+
+        async function processOperators(formula, items, operators) {
+            let opIndex;
+            while ((opIndex = formula.findIndex(item => operators.includes(item))) !== -1) {
+                const leftIndex = opIndex - 1;
+                const rightIndex = opIndex + 1;
+
+                const leftVal = formula[leftIndex];
+                const rightVal = formula[rightIndex];
+                
+                const leftEl = items[leftIndex];
+                const rightEl = items[rightIndex];
+                const opEl = items[opIndex];
+
+                await sleep(500);
+                
+                // アニメーション
+                const targetX = parseFloat(opEl.style.left) + (opEl.offsetWidth / 2) - (leftEl.offsetWidth / 2);
+                leftEl.style.left = `${targetX}px`;
+                rightEl.style.left = `${targetX}px`;
+
+                await sleep(500);
+
+                // 計算
+                let result;
+                const operator = formula[opIndex];
+                if (operator === '×') result = Fraction.multiply(leftVal, rightVal);
+                if (operator === '÷') result = Fraction.divide(leftVal, rightVal);
+                if (operator === '+') result = Fraction.add(leftVal, rightVal);
+                if (operator === '-') result = Fraction.subtract(leftVal, rightVal);
+
+                // 結果要素の更新
+                leftEl.innerHTML = Fraction.toString(result);
+                leftEl.classList.add('bg-indigo-500');
+                if (result.d !== 1) leftEl.classList.add('fraction');
+
+                rightEl.hidden = true;
+                opEl.hidden = true;
+                
+                // 配列の更新
+                formula.splice(leftIndex, 3, result);
+                items.splice(leftIndex, 3, leftEl);
+            }
+        }
+        
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // --- イベントリスナー ---
+        document.addEventListener('DOMContentLoaded', () => {
+            stages.forEach((_, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `ステージ ${index + 1}`;
+                stageSelect.appendChild(option);
+            });
+            initGame();
+        });
+
+        stageSelect.addEventListener('change', (e) => {
+            currentStageIndex = parseInt(e.target.value);
+            initGame();
+        });
+
+        resetBtn.addEventListener('click', initGame);
+
+    </script>
+</body>
+</html>
+
+
+
