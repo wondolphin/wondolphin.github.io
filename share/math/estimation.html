@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>見積もりゲーム</title>
+    <!-- Tailwind CSSを読み込みます -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* フォントとしてGoogle Fontsの'Inter'と'Noto Sans JP'を使用します */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans JP', 'Inter', sans-serif;
+        }
+        /* ボタンの無効化スタイルを調整します */
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        /* 棒グラフのトランジション */
+        .bar {
+            transition: width 0.5s ease-in-out;
+        }
+        /* SVG内のテキストが選択できないようにします */
+        #area-svg text, #speed-svg text {
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-lg w-full max-w-2xl mx-4">
+        
+        <!-- メニュー画面 -->
+        <div id="menu-screen">
+            <h1 class="text-3xl sm:text-4xl font-bold text-slate-800 text-center mb-8">見積もりゲーム</h1>
+            <p class="text-center text-slate-600 mb-6">プレイするレベルを選択してください。</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button id="easy-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-4 rounded-lg shadow text-lg transition-all duration-200">
+                    初級
+                </button>
+                <button id="medium-btn" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-4 px-4 rounded-lg shadow text-lg transition-all duration-200">
+                    中級
+                </button>
+                <button id="area-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 px-4 rounded-lg shadow text-lg transition-all duration-200">
+                    面積編
+                </button>
+                <button id="speed-btn" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-4 px-4 rounded-lg shadow text-lg transition-all duration-200">
+                    速さ編
+                </button>
+            </div>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <div id="game-screen" class="hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="question-counter" class="text-xl font-bold text-slate-700"></h2>
+                <div id="current-score" class="text-lg font-medium text-slate-500"></div>
+            </div>
+            
+            <!-- 問題エリア -->
+            <div id="problem-area" class="mb-4 min-h-[280px] flex flex-col justify-center items-center">
+                <!-- 初級問題 -->
+                <div id="easy-problem" class="hidden w-full bg-slate-50 border border-slate-200 rounded-lg p-4 text-center">
+                    <p class="text-slate-600">この値の位置を数直線で示してください</p>
+                    <p id="easy-problem-text" class="text-4xl font-bold text-blue-600 mt-2"></p>
+                </div>
+                <!-- 中級問題 -->
+                <div id="medium-problem" class="hidden w-full">
+                    <p class="text-center text-slate-600 mb-4">下の棒は、上の棒の何倍でしょう？</p>
+                    <div class="space-y-3">
+                        <div id="bar1" class="bar h-8 bg-indigo-400 rounded"></div>
+                        <div id="bar2" class="bar h-8 bg-purple-400 rounded"></div>
+                    </div>
+                </div>
+                <!-- 面積編問題 -->
+                <div id="area-problem" class="hidden w-full">
+                     <p class="text-center text-slate-600 mb-2">右の図形の面積は、左の何倍でしょう？</p>
+                     <svg id="area-svg" class="w-full h-64"></svg>
+                </div>
+                <!-- 速さ編問題 -->
+                <div id="speed-problem" class="hidden w-full">
+                     <p class="text-center text-slate-600 mb-2">右の点の速さは、左の何倍でしょう？</p>
+                     <svg id="speed-svg" class="w-full h-64"></svg>
+                </div>
+            </div>
+
+            <!-- 数直線エリア -->
+            <div id="number-line-container" class="mb-6">
+                <div id="number-line-labels" class="relative h-6 text-sm sm:text-base font-semibold text-slate-700"></div>
+                <div id="number-line" class="relative w-full h-3 bg-slate-200 rounded-full mt-2 cursor-pointer group">
+                    <div id="number-line-ticks" class="absolute inset-0"></div>
+                    <div id="user-marker" class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 bg-blue-500 border-4 border-white rounded-full shadow-md hidden"></div>
+                </div>
+            </div>
+
+             <!-- フィードバック表示エリア -->
+            <div id="feedback-area" class="text-center min-h-[80px] mb-4 p-4 rounded-lg transition-opacity duration-300 opacity-0">
+                <p id="feedback-score" class="text-2xl font-bold"></p>
+                <p id="feedback-text" class="text-slate-600 mt-1"></p>
+            </div>
+
+            <!-- 操作ボタンエリア -->
+            <div id="controls" class="flex flex-col sm:flex-row gap-4">
+                <button id="submit-btn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow transition-all duration-200">OK</button>
+                <button id="next-question-btn" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-4 rounded-lg shadow transition-all duration-200 hidden">次へ</button>
+            </div>
+        </div>
+
+        <!-- 結果画面 -->
+        <div id="result-screen" class="hidden text-center">
+            <h1 class="text-3xl font-bold text-slate-800 mb-4">結果発表</h1>
+            <p class="text-lg text-slate-600 mb-6">あなたの合計スコアは...</p>
+            <p id="total-score-text" class="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600 mb-8"></p>
+            <div class="flex flex-col sm:flex-row gap-4">
+                 <button id="retry-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow transition-all duration-200">もういちど</button>
+                 <button id="back-to-menu-btn" class="w-full bg-slate-500 hover:bg-slate-600 text-white font-bold py-3 px-4 rounded-lg shadow transition-all duration-200">メニューへ</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM要素の取得 ---
+        const menuScreen = document.getElementById('menu-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const resultScreen = document.getElementById('result-screen');
+        
+        const easyBtn = document.getElementById('easy-btn');
+        const mediumBtn = document.getElementById('medium-btn');
+        const areaBtn = document.getElementById('area-btn');
+        const speedBtn = document.getElementById('speed-btn');
+        
+        const questionCounter = document.getElementById('question-counter');
+        const currentScoreText = document.getElementById('current-score');
+        
+        const easyProblem = document.getElementById('easy-problem');
+        const easyProblemText = document.getElementById('easy-problem-text');
+        const mediumProblem = document.getElementById('medium-problem');
+        const bar1 = document.getElementById('bar1');
+        const bar2 = document.getElementById('bar2');
+        const areaProblem = document.getElementById('area-problem');
+        const areaSvg = document.getElementById('area-svg');
+        const speedProblem = document.getElementById('speed-problem');
+        const speedSvg = document.getElementById('speed-svg');
+
+        const numberLineContainer = document.getElementById('number-line-container');
+        const numberLineLabels = document.getElementById('number-line-labels');
+        const numberLine = document.getElementById('number-line');
+        const numberLineTicks = document.getElementById('number-line-ticks');
+        const userMarker = document.getElementById('user-marker');
+        
+        const feedbackArea = document.getElementById('feedback-area');
+        const feedbackScore = document.getElementById('feedback-score');
+        const feedbackText = document.getElementById('feedback-text');
+
+        const submitBtn = document.getElementById('submit-btn');
+        const nextQuestionBtn = document.getElementById('next-question-btn');
+        
+        const totalScoreText = document.getElementById('total-score-text');
+        const retryBtn = document.getElementById('retry-btn');
+        const backToMenuBtn = document.getElementById('back-to-menu-btn');
+
+        // --- ゲーム状態管理 ---
+        const QUESTIONS_PER_GAME = 5;
+        let currentLevel = 'easy';
+        let currentQuestionIndex = 0;
+        let totalScore = 0;
+        let problemValue = 0;
+        let userValue = null;
+        let animationFrameId = null;
+
+        // --- 画面切り替え ---
+        function showScreen(screen) {
+            menuScreen.classList.add('hidden');
+            gameScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            document.getElementById(screen).classList.remove('hidden');
+        }
+
+        // --- ゲーム進行 ---
+        function startGame(level) {
+            currentLevel = level;
+            currentQuestionIndex = 0;
+            totalScore = 0;
+            showScreen('game-screen');
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            if (currentQuestionIndex >= QUESTIONS_PER_GAME) {
+                showResult();
+                return;
+            }
+            currentQuestionIndex++;
+            userValue = null;
+
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
+            // UIリセット
+            questionCounter.textContent = `第 ${currentQuestionIndex} / ${QUESTIONS_PER_GAME} 問`;
+            currentScoreText.textContent = `合計スコア: ${totalScore}`;
+            submitBtn.disabled = true;
+            submitBtn.classList.remove('hidden');
+            nextQuestionBtn.classList.add('hidden');
+            userMarker.classList.add('hidden');
+            feedbackArea.classList.add('opacity-0');
+            
+            setupNumberLine(currentLevel);
+            generateProblem(currentLevel);
+        }
+        
+        function showResult() {
+            totalScoreText.textContent = `${totalScore} pt`;
+            showScreen('result-screen');
+        }
+
+        // --- 問題生成と設定 ---
+        function setupNumberLine(level) {
+            numberLineLabels.innerHTML = '';
+            numberLineTicks.innerHTML = '';
+
+            if (level === 'easy') {
+                 numberLineLabels.className = 'flex items-center justify-between relative h-6 text-sm sm:text-base font-semibold text-slate-700';
+                 numberLineLabels.innerHTML = '<span>0</span><span>1</span>';
+            } else { // 中級、面積編、速さ編
+                numberLineLabels.className = 'relative h-6 text-sm sm:text-base font-semibold text-slate-700';
+                for (let i = 0; i <= 10; i++) {
+                    const label = document.createElement('span');
+                    label.textContent = i;
+                    label.className = 'absolute';
+                    label.style.left = `${i * 10}%`;
+                    label.style.transform = 'translateX(-50%)';
+                    numberLineLabels.appendChild(label);
+                    
+                    const tick = document.createElement('div');
+                    tick.className = 'absolute w-px bg-slate-400';
+                    tick.style.left = `${i * 10}%`;
+                    tick.style.top = '-4px';
+                    tick.style.height = '20px';
+                    numberLineTicks.appendChild(tick);
+                }
+            }
+        }
+
+        function generateProblem(level) {
+            document.querySelectorAll('#problem-area > div').forEach(el => el.classList.add('hidden'));
+
+            switch(level) {
+                case 'easy':
+                    easyProblem.classList.remove('hidden');
+                    generateEasyProblem();
+                    break;
+                case 'medium':
+                    mediumProblem.classList.remove('hidden');
+                    generateMediumProblem();
+                    break;
+                case 'area':
+                    areaProblem.classList.remove('hidden');
+                    generateAreaProblem();
+                    break;
+                case 'speed':
+                    speedProblem.classList.remove('hidden');
+                    generateSpeedProblem();
+                    break;
+            }
+        }
+
+        // --- 初級問題 ---
+        function generateEasyProblem() {
+            problemValue = Math.random() * 0.98 + 0.01;
+            const formatType = Math.floor(Math.random() * 3);
+            switch (formatType) {
+                case 0:
+                    easyProblemText.textContent = problemValue.toFixed(2);
+                    problemValue = parseFloat(problemValue.toFixed(2));
+                    break;
+                case 1:
+                    easyProblemText.innerHTML = formatAsFraction(problemValue);
+                    break;
+                case 2:
+                    const percent = Math.round(problemValue * 100);
+                    easyProblemText.textContent = `${percent}%`;
+                    problemValue = percent / 100;
+                    break;
+            }
+        }
+        function formatAsFraction(value) {
+            const d = Math.floor(Math.random() * 291) + 10;
+            let n = Math.round(value * d);
+            if (n === 0) n = 1; if (n === d) n = d - 1;
+            const cd = gcd(n, d);
+            problemValue = (n / cd) / (d / cd);
+            return `<span class="text-3xl">${n/cd}</span><span class="text-xl mx-1">/</span><span class="text-3xl">${d/cd}</span>`;
+        }
+        function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+
+        // --- 中級問題 ---
+        function generateMediumProblem() {
+            problemValue = Math.random() * 8.9 + 1.1; 
+            const bar2Width = Math.random() * 55 + 40; 
+            const bar1Width = bar2Width / problemValue;
+            bar1.style.width = `${bar1Width}%`;
+            bar2.style.width = `${bar2Width}%`;
+        }
+        
+        // --- 面積編問題 ---
+        function generateAreaProblem() {
+            areaSvg.innerHTML = '';
+            const w = 200, h = 192;
+            areaSvg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+            const createRandomShapeData = () => {
+                const isRect = Math.random() < 0.5;
+                if (isRect) {
+                    const rectW = Math.random() * 80 + 40; // 図形を大きく
+                    const rectH = Math.random() * 80 + 40; // 図形を大きく
+                    return { type: 'rect', w: rectW, h: rectH, area: rectW * rectH };
+                } else {
+                    const p1 = { x: 0, y: Math.random() * 80 + 30 }; // 図形を大きく
+                    const p2 = { x: Math.random() * 80 + 30, y: 0 }; // 図形を大きく
+                    const p3 = { x: Math.random() * 80 + 30, y: Math.random() * 80 + 30 }; // 図形を大きく
+                    const area = 0.5 * Math.abs(p1.x*(p2.y-p3.y)+p2.x*(p3.y-p1.y)+p3.x*(p1.y-p2.y));
+                    return { type: 'triangle', p1, p2, p3, area };
+                }
+            };
+
+            let shape1, shape2, ratio;
+            // 左右の図形の面積比が 1倍～10倍 の範囲に収まるまで再生成する
+            do {
+                shape1 = createRandomShapeData();
+                shape2 = createRandomShapeData();
+                if (shape1.area > shape2.area) { // 左が右より大きい場合は入れ替える
+                    [shape1, shape2] = [shape2, shape1];
+                }
+                ratio = shape2.area / shape1.area;
+            } while (ratio < 1 || ratio > 10);
+            
+            problemValue = ratio;
+            
+            const createSVGEl = (tag, attrs) => {
+                const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+                for (const key in attrs) el.setAttribute(key, attrs[key]);
+                return el;
+            };
+
+            const drawShape = (shape, cx, cy, fill) => {
+                let element;
+                if (shape.type === 'rect') {
+                    element = createSVGEl('rect', { x: cx - shape.w/2, y: cy - shape.h/2, width: shape.w, height: shape.h, fill });
+                } else {
+                    const centroid = {
+                        x: (shape.p1.x + shape.p2.x + shape.p3.x) / 3,
+                        y: (shape.p1.y + shape.p2.y + shape.p3.y) / 3
+                    };
+                    const p = (pt) => `${cx + pt.x - centroid.x},${cy + pt.y - centroid.y}`;
+                    const points = `${p(shape.p1)} ${p(shape.p2)} ${p(shape.p3)}`;
+                    element = createSVGEl('polygon', { points, fill });
+                }
+                areaSvg.appendChild(element);
+            };
+
+            drawShape(shape1, w * 0.20, h * 0.5, 'rgb(129 140 248)'); // 間隔を広げる
+            drawShape(shape2, w * 0.80, h * 0.5, 'rgb(245 158 11)'); // 間隔を広げる
+            
+            areaSvg.appendChild(createSVGEl('text', { x: '20%', y: '95%', 'text-anchor': 'middle', 'font-size': '14', fill: '#333', class:'font-bold' , innerHTML: '1' }));
+            areaSvg.appendChild(createSVGEl('text', { x: '80%', y: '95%', 'text-anchor': 'middle', 'font-size': '14', fill: '#333', class:'font-bold' , innerHTML: '?' }));
+        }
+
+        // --- 速さ編問題 ---
+        function generateSpeedProblem() {
+            speedSvg.innerHTML = '';
+            problemValue = Math.random() * 7 + 1; // 比率の最大を8倍に
+            const w = 240, h = 192;
+            const r = 70; // 円の半径を大きく
+            const cx1 = w * 0.15, cy = h * 0.5; // 間隔をさらに広げる
+            const cx2 = w * 0.85; // 間隔をさらに広げる
+            
+            const baseSpeed = Math.random() * 0.00015 + 0.0001; // 左の円の速度をランダム化
+            const speed1 = baseSpeed;
+            const speed2 = baseSpeed * problemValue;
+
+            const createSVGEl = (tag, attrs) => {
+                const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+                for (const key in attrs) el.setAttribute(key, attrs[key]);
+                return el;
+            };
+
+            speedSvg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+            speedSvg.appendChild(createSVGEl('circle', { cx: cx1, cy, r, fill: 'none', stroke: '#999', 'stroke-width': 2 }));
+            speedSvg.appendChild(createSVGEl('circle', { cx: cx2, cy, r, fill: 'none', stroke: '#999', 'stroke-width': 2 }));
+            const dot1 = createSVGEl('circle', { r: 5, fill: 'rgb(236 72 153)'});
+            const dot2 = createSVGEl('circle', { r: 5, fill: 'rgb(236 72 153)'});
+            speedSvg.appendChild(dot1);
+            speedSvg.appendChild(dot2);
+            
+            speedSvg.appendChild(createSVGEl('text', { x: '15%', y: '95%', 'text-anchor': 'middle', 'font-size': '14', fill: '#333', class:'font-bold' , innerHTML: '1' }));
+            speedSvg.appendChild(createSVGEl('text', { x: '85%', y: '95%', 'text-anchor': 'middle', 'font-size': '14', fill: '#333', class:'font-bold' , innerHTML: '?' }));
+
+            let startTime = null;
+            function animate(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const elapsed = timestamp - startTime;
+                
+                const angle1 = elapsed * speed1 * 2 * Math.PI;
+                dot1.setAttribute('cx', cx1 + r * Math.cos(angle1));
+                dot1.setAttribute('cy', cy + r * Math.sin(angle1));
+
+                const angle2 = elapsed * speed2 * 2 * Math.PI;
+                dot2.setAttribute('cx', cx2 + r * Math.cos(angle2));
+                dot2.setAttribute('cy', cy + r * Math.sin(angle2));
+
+                animationFrameId = requestAnimationFrame(animate);
+            }
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // --- ユーザー操作 ---
+        function handleNumberLineClick(e) {
+            const rect = numberLine.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            let positionRatio = Math.max(0, Math.min(1, clickX / rect.width));
+            const max = (currentLevel === 'easy') ? 1 : 10;
+            userValue = positionRatio * max;
+            userMarker.style.left = `${positionRatio * 100}%`;
+            userMarker.classList.remove('hidden');
+            submitBtn.disabled = false;
+        }
+
+        // --- 回答判定 ---
+        function submitAnswer() {
+            if (userValue === null) return;
+            submitBtn.disabled = true;
+
+            const error = Math.abs(userValue - problemValue);
+            let score = 0;
+
+            if (currentLevel === 'easy') {
+                 score = Math.floor(Math.max(0, 100 - (error * 100)));
+            } else {
+                const adjustedError = (error / (problemValue + 2)) * 100;
+                score = Math.floor(Math.max(0, 100 - adjustedError));
+            }
+            
+            totalScore += score;
+            
+            // フィードバック表示
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+
+            feedbackScore.textContent = `${score} pt`;
+            feedbackScore.className = `text-2xl font-bold ${score > 80 ? 'text-green-500' : score > 50 ? 'text-yellow-500' : 'text-red-500'}`;
+            
+            const userDisplay = userValue.toFixed(1);
+            const problemDisplay = problemValue.toFixed(1);
+
+            let feedbackMsg = '';
+            switch(currentLevel) {
+                case 'easy':
+                    feedbackMsg = `あなたの回答: ${(userValue * 100).toFixed(1)}% / 正解: ${(problemValue * 100).toFixed(1)}%`;
+                    break;
+                case 'medium':
+                case 'area':
+                case 'speed':
+                    feedbackMsg = `あなたの回答: ${userDisplay}倍 / 正解: ${problemDisplay}倍`;
+                    break;
+            }
+            feedbackText.textContent = feedbackMsg;
+
+            feedbackArea.classList.remove('opacity-0');
+            currentScoreText.textContent = `合計スコア: ${totalScore}`;
+
+            submitBtn.classList.add('hidden');
+            nextQuestionBtn.classList.remove('hidden');
+        }
+
+        // --- イベントリスナー ---
+        easyBtn.addEventListener('click', () => startGame('easy'));
+        mediumBtn.addEventListener('click', () => startGame('medium'));
+        areaBtn.addEventListener('click', () => startGame('area'));
+        speedBtn.addEventListener('click', () => startGame('speed'));
+        
+        numberLine.addEventListener('click', handleNumberLineClick);
+        submitBtn.addEventListener('click', submitAnswer);
+        nextQuestionBtn.addEventListener('click', nextQuestion);
+        
+        retryBtn.addEventListener('click', () => startGame(currentLevel));
+        backToMenuBtn.addEventListener('click', () => showScreen('menu-screen'));
+    </script>
+</body>
+</html>
+
+
