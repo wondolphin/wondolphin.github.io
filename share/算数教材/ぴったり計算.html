@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ぴったり計算ゲーム</title>
+    <style>
+        /* CSS: サイトの見た目を整えます */
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            text-align: center;
+            background-color: #f0f8ff;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 2em;
+            margin-top: 0;
+        }
+
+        /* 問題選択エリア */
+        #problem-selector {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .problem-button {
+            padding: 10px 15px;
+            font-size: 1em;
+            cursor: pointer;
+            border: 2px solid #bdc3c7;
+            background-color: #fff;
+            color: #34495e;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .problem-button:hover {
+            background-color: #ecf0f1;
+            border-color: #95a5a6;
+        }
+
+        .problem-button.active {
+            background-color: #3498db;
+            color: #fff;
+            border-color: #3498db;
+            font-weight: bold;
+        }
+        
+        #target-display {
+            background-color: #e8f4f8;
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        
+        #target-number {
+            font-size: 3em;
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        #current-display {
+            margin-bottom: 30px;
+        }
+        
+        #current-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #3498db;
+            padding: 5px 15px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            min-width: 100px; /* 数字が変動しても幅を維持 */
+            display: inline-block;
+        }
+        
+        #buttons-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px; /* ボタン間の隙間 */
+            margin-bottom: 30px;
+            min-height: 180px; /* 問題によってボタン数が変わってもレイアウトが崩れないように */
+        }
+
+        .number-button {
+            width: 80px;
+            height: 80px;
+            font-size: 1.5em;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            border-radius: 50%; /* 丸いボタン */
+            background-color: #f1c40f;
+            color: #fff;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0 4px #d4ac0d;
+        }
+
+        .number-button:hover {
+            background-color: #f39c12;
+        }
+        
+        .number-button.negative {
+            background-color: #95a5a6;
+            box-shadow: 0 4px #7f8c8d;
+        }
+
+        .number-button.negative:hover {
+            background-color: #7f8c8d;
+        }
+
+        .number-button.selected {
+            background-color: #2ecc71; /* 選択中の色 */
+            box-shadow: 0 4px #27ae60;
+            transform: translateY(2px); /* 少し沈むアニメーション */
+        }
+        
+        .number-button.selected.negative {
+            background-color: #e74c3c; /* マイナスの選択中の色 */
+            box-shadow: 0 4px #c0392b;
+        }
+
+        #clear-message {
+            font-size: 3em;
+            font-weight: bold;
+            color: #e67e22;
+            display: none; /* 初期状態では非表示 */
+            animation: bounce 0.8s;
+        }
+
+        /* クリアメッセージのアニメーション */
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-30px);
+            }
+            60% {
+                transform: translateY(-15px);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>ぴったり計算ゲーム！</h1>
+
+        <p>問題を選んでね</p>
+        <div id="problem-selector">
+            <!-- 問題選択ボタンはJavaScriptでここに生成されます -->
+        </div>
+
+        <div id="target-display">
+            <p>この数字を目指そう！</p>
+            <div id="target-number"></div>
+        </div>
+
+        <div id="current-display">
+            <p>現在の合計</p>
+            <div id="current-number">0</div>
+        </div>
+
+        <div id="buttons-container">
+            <!-- 数字ボタンはJavaScriptでここに生成されます -->
+        </div>
+
+        <div id="clear-message">クリア！🎉</div>
+    </div>
+
+    <script>
+        // JavaScript: ゲームの動きを作ります
+
+        // --- 問題データ ---
+        const problems = [
+            { title: "問1", target: 20, buttons: [3, 5, 7, 8, -3] },
+            { title: "問2", target: 50, buttons: [10, 15, 20, 25, -5, -10] },
+            { title: "問3", target: 100, buttons: [6, 9, 15, 21, 30, 42, 45, -11, -22] },
+            { title: "問4", target: 77, buttons: [7, 11, 14, 22, 33, 44, -7, -11] },
+            { title: "問5", target: 123, buttons: [1, 10, 100, 2, 20, 200, 3, 30, -10, -2] },
+            { title: "問6", target: 99, buttons: [17, 23, 34, 41, 58, -8, -19, -28] }
+        ];
+
+        // --- グローバル変数 ---
+        let currentProblem = {}; // 現在の問題データを保持
+
+        // --- HTMLの要素を取得 ---
+        const problemSelector = document.getElementById('problem-selector');
+        const targetNumberEl = document.getElementById('target-number');
+        const currentNumberEl = document.getElementById('current-number');
+        const buttonsContainer = document.getElementById('buttons-container');
+        const clearMessageEl = document.getElementById('clear-message');
+
+        // --- 関数定義 ---
+
+        /**
+         * 問題を選択するボタンを生成する関数
+         */
+        function setupProblemSelector() {
+            problems.forEach((problem, index) => {
+                const button = document.createElement('button');
+                button.textContent = problem.title;
+                button.classList.add('problem-button');
+                button.dataset.index = index;
+
+                // 最初の問題に 'active' クラスを付ける
+                if (index === 0) {
+                    button.classList.add('active');
+                }
+
+                button.addEventListener('click', (e) => {
+                    // すべてのボタンから 'active' クラスを削除
+                    document.querySelectorAll('.problem-button').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    // クリックされたボタンに 'active' クラスを追加
+                    e.target.classList.add('active');
+
+                    // 新しい問題でゲームを初期化
+                    initGame(problems[index]);
+                });
+                problemSelector.appendChild(button);
+            });
+        }
+
+        /**
+         * 指定された問題でゲームを初期化する関数
+         * @param {object} problem - 開始する問題のデータ
+         */
+        function initGame(problem) {
+            currentProblem = problem;
+
+            // 表示をリセット
+            targetNumberEl.textContent = currentProblem.target;
+            currentNumberEl.textContent = 0;
+            clearMessageEl.style.display = 'none';
+            
+            // 前の問題のボタンをすべて削除
+            buttonsContainer.innerHTML = '';
+
+            // 新しい問題のボタンを生成
+            currentProblem.buttons.forEach(value => {
+                const button = document.createElement('button');
+                button.classList.add('number-button');
+                button.dataset.value = value;
+                
+                if (value > 0) {
+                    button.textContent = `+${value}`;
+                } else {
+                    button.textContent = value;
+                    button.classList.add('negative');
+                }
+                
+                button.addEventListener('click', () => {
+                    button.classList.toggle('selected');
+                    updateCurrentNumber();
+                });
+                
+                buttonsContainer.appendChild(button);
+            });
+        }
+
+        /**
+         * 現在の合計値を計算して画面を更新する関数
+         */
+        function updateCurrentNumber() {
+            let currentTotal = 0;
+            const selectedButtons = document.querySelectorAll('.number-button.selected');
+            
+            selectedButtons.forEach(button => {
+                currentTotal += parseInt(button.dataset.value, 10);
+            });
+            
+            currentNumberEl.textContent = currentTotal;
+
+            if (currentTotal === currentProblem.target) {
+                clearMessageEl.style.display = 'block';
+            } else {
+                clearMessageEl.style.display = 'none';
+            }
+        }
+
+        // --- 初期化処理 ---
+        
+        // ページが読み込まれたら実行
+        window.onload = () => {
+            setupProblemSelector(); // 問題選択ボタンをセット
+            initGame(problems[0]);  // 最初の問題でゲームを開始
+        };
+
+    </script>
+
+</body>
+</html>

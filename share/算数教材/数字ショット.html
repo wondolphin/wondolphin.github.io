@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>パズルボブル風ゲーム</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: sans-serif;
+            flex-direction: column;
+        }
+        #game-container {
+            position: relative;
+        }
+        canvas {
+            background-color: #fff;
+            border: 2px solid #333;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            display: block;
+        }
+        #controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        #resetButton, #stageSelector {
+            padding: 10px 15px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 8px;
+            border: 2px solid #333;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        #resetButton:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+            50% { transform: scale(1.05); box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4); }
+            100% { transform: scale(1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        }
+        .highlight-button {
+            animation: pulse 1.2s infinite;
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+    <div id="controls">
+        <select id="stageSelector">
+            <option value="0">ステージ 1</option>
+            <option value="1">ステージ 2</option>
+            <option value="2">ステージ 3</option>
+            <option value="3">ステージ 4</option>
+        </select>
+        <button id="resetButton">リセット</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const resetButton = document.getElementById('resetButton');
+        const stageSelector = document.getElementById('stageSelector');
+
+        // --- 設定 ---
+        const GAME_AREA_WIDTH = 300;
+        const GAME_AREA_HEIGHT = 600;
+        const BALL_RADIUS = GAME_AREA_WIDTH / 8;
+        const BALL_SPEED = 15;
+        const SPECIAL_COLOR_FOR_1 = '#eeeeee';
+        const BALL_COLORS = [
+            '#e74c3c', '#8e44ad', '#3498db', '#1abc9c', '#f1c40f', '#e67e22', 
+            '#2ecc71', '#9b59b6', '#34495e', '#16a085', '#d35400', '#c0392b'
+        ];
+
+        // --- ステージデータ ---
+        const STAGES = [
+            { // Stage 1
+                layout: [ [0,6,35,0], [3,7,2,5], [21,0,0,10] ],
+                shooterSequence: [2, 3, 5, 7]
+            },
+            { // Stage 2
+                layout: [  [5, 4, 9, 7], [10, 6, 21], [2, 15, 14, 3]  ],
+                shooterSequence: [5,7,3,2,3,2]
+            },
+            { // Stage 3
+                layout: [  [24,5,9], [0], [18,3,20]  ],
+                shooterSequence: [3,4,6,5,3]
+            },
+            { // Stage 4
+                layout: [ [7, 8, 9, 10], [12, 14, 15, 16], [20, 21, 24, 25], [27, 28, 30, 32] ],
+                shooterSequence: [2, 3, 4, 5, 6, 7, 8]
+            }
+        ];
+
+        // --- 変数 ---
+        let ball; 
+        let fixedBalls = []; 
+        let isDragging = false;
+        let trajectory = [];
+        let shooterSequence = []; // ステージごとに設定
+        let shooterIndex = 0;
+        let currentStageIndex = 0;
+        let isGameClear = false;
+        let isGameOver = false;
+
+        function getBallColor(number) {
+            if (number === 1) return SPECIAL_COLOR_FOR_1;
+            return BALL_COLORS[(number - 2 + BALL_COLORS.length) % BALL_COLORS.length];
+        }
+        
+        class Ball {
+            constructor(x, y, radius, color, number) {
+                this.x = x; this.y = y; this.radius = radius;
+                this.color = color; this.number = number;
+                this.vx = 0; this.vy = 0; this.isMoving = false;
+                this.passedBalls = new Set();
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.closePath();
+                
+                ctx.fillStyle = this.number === 1 ? '#333' : '#fff';
+                ctx.font = `bold ${this.radius * 0.8}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.number, this.x, this.y);
+            }
+
+            update() {
+                if (!this.isMoving) return;
+                this.x += this.vx; this.y += this.vy;
+
+                if (this.x - this.radius <= 0 || this.x + this.radius >= GAME_AREA_WIDTH) {
+                    this.vx *= -1;
+                    if (this.x - this.radius <= 0) this.x = this.radius;
+                    if (this.x + this.radius >= GAME_AREA_WIDTH) this.x = GAME_AREA_WIDTH - this.radius;
+                }
+                
+                if (this.y - this.radius <= 0) {
+                    resetBall(); return;
+                }
+
+                for (const fixedBall of fixedBalls) {
+                    if (this.passedBalls.has(fixedBall)) continue;
+                    const dist = Math.sqrt((this.x - fixedBall.x)**2 + (this.y - fixedBall.y)**2);
+
+                    if (dist < fixedBall.radius) {
+                        if (fixedBall.number > 1 && fixedBall.number % this.number === 0) {
+                            fixedBall.number /= this.number;
+                            fixedBall.color = getBallColor(fixedBall.number);
+                            checkGameClear();
+                        }
+                        this.passedBalls.add(fixedBall);
+                    }
+                }
+            }
+        }
+        
+        function setup() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = GAME_AREA_WIDTH * dpr; canvas.height = GAME_AREA_HEIGHT * dpr;
+            canvas.style.width = `${GAME_AREA_WIDTH}px`; canvas.style.height = `${GAME_AREA_HEIGHT}px`;
+            ctx.scale(dpr, dpr);
+            
+            resetGame();
+            addEventListeners();
+            gameLoop();
+        }
+
+        function resetGame() {
+            isGameClear = false;
+            isGameOver = false;
+            shooterIndex = 0;
+            resetButton.classList.remove('highlight-button');
+            
+            // 現在のステージの手玉シーケンスをセット
+            shooterSequence = STAGES[currentStageIndex].shooterSequence;
+
+            createLevel(currentStageIndex);
+            resetBall();
+        }
+        
+        function createLevel(stageIndex) {
+            fixedBalls = [];
+            const layout = STAGES[stageIndex].layout;
+
+            layout.forEach((row, rowIndex) => {
+                const y = BALL_RADIUS + (BALL_RADIUS * 2 * rowIndex);
+                const ballCount = row.filter(num => num > 0).length;
+                const rowWidth = ballCount * BALL_RADIUS * 2;
+                const paddingX = (GAME_AREA_WIDTH - rowWidth) / 2;
+                
+                let currentBall = 0;
+                row.forEach((num) => {
+                    if (num > 0) {
+                        const x = paddingX + BALL_RADIUS + currentBall * BALL_RADIUS * 2;
+                        fixedBalls.push(new Ball(x, y, BALL_RADIUS, getBallColor(num), num));
+                        currentBall++;
+                    }
+                });
+            });
+        }
+
+        function resetBall() {
+            if (shooterIndex >= shooterSequence.length) {
+                ball = null;
+                if(!isGameClear) {
+                    isGameOver = true;
+                    resetButton.classList.add('highlight-button');
+                }
+                return;
+            }
+            const initialX = GAME_AREA_WIDTH / 2;
+            const initialY = GAME_AREA_HEIGHT - 120;
+            const number = shooterSequence[shooterIndex];
+            shooterIndex++;
+            ball = new Ball(initialX, initialY, BALL_RADIUS, getBallColor(number), number);
+        }
+
+        function checkGameClear() {
+            const isAllOne = fixedBalls.every(b => b.number === 1);
+            if (isAllOne) {
+                isGameClear = true;
+                ball = null;
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, GAME_AREA_WIDTH, GAME_AREA_HEIGHT);
+            fixedBalls.forEach(b => b.draw());
+            
+            if (ball) {
+                ball.update();
+                if (ball) {
+                    ball.draw();
+                }
+            }
+
+            if (isDragging && ball && !ball.isMoving) drawTrajectory();
+            
+            if (!isGameClear) {
+                drawNextBalls();
+            }
+            
+            if (isGameClear) drawEndScreen("CLEAR!");
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function drawNextBalls() {
+            ctx.save();
+            ctx.font = '14px sans-serif'; ctx.fillStyle = '#555';
+            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            const textY = GAME_AREA_HEIGHT - 45;
+            ctx.fillText('Next:', 10, textY);
+
+            const nextBallsToShow = 5;
+            for (let i = 0; i < nextBallsToShow; i++) {
+                const nextIndex = shooterIndex + i;
+                if (nextIndex >= shooterSequence.length) break;
+
+                const number = shooterSequence[nextIndex];
+                const x = 70 + i * 40;
+                const y = textY;
+                const radius = 16;
+
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = getBallColor(number);
+                ctx.fill();
+                ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5; ctx.stroke();
+                ctx.closePath();
+
+                ctx.fillStyle = number === 1 ? '#333' : '#fff';
+                ctx.font = `bold ${radius * 0.9}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText(number, x, y);
+            }
+            ctx.restore();
+        }
+
+        function drawEndScreen(message) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, GAME_AREA_WIDTH, GAME_AREA_HEIGHT);
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 60px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(message, GAME_AREA_WIDTH / 2, GAME_AREA_HEIGHT / 2);
+            ctx.restore();
+        }
+        
+        function addEventListeners() {
+            resetButton.addEventListener('click', resetGame);
+            stageSelector.addEventListener('change', (e) => {
+                currentStageIndex = parseInt(e.target.value, 10);
+                resetGame();
+            });
+
+            canvas.addEventListener('mousedown', onDragStart);
+            canvas.addEventListener('mousemove', onDragging);
+            window.addEventListener('mouseup', onDragEnd);
+            canvas.addEventListener('touchstart', onDragStart, { passive: false });
+            canvas.addEventListener('touchmove', onDragging, { passive: false });
+            window.addEventListener('touchend', onDragEnd);
+        }
+        
+        function getEventPosition(event) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function onDragStart(event) {
+            event.preventDefault();
+            if (!ball || ball.isMoving || isGameClear || isGameOver) return;
+            const pos = getEventPosition(event);
+            const dist = Math.sqrt((pos.x - ball.x)**2 + (pos.y - ball.y)**2);
+            if (dist < ball.radius) {
+                 isDragging = true;
+                 calculateTrajectory(pos);
+            }
+        }
+
+        function onDragging(event) {
+            event.preventDefault();
+            if (isDragging) calculateTrajectory(getEventPosition(event));
+        }
+
+        function onDragEnd(event) {
+            if (isDragging) {
+                event.preventDefault();
+                isDragging = false;
+                if (ball && trajectory.length > 1 && trajectory[0].y > trajectory[1].y) {
+                    const firstSegment = trajectory[1], startPoint = trajectory[0];
+                    const dx = firstSegment.x - startPoint.x, dy = firstSegment.y - startPoint.y;
+                    const magnitude = Math.sqrt(dx * dx + dy * dy);
+                    if (magnitude > 0) {
+                        ball.vx = (dx / magnitude) * BALL_SPEED;
+                        ball.vy = (dy / magnitude) * BALL_SPEED;
+                        ball.isMoving = true;
+                    }
+                }
+                trajectory = [];
+            }
+        }
+        
+        function calculateTrajectory(dragPos) {
+            trajectory = [];
+            if (!ball) return;
+            const dx = ball.x - dragPos.x, dy = ball.y - dragPos.y;
+            if (dy > 0) return;
+            const magnitude = Math.sqrt(dx * dx + dy * dy);
+            if (magnitude === 0) return;
+
+            let simBall = {
+                x: ball.x, y: ball.y,
+                vx: (dx / magnitude) * BALL_SPEED, vy: (dy / magnitude) * BALL_SPEED
+            };
+            trajectory.push({ x: simBall.x, y: simBall.y });
+
+            for (let i = 0; i < 150; i++) {
+                simBall.x += simBall.vx; simBall.y += simBall.vy;
+                if (simBall.x - BALL_RADIUS <= 0 || simBall.x + BALL_RADIUS >= GAME_AREA_WIDTH) {
+                    simBall.vx *= -1;
+                    trajectory.push({ x: simBall.x, y: simBall.y });
+                }
+                if (simBall.y - BALL_RADIUS <= 0) {
+                    trajectory.push({ x: simBall.x, y: BALL_RADIUS });
+                    break;
+                }
+            }
+        }
+        
+        function drawTrajectory() {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            if (trajectory.length > 0) {
+                ctx.moveTo(trajectory[0].x, trajectory[0].y);
+                trajectory.forEach(p => ctx.lineTo(p.x, p.y));
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        setup();
+    </script>
+</body>
+</html>
+

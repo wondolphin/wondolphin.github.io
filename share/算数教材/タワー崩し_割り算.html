@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>割り算ブロック崩し</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=M+PLUS+Rounded+1c:wght@700&display=swap" rel="stylesheet">
+    <style>
+        /* カスタムスタイル */
+        body {
+            font-family: 'Inter', 'M PLUS Rounded 1c', sans-serif;
+            touch-action: manipulation; /* ダブルタップによるズームを無効化 */
+        }
+        .lane-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: space-around;
+            padding: 1rem 0.5rem;
+            gap: 0.5rem;
+            position: relative;
+        }
+        .lane {
+            display: flex;
+            flex-direction: column;
+            width: 23%;
+            height: 100%;
+            background-color: #f0f4f8;
+            border-radius: 0.75rem;
+            position: relative;
+            padding-top: 5rem; /* ブロックのスペースを確保 */
+            overflow: hidden;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .lane:hover {
+            background-color: #e2e8f0;
+        }
+        .block {
+            position: absolute;
+            top: 0.75rem;
+            width: 80%;
+            left: 10%;
+            padding: 0.75rem 0.5rem;
+            border-radius: 0.5rem;
+            font-weight: 700;
+            text-align: center;
+            color: white;
+            background: linear-gradient(145deg, #4a5568, #2d3748);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            font-size: 1.25rem;
+            z-index: 10;
+        }
+        .numbers-stack {
+            display: flex;
+            flex-direction: column-reverse; /* 上から0,1,2..とデータを持つが、表示は下から積む */
+            gap: 2px;
+            padding: 0.5rem;
+            width: 100%;
+            height: 100%;
+        }
+        .number-slot {
+            height: 10%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            font-size: 1rem;
+            padding: 0 2px;
+            transition: background-color 0.3s, opacity 0.3s;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        .number-slot.filled {
+             background-color: #4299e1;
+             box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        .flying-item.invalid {
+            background-color: #ef4444; /* red-500 */
+        }
+    </style>
+</head>
+<body class="bg-gray-200 text-gray-800 flex flex-col h-screen select-none">
+
+    <!-- スタート画面 -->
+    <div id="start-screen" class="flex flex-col items-center justify-center h-full w-full max-w-2xl mx-auto bg-white shadow-lg p-8">
+        <h1 class="text-4xl font-bold mb-8">割り算ブロック崩し</h1>
+        <p class="mb-8 text-lg">難易度を選択してください</p>
+        <div class="flex gap-4">
+            <button id="beginner-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-lg text-2xl">初級</button>
+            <button id="advanced-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-lg text-2xl">上級</button>
+        </div>
+    </div>
+
+    <!-- ゲーム画面全体 (最初は非表示) -->
+    <div id="game-container" class="hidden relative flex flex-col h-full w-full max-w-2xl mx-auto bg-white shadow-lg">
+        <!-- 4つのレーン -->
+        <div id="lanes-container" class="lane-container">
+            <!-- レーンはJavaScriptで生成されます -->
+        </div>
+
+        <!-- 操作パネル -->
+        <div id="controls" class="flex items-center justify-between p-4 bg-gray-100 border-t border-gray-300">
+            <!-- Left: Next Number -->
+            <div class="text-center w-28">
+                <p class="text-xs text-gray-500">NEXT</p>
+                <div id="next-number" class="w-14 h-14 bg-gray-300 text-gray-700 flex items-center justify-center rounded-md font-bold text-2xl transition-all mx-auto"></div>
+            </div>
+
+            <!-- Center: Current Number -->
+            <div class="text-center">
+                <p class="text-xs text-gray-500">配置する数字</p>
+                <div id="current-number" class="w-20 h-20 bg-blue-500 text-white flex items-center justify-center rounded-lg shadow-md font-bold text-3xl transition-all mx-auto"></div>
+            </div>
+
+            <!-- Right: Go Button -->
+            <div class="w-28 flex justify-end">
+                <button id="go-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-lg shadow-lg transform transition active:scale-95 text-2xl">
+                    Go!
+                </button>
+            </div>
+        </div>
+        
+        <!-- 結果表示モーダル -->
+        <div id="result-modal" class="hidden absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
+            <div class="bg-white p-8 rounded-lg shadow-2xl text-center">
+                <h2 class="text-4xl font-bold mb-4 text-yellow-500">Game Clear!</h2>
+                <p class="text-2xl mb-4">得点: <span id="score-result" class="font-bold text-blue-600">0</span></p>
+                <p class="text-lg mb-2">発射回数: <span id="go-count-result" class="font-bold">0</span></p>
+                <p class="text-lg mb-6">効果がなかった回数: <span id="ineffective-count-result" class="font-bold">0</span></p>
+                <button id="restart-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-xl">
+                    もう一度プレイ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const startScreen = document.getElementById('start-screen');
+            const gameContainer = document.getElementById('game-container');
+            const beginnerButton = document.getElementById('beginner-button');
+            const advancedButton = document.getElementById('advanced-button');
+
+            const lanesContainer = document.getElementById('lanes-container');
+            const currentNumberEl = document.getElementById('current-number');
+            const nextNumberEl = document.getElementById('next-number');
+            const goButton = document.getElementById('go-button');
+            
+            const resultModal = document.getElementById('result-modal');
+            const goCountResultEl = document.getElementById('go-count-result');
+            const ineffectiveCountResultEl = document.getElementById('ineffective-count-result');
+            const scoreResultEl = document.getElementById('score-result');
+            const restartButton = document.getElementById('restart-button');
+
+            const LANE_COUNT = 4;
+            const LANE_CAPACITY = 10;
+            let blocks, currentNumber, nextNumber, goCount, lanesData, isProcessing, gameMode;
+            let numberSequence, sequenceIndex, ineffectiveCount, recycledFactorsQueue;
+
+            const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+            
+            // ゲームの初期設定を生成する関数
+            function generateGameSetup(mode) {
+                const newBlocks = [];
+                let allFactors = [];
+
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    let product = 1;
+                    const factors = [];
+
+                    if (mode === 'advanced') {
+                        // 上級：11以上19以下の数字を1つ選択
+                        const primeLike = getRandomInt(11, 19);
+                        product *= primeLike;
+                        factors.push(primeLike);
+
+                        // 上級：2以上10以下の数字を3〜5つ選択
+                        const numSmallFactors = getRandomInt(3, 5);
+                        for (let j = 0; j < numSmallFactors; j++) {
+                            const factor = getRandomInt(2, 10);
+                            // 積が4桁を超えないようにする
+                            if (product * factor <= 9999) {
+                                product *= factor;
+                                factors.push(factor);
+                            }
+                        }
+                    } else { // 初級
+                        // 初級：2以上9以下の因数を3から5個かけ合わせる
+                        const numFactors = getRandomInt(3, 5);
+                        for (let j = 0; j < numFactors; j++) {
+                            const factor = getRandomInt(2, 9);
+                            // 積が3桁を超えないようにする
+                            if (product * factor <= 999) {
+                                product *= factor;
+                                factors.push(factor);
+                            }
+                        }
+                        // productが1のままの事故を防ぐ
+                        if (product === 1) {
+                            product = getRandomInt(2,9) * getRandomInt(2,9) * getRandomInt(2,9);
+                        }
+                    }
+                    newBlocks.push(product);
+                    allFactors.push(...factors);
+                }
+
+                // 全ての因数をシャッフル
+                for (let i = allFactors.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [allFactors[i], allFactors[j]] = [allFactors[j], allFactors[i]];
+                }
+
+                return { blocks: newBlocks, sequence: allFactors };
+            }
+
+            // 数値を素因数分解するヘルパー関数
+            function getPrimeFactors(num) {
+                const factors = [];
+                let divisor = 2;
+                if (num <= 1) return [];
+                while (num >= 2) {
+                    if (num % divisor === 0) {
+                        factors.push(divisor);
+                        num = num / divisor;
+                    } else {
+                        divisor++;
+                    }
+                }
+                return factors;
+            }
+
+            // 次に配置する数字を取得する関数
+            function getNextNumber() {
+                let num;
+                // 優先度1: 初期の数字シーケンス
+                if (sequenceIndex < numberSequence.length) {
+                    num = numberSequence[sequenceIndex];
+                    sequenceIndex++;
+                    return { text: num.toString(), value: num };
+                }
+
+                // 優先度2: 効果のなかった数字から作られた因数キュー
+                if (recycledFactorsQueue.length > 0) {
+                    num = recycledFactorsQueue.shift(); // キューの先頭から取り出す
+                    return { text: num.toString(), value: num };
+                }
+
+                // 優先度3: 現在のブロックを解決するために必要な因数
+                const neededFactors = [];
+                blocks.forEach(blockValue => {
+                    if (blockValue > 1) {
+                        neededFactors.push(...getPrimeFactors(blockValue));
+                    }
+                });
+
+                if (neededFactors.length > 0) {
+                    num = neededFactors[getRandomInt(0, neededFactors.length - 1)];
+                    return { text: num.toString(), value: num };
+                }
+                
+                // 最終手段: ランダムな数字
+                num = getRandomInt(2, 20);
+                return { text: num.toString(), value: num };
+            }
+
+
+            function startGame(mode) {
+                gameMode = mode;
+                startScreen.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
+                initializeGame();
+            }
+
+            function initializeGame() {
+                lanesContainer.innerHTML = '';
+                
+                const gameData = generateGameSetup(gameMode);
+                blocks = gameData.blocks;
+                numberSequence = gameData.sequence;
+                sequenceIndex = 0;
+                recycledFactorsQueue = []; // 因数キューを初期化
+
+                lanesData = Array.from({ length: LANE_COUNT }, () => Array(LANE_CAPACITY).fill(null));
+                ineffectiveCount = 0;
+                goCount = 0;
+                isProcessing = false;
+                goButton.disabled = false;
+                resultModal.classList.add('hidden');
+                
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    const lane = document.createElement('div');
+                    lane.className = 'lane';
+                    lane.dataset.laneIndex = i;
+                    lane.addEventListener('click', () => handleLaneClick(i));
+
+                    const block = document.createElement('div');
+                    block.className = 'block';
+                    block.id = `block-${i}`;
+                    
+                    const numbersStack = document.createElement('div');
+                    numbersStack.className = 'numbers-stack';
+                    numbersStack.id = `stack-${i}`;
+                    
+                    for (let j = 0; j < LANE_CAPACITY; j++) {
+                        const slot = document.createElement('div');
+                        slot.className = 'number-slot';
+                        slot.dataset.rowIndex = j;
+                        numbersStack.appendChild(slot);
+                    }
+                    
+                    lane.appendChild(block);
+                    lane.appendChild(numbersStack);
+                    lanesContainer.appendChild(lane);
+                }
+                
+                currentNumber = getNextNumber();
+                nextNumber = getNextNumber();
+
+                updateUI();
+                renderAllLanes();
+            }
+            
+            function renderAllLanes() {
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    const stack = document.getElementById(`stack-${i}`);
+                    for (let j = 0; j < LANE_CAPACITY; j++) {
+                        const slot = stack.querySelector(`[data-row-index='${j}']`);
+                        const data = lanesData[i][j];
+                        if (data) {
+                            slot.textContent = data.text;
+                            slot.classList.add('filled');
+                        } else {
+                            slot.textContent = '';
+                            slot.classList.remove('filled');
+                        }
+                    }
+                }
+            }
+
+            function updateUI() {
+                blocks.forEach((value, index) => {
+                    document.getElementById(`block-${index}`).textContent = value;
+                });
+                currentNumberEl.textContent = currentNumber.text;
+                nextNumberEl.textContent = nextNumber.text;
+            }
+            
+            function isGameEnd() {
+                return blocks.every(value => value === 1);
+            }
+            
+            function showResults() {
+                // スコア計算: 1000 - (発射回数-1) * 70 - 効果がなかった回数 * 100
+                const goPenalty = Math.max(0, goCount - 1) * 70;
+                const ineffectivePenalty = ineffectiveCount * 100;
+                let score = Math.max(0, 1000 - goPenalty - ineffectivePenalty);
+                
+                scoreResultEl.textContent = Math.round(score);
+                goCountResultEl.textContent = goCount;
+                ineffectiveCountResultEl.textContent = ineffectiveCount;
+                resultModal.classList.remove('hidden');
+            }
+
+            function handleLaneClick(laneIndex) {
+                if (!currentNumber || isProcessing) return;
+
+                // レーンに空きがあるかチェック
+                const emptySlotIndex = lanesData[laneIndex].findIndex(slot => slot === null);
+                if (emptySlotIndex === -1) {
+                    // レーンが満杯
+                    return;
+                }
+
+                lanesData[laneIndex][emptySlotIndex] = currentNumber;
+                
+                currentNumber = nextNumber;
+                nextNumber = getNextNumber();
+                
+                renderAllLanes();
+                updateUI();
+            }
+
+            async function handleGoButtonClick() {
+                if (isProcessing) return;
+                isProcessing = true;
+                goButton.disabled = true;
+                goCount++;
+
+                const numbersToLaunch = [];
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    for(let j=0; j < LANE_CAPACITY; j++){
+                        if(lanesData[i][j]){
+                            numbersToLaunch.push({ laneIndex: i, rowIndex: j, number: lanesData[i][j] });
+                        }
+                    }
+                }
+
+                if (numbersToLaunch.length === 0) {
+                    goCount--;
+                    goButton.disabled = false;
+                    isProcessing = false;
+                    return;
+                }
+
+                // --- 計算ロジック ---
+                let tempBlocks = [...blocks];
+                const animationPlan = [];
+                
+                const launchesByLane = numbersToLaunch.reduce((acc, launch) => {
+                    if (!acc[launch.laneIndex]) acc[launch.laneIndex] = [];
+                    acc[launch.laneIndex].push(launch);
+                    return acc;
+                }, {});
+
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    if (launchesByLane[i]) {
+                        // rowIndexが小さい順（下から）に処理
+                        launchesByLane[i].sort((a, b) => a.rowIndex - b.rowIndex); 
+                        
+                        for (const launch of launchesByLane[i]) {
+                            const isDivisible = tempBlocks[i] % launch.number.value === 0;
+                            animationPlan.push({ ...launch, isDivisible });
+                            if (isDivisible) {
+                                tempBlocks[i] /= launch.number.value;
+                            } else {
+                                ineffectiveCount++;
+                                // 効果がなかった場合、素因数分解してキューに追加
+                                const factors = getPrimeFactors(launch.number.value);
+                                if (factors.length > 0) {
+                                    recycledFactorsQueue.push(...factors);
+                                }
+                            }
+                        }
+                    }
+                }
+                blocks = tempBlocks;
+                // --- 計算ロジックここまで ---
+
+                await animateLaunches(animationPlan);
+                
+                lanesData = Array.from({ length: LANE_COUNT }, () => Array(LANE_CAPACITY).fill(null));
+                
+                renderAllLanes();
+
+                if(!isGameEnd()){
+                    goButton.disabled = false;
+                }
+                isProcessing = false;
+            }
+
+            function animateLaunches(animationPlan) {
+                return new Promise(resolve => {
+                    const animationDuration = 700;
+                    if (animationPlan.length === 0) {
+                        resolve(); return;
+                    }
+                    
+                    let animationsCompleted = 0;
+
+                    animationPlan.forEach(({ laneIndex, rowIndex, number, isDivisible }) => {
+                        const stack = document.getElementById(`stack-${laneIndex}`);
+                        const slot = stack.querySelector(`[data-row-index='${rowIndex}']`);
+                        
+                        slot.textContent = '';
+                        slot.classList.remove('filled');
+
+                        const flyingItem = document.createElement('div');
+                        flyingItem.className = 'number-slot filled flying-item';
+                        flyingItem.textContent = number.text;
+                        if(!isDivisible) {
+                             flyingItem.classList.add('invalid');
+                        }
+                        
+                        const slotRect = slot.getBoundingClientRect();
+                        const containerRect = lanesContainer.getBoundingClientRect();
+                        
+                        flyingItem.style.position = 'absolute';
+                        flyingItem.style.left = `${slotRect.left - containerRect.left}px`;
+                        flyingItem.style.top = `${slotRect.top - containerRect.top}px`;
+                        flyingItem.style.width = `${slotRect.width}px`;
+                        flyingItem.style.height = `${slotRect.height}px`;
+                        lanesContainer.appendChild(flyingItem);
+
+                        const opacityDuration = 100;
+                        const opacityDelay = animationDuration - opacityDuration;
+                        flyingItem.style.transition = `transform ${animationDuration / 1000}s linear, opacity ${opacityDuration / 1000}s ${opacityDelay / 1000}s`;
+
+                        requestAnimationFrame(() => {
+                            const blockEl = document.getElementById(`block-${laneIndex}`);
+                            const blockRect = blockEl.getBoundingClientRect();
+                            const targetY = blockRect.bottom - containerRect.top;
+                            const travelY = slotRect.top - containerRect.top - targetY;
+                            flyingItem.style.transform = `translateY(-${travelY}px)`;
+                            flyingItem.style.opacity = '0';
+                        });
+
+                        setTimeout(() => {
+                            flyingItem.remove();
+                            animationsCompleted++;
+                            if (animationsCompleted === animationPlan.length) {
+                                updateUI();
+                                if (isGameEnd() && resultModal.classList.contains('hidden')) {
+                                    showResults();
+                                }
+                                resolve();
+                            }
+                        }, animationDuration);
+                    });
+                });
+            }
+
+            beginnerButton.addEventListener('click', () => startGame('beginner'));
+            advancedButton.addEventListener('click', () => startGame('advanced'));
+            goButton.addEventListener('click', handleGoButtonClick);
+            restartButton.addEventListener('click', () => {
+                resultModal.classList.add('hidden');
+                gameContainer.classList.add('hidden');
+                startScreen.classList.remove('hidden');
+            });
+        });
+    </script>
+</body>
+</html>
+

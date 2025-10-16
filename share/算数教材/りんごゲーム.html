@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>りんご落下ゲーム</title>
+    <!-- Tailwind CSSを読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 物理エンジン Matter.js を読み込み -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        /* ページの背景色とフォントを設定 */
+        body {
+            font-family: 'Inter', 'Helvetica Neue', 'Arial', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* canvasが親要素のサイズいっぱいに広がるように設定 */
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md mx-auto">
+        <!-- レベル選択画面 -->
+        <div id="level-selection-screen">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">レベルを選択してください</h1>
+            <div class="grid grid-cols-1 gap-4">
+                <button data-level="0" class="level-select-button text-xl w-full h-20 bg-blue-500 text-white font-bold rounded-lg shadow-md hover:bg-blue-600 transition-transform transform hover:scale-105">レベル 1</button>
+                <button data-level="1" class="level-select-button text-xl w-full h-20 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 transition-transform transform hover:scale-105">レベル 2</button>
+                <button data-level="2" class="level-select-button text-xl w-full h-20 bg-purple-500 text-white font-bold rounded-lg shadow-md hover:bg-purple-600 transition-transform transform hover:scale-105">レベル 3</button>
+            </div>
+        </div>
+
+        <!-- ゲーム画面 (最初は非表示) -->
+        <div id="game-screen" class="hidden">
+            <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">りんご落下ゲーム</h1>
+            
+            <!-- 状態表示エリア -->
+            <div class="w-full flex justify-between items-center mb-4 px-2">
+                <!-- 残り回数ランプ -->
+                <div class="flex items-center gap-2 bg-gray-200 p-2 rounded-full shadow-inner">
+                    <div id="press-lamps" class="flex gap-1.5"></div>
+                </div>
+                
+                <!-- 目標数 -->
+                <div id="target-display" class="flex gap-2 bg-amber-100 border-2 border-amber-400 rounded-lg px-4 py-1 shadow"></div>
+
+                <!-- 合計数 -->
+                <div id="total-display"></div>
+            </div>
+
+            <!-- アニメーションが表示されるコンテナ -->
+            <div id="canvas-container" class="relative w-full h-96 bg-white border-2 border-gray-300 rounded-lg shadow-inner overflow-hidden">
+                 <!-- ゲーム結果表示モーダル -->
+                 <div id="result-modal" class="hidden absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-10 p-4">
+                    <div class="bg-white p-8 rounded-2xl shadow-xl text-center transform transition-all scale-95" id="result-card">
+                        <h2 id="result-message" class="text-4xl font-bold mb-4"></h2>
+                        <p id="result-details" class="text-lg text-gray-600 mb-6"></p>
+                        <div class="flex flex-col gap-4">
+                            <button id="play-again-button" class="px-8 py-3 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 transition-transform transform hover:scale-105">
+                                このレベルをもう一度
+                            </button>
+                             <button id="back-to-level-select" class="px-8 py-3 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition-transform transform hover:scale-105">
+                                レベル選択に戻る
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作ボタン -->
+            <div id="action-buttons" class="flex justify-center gap-4 mt-6"></div>
+            
+            <div class="text-center mt-4">
+                <button id="level-select-return-button" class="px-4 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600">レベル選択に戻る</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const { Engine, Render, Runner, World, Bodies } = Matter;
+
+            // DOM要素
+            const levelSelectionScreen = document.getElementById('level-selection-screen');
+            const gameScreen = document.getElementById('game-screen');
+            const levelSelectButtons = document.querySelectorAll('.level-select-button');
+            const container = document.getElementById('canvas-container');
+            const pressLampsContainer = document.getElementById('press-lamps');
+            const targetDisplay = document.getElementById('target-display');
+            const totalDisplay = document.getElementById('total-display');
+            const actionButtonsContainer = document.getElementById('action-buttons');
+            const resultModal = document.getElementById('result-modal');
+            const resultCard = document.getElementById('result-card');
+            const resultMessage = document.getElementById('result-message');
+            const resultDetails = document.getElementById('result-details');
+            const playAgainButton = document.getElementById('play-again-button');
+            const backToLevelSelectButton = document.getElementById('back-to-level-select');
+            const levelSelectReturnButton = document.getElementById('level-select-return-button');
+
+            // ゲーム設定
+            const levels = [
+                { // Level 1
+                    maxPresses: 6,
+                    targets: { apple: 14 },
+                    buttons: [ { apple: 3 }, { apple: 2 } ]
+                },
+                { // Level 2
+                    maxPresses: 6,
+                    targets: { apple: 20 },
+                    buttons: [ { apple: 1 }, { apple: 2 }, { apple: 5 } ]
+                },
+                { // Level 3
+                    maxPresses: 6,
+                    targets: { apple: 9, grape: 10 },
+                    buttons: [ { apple: 1, grape: 2 }, { apple: 2, grape: 2 }, { apple: 3 } ]
+                }
+            ];
+            
+            // ゲームの状態
+            let engine, render, runner;
+            let currentLevelIndex;
+            let pressCount;
+            let totals;
+            
+            // SVG定義
+            const appleSVG = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><radialGradient id="grad1" cx="40%" cy="40%" r="60%" fx="40%" fy="40%"><stop offset="0%" style="stop-color:rgb(255,255,255);stop-opacity:0.5" /><stop offset="100%" style="stop-color:rgb(255,255,255);stop-opacity:0" /></radialGradient></defs><path d="M 85,40 C 85,65 65,85 50,85 C 35,85 15,65 15,40 C 15,25 25,15 40,15 C 45,15 48,10 50,5 C 52,10 55,15 60,15 C 75,15 85,25 85,40 Z" fill="#dd2e44"/><path d="M 50,5 C 52,15 55,20 60,18 C 65,16 70,10 70,5" fill="#6a4725"/><path d="M 65,10 C 75,0 85,5 80,15 Z" fill="#3c8a41"/><circle cx="45" cy="45" r="30" fill="url(#grad1)" /></svg>`)}`;
+            const grapeSVG = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><radialGradient id="gradX" cx="40%" cy="40%" r="60%" fx="40%" fy="40%"><stop offset="0%" style="stop-color:rgb(255,255,255);stop-opacity:0.5" /><stop offset="100%" style="stop-color:rgb(255,255,255);stop-opacity:0" /></radialGradient></defs><path d="M 80,55 C 80,75 65,90 50,90 C 35,90 20,75 20,55 C 20,35 35,20 50,20 C 65,20 80,35 80,55 Z" fill="#8e44ad"/><path d="M 50,20 C 55,15 60,10 65,12 C 70,14 70,20 68,25 Z" fill="#6a4725"/><path d="M 65,12 C 75,5 85,10 80,20 Z" fill="#3c8a41"/><circle cx="45" cy="50" r="30" fill="url(#gradX)" /></svg>`)}`;
+            const fruitData = {
+                apple: { icon: '🍎', svg: appleSVG },
+                grape: { icon: '🍇', svg: grapeSVG }
+            };
+
+            function cleanupPhysics() {
+                if (runner) Runner.stop(runner);
+                if (render) {
+                    Render.stop(render);
+                    if (render.canvas) render.canvas.remove();
+                }
+                engine = null;
+                render = null;
+                runner = null;
+            }
+
+            function showLevelSelection() {
+                cleanupPhysics();
+                gameScreen.classList.add('hidden');
+                levelSelectionScreen.classList.remove('hidden');
+            }
+
+            function startGame(levelIndex) {
+                // [修正] ゲーム開始時に必ず物理エンジンをクリーンアップする
+                cleanupPhysics();
+
+                currentLevelIndex = levelIndex;
+                const settings = levels[currentLevelIndex];
+
+                pressCount = 0;
+                totals = { apple: 0, grape: 0 };
+                
+                levelSelectionScreen.classList.add('hidden');
+                gameScreen.classList.remove('hidden');
+                resultModal.classList.add('hidden');
+                
+                setupUIForLevel(settings);
+                initPhysics();
+            }
+
+            function setupUIForLevel(settings) {
+                // ランプ
+                pressLampsContainer.innerHTML = '';
+                for (let i = 0; i < settings.maxPresses; i++) {
+                    const lamp = document.createElement('div');
+                    lamp.className = 'w-5 h-5 rounded-full border-2 transition-colors duration-300';
+                    pressLampsContainer.appendChild(lamp);
+                }
+
+                // 目標表示
+                targetDisplay.innerHTML = '';
+                Object.entries(settings.targets).forEach(([fruit, count]) => {
+                    targetDisplay.innerHTML += `<div class="text-2xl font-bold text-amber-600">${fruitData[fruit].icon}${count}</div>`;
+                });
+
+                // 操作ボタン
+                actionButtonsContainer.innerHTML = '';
+                settings.buttons.forEach(buttonConfig => {
+                    const button = document.createElement('button');
+                    let buttonText = '';
+                    Object.entries(buttonConfig).forEach(([fruit, count]) => {
+                        if (count > 0) buttonText += `${count} ${fruitData[fruit].icon.repeat(count)}<br>`;
+                    });
+                    button.innerHTML = buttonText.trim();
+                    button.className = "text-2xl w-32 h-24 bg-red-500 text-white font-bold rounded-lg shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:scale-100";
+                    button.onclick = () => dropFruits(buttonConfig);
+                    actionButtonsContainer.appendChild(button);
+                });
+
+                updateUI();
+            }
+
+            function initPhysics() {
+                engine = Engine.create();
+                engine.world.gravity.y = 1.2;
+
+                render = Render.create({
+                    element: container,
+                    engine: engine,
+                    options: { width: container.clientWidth, height: container.clientHeight, wireframes: false, background: '#f8fafc' }
+                });
+
+                const ground = Bodies.rectangle(container.clientWidth / 2, container.clientHeight + 25, container.clientWidth, 50, { isStatic: true, render: { visible: false } });
+                const leftWall = Bodies.rectangle(-25, container.clientHeight / 2, 50, container.clientHeight, { isStatic: true, render: { visible: false } });
+                const rightWall = Bodies.rectangle(container.clientWidth + 25, container.clientHeight / 2, 50, container.clientHeight, { isStatic: true, render: { visible: false } });
+                World.add(engine.world, [ground, leftWall, rightWall]);
+
+                Render.run(render);
+                runner = Runner.create();
+                Runner.run(runner, engine);
+            }
+
+            function updateUI() {
+                 const settings = levels[currentLevelIndex];
+                // 合計表示
+                totalDisplay.innerHTML = '';
+                if (settings.targets.grape !== undefined) { // Level 3
+                     totalDisplay.innerHTML = `<div class="flex flex-col items-end">
+                        <div class="text-3xl font-bold text-red-500" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.1);">${fruitData.apple.icon}${totals.apple}</div>
+                        <div class="text-3xl font-bold text-purple-600" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.1);">${fruitData.grape.icon}${totals.grape}</div>
+                     </div>`;
+                } else { // Level 1 & 2
+                     totalDisplay.innerHTML = `<div class="text-5xl font-bold text-red-500" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.1);">${fruitData.apple.icon}${totals.apple}</div>`;
+                }
+
+                // ランプ
+                const lamps = pressLampsContainer.children;
+                for (let i = 0; i < lamps.length; i++) {
+                    if (i < pressCount) {
+                        lamps[i].classList.remove('bg-yellow-400', 'border-yellow-500');
+                        lamps[i].classList.add('bg-gray-300', 'border-gray-400');
+                    } else {
+                        lamps[i].classList.add('bg-yellow-400', 'border-yellow-500');
+                        lamps[i].classList.remove('bg-gray-300', 'border-gray-400');
+                    }
+                }
+            }
+            
+            function checkGameResult() {
+                actionButtonsContainer.querySelectorAll('button').forEach(b => b.disabled = true);
+                const settings = levels[currentLevelIndex];
+
+                let isClear = true;
+                Object.entries(settings.targets).forEach(([fruit, targetCount]) => {
+                    if (totals[fruit] !== targetCount) {
+                        isClear = false;
+                    }
+                });
+
+                if (isClear) {
+                    resultMessage.textContent = '🎉 クリア！ 🎉';
+                    resultMessage.className = 'text-4xl font-bold mb-4 text-green-500';
+                    resultDetails.textContent = `おめでとう！目標ぴったりです！`;
+                } else {
+                    resultMessage.textContent = '😢 ゲームオーバー 😢';
+                    resultMessage.className = 'text-4xl font-bold mb-4 text-gray-700';
+                    let details = "残念！";
+                    Object.entries(settings.targets).forEach(([fruit, targetCount]) => {
+                         details += ` ${fruitData[fruit].icon}は${totals[fruit]}個でした。`;
+                    });
+                    resultDetails.textContent = details;
+                }
+                
+                resultModal.classList.remove('hidden');
+                setTimeout(() => resultCard.classList.remove('scale-95'), 10);
+            }
+
+            function dropFruits(fruitCounts) {
+                const settings = levels[currentLevelIndex];
+                if (pressCount >= settings.maxPresses || !engine) return;
+
+                pressCount++;
+                Object.entries(fruitCounts).forEach(([fruit, count]) => {
+                    if(totals[fruit] !== undefined) totals[fruit] += count;
+                });
+                updateUI();
+
+                const radius = 20;
+                const outletWidth = container.clientWidth * 0.6;
+
+                Object.entries(fruitCounts).forEach(([fruit, count]) => {
+                    for (let i = 0; i < count; i++) {
+                        const x = container.clientWidth / 2 + (Math.random() - 0.5) * outletWidth;
+                        const y = -30 - Math.random() * 20;
+
+                        const body = Bodies.circle(x, y, radius, {
+                            friction: 0.4, restitution: 0.5, density: 0.005,
+                            render: {
+                                sprite: { texture: fruitData[fruit].svg, xScale: radius * 2 / 100, yScale: radius * 2 / 100 }
+                            }
+                        });
+                        World.add(engine.world, body);
+                    }
+                });
+                
+                if (pressCount >= settings.maxPresses) {
+                    setTimeout(checkGameResult, 2000);
+                }
+            }
+            
+            // イベントリスナー
+            levelSelectButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    startGame(parseInt(button.dataset.level));
+                });
+            });
+
+            playAgainButton.addEventListener('click', () => startGame(currentLevelIndex));
+            backToLevelSelectButton.addEventListener('click', showLevelSelection);
+            levelSelectReturnButton.addEventListener('click', showLevelSelection);
+
+            window.addEventListener('resize', () => {
+                 if(render) {
+                    render.bounds.max.x = container.clientWidth;
+                    render.bounds.max.y = container.clientHeight;
+                    render.options.width = container.clientWidth;
+                    render.options.height = container.clientHeight;
+                    render.canvas.width = container.clientWidth;
+                    render.canvas.height = container.clientHeight;
+
+                    const ground = engine.world.bodies.find(body => body.isStatic && body.position.y > container.clientHeight);
+                    if (ground) Matter.Body.setPosition(ground, { x: container.clientWidth / 2, y: container.clientHeight + 25 });
+                    const leftWall = engine.world.bodies.find(body => body.isStatic && body.position.x < 0);
+                    if (leftWall) Matter.Body.setPosition(leftWall, { x: -25, y: container.clientHeight / 2 });
+                    const rightWall = engine.world.bodies.find(body => body.isStatic && body.position.x > container.clientWidth);
+                    if (rightWall) Matter.Body.setPosition(rightWall, { x: container.clientWidth + 25, y: container.clientHeight / 2 });
+                 }
+            });
+
+            // 初期表示
+            showLevelSelection();
+        });
+    </script>
+
+</body>
+</html>
+

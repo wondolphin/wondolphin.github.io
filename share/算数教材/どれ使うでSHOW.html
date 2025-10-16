@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>SVGクイズ（複数問題対応）</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+            text-align: center;
+        }
+        /* --- 問題選択ボタン --- */
+        .question-selector {
+            padding: 10px;
+            background-color: #333;
+        }
+        .question-btn {
+            padding: 8px 16px;
+            font-size: 1em;
+            border: 2px solid #fff;
+            background-color: #666;
+            color: #fff;
+            cursor: pointer;
+            margin: 0 5px;
+            border-radius: 5px;
+        }
+        .question-btn.active {
+            background-color: #29abe2;
+            font-weight: bold;
+        }
+
+        /* --- SVGコンテナ --- */
+        .svg-container {
+            height: 50vh;
+            width: 100%;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-bottom: 2px solid #ddd;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box; 
+        }
+        .svg-container svg {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* --- アニメーションとインタラクション --- */
+        .clickable-line {
+            cursor: pointer;
+            transition: stroke-width 0.2s ease;
+        }
+        .clickable-line:hover {
+            stroke-width: 10; /* 少し太くして反応を良くする */
+        }
+        .svg-shape {
+            transition: opacity 0.8s ease-out, fill 0.8s ease;
+        }
+        .fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #q2-invisible { /* Q2の隠し線 */
+            opacity: 0;
+            transition: opacity 0.8s ease-in 0.5s; /* 少し遅れて表示 */
+        }
+        #q2-invisible.visible {
+            opacity: 1;
+        }
+
+        /* --- 下部コンテンツ --- */
+        .quiz-container.hidden {
+            display: none;
+        }
+        .output-container {
+            padding: 20px;
+        }
+        .formula-container {
+            font-size: 2.5em;
+            font-weight: bold;
+            letter-spacing: 0.2em;
+            margin-bottom: 20px;
+        }
+        .box {
+            display: inline-block;
+            width: 1em;
+            color: #ccc;
+        }
+        .message-area {
+            font-size: 1.5em;
+            font-weight: bold;
+            height: 1.5em;
+            color: #d9534f;
+        }
+        .message-area.correct {
+            color: #5cb85c;
+        }
+    </style>
+</head>
+<body>
+    <div class="question-selector">
+        <button id="btn-q1" class="question-btn active">第1問</button>
+        <button id="btn-q2" class="question-btn">第2問</button>
+    </div>
+
+    <!-- 第1問のコンテンツ -->
+    <div id="quiz-1" class="quiz-container">
+        <div class="svg-container">
+            <svg id="svg-q1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 346.86 248.59">
+                <g><polygon class="svg-shape involved-object" data-polygon-id="1" points="124.99 245.16 3.27 25.29 342.1 2.33 124.99 245.16" fill="#ffffcc" stroke="#000" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/></g>
+                <g>
+                    <line class="svg-shape clickable-line" x1="3.27" y1="25.29" x2="342.1" y2="2.33" fill="none" stroke="blue" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/>
+                    <line id="q1-ans1" class="svg-shape clickable-line involved-object" x1="124.99" y1="245.16" x2="342.1" y2="2.33" fill="none" stroke="#22b573" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/>
+                    <line id="q1-ans2" class="svg-shape clickable-line involved-object" x1="180.44" y1="183.14" x2="3.58" y2="25.02" fill="none" stroke="#29abe2" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/>
+                    <line class="svg-shape clickable-line" x1="233.55" y1="123.74" x2="115.33" y2="18.05" fill="none" stroke="#f7931e" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/>
+                    <line class="svg-shape clickable-line" x1="180.44" y1="183.14" x2="115.69" y2="18.38" fill="none" stroke="#d9e021" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/>
+                    <line class="svg-shape clickable-line" x1="124.99" y1="245.16" x2="3.27" y2="25.29" fill="none" stroke="#c1272d" stroke-linecap="round" stroke-miterlimit="10" stroke-width="4"/>
+                </g>
+                <g>
+                    <polyline class="svg-shape involved-object" points="168.94 172.85 159.07 183.95 168.94 193.13" fill="none" stroke="#000" stroke-linecap="round" stroke-miterlimit="10"/>
+                    <polyline class="svg-shape" points="221.69 113.61 211.83 124.7 221.69 133.88" fill="none" stroke="#000" stroke-linecap="round" stroke-miterlimit="10"/>
+                </g>
+            </svg>
+        </div>
+        <div class="output-container">
+            <div class="formula-container">
+                <span class="box">□</span> × <span class="box">□</span> ÷ 2
+            </div>
+            <div id="message-area-q1" class="message-area"></div>
+        </div>
+    </div>
+
+    <!-- 第2問のコンテンツ（SVG更新・サイズ調整済み） -->
+    <div id="quiz-2" class="quiz-container hidden">
+        <div class="svg-container">
+            <!-- ★★★ 修正点2: viewBoxを調整して、図形が大きく表示されるようにした ★★★ -->
+            <svg id="svg-q2" xmlns="http://www.w3.org/2000/svg" viewBox="84.06 110.66 456.85 270.3">
+                <g id="_レイヤー_1">
+                    <polygon class="svg-shape involved-object" data-polygon-id="2a" points="220.07 181.77 530.91 360.96 530.91 181.77 220.07 181.77" fill="#ffffcb"/>
+                    <polygon class="svg-shape involved-object" data-polygon-id="2b" points="114.06 120.66 114.06 360.96 530.91 360.96 114.06 120.66" fill="#ffffcb"/>
+                </g>
+                <g id="_レイヤー_2">
+                    <line id="q2-ans2" class="svg-shape clickable-line involved-object" x1="114.06" y1="360.96" x2="530.91" y2="360.96" fill="none" stroke="#22b473" stroke-linecap="round" stroke-miterlimit="10" stroke-width="6.76"/>
+                    <line id="q2-ans4" class="svg-shape clickable-line involved-object" x1="220.07" y1="181.77" x2="530.91" y2="181.77" fill="none" stroke="#f6921e" stroke-linecap="round" stroke-miterlimit="10" stroke-width="6.76"/>
+                    <line class="svg-shape clickable-line" x1="220.07" y1="181.77" x2="114.06" y2="120.66" fill="none" stroke="#29aae1" stroke-linecap="round" stroke-miterlimit="10" stroke-width="6.76"/>
+                    <line id="q2-ans1" class="svg-shape clickable-line involved-object" x1="114.06" y1="360.96" x2="114.06" y2="120.66" fill="none" stroke="#c0272d" stroke-linecap="round" stroke-miterlimit="10" stroke-width="6.76"/>
+                    <line id="q2-ans3" class="svg-shape clickable-line involved-object" x1="530.91" y1="360.96" x2="530.91" y2="181.77" fill="none" stroke="blue" stroke-linecap="round" stroke-miterlimit="10" stroke-width="6.76"/>
+                    <line id="q2-invisible" class="svg-shape involved-object" x1="114.06" y1="120.66" x2="530.91" y2="360.96" fill="#ffffcb" stroke="#000" stroke-miterlimit="10" stroke-width="1.42"/>
+                </g>
+                <g id="_レイヤー_3">
+                    <polyline class="svg-shape involved-object" points="141.63 356.88 141.37 331.82 118.62 331.53" fill="none" stroke="#000" stroke-linecap="round" stroke-miterlimit="10" stroke-width="1.69"/>
+                    <polyline class="svg-shape" points="504.44 356.88 504.7 331.82 527.46 331.53" fill="none" stroke="#000" stroke-linecap="round" stroke-miterlimit="10" stroke-width="1.69"/>
+                    <polyline class="svg-shape involved-object" points="528.06 209.36 502.99 209.11 502.71 186.35" fill="none" stroke="#000" stroke-linecap="round" stroke-miterlimit="10" stroke-width="1.69"/>
+                </g>
+            </svg>
+        </div>
+        <div class="output-container">
+            <div class="formula-container">
+                <span class="box">□</span> × <span class="box">□</span> ÷ 2 + <span class="box">□</span> × <span class="box">□</span> ÷ 2
+            </div>
+            <div id="message-area-q2" class="message-area"></div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- グローバル変数と設定 ---
+        let currentQuizId = 1;
+        let selections = [];
+        let isClickable = true;
+
+        const quizData = {
+            1: {
+                answer: ['q1-ans1', 'q1-ans2'],
+                selectionLimit: 2,
+                involvedSelector: '#quiz-1 .involved-object',
+                allShapesSelector: '#quiz-1 .svg-shape',
+                polygonSelector: '#quiz-1 [data-polygon-id="1"]'
+            },
+            2: {
+                answerPairs: [
+                    ['q2-ans1', 'q2-ans2'].sort(),
+                    ['q2-ans3', 'q2-ans4'].sort()
+                ],
+                selectionLimit: 4,
+                involvedSelector: '#quiz-2 .involved-object',
+                allShapesSelector: '#quiz-2 .svg-shape',
+                polygonSelector: '#quiz-2 [data-polygon-id]'
+            }
+        };
+
+        // --- DOM要素 ---
+        const quizContainers = document.querySelectorAll('.quiz-container');
+        const questionButtons = document.querySelectorAll('.question-btn');
+
+        // --- 関数定義 ---
+
+        function setupQuiz(quizId) {
+            currentQuizId = quizId;
+            selections = [];
+            isClickable = true;
+
+            quizContainers.forEach(c => c.classList.add('hidden'));
+            document.getElementById(`quiz-${quizId}`).classList.remove('hidden');
+
+            questionButtons.forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-q${quizId}`).classList.add('active');
+            
+            const boxes = document.querySelectorAll(`#quiz-${quizId} .box`);
+            boxes.forEach(box => {
+                box.textContent = '□';
+                box.style.color = '#ccc';
+            });
+            document.querySelector(`#message-area-q${quizId}`).textContent = '';
+            document.querySelector(`#message-area-q${quizId}`).className = 'message-area';
+
+            const shapes = document.querySelectorAll(quizData[quizId].allShapesSelector);
+            shapes.forEach(s => s.classList.remove('fade-out'));
+            
+            const polygons = document.querySelectorAll(quizData[quizId].polygonSelector);
+            polygons.forEach(p => p.style.fill = '#ffffcc');
+
+            if (quizId === 2) {
+                document.getElementById('q2-invisible').classList.remove('visible');
+            }
+        }
+
+        // クリック処理
+        function handleLineClick(event) {
+            const quizConfig = quizData[currentQuizId];
+            if (!isClickable || selections.length >= quizConfig.selectionLimit) return;
+            
+            const clickedElement = event.target;
+            
+            // ★★★ 修正点1: IDの有無に関わらず、同じ要素を2回クリックできないように修正 ★★★
+            if (selections.some(sel => sel.element === clickedElement)) {
+                return;
+            }
+
+            const clickedId = clickedElement.id;
+            const clickedColor = clickedElement.getAttribute('stroke');
+            
+            selections.push({ element: clickedElement, id: clickedId, color: clickedColor });
+
+            const boxes = document.querySelectorAll(`#quiz-${currentQuizId} .box`);
+            const currentBox = boxes[selections.length - 1];
+            currentBox.textContent = '／';
+            currentBox.style.color = clickedColor;
+
+            if (selections.length === quizConfig.selectionLimit) {
+                isClickable = false;
+                checkAnswer();
+            }
+        }
+
+        // 判定処理
+        function checkAnswer() {
+            const quizConfig = quizData[currentQuizId];
+            const messageArea = document.querySelector(`#message-area-q${currentQuizId}`);
+            let isCorrect = false;
+            const selectedIds = selections.map(s => s.id);
+
+            if (currentQuizId === 1) {
+                isCorrect = JSON.stringify(selectedIds) === JSON.stringify(quizConfig.answer);
+            } else if (currentQuizId === 2) {
+                const pair1 = [selectedIds[0], selectedIds[1]].sort();
+                const pair2 = [selectedIds[2], selectedIds[3]].sort();
+                
+                const answerPair1 = quizConfig.answerPairs[0];
+                const answerPair2 = quizConfig.answerPairs[1];
+
+                if ((JSON.stringify(pair1) === JSON.stringify(answerPair1) && JSON.stringify(pair2) === JSON.stringify(answerPair2)) ||
+                    (JSON.stringify(pair1) === JSON.stringify(answerPair2) && JSON.stringify(pair2) === JSON.stringify(answerPair1))) {
+                    isCorrect = true;
+                }
+            }
+
+            if (isCorrect) {
+                messageArea.textContent = '正解！';
+                messageArea.className = 'message-area correct';
+
+                const involvedObjects = document.querySelectorAll(quizConfig.involvedSelector);
+                document.querySelectorAll(quizConfig.allShapesSelector).forEach(shape => {
+                    let isInvolved = false;
+                    involvedObjects.forEach(inv => { if (inv === shape) isInvolved = true; });
+                    if (!isInvolved) {
+                        shape.classList.add('fade-out');
+                    }
+                });
+                
+                if (currentQuizId === 1) {
+                    document.querySelector(quizConfig.polygonSelector).style.fill = '#ccffcc';
+                } else if (currentQuizId === 2) {
+                    document.querySelector('[data-polygon-id="2a"]').style.fill = '#ccffcc'; // 薄緑
+                    document.querySelector('[data-polygon-id="2b"]').style.fill = '#cceeff'; // 薄青
+                    document.getElementById('q2-invisible').classList.add('visible');
+                }
+
+            } else {
+                messageArea.textContent = 'ちがうみたい…';
+                messageArea.className = 'message-area';
+                setTimeout(() => setupQuiz(currentQuizId), 1500);
+            }
+        }
+
+        // --- イベントリスナー設定 ---
+        questionButtons.forEach(button => {
+            button.addEventListener('click', (event) => {
+                const quizId = parseInt(event.target.id.replace('btn-q', ''));
+                setupQuiz(quizId);
+            });
+        });
+
+        document.querySelectorAll('.clickable-line').forEach(line => {
+            line.addEventListener('click', handleLineClick);
+        });
+
+        // --- 初期化 ---
+        setupQuiz(1);
+
+    </script>
+</body>
+</html>

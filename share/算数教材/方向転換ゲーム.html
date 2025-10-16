@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>方向転換パズルゲーム</title>
+    <style>
+        /* 全体のスタイル */
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* 上寄せに変更 */
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        /* ゲームコンテナ */
+        .main-container {
+            display: flex;
+            flex-wrap: wrap; /* 小画面で折り返す */
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        /* 盤面 */
+        #game-board {
+            width: 500px;
+            height: 500px;
+            border: 2px solid #333;
+            position: relative;
+            background-color: #fff;
+            background-image:
+                linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            overflow: hidden; /* プレイヤーがはみ出さないように */
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        /* サイドパネル */
+        .side-panel {
+            width: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .side-panel h3 {
+            margin: 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            text-align: center;
+            font-size: 1.1em;
+        }
+        
+        /* スタンバイエリア */
+        #standby-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            min-height: 100px;
+        }
+
+        /* ゲームオブジェクトの共通スタイル */
+        .game-object {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        /* プレイヤー */
+        #player {
+            background-color: #4a90e2;
+            color: white;
+            z-index: 10;
+            transition: transform 0.1s linear; /* 回転を滑らかに */
+        }
+        /* プレイヤーの向きを示す矢印 */
+        #player::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 15px;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-bottom: 10px solid #fff;
+        }
+
+
+        /* ゴール */
+        .goal {
+            background-color: #f5a623;
+            border: 4px dashed white;
+        }
+        .goal::after {
+            content: 'G';
+            color: white;
+            font-size: 24px;
+        }
+
+        /* 壁 */
+        .wall {
+            background-color: #777;
+            z-index: 5;
+            border-radius: 4px;
+        }
+        
+        /* 方向転換ブロック */
+        .direction-block {
+            background-color: #7ed321;
+            color: white;
+            cursor: grab;
+            position: relative; /* スタンバイエリアでの配置のため */
+            z-index: 8;
+            user-select: none; /* テキスト選択を防ぐ */
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .direction-block.placed {
+             position: absolute; /* 盤面上での配置のため */
+        }
+        .direction-block:active {
+            cursor: grabbing;
+            z-index: 20; /* ドラッグ中は最前面に */
+        }
+        
+        /* ボタン */
+        .button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .button:active {
+            transform: translateY(1px);
+        }
+
+        #go-button {
+            background-color: #50e3c2;
+            color: white;
+        }
+        #go-button:hover {
+            background-color: #45c4a8;
+        }
+
+        #reset-button {
+            background-color: #f0f2f5;
+            color: #555;
+            border: 1px solid #ddd;
+        }
+         #reset-button:hover {
+            background-color: #e6e8eb;
+        }
+
+
+        /* メッセージ表示エリア */
+        #message-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 48px;
+            font-weight: bold;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none; /* メッセージ表示中は操作不可に */
+            transition: opacity 0.3s ease;
+            border-radius: 8px; /* 親要素に合わせる */
+        }
+        #message-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div id="game-board">
+             <div id="message-overlay"></div>
+        </div>
+        <div class="side-panel">
+            <h3>ブロック</h3>
+            <div id="standby-area">
+                <!-- 方向転換ブロックはJSで生成 -->
+            </div>
+            <button id="go-button" class="button">Go!</button>
+            <button id="reset-button" class="button">リセット</button>
+        </div>
+    </div>
+
+    <script>
+        // --- ゲーム設定 ---
+        const BOARD_SIZE = 500;
+        const PLAYER_SPEED = 8; // プレイヤーの速さをさらに2倍に変更
+        const OBJECT_SIZE = 40;
+
+        const level1 = {
+            player: { x: 50, y: 450, angle: 0 }, // angle: 0は真上
+            goal: { x: 450, y: 50 },
+            walls: [
+                { x: 100, y: 300, w: 300, h: 40 },
+                { x: 100, y: 100, w: 40, h: 200 }
+            ],
+            blocks: [
+                { angle: 90 },
+                { angle: -90 },
+                { angle: 45 },
+            ]
+        };
+
+        // --- DOM要素の取得 ---
+        const gameBoard = document.getElementById('game-board');
+        const standbyArea = document.getElementById('standby-area');
+        const goButton = document.getElementById('go-button');
+        const resetButton = document.getElementById('reset-button');
+        const messageOverlay = document.getElementById('message-overlay');
+
+        // --- ゲームの状態管理 ---
+        let player, goal, walls = [], placedBlocks = [];
+        let gameState = 'standby'; // 'standby' or 'playing'
+        let animationFrameId;
+
+        // --- ドラッグ＆ドロップ関連の変数 ---
+        let draggedElement = null;
+        let offsetX, offsetY;
+
+        // --- 初期化処理 ---
+        function init() {
+            // 以前のゲームオブジェクトをクリア
+            gameBoard.innerHTML = '';
+            gameBoard.appendChild(messageOverlay); // メッセージエリアを再追加
+            standbyArea.innerHTML = '';
+            placedBlocks = [];
+
+            // プレイヤーの作成
+            const playerConfig = level1.player;
+            player = createGameObject('player', playerConfig.x, playerConfig.y, OBJECT_SIZE, OBJECT_SIZE);
+            player.angle = playerConfig.angle;
+            updatePlayerTransform();
+
+            // ゴールの作成
+            const goalConfig = level1.goal;
+            goal = createGameObject('goal game-object', goalConfig.x, goalConfig.y, OBJECT_SIZE, OBJECT_SIZE);
+
+            // 壁の作成
+            walls = level1.walls.map(w => 
+                createGameObject('wall', w.x, w.y, w.w, w.h, false)
+            );
+
+            // スタンバイエリアに方向転換ブロックを作成
+            level1.blocks.forEach(blockInfo => {
+                const block = document.createElement('div');
+                block.className = 'direction-block game-object';
+                block.textContent = `${blockInfo.angle > 0 ? '+' : ''}${blockInfo.angle}°`;
+                block.dataset.angle = blockInfo.angle;
+                block.style.width = `${OBJECT_SIZE}px`; // サイズをJSで明示的に設定
+                block.style.height = `${OBJECT_SIZE}px`; // サイズをJSで明示的に設定
+                block.dataset.radius = OBJECT_SIZE / 2; // 衝突判定用の半径情報を追加
+                block.style.position = 'relative'; // スタンバイエリア内での配置
+                block.style.left = 'auto';
+                block.style.top = 'auto';
+                standbyArea.appendChild(block);
+                block.addEventListener('mousedown', onDragStart);
+            });
+            
+            resetToStandby();
+        }
+
+        // --- ゲームオブジェクト生成関数 ---
+        function createGameObject(idOrClass, x, y, w, h, isCircle = true) {
+            const el = document.createElement('div');
+            if (idOrClass.includes(' ')) {
+                el.className = idOrClass;
+            } else {
+                el.id = idOrClass;
+                el.className = `${idOrClass} game-object`;
+            }
+
+            el.style.width = `${w}px`;
+            el.style.height = `${h}px`;
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            
+            if (isCircle) {
+                el.dataset.radius = w / 2;
+            }
+            el.dataset.x = x;
+            el.dataset.y = y;
+            
+            gameBoard.appendChild(el);
+            return el;
+        }
+
+        // --- ドラッグ＆ドロップ処理 ---
+        function onDragStart(e) {
+            if (gameState !== 'standby') return;
+            e.preventDefault();
+
+            draggedElement = e.target;
+            
+            if (draggedElement.parentElement === standbyArea) {
+                draggedElement.classList.add('placed');
+                draggedElement.style.position = 'absolute';
+                gameBoard.appendChild(draggedElement);
+                placedBlocks.push(draggedElement);
+            }
+
+            const rect = draggedElement.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+
+            draggedElement.style.zIndex = 1000;
+            document.addEventListener('mousemove', onDragMove);
+            document.addEventListener('mouseup', onDragEnd);
+        }
+
+        function onDragMove(e) {
+            if (!draggedElement) return;
+
+            const boardRect = gameBoard.getBoundingClientRect();
+            let x = e.clientX - boardRect.left - offsetX;
+            let y = e.clientY - boardRect.top - offsetY;
+
+            x = Math.max(0, Math.min(x, BOARD_SIZE - draggedElement.offsetWidth));
+            y = Math.max(0, Math.min(y, BOARD_SIZE - draggedElement.offsetHeight));
+
+            draggedElement.style.left = `${x}px`;
+            draggedElement.style.top = `${y}px`;
+            draggedElement.dataset.x = x;
+            draggedElement.dataset.y = y;
+        }
+
+        function onDragEnd() {
+            if (!draggedElement) return;
+            draggedElement.style.zIndex = 8;
+            document.removeEventListener('mousemove', onDragMove);
+            document.removeEventListener('mouseup', onDragEnd);
+            draggedElement = null;
+        }
+
+
+        // --- ゲームロジック ---
+        function startGame() {
+            if (gameState !== 'standby') return;
+            gameState = 'playing';
+
+            // プレイヤーを初期位置と状態にリセット
+            const playerConfig = level1.player;
+            player.style.left = `${playerConfig.x}px`;
+            player.style.top = `${playerConfig.y}px`;
+            player.angle = playerConfig.angle;
+            player.overlappingBlock = null;
+            player.lastDistanceToBlock = Infinity;
+            updatePlayerTransform();
+
+            goButton.disabled = true;
+            resetButton.disabled = true;
+
+            gameLoop();
+        }
+
+        function gameLoop() {
+            // プレイヤーの移動
+            const rad = (player.angle - 90) * (Math.PI / 180);
+            const currentX = parseFloat(player.style.left);
+            const currentY = parseFloat(player.style.top);
+
+            const newX = currentX + PLAYER_SPEED * Math.cos(rad);
+            const newY = currentY + PLAYER_SPEED * Math.sin(rad);
+
+            player.style.left = `${newX}px`;
+            player.style.top = `${newY}px`;
+
+            if (checkCollisions()) {
+                return;
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+        
+        function updatePlayerTransform() {
+             player.style.transform = `rotate(${player.angle}deg)`;
+        }
+
+        // --- 衝突判定 ---
+        function checkCollisions() {
+            const pRect = player.getBoundingClientRect();
+            const boardRect = gameBoard.getBoundingClientRect();
+            
+            if (pRect.left < boardRect.left || pRect.right > boardRect.right ||
+                pRect.top < boardRect.top || pRect.bottom > boardRect.bottom) {
+                handleFailure("壁にぶつかった！");
+                return true;
+            }
+
+            for (const wall of walls) {
+                if (isRectOverlap(pRect, wall.getBoundingClientRect())) {
+                    handleFailure("壁にぶつかった！");
+                    return true;
+                }
+            }
+            
+            if (isCircleOverlap(player, goal)) {
+                handleClear();
+                return true;
+            }
+
+            // 方向転換ブロックとの衝突ロジック (新)
+            if (player.overlappingBlock) {
+                // すでにブロック内にいる場合、中心から離れ始めたかチェック
+                const currentDistance = getDistance(player, player.overlappingBlock);
+                
+                if (isCircleOverlap(player, player.overlappingBlock)) {
+                    if (currentDistance > player.lastDistanceToBlock) {
+                        // 中心を通過して離れ始めたので、方向転換を実行
+                        player.angle -= parseInt(player.overlappingBlock.dataset.angle);
+                        updatePlayerTransform();
+                        player.overlappingBlock.hit = true;
+                        player.overlappingBlock.style.backgroundColor = '#ccc';
+                        
+                        // 状態をリセット
+                        player.overlappingBlock = null;
+                        player.lastDistanceToBlock = Infinity;
+                    } else {
+                        // まだ中心に近づいているので、距離を更新
+                        player.lastDistanceToBlock = currentDistance;
+                    }
+                } else {
+                    // 何らかの理由で重なり判定から外れた場合（エッジをかすめた等）
+                    player.overlappingBlock = null;
+                    player.lastDistanceToBlock = Infinity;
+                }
+            } else {
+                // 新しいブロックとの重なりをチェック
+                for (const block of placedBlocks) {
+                    if (!block.hit && isCircleOverlap(player, block)) {
+                        // 新しくブロックに入った
+                        player.overlappingBlock = block;
+                        player.lastDistanceToBlock = getDistance(player, block);
+                        break; // 同時に複数のブロックには入らない
+                    }
+                }
+            }
+
+
+            return false;
+        }
+        
+        function isRectOverlap(rectA, rectB) {
+            return !(rectA.right < rectB.left || rectA.left > rectB.right ||
+                     rectA.bottom < rectB.top || rectA.top > rectB.bottom);
+        }
+        
+        function isCircleOverlap(objA, objB) {
+            const distance = getDistance(objA, objB);
+            const radiusA = parseFloat(objA.dataset.radius);
+            const radiusB = parseFloat(objB.dataset.radius);
+            return distance < radiusA + radiusB;
+        }
+        
+        // 2つのオブジェクトの中心間の距離を計算する
+        function getDistance(objA, objB) {
+            const radiusA = parseFloat(objA.dataset.radius);
+            const radiusB = parseFloat(objB.dataset.radius);
+            // objA (player) の座標は style から取得
+            const centerAx = parseFloat(objA.style.left) + radiusA;
+            const centerAy = parseFloat(objA.style.top) + radiusA;
+            // objB (block/goal) の座標は dataset から取得
+            const centerBx = parseFloat(objB.dataset.x) + radiusB;
+            const centerBy = parseFloat(objB.dataset.y) + radiusB;
+
+            const dx = centerAx - centerBx;
+            const dy = centerAy - centerBy;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        // --- ゲーム状態のハンドラ ---
+        function handleClear() {
+            cancelAnimationFrame(animationFrameId);
+            showMessage("クリア！");
+            setTimeout(resetToStandby, 2000);
+        }
+
+        function handleFailure(message) {
+            cancelAnimationFrame(animationFrameId);
+            showMessage(message);
+            setTimeout(resetToStandby, 2000);
+        }
+
+        function resetToStandby() {
+            gameState = 'standby';
+            cancelAnimationFrame(animationFrameId);
+            
+            const playerConfig = level1.player;
+            player.style.left = `${playerConfig.x}px`;
+            player.style.top = `${playerConfig.y}px`;
+            player.angle = playerConfig.angle;
+            // プレイヤーの衝突状態をリセット
+            player.overlappingBlock = null;
+            player.lastDistanceToBlock = Infinity;
+            updatePlayerTransform();
+
+            placedBlocks.forEach(block => {
+                block.hit = false;
+                block.style.backgroundColor = '#7ed321';
+            });
+            
+            goButton.disabled = false;
+            resetButton.disabled = false;
+            hideMessage();
+        }
+
+        function fullReset() {
+             cancelAnimationFrame(animationFrameId);
+             init();
+        }
+
+        function showMessage(text) {
+            messageOverlay.textContent = text;
+            messageOverlay.classList.add('show');
+        }
+
+        function hideMessage() {
+            messageOverlay.classList.remove('show');
+        }
+
+        // --- イベントリスナーの設定 ---
+        goButton.addEventListener('click', startGame);
+        resetButton.addEventListener('click', fullReset);
+
+        // --- ゲーム開始 ---
+        init();
+    </script>
+</body>
+</html>
+

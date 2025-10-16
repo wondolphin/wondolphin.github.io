@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2直線のなす角の可視化</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .angle-arc {
+            cursor: move;
+        }
+        .btn-active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-inactive {
+            background-color: white;
+            color: #374151;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-xl shadow-lg max-w-2xl w-full text-center">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4">角の移動ゲーム</h1>
+        <p class="text-gray-600 mb-2">下のボタンでモードを切り替え、扇形をドラッグしてください。</p>
+        <p class="text-sm text-gray-500 mb-6">「カット」モードでは、小さい扇形を大きい扇形の上で離すとカットできます。</p>
+
+        <!-- モード切替ボタン -->
+        <div class="flex justify-center mb-4">
+            <div class="inline-flex rounded-md shadow-sm" role="group">
+                <button type="button" id="btn-opposite" class="btn-active px-4 py-2 text-sm font-medium border border-gray-200 rounded-l-lg focus:z-10 focus:ring-2 focus:ring-blue-500">
+                    対頂角
+                </button>
+                <button type="button" id="btn-corresponding" class="btn-inactive px-4 py-2 text-sm font-medium border-t border-b border-gray-200 focus:z-10 focus:ring-2 focus:ring-blue-500">
+                    同位角
+                </button>
+                <button type="button" id="btn-supplementary" class="btn-inactive px-4 py-2 text-sm font-medium border-t border-b border-gray-200 focus:z-10 focus:ring-2 focus:ring-blue-500">
+                    補角
+                </button>
+                 <button type="button" id="btn-cut" class="btn-inactive px-4 py-2 text-sm font-medium border-t border-b border-r border-gray-200 rounded-r-lg focus:z-10 focus:ring-2 focus:ring-blue-500">
+                    カット
+                </button>
+            </div>
+        </div>
+        
+        <!-- 軌跡表示トグル -->
+        <div id="history-toggle-container" class="flex justify-center items-center flex-wrap gap-x-4 gap-y-2 mb-4">
+            <span class="text-sm font-medium text-gray-700">軌跡の表示:</span>
+        </div>
+
+
+        <!-- SVG表示エリア -->
+        <div class="border border-gray-200 rounded-lg p-4 mb-6" id="svg-container">
+            <svg id="line-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 343.22 203.53" class="w-full h-auto">
+                <g id="history-arcs-container"></g>
+                <line id="l1" x1="31.21" y1="48.31" x2="259.02" y2="48.31" fill="none" stroke="#da7be1" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"/>
+                <line id="l2" x1="105.23" y1="132.74" x2="333.04" y2="132.74" fill="none" stroke="#da7be1" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"/>
+                <line id="l3" x1="63.61" y1="17.94" x2="218.64" y2="172.97" fill="none" stroke="#73cce1" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"/>
+                <line id="l4" x1="145.11" y1="17.94" x2="300.15" y2="172.97" fill="none" stroke="#73cce1" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"/>
+                <line id="l5" x1="174.52" y1="20.44" x2="179.78" y2="172.14" fill="none" stroke="#6c4" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"/>
+                <circle id="p1" cx="93.98" cy="48.31" r="2.33" fill="#661944"/>
+                <circle id="p2" cx="175.49" cy="48.31" r="2.33" fill="#661944"/>
+                <circle id="p3" cx="178.42" cy="132.74" r="2.33" fill="#661944"/>
+                <circle id="p4" cx="259.92" cy="132.74" r="2.33" fill="#661944"/>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Global State & Config ---
+            let angles = [];
+            const globalState = {
+                moveMode: 'opposite',
+                activeAngle: null,
+                allLines: [],
+                allPoints: [],
+                angleSignCache: {},
+                nextAngleId: 0,
+                nextColorSetIndex: 0,
+            };
+
+            const colorSets = [
+                { name: 'オレンジ', normal: 'rgba(255, 165, 0, 0.6)', supplementary: 'rgba(76, 175, 80, 0.6)', stroke: '#FFA500', strokeSup: '#4CAF50', supName: '緑' },
+                { name: '青', normal: 'rgba(59, 130, 246, 0.6)', supplementary: 'rgba(168, 85, 247, 0.6)', stroke: '#3b82f6', strokeSup: '#a855f7', supName: '紫' },
+                { name: 'ピンク', normal: 'rgba(236, 72, 153, 0.6)', supplementary: 'rgba(22, 163, 74, 0.6)', stroke: '#ec4899', strokeSup: '#16a34a', supName: '青緑' },
+                { name: '橙', normal: 'rgba(249, 115, 22, 0.6)', supplementary: 'rgba(14, 165, 233, 0.6)', stroke: '#f97316', strokeSup: '#0ea5e9', supName: '水色' },
+            ];
+
+            const parallelPairs = { 'l1': 'l2', 'l2': 'l1', 'l3': 'l4', 'l4': 'l3' };
+            const linePointData = { l1: ['p1', 'p2'], l2: ['p3', 'p4'], l3: ['p1', 'p3'], l4: ['p2', 'p4'], l5: ['p2', 'p3'] };
+            
+            const initialConfigs = [
+                { line1_id: 'l1', line2_id: 'l3', line1_endpoint: 'start', line2_endpoint: 'start' },
+                { line1_id: 'l1', line2_id: 'l5', line1_endpoint: 'start', line2_endpoint: 'end' }
+            ];
+
+            const svg = document.getElementById('line-svg');
+            const historyContainer = document.getElementById('history-arcs-container');
+            const historyToggleContainer = document.getElementById('history-toggle-container');
+            const buttons = {
+                opposite: document.getElementById('btn-opposite'),
+                corresponding: document.getElementById('btn-corresponding'),
+                supplementary: document.getElementById('btn-supplementary'),
+                cut: document.getElementById('btn-cut'),
+            };
+
+            const getCoords = (el) => {
+                if (el.tagName === 'line') return { id: el.id, x1: el.x1.baseVal.value, y1: el.y1.baseVal.value, x2: el.x2.baseVal.value, y2: el.y2.baseVal.value };
+                if (el.tagName === 'circle') return { id: el.id, x: el.cx.baseVal.value, y: el.cy.baseVal.value };
+            };
+            const findIntersection = (l1, l2) => {
+                const den = (l1.x1 - l1.x2) * (l2.y1 - l2.y2) - (l1.y1 - l1.y2) * (l2.x1 - l2.x2);
+                if (Math.abs(den) < 1e-6) return null;
+                const t = ((l1.x1 - l2.x1) * (l2.y1 - l2.y2) - (l1.y1 - l2.y1) * (l2.x1 - l2.x2)) / den;
+                return { x: l1.x1 + t * (l1.x2 - l1.x1), y: l1.y1 + t * (l1.y2 - l1.y1) };
+            };
+            const distance = (p1, p2) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+            const pointToLineDistance = (p, l) => {
+                const dx = l.x2 - l.x1, dy = l.y2 - l.y1;
+                if (dx === 0 && dy === 0) return distance({x: l.x1, y: l.y1}, p);
+                return Math.abs(dy * p.x - dx * p.y + l.x2 * l.y1 - l.y2 * l.x1) / Math.sqrt(dx * dx + dy * dy);
+            };
+            const normalize = v => { const m = Math.sqrt(v.x * v.x + v.y * v.y) || 1; return { x: v.x / m, y: v.y / m }; };
+            const dot = (v1, v2) => v1.x * v2.x + v1.y * v2.y;
+            const getAngle = v => (Math.atan2(v.y, v.x) + 2 * Math.PI) % (2 * Math.PI);
+
+            class Angle {
+                constructor(initialConfig, forceColorSetIndex = null) {
+                    this.id = `angle-${globalState.nextAngleId++}`;
+                    if (forceColorSetIndex !== null) {
+                        this.colorSetIndex = forceColorSetIndex;
+                    } else {
+                        this.colorSetIndex = globalState.nextColorSetIndex % colorSets.length;
+                        globalState.nextColorSetIndex++;
+                    }
+                    this.colorSet = colorSets[this.colorSetIndex];
+                    this.config = initialConfig;
+                    this.el = null;
+                    this.intersectionPoint = null;
+                    this.angleVectors = [];
+                    this.angleSpan = 0;
+                    this.currentPointId = null;
+                    this.initialize(initialConfig);
+                    this.ensureHistoryToggleExists();
+                }
+
+                initialize(config) {
+                    if (this.config && JSON.stringify(this.config) !== JSON.stringify(config)) this.addGhostArc();
+                    this.config = { ...config };
+                    
+                    const line1El = globalState.allLines.find(l => l.id === config.line1_id);
+                    const line2El = globalState.allLines.find(l => l.id === config.line2_id);
+                    if (!line1El || !line2El) return;
+
+                    this.intersectionPoint = findIntersection(line1El, line2El);
+                    if (this.intersectionPoint) {
+                        const { x: ix, y: iy } = this.intersectionPoint;
+                        const vecs1 = { start: { x: line1El.x1 - ix, y: line1El.y1 - iy }, end: { x: line1El.x2 - ix, y: line1El.y2 - iy } };
+                        const vecs2 = { start: { x: line2El.x1 - ix, y: line2El.y1 - iy }, end: { x: line2El.x2 - ix, y: line2El.y2 - iy } };
+                        this.angleVectors = [vecs1[config.line1_endpoint], vecs2[config.line2_endpoint]];
+                        
+                        const cacheKey = [config.line1_id, config.line2_id].sort().join('-');
+                        if (!globalState.angleSignCache[cacheKey]) globalState.angleSignCache[cacheKey] = Math.sign(dot(vecs1['end'], vecs2['end']));
+                        
+                        this.updateCurrentPoint();
+                        this.draw();
+                    }
+                }
+                
+                updateCurrentPoint() {
+                    if (!this.intersectionPoint) return;
+                    let closestDist = Infinity, closestPointId = null;
+                    for (const p of globalState.allPoints) {
+                        const d = distance(this.intersectionPoint, p);
+                        if (d < closestDist) { closestDist = d; closestPointId = p.id; }
+                    }
+                    this.currentPointId = closestDist < 1 ? closestPointId : null;
+                }
+
+                createArcPath() {
+                    const [vecA, vecB] = this.angleVectors;
+                    const { x: ix, y: iy } = this.intersectionPoint;
+
+                    const cacheKey = [this.config.line1_id, this.config.line2_id].sort().join('-');
+                    const primaryAngleSign = globalState.angleSignCache[cacheKey];
+                    const currentAngleSign = Math.sign(dot(vecA, vecB));
+                    const isSupplementary = primaryAngleSign && Math.abs(primaryAngleSign - currentAngleSign) > 1;
+
+                    const fillColor = isSupplementary ? this.colorSet.supplementary : this.colorSet.normal;
+                    const strokeColor = isSupplementary ? this.colorSet.strokeSup : this.colorSet.stroke;
+
+                    const angle1 = getAngle(vecA), angle2 = getAngle(vecB);
+                    let startAngle = Math.min(angle1, angle2), endAngle = Math.max(angle1, angle2);
+                    if (endAngle - startAngle > Math.PI) [startAngle, endAngle] = [endAngle, startAngle + 2 * Math.PI];
+                    
+                    this.angleSpan = endAngle - startAngle;
+                    const radius = 30;
+                    
+                    const d = `M ${ix + radius * Math.cos(startAngle)} ${iy + radius * Math.sin(startAngle)} A ${radius} ${radius} 0 ${this.angleSpan <= Math.PI ? '0' : '1'} 1 ${ix + radius * Math.cos(endAngle)} ${iy + radius * Math.sin(endAngle)} L ${ix} ${iy} Z`;
+
+                    const arcPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    arcPath.setAttribute('d', d);
+                    arcPath.setAttribute('fill', fillColor);
+                    arcPath.setAttribute('stroke', strokeColor);
+                    arcPath.setAttribute('stroke-width', '1');
+                    return arcPath;
+                }
+                
+                addGhostArc() {
+                    if (!this.intersectionPoint) return;
+                    
+                    const [vecA, vecB] = this.angleVectors;
+                    const cacheKey = [this.config.line1_id, this.config.line2_id].sort().join('-');
+                    const primaryAngleSign = globalState.angleSignCache[cacheKey];
+                    const currentAngleSign = Math.sign(dot(vecA, vecB));
+                    const isSupplementary = primaryAngleSign && Math.abs(primaryAngleSign - currentAngleSign) > 1;
+                    const type = isSupplementary ? 'supplementary' : 'normal';
+
+                    const historyGroup = document.getElementById(`history-group-${this.colorSetIndex}-${type}`);
+                    if (!historyGroup) return;
+
+                    const newGhostPath = this.createArcPath();
+                    const newD = newGhostPath.getAttribute('d'), newFill = newGhostPath.getAttribute('fill');
+                    if (Array.from(historyGroup.querySelectorAll('path')).some(g => g.getAttribute('d') === newD && g.getAttribute('fill') === newFill)) return;
+                    
+                    newGhostPath.setAttribute('fill-opacity', '0.5');
+                    historyGroup.appendChild(newGhostPath);
+                }
+
+                draw() {
+                    if (this.el) this.el.remove();
+                    if (!this.intersectionPoint) return;
+                    this.el = this.createArcPath();
+                    this.el.id = this.id;
+                    this.el.classList.add('angle-arc');
+                    svg.appendChild(this.el);
+                    this.el.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        globalState.activeAngle = this;
+                        globalState.dragStartConfig = { ...this.config };
+                        document.addEventListener('mousemove', onMouseMove);
+                        document.addEventListener('mouseup', onMouseUp);
+                    });
+                }
+
+                ensureHistoryToggleExists() {
+                    if (document.getElementById(`history-toggle-wrapper-${this.colorSetIndex}`)) return;
+                    
+                    const wrapper = document.createElement('div');
+                    wrapper.id = `history-toggle-wrapper-${this.colorSetIndex}`;
+                    wrapper.className = 'flex items-center space-x-2 p-1 border border-gray-200 rounded-md';
+
+                    wrapper.appendChild(this.createToggleElement('normal'));
+                    wrapper.appendChild(this.createToggleElement('supplementary'));
+                    historyToggleContainer.appendChild(wrapper);
+                }
+
+                createToggleElement(type) {
+                    const color = type === 'normal' ? this.colorSet.normal : this.colorSet.supplementary;
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `history-toggle-${this.colorSetIndex}-${type}`;
+                    checkbox.className = 'h-4 w-4 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer';
+
+                    const label = document.createElement('label');
+                    label.htmlFor = checkbox.id;
+                    label.className = 'ml-1 w-4 h-4 rounded-full block cursor-pointer';
+                    label.style.backgroundColor = color;
+
+                    div.appendChild(checkbox);
+                    div.appendChild(label);
+
+                    const historyGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    historyGroup.id = `history-group-${this.colorSetIndex}-${type}`;
+                    historyGroup.style.display = 'none'; // Default OFF
+                    historyContainer.appendChild(historyGroup);
+
+                    checkbox.addEventListener('change', (e) => {
+                        historyGroup.style.display = e.target.checked ? '' : 'none';
+                    });
+                    return div;
+                }
+            }
+            
+            function redrawAllAngles() {
+                angles.sort((a, b) => b.angleSpan - a.angleSpan);
+                angles.forEach(angle => {
+                    if (angle.el) svg.appendChild(angle.el);
+                });
+            }
+
+            function onMouseMove(e) {}
+
+            function onMouseUp(e) {
+                const activeAngle = globalState.activeAngle;
+                if (!activeAngle) return;
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+
+                const pt = svg.createSVGPoint();
+                pt.x = e.clientX; pt.y = e.clientY;
+                const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+                
+                let actionResult = null;
+                switch(globalState.moveMode) {
+                    case 'opposite': actionResult = handleOppositeMove(activeAngle, svgP); break;
+                    case 'corresponding': actionResult = handleCorrespondingMove(activeAngle, svgP); break;
+                    case 'supplementary': actionResult = handleSupplementaryMove(activeAngle, svgP); break;
+                    case 'cut': actionResult = handleCutMove(activeAngle, svgP); break;
+                }
+
+                if (actionResult && actionResult.type === 'cut') {
+                    const { newConfigs } = actionResult;
+                    const newColorIndex = globalState.nextColorSetIndex % colorSets.length;
+                    globalState.nextColorSetIndex++;
+                    newConfigs.forEach(c => angles.push(new Angle(c, newColorIndex)));
+                    activeAngle.initialize(globalState.dragStartConfig);
+                } else {
+                    activeAngle.initialize(actionResult || globalState.dragStartConfig);
+                }
+                
+                redrawAllAngles();
+                globalState.activeAngle = null;
+            }
+            
+            function handleOppositeMove(angle, mousePoint) {
+                const [vecA, vecB] = angle.angleVectors;
+                const bisector = { x: normalize(vecA).x + normalize(vecB).x, y: normalize(vecA).y + normalize(vecB).y };
+                const mouseVec = { x: mousePoint.x - angle.intersectionPoint.x, y: mousePoint.y - angle.intersectionPoint.y };
+                if (dot(mouseVec, bisector) < 0) {
+                    return { ...angle.config, line1_endpoint: angle.config.line1_endpoint === 'start' ? 'end' : 'start', line2_endpoint: angle.config.line2_endpoint === 'start' ? 'end' : 'start' };
+                }
+                return null;
+            }
+
+            function handleCorrespondingMove(angle, mousePoint) {
+                const c1 = globalState.allLines.find(l => l.id === angle.config.line1_id);
+                const c2 = globalState.allLines.find(l => l.id === angle.config.line2_id);
+                const [fixedLine, movingLine, newConfigKey] = pointToLineDistance(mousePoint, c1) < pointToLineDistance(mousePoint, c2) ? [c1, c2, 'line2_id'] : [c2, c1, 'line1_id'];
+                
+                const parallelLineId = parallelPairs[movingLine.id];
+                if (parallelLineId) {
+                    const pLine = globalState.allLines.find(l => l.id === parallelLineId);
+                    const inter = findIntersection(fixedLine, pLine);
+                    if (inter && distance(mousePoint, inter) < 40) return { ...angle.config, [newConfigKey]: pLine.id };
+                }
+                return null;
+            }
+
+            function handleSupplementaryMove(angle, mousePoint) {
+                const [vecA, vecB] = angle.angleVectors;
+                const mouseVec = { x: mousePoint.x - angle.intersectionPoint.x, y: mousePoint.y - angle.intersectionPoint.y };
+                const dotA = dot(normalize(mouseVec), normalize(vecA)), dotB = dot(normalize(mouseVec), normalize(vecB));
+                if (dotA < 0 && dotB > 0.3) return {...angle.config, line1_endpoint: angle.config.line1_endpoint === 'start' ? 'end' : 'start'};
+                if (dotB < 0 && dotA > 0.3) return {...angle.config, line2_endpoint: angle.config.line2_endpoint === 'start' ? 'end' : 'start'};
+                return null;
+            }
+            
+            function handleCutMove(angleA, mousePoint) {
+                const targetB = angles.find(angleB => angleB.id !== angleA.id && angleB.currentPointId === angleA.currentPointId && angleB.angleSpan > angleA.angleSpan);
+                if (!targetB) return null;
+
+                const getVecConfig = (angle, vecIndex) => {
+                    const lineKey = `line${vecIndex + 1}_id`;
+                    const endpointKey = `line${vecIndex + 1}_endpoint`;
+                    return { l: angle.config[lineKey], e: angle.config[endpointKey] };
+                };
+                
+                const isBetween = (angle, start, end) => {
+                    if (start > end) end += 2 * Math.PI;
+                    if (angle < start) angle += 2 * Math.PI;
+                    return angle >= start && angle <= end;
+                };
+
+                const angleA_start = getAngle(angleA.angleVectors[0]), angleA_end = getAngle(angleA.angleVectors[1]);
+                const angleB_start = getAngle(targetB.angleVectors[0]), angleB_end = getAngle(targetB.angleVectors[1]);
+                const mouseAngle = getAngle({ x: mousePoint.x - angleA.intersectionPoint.x, y: mousePoint.y - angleA.intersectionPoint.y });
+
+                if (isBetween(angleA_start, angleB_start, angleB_end) && isBetween(angleA_end, angleB_start, angleB_end) && isBetween(mouseAngle, angleB_start, angleB_end)) {
+                     const allVecs = [
+                        { vec: angleA.angleVectors[0], conf: getVecConfig(angleA, 0) },
+                        { vec: angleA.angleVectors[1], conf: getVecConfig(angleA, 1) },
+                        { vec: targetB.angleVectors[0], conf: getVecConfig(targetB, 0) },
+                        { vec: targetB.angleVectors[1], conf: getVecConfig(targetB, 1) },
+                    ].sort((a, b) => getAngle(a.vec) - getAngle(b.vec));
+
+                    const newConfigs = [
+                        { line1_id: allVecs[0].conf.l, line1_endpoint: allVecs[0].conf.e, line2_id: allVecs[1].conf.l, line2_endpoint: allVecs[1].conf.e },
+                        { line1_id: allVecs[2].conf.l, line1_endpoint: allVecs[2].conf.e, line2_id: allVecs[3].conf.l, line2_endpoint: allVecs[3].conf.e }
+                    ];
+                    return { type: 'cut', newConfigs };
+                }
+                return null;
+            }
+
+            // --- Main Initialization ---
+            function setActiveButton(activeBtnId) {
+                globalState.moveMode = activeBtnId;
+                Object.values(buttons).forEach(btn => btn.classList.replace('btn-active', 'btn-inactive'));
+                buttons[activeBtnId].classList.replace('btn-inactive', 'btn-active');
+            }
+
+            globalState.allLines = Array.from(svg.querySelectorAll('line')).map(getCoords);
+            globalState.allPoints = Array.from(svg.querySelectorAll('circle')).map(getCoords);
+            Object.keys(buttons).forEach(id => buttons[id].addEventListener('click', () => setActiveButton(id)));
+            
+            initialConfigs.forEach(config => angles.push(new Angle(config)));
+            redrawAllAngles();
+        });
+    </script>
+</body>
+</html>

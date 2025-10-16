@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>気持ちいい通分・約分体験</title>
+    <style>
+        /* 全体のスタイル */
+        body {
+            font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px 0;
+            background-color: #f0f7ff;
+            color: #333;
+            text-align: center;
+        }
+
+        /* コンテナ */
+        #container {
+            width: 90%;
+            max-width: 600px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #005a9c;
+            margin-bottom: 30px;
+        }
+
+        /* 問題・結果表示エリア */
+        #problem-container, #result-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 200px;
+            transition: opacity 0.5s ease-out;
+        }
+        #problem-display {
+             display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+        }
+
+        /* 分数全体のコンテナ */
+        .fraction-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        /* 分数のスタイル */
+        .fraction {
+            font-size: 4rem;
+            font-weight: bold;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+        
+        .fraction:hover {
+            transform: scale(1.05);
+        }
+
+        .numerator {
+            padding: 0 10px;
+        }
+
+        .denominator {
+            border-top: 4px solid #333;
+            padding: 0 10px;
+        }
+
+        /* 演算子 '+' */
+        .operator {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #555;
+            align-self: center;
+            padding-bottom: 50px;
+        }
+        
+        /* 操作ボタン (+, -) */
+        .controls button {
+            font-size: 1.5rem;
+            width: 50px;
+            height: 50px;
+            margin: 0 5px;
+            border-radius: 50%;
+            border: 2px solid #007bff;
+            background-color: #fff;
+            color: #007bff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .controls button:hover {
+            background-color: #007bff;
+            color: #fff;
+        }
+
+        .controls button:active {
+            transform: scale(0.9);
+        }
+        
+        /* 下部のボタンエリア */
+        #button-area {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        /* 汎用アクションボタン */
+        .action-button {
+            width: 80%;
+            max-width: 300px;
+            padding: 15px 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 50px;
+            border: none;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .action-button:not(:disabled):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        #merge-button { background-color: #28a745; }
+        #merge-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+        #reduce-button { background-color: #ffc107; color: #333; }
+        #new-problem-button { background-color: #007bff; }
+        
+        /* 結果表示 */
+        #result-message {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #d9534f;
+            min-height: 2.2rem;
+            margin-top: 20px;
+        }
+        
+        /* 約分フェーズ */
+        #factor-buttons-container {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .factor-button {
+            width: 50px;
+            height: 50px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 50%;
+            border: 2px solid #6c757d;
+            background: #fff;
+            color: #6c757d;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .factor-button:hover {
+            background: #6c757d;
+            color: #fff;
+        }
+
+        /* 汎用クラス */
+        .hidden {
+            display: none !important;
+        }
+        
+        /* アニメーション */
+        @keyframes merge-left { to { transform: translateX(calc(50% + 10px)); opacity: 0; } }
+        @keyframes merge-right { to { transform: translateX(calc(-50% - 10px)); opacity: 0; } }
+        @keyframes merge-operator { to { opacity: 0; } }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .shake { animation: shake 0.5s ease-in-out; }
+
+        #problem-display.merging .fraction-wrapper:first-child { animation: merge-left 0.8s forwards ease-in-out; }
+        #problem-display.merging .fraction-wrapper:last-child { animation: merge-right 0.8s forwards ease-in-out; }
+        #problem-display.merging .operator { animation: merge-operator 0.8s forwards ease-in-out; }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <h1>通分・約分チャレンジ！</h1>
+
+        <!-- 問題表示コンテナ -->
+        <div id="problem-container">
+            <div id="problem-display">
+                <div class="fraction-wrapper">
+                    <div class="fraction" id="fraction1"><span class="numerator" id="num1"></span><span class="denominator" id="den1"></span></div>
+                    <div class="controls"><button class="btn-plus" data-target="1">+</button><button class="btn-minus" data-target="1">-</button></div>
+                </div>
+                <div class="operator">+</div>
+                <div class="fraction-wrapper">
+                    <div class="fraction" id="fraction2"><span class="numerator" id="num2"></span><span class="denominator" id="den2"></span></div>
+                    <div class="controls"><button class="btn-plus" data-target="2">+</button><button class="btn-minus" data-target="2">-</button></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 結果表示コンテナ -->
+        <div id="result-container" class="hidden">
+            <div id="final-answer" class="fraction"></div>
+            <div id="result-message"></div>
+            <div id="factor-buttons-container" class="hidden"></div>
+        </div>
+
+        <!-- ボタンエリア -->
+        <div id="button-area">
+            <button id="merge-button" class="action-button" disabled>合体!</button>
+            <button id="reduce-button" class="action-button hidden">約分する</button>
+            <button id="new-problem-button" class="action-button">新しい問題</button>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- グローバル変数 ---
+        let initialFractions = {};
+        let multipliers = {};
+        let currentFinalFraction = { num: 0, den: 0 };
+
+        // --- DOM要素のキャッシュ ---
+        const dom = {
+            num1: document.getElementById('num1'), den1: document.getElementById('den1'),
+            num2: document.getElementById('num2'), den2: document.getElementById('den2'),
+            mergeButton: document.getElementById('merge-button'),
+            reduceButton: document.getElementById('reduce-button'),
+            newProblemButton: document.getElementById('new-problem-button'),
+            problemContainer: document.getElementById('problem-container'),
+            problemDisplay: document.getElementById('problem-display'),
+            resultContainer: document.getElementById('result-container'),
+            finalAnswer: document.getElementById('final-answer'),
+            resultMessage: document.getElementById('result-message'),
+            factorButtonsContainer: document.getElementById('factor-buttons-container'),
+            buttonArea: document.getElementById('button-area'),
+            plusButtons: document.querySelectorAll('.btn-plus'),
+            minusButtons: document.querySelectorAll('.btn-minus'),
+        };
+
+        // --- 数学ヘルパー関数 ---
+        const gcd = (a, b) => { while (b) { [a, b] = [b, a % b]; } return Math.abs(a); };
+        const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+        // --- 問題生成 ---
+        const generateNewProblem = () => {
+            let den1, den2, num1, num2;
+            while (true) {
+                const commonFactor = [2, 3, 5, 7][getRandomInt(0, 3)];
+                const factor1 = getRandomInt(2, 7);
+                let factor2 = getRandomInt(2, 7);
+                while (factor1 === factor2) { factor2 = getRandomInt(2, 7); }
+                den1 = commonFactor * factor1;
+                den2 = commonFactor * factor2;
+
+                if (den1 % den2 === 0 || den2 % den1 === 0) continue;
+
+                do { num1 = getRandomInt(1, den1 - 1); } while (gcd(num1, den1) !== 1);
+                do { num2 = getRandomInt(1, den2 - 1); } while (gcd(num2, den2) !== 1);
+                break;
+            }
+            return { 1: { num: num1, den: den1 }, 2: { num: num2, den: den2 } };
+        };
+
+        // --- UI更新 & 状態管理 ---
+        const setupProblem = (problem) => {
+            initialFractions = problem;
+            multipliers = { 1: 1, 2: 1 };
+            updateFractionDisplay(1);
+            updateFractionDisplay(2);
+            resetToProblemPhase();
+        };
+
+        const updateFractionDisplay = (target) => {
+            dom[`num${target}`].textContent = initialFractions[target].num * multipliers[target];
+            dom[`den${target}`].textContent = initialFractions[target].den * multipliers[target];
+        };
+        
+        const updateFinalAnswerDisplay = () => {
+            dom.finalAnswer.innerHTML = `<span class="numerator">${currentFinalFraction.num}</span><span class="denominator">${currentFinalFraction.den}</span>`;
+        };
+
+        const resetToProblemPhase = () => {
+            dom.problemContainer.classList.remove('hidden');
+            dom.resultContainer.classList.add('hidden');
+            dom.problemDisplay.classList.remove('merging');
+            dom.buttonArea.classList.remove('hidden');
+            dom.mergeButton.classList.remove('hidden');
+            dom.reduceButton.classList.add('hidden');
+            dom.newProblemButton.classList.remove('hidden');
+            dom.factorButtonsContainer.classList.add('hidden');
+            dom.resultMessage.textContent = '';
+            checkDenominators();
+        };
+
+        // --- イベントハンドラ ---
+        const handlePlusMinus = (target, operation) => {
+            if (operation === 'plus') multipliers[target]++;
+            else if (operation === 'minus' && multipliers[target] > 1) multipliers[target]--;
+            updateFractionDisplay(target);
+            checkDenominators();
+        };
+
+        const checkDenominators = () => {
+            dom.mergeButton.disabled = dom.den1.textContent !== dom.den2.textContent;
+        };
+
+        const mergeFractions = () => {
+            dom.problemDisplay.classList.add('merging');
+            dom.buttonArea.classList.add('hidden');
+
+            setTimeout(() => {
+                const num1 = parseInt(dom.num1.textContent, 10);
+                const num2 = parseInt(dom.num2.textContent, 10);
+                const den = parseInt(dom.den1.textContent, 10);
+                currentFinalFraction = { num: num1 + num2, den: den };
+                
+                updateFinalAnswerDisplay();
+                dom.problemContainer.classList.add('hidden');
+                dom.resultContainer.classList.remove('hidden');
+                dom.buttonArea.classList.remove('hidden');
+                dom.mergeButton.classList.add('hidden');
+
+                if (gcd(currentFinalFraction.num, currentFinalFraction.den) === 1) {
+                    dom.resultMessage.textContent = '計算完了！(既約分数)';
+                } else {
+                    dom.resultMessage.textContent = '計算完了！約分してみよう！';
+                    dom.reduceButton.classList.remove('hidden');
+                }
+            }, 800);
+        };
+
+        const startReductionPhase = () => {
+            dom.reduceButton.classList.add('hidden');
+            dom.newProblemButton.classList.add('hidden');
+            dom.factorButtonsContainer.innerHTML = ''; // Clear previous buttons
+            
+            const factors = [2, 3, 5, 7, 11];
+            factors.forEach(factor => {
+                const button = document.createElement('button');
+                button.textContent = factor;
+                button.className = 'factor-button';
+                button.onclick = () => tryFactor(factor);
+                dom.factorButtonsContainer.appendChild(button);
+            });
+            dom.factorButtonsContainer.classList.remove('hidden');
+            dom.resultMessage.textContent = 'どの数で割れるかな？';
+        };
+
+        const tryFactor = (factor) => {
+            const { num, den } = currentFinalFraction;
+            if (num % factor === 0 && den % factor === 0) {
+                // 割り切れる場合
+                currentFinalFraction.num /= factor;
+                currentFinalFraction.den /= factor;
+                updateFinalAnswerDisplay();
+
+                if (gcd(currentFinalFraction.num, currentFinalFraction.den) === 1) {
+                    dom.resultMessage.textContent = 'クリア！';
+                    dom.factorButtonsContainer.classList.add('hidden');
+                    dom.newProblemButton.classList.remove('hidden');
+                }
+            } else {
+                // 割り切れない場合
+                const tempNum = (num / factor).toFixed(2).replace(/\.00$/, '');
+                const tempDen = (den / factor).toFixed(2).replace(/\.00$/, '');
+                dom.finalAnswer.innerHTML = `<span class="numerator">${tempNum}</span><span class="denominator">${tempDen}</span>`;
+                dom.finalAnswer.classList.add('shake');
+                setTimeout(() => {
+                    updateFinalAnswerDisplay();
+                    dom.finalAnswer.classList.remove('shake');
+                }, 500);
+            }
+        };
+
+        // --- イベントリスナー設定 ---
+        dom.plusButtons.forEach(b => b.addEventListener('click', (e) => handlePlusMinus(e.target.dataset.target, 'plus')));
+        dom.minusButtons.forEach(b => b.addEventListener('click', (e) => handlePlusMinus(e.target.dataset.target, 'minus')));
+        dom.mergeButton.addEventListener('click', mergeFractions);
+        dom.reduceButton.addEventListener('click', startReductionPhase);
+        dom.newProblemButton.addEventListener('click', () => setupProblem(generateNewProblem()));
+
+        // --- 初期化 ---
+        setupProblem({ 1: { num: 5, den: 6 }, 2: { num: 5, den: 28 } });
+    });
+    </script>
+</body>
+</html>

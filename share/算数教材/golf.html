@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数値ゴルフゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=M+PLUS+Rounded+1c:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', 'Inter', sans-serif;
+        }
+        .game-container {
+            max-width: 900px;
+            width: 95%;
+        }
+        canvas {
+            background-color: #f0f4f8;
+            border-radius: 0.5rem;
+            overflow: hidden; /* はみ出した線を見えなくする */
+        }
+        .btn-op {
+            transition: all 0.2s ease-in-out;
+            font-feature-settings: "tnum"; /* 等幅数字 */
+        }
+        .btn-op:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .btn-op:active {
+            transform: translateY(-1px);
+        }
+        .clear-message {
+            animation: fadeIn 0.5s ease-in-out, popUp 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes popUp {
+            from { transform: translate(-50%, -50%) scale(0.5); }
+            to { transform: translate(-50%, -50%) scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div id="game-container" class="game-container mx-auto bg-white p-6 rounded-xl shadow-lg">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-2xl font-bold text-gray-800">数値ゴルフゲーム</h1>
+            <div class="flex items-baseline gap-4">
+                <p id="score-display" class="text-xl font-bold text-gray-800"></p>
+                <p id="par-display" class="text-lg font-medium text-gray-500"></p>
+            </div>
+            <button id="reset-button" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg shadow transition">
+                やり直す
+            </button>
+        </div>
+
+        <div class="relative w-full">
+            <canvas id="game-canvas" width="850" height="300"></canvas>
+            <div id="clear-message" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-2xl text-center">
+                <p class="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-violet-500 mb-2">クリア！</p>
+                <p class="text-gray-600 font-medium">おめでとうございます！</p>
+            </div>
+        </div>
+
+        <div class="mt-4 text-center">
+             <p class="text-lg text-gray-600">現在の着弾距離</p>
+             <p id="current-distance-text" class="text-4xl font-bold text-gray-800 tracking-tighter">40.0 m</p>
+        </div>
+        
+        <div id="operations-container" class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+        </div>
+    </div>
+
+    <script>
+        // DOM要素
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const currentDistanceText = document.getElementById('current-distance-text');
+        const operationsContainer = document.getElementById('operations-container');
+        const resetButton = document.getElementById('reset-button');
+        const clearMessage = document.getElementById('clear-message');
+        const parDisplay = document.getElementById('par-display');
+        const scoreDisplay = document.getElementById('score-display');
+
+        // ゲーム状態
+        let currentDistance;
+        let targetDistance;
+        let isGameOver;
+        let animationFrameId;
+        let moveCount;
+
+        // 定数
+        const INITIAL_DISTANCE = 40;
+        const TARGET_X_RATIO = 0.8;
+        const zoneBoundaries = [2, 8, 16, 25, 35, 46, 58, 80, 95, Infinity];
+
+        // ユーティリティ
+        const round1 = (num) => Math.round(num * 10) / 10;
+        const round2 = (num) => Math.round(num * 100) / 100;
+        const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+        // --- 新しいロジックのコア関数 ---
+
+        function getZone(distance) {
+            if (targetDistance === 0) return distance === 0 ? 0 : 9;
+            const errorPercent = Math.abs(distance - targetDistance) / targetDistance * 100;
+            const zone = zoneBoundaries.findIndex(boundary => errorPercent <= boundary);
+            return zone === -1 ? 9 : zone;
+        }
+
+        function decimalToFraction(decimal) {
+            const tolerance = 1.0E-6;
+            let h1=1, h2=0, k1=0, k2=1;
+            let b = decimal;
+            do {
+                let a = Math.floor(b);
+                let aux = h1; h1 = a*h1+h2; h2 = aux;
+                aux = k1; k1 = a*k1+k2; k2 = aux;
+                b = 1/(b-a);
+            } while (Math.abs(decimal-h1/k1) > decimal*tolerance && k1 < 100);
+            return {num: h1, den: k1};
+        }
+        
+        function createOperationForZone(targetZone) {
+            const lowerBoundError = targetZone === 0 ? 0 : zoneBoundaries[targetZone - 1];
+            
+            let upperBoundError = zoneBoundaries[targetZone];
+            if (upperBoundError === Infinity) {
+                upperBoundError = 200; 
+            }
+
+            const randomError = lowerBoundError + Math.random() * (upperBoundError - lowerBoundError);
+            const sign = Math.random() < 0.5 ? -1 : 1;
+            
+            let targetValueInZone = targetDistance * (1 + sign * randomError / 100);
+            if (targetValueInZone <= 0) {
+                targetValueInZone = targetDistance * (1 + 1 * randomError / 100);
+            }
+
+            if (currentDistance === 0) return { type: '*', value: round2(targetValueInZone) };
+
+            const requiredFactor = targetValueInZone / currentDistance;
+
+            const opTypeChoice = Math.random();
+            if (opTypeChoice < 0.25) {
+                if (requiredFactor === 0) return { type: '*', value: 0 }; 
+                return { type: '/', value: round2(1 / requiredFactor) };
+            } 
+            else if (opTypeChoice < 0.55) { 
+                const frac = decimalToFraction(requiredFactor);
+                if (frac.num > 99 || frac.den > 99 || frac.den === 0) {
+                    return { type: '*', value: round2(requiredFactor) };
+                }
+                return { type: 'fraction', operator: '*', value: frac };
+            } 
+            else if (opTypeChoice < 0.80) { 
+                const percent = round1((requiredFactor - 1) * 100);
+                return { type: 'percent', operator: percent >= 0 ? '+' : '-', value: Math.abs(percent) };
+            } 
+            else { 
+                return { type: '*', value: round2(requiredFactor) };
+            }
+        }
+
+        function generateOperations() {
+            operationsContainer.innerHTML = '';
+            
+            const currentZone = getZone(currentDistance);
+            const zonePriorities = [];
+            for (let i = currentZone; i >= 0; i--) zonePriorities.push(i);
+            for (let i = currentZone + 1; i < 10; i++) zonePriorities.push(i);
+
+            const uniquePriorities = [...new Set(zonePriorities)];
+            const selectedTargetZones = uniquePriorities.slice(0, 4);
+
+            let ops = selectedTargetZones.map(zone => createOperationForZone(zone));
+            
+            ops.sort(() => Math.random() - 0.5).forEach(op => {
+                const button = document.createElement('button');
+                button.className = 'btn-op w-full bg-white border-2 border-gray-300 hover:border-indigo-400 text-gray-700 font-bold text-xl md:text-2xl py-4 rounded-xl shadow-sm';
+                button.textContent = formatOp(op);
+                button.onclick = () => applyOperation(op);
+                operationsContainer.appendChild(button);
+            });
+        }
+        
+        function initGame() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            
+            currentDistance = INITIAL_DISTANCE;
+            targetDistance = getRandomInt(100, 1000);
+            isGameOver = false;
+            moveCount = 0;
+
+            // PARとSCOREの計算と表示
+            const initialZone = getZone(currentDistance);
+            const par = Math.max(1, Math.ceil(initialZone / 3));
+            parDisplay.textContent = `PAR：${par}`;
+            scoreDisplay.textContent = `SCORE：${moveCount}`;
+
+
+            clearMessage.classList.add('hidden');
+            operationsContainer.innerHTML = '';
+            
+            generateOperations();
+            updateDisplay();
+        }
+        
+        function updateDisplay() {
+            currentDistanceText.textContent = `${round1(currentDistance)} m`;
+            scoreDisplay.textContent = `SCORE：${moveCount}`;
+            drawCanvas();
+        }
+
+        function drawCanvas() {
+            const containerWidth = canvas.parentElement.clientWidth;
+            canvas.width = containerWidth;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const y_center = canvas.height / 2;
+            const startX = 30; 
+            const targetX = canvas.width * TARGET_X_RATIO;
+            const scale = (targetX - startX) / targetDistance;
+
+            const clearRangePixels = targetDistance * 0.02 * scale;
+
+            ctx.fillStyle = 'rgba(236, 72, 153, 0.3)';
+            ctx.beginPath();
+            ctx.arc(targetX, y_center, Math.max(5, clearRangePixels), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(236, 72, 153, 0.8)';
+            ctx.beginPath();
+            ctx.arc(targetX, y_center, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#be185d';
+            ctx.font = '16px "M PLUS Rounded 1c"';
+            ctx.textAlign = 'center';
+            ctx.fillText('標的', targetX, y_center - Math.max(10, clearRangePixels) - 15);
+            ctx.font = 'bold 18px "M PLUS Rounded 1c"';
+            ctx.fillText(`${targetDistance}m`, targetX, y_center + Math.max(10, clearRangePixels) + 25);
+
+            const currentX = startX + currentDistance * scale;
+            
+            ctx.fillStyle = '#1f2937';
+            ctx.beginPath();
+            ctx.arc(startX, y_center, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(startX, y_center);
+            ctx.lineTo(currentX, y_center);
+            ctx.stroke();
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(currentX, y_center, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        function formatOp(op) {
+            switch (op.type) {
+                case 'fraction':
+                    return `${op.operator === '*' ? '×' : '÷'} ${op.value.num}/${op.value.den}`;
+                case 'percent':
+                    return `${op.operator}${op.value.toFixed(1)}%`;
+                case '*':
+                case '/':
+                    const symbol = op.type === '*' ? '×' : '÷';
+                    return `${symbol} ${op.value.toFixed(2)}`;
+                default: return 'エラー';
+            }
+        }
+        
+        function applyOperation(op) {
+            if (isGameOver) return;
+
+            moveCount++;
+            
+            let result = currentDistance;
+            switch (op.type) {
+                case '*': result = currentDistance * op.value; break;
+                case '/': result = op.value !== 0 ? currentDistance / op.value : currentDistance; break;
+                case 'fraction':
+                    if (op.operator === '*') {
+                        result = currentDistance * op.value.num / op.value.den;
+                    } else {
+                        if (op.value.num !== 0) result = currentDistance / op.value.num * op.value.den;
+                    }
+                    break;
+                case 'percent':
+                    result = currentDistance * (1 + (op.operator === '+' ? op.value : -op.value) / 100);
+                    break;
+            }
+            currentDistance = round2(result);
+            if (currentDistance < 0) currentDistance = 0;
+
+            updateDisplay();
+            checkWinCondition();
+            if (!isGameOver) generateOperations();
+        }
+
+        function checkWinCondition() {
+            if (getZone(currentDistance) === 0) {
+                isGameOver = true;
+                operationsContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full">ゲームクリア！</p>`;
+                playWinAnimation();
+            }
+        }
+
+        function playWinAnimation() {
+            const targetX = canvas.width * TARGET_X_RATIO;
+            const startX = 30;
+            const y_center = canvas.height / 2;
+            const projectile = { radius: 6, color: 'rgba(99, 102, 241, 1)' };
+            const duration = 1000;
+            let startTime = null;
+
+            function animate(currentTime) {
+                if (!startTime) startTime = currentTime;
+                const progress = Math.min((currentTime - startTime) / duration, 1);
+                
+                updateDisplay();
+
+                const currentX = startX + (targetX - startX) * progress;
+                const peakHeight = -canvas.height / 3.5;
+                const currentY = y_center + peakHeight * (4 * progress * (1 - progress));
+
+                ctx.fillStyle = projectile.color;
+                ctx.beginPath();
+                ctx.arc(currentX, currentY, projectile.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (progress < 1) {
+                    animationFrameId = requestAnimationFrame(animate);
+                } else {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.strokeStyle = projectile.color;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(targetX, y_center, 15, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    clearMessage.classList.remove('hidden');
+                }
+            }
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        resetButton.addEventListener('click', initGame);
+        window.addEventListener('resize', updateDisplay);
+
+        initGame();
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数当てゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ドラッグ中のカードのスタイルを控えめに */
+        .dragging {
+            transform: scale(1.1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        /* 基本的なカードのトランジション */
+        .card {
+            transition: background-color 0.3s ease, transform 0.1s ease;
+        }
+        /* スロットのドロップ可能エリアのハイライト */
+        .drag-over {
+            background-color: #e0f2fe; /* light-blue-100 */
+            border-style: dashed;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans flex flex-col items-center justify-center min-h-screen p-4">
+
+    <!-- 問題選択画面 -->
+    <div id="question-selection-screen" class="w-full max-w-md mx-auto text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">数当てゲーム</h1>
+        <h2 class="text-xl text-gray-700 mb-8">挑戦する問題を選んでください</h2>
+        <div id="question-buttons" class="grid grid-cols-1 gap-4">
+            <!-- JavaScriptで問題選択ボタンを生成 -->
+        </div>
+    </div>
+
+    <!-- ゲーム画面 (最初は非表示) -->
+    <div id="game-container" class="w-full max-w-md mx-auto relative hidden">
+        <h1 id="game-title" class="text-2xl font-bold text-center text-gray-800 mb-6"></h1>
+
+        <!-- ヒントカードエリア -->
+        <div id="hint-container" class="mb-8 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- JavaScriptでヒントカードを生成 -->
+        </div>
+
+        <!-- 3桁の数字を置くスロット -->
+        <div id="slots-container" class="flex justify-center items-center gap-3 mb-8">
+            <div data-slot-index="0" class="drop-slot w-20 h-28 sm:w-24 sm:h-32 bg-white border-2 border-gray-300 rounded-lg shadow-inner flex items-center justify-center text-5xl font-bold text-gray-800"></div>
+            <div data-slot-index="1" class="drop-slot w-20 h-28 sm:w-24 sm:h-32 bg-white border-2 border-gray-300 rounded-lg shadow-inner flex items-center justify-center text-5xl font-bold text-gray-800"></div>
+            <div data-slot-index="2" class="drop-slot w-20 h-28 sm:w-24 sm:h-32 bg-white border-2 border-gray-300 rounded-lg shadow-inner flex items-center justify-center text-5xl font-bold text-gray-800"></div>
+        </div>
+
+        <!-- 数字カードエリア -->
+        <div id="cards-container" class="bg-gray-200 p-4 rounded-lg shadow-lg">
+            <p class="text-center text-sm text-gray-600 mb-3">下のカードを上の空欄へドラッグしてください</p>
+            <div class="flex flex-wrap justify-center gap-2">
+                <!-- JavaScriptで0から9のカードを生成 -->
+            </div>
+        </div>
+        
+        <!-- 操作ボタン -->
+        <div class="mt-6 flex justify-center gap-4">
+            <button id="reset-button" class="px-6 py-2 bg-yellow-500 text-white font-bold rounded-lg shadow hover:bg-yellow-600 transition-colors">リセット</button>
+            <button id="back-to-selection-button" class="px-6 py-2 bg-gray-500 text-white font-bold rounded-lg shadow hover:bg-gray-600 transition-colors">問題選択に戻る</button>
+        </div>
+
+
+        <!-- クリアメッセージ -->
+        <div id="win-message" class="absolute inset-0 bg-white bg-opacity-90 flex-col items-center justify-center rounded-lg p-4 flex opacity-0 pointer-events-none transition-opacity duration-500 ease-in-out">
+            <p class="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 animate-pulse">クリア！</p>
+            <p id="correct-answer" class="mt-4 text-2xl font-bold text-gray-700"></p>
+            <button id="next-level-button" class="mt-8 px-6 py-2 bg-blue-500 text-white font-bold rounded-lg shadow hover:bg-blue-600 transition-colors">次の問題へ</button>
+            <button id="win-back-button" class="mt-4 px-6 py-2 bg-gray-500 text-white font-bold rounded-lg shadow hover:bg-gray-600 transition-colors">問題選択に戻る</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 問題データ ---
+            const questions = [
+                {
+                    title: '第1問',
+                    hints: [
+                        { text: '１が２こ使われている', validator: (slots) => {
+                            const onesCount = slots.filter(s => s === '1').length;
+                            const filledCount = slots.filter(s => s !== null).length;
+                            if (onesCount > 2) return 'incorrect';
+                            if (filledCount === 3) return onesCount === 2 ? 'correct' : 'incorrect';
+                            if (onesCount === 2 && filledCount < 3) return 'correct';
+                            if (onesCount + (3 - filledCount) < 2) return 'incorrect';
+                            return 'neutral';
+                        }},
+                        { text: '３の倍数である', validator: (slots) => {
+                            if (slots.some(s => s === null)) return 'neutral';
+                            const num = parseInt(slots.join(''));
+                            return num % 3 === 0 ? 'correct' : 'incorrect';
+                        }},
+                        { text: '200以上である', validator: (slots) => {
+                            const hundreds = slots[0];
+                            if (hundreds === null) return 'neutral';
+                            if (['0', '1'].includes(hundreds)) return 'incorrect';
+                            return 'correct';
+                        }},
+                        { text: '800未満である', validator: (slots) => {
+                            const hundreds = slots[0];
+                            if (hundreds === null) return 'neutral';
+                            if (['8', '9'].includes(hundreds)) return 'incorrect';
+                            return 'correct';
+                        }},
+                    ]
+                },
+                {
+                    title: '第2問',
+                    hints: [
+                        { text: '偶数が１つだけ使われている', validator: (slots) => {
+                            const evens = slots.filter(s => s !== null && parseInt(s) % 2 === 0);
+                            const filledCount = slots.filter(s => s !== null).length;
+                            if (evens.length > 1) return 'incorrect';
+                            if (filledCount === 3) return evens.length === 1 ? 'correct' : 'incorrect';
+                            if (evens.length === 1 && filledCount < 3) return 'correct';
+                            if (evens.length === 0 && filledCount === 3) return 'incorrect';
+                            return 'neutral';
+                        }},
+                        { text: 'となり合う数字は7以上離れている', validator: (slots) => {
+                            if (slots[0] !== null && slots[1] !== null && Math.abs(parseInt(slots[0]) - parseInt(slots[1])) < 7) {
+                                return 'incorrect';
+                            }
+                            if (slots[1] !== null && slots[2] !== null && Math.abs(parseInt(slots[1]) - parseInt(slots[2])) < 7) {
+                                return 'incorrect';
+                            }
+                            if (slots.every(s => s !== null)) {
+                                const isOk1 = Math.abs(parseInt(slots[0]) - parseInt(slots[1])) >= 7;
+                                const isOk2 = Math.abs(parseInt(slots[1]) - parseInt(slots[2])) >= 7;
+                                return isOk1 && isOk2 ? 'correct' : 'incorrect';
+                            }
+                            return 'neutral';
+                        }},
+                        { text: '数字はすべて異なる', validator: (slots) => {
+                            const filledSlots = slots.filter(s => s !== null);
+                            if (filledSlots.length < 2) return 'neutral';
+                            const isUnique = new Set(filledSlots).size === filledSlots.length;
+                            return isUnique ? 'correct' : 'incorrect';
+                        }},
+                        { text: '各位の数の和は10', validator: (slots) => {
+                            if (slots.some(s => s === null)) return 'neutral';
+                            const sum = slots.reduce((acc, val) => acc + parseInt(val), 0);
+                            return sum === 10 ? 'correct' : 'incorrect';
+                        }},
+                    ]
+                },
+                {
+                    title: '第3問',
+                    hints: [
+                        { text: '百の位 > 十の位', validator: (slots) => {
+                            if (slots[0] === null || slots[1] === null) return 'neutral';
+                            return parseInt(slots[0]) > parseInt(slots[1]) ? 'correct' : 'incorrect';
+                        }},
+                        { text: '百の位+十の位=一の位', validator: (slots) => {
+                            if (slots.some(s => s === null)) return 'neutral';
+                            return parseInt(slots[0]) + parseInt(slots[1]) === parseInt(slots[2]) ? 'correct' : 'incorrect';
+                        }},
+                        { text: '6の倍数', validator: (slots) => {
+                            if (slots.some(s => s === null)) return 'neutral';
+                            const num = parseInt(slots.join(''));
+                            return num % 6 === 0 ? 'correct' : 'incorrect';
+                        }},
+                        { text: '0と4はない', validator: (slots) => {
+                            if (slots.includes('4') || slots.includes('0')) return 'incorrect';
+                            if (slots.every(s => s !== null)) return 'correct';
+                            return 'neutral';
+                        }},
+                    ]
+                }
+            ];
+            
+            // --- DOM要素の取得 ---
+            const questionSelectionScreen = document.getElementById('question-selection-screen');
+            const questionButtonsContainer = document.getElementById('question-buttons');
+            const gameContainer = document.getElementById('game-container');
+            const gameTitle = document.getElementById('game-title');
+            const hintContainer = document.getElementById('hint-container');
+            const cardsContainer = document.querySelector('#cards-container .flex');
+            const winMessage = document.getElementById('win-message');
+            const resetButton = document.getElementById('reset-button');
+            const backToSelectionButton = document.getElementById('back-to-selection-button');
+            const winBackButton = document.getElementById('win-back-button');
+            const nextLevelButton = document.getElementById('next-level-button');
+            const correctAnswerEl = document.getElementById('correct-answer');
+            const dropSlots = document.querySelectorAll('.drop-slot');
+
+            // --- ゲームの状態管理 ---
+            let currentQuestionIndex = -1;
+            let slots = [null, null, null];
+            let draggedCardValue = null;
+            let draggedFromSlotIndex = null;
+
+            // --- 初期化処理 ---
+            function showQuestionSelection() {
+                questionSelectionScreen.classList.remove('hidden');
+                gameContainer.classList.add('hidden');
+                questionButtonsContainer.innerHTML = '';
+                questions.forEach((q, index) => {
+                    const button = document.createElement('button');
+                    button.className = 'w-full p-4 bg-white rounded-lg shadow hover:bg-blue-50 transition-colors text-lg font-semibold text-blue-600';
+                    button.textContent = q.title;
+                    button.addEventListener('click', () => startGame(index));
+                    questionButtonsContainer.appendChild(button);
+                });
+            }
+
+            function startGame(questionIndex) {
+                currentQuestionIndex = questionIndex;
+                questionSelectionScreen.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
+                initializeGame();
+            }
+
+            function initializeGame() {
+                const question = questions[currentQuestionIndex];
+                gameTitle.textContent = question.title;
+
+                // ヒントカードを生成
+                hintContainer.innerHTML = '';
+                question.hints.forEach((hint, index) => {
+                    const card = document.createElement('div');
+                    card.id = `hint-${index}`;
+                    card.className = 'card bg-gray-200 p-3 rounded-lg shadow text-center text-gray-700';
+                    card.textContent = hint.text;
+                    hintContainer.appendChild(card);
+                });
+
+                // 数字カードを生成 (初回のみ)
+                if (cardsContainer.children.length === 0) {
+                    for (let i = 0; i <= 9; i++) {
+                        const card = document.createElement('div');
+                        card.className = 'number-card card w-12 h-16 sm:w-14 sm:h-20 bg-white rounded-lg shadow flex items-center justify-center text-3xl font-bold text-blue-600 cursor-grab active:cursor-grabbing';
+                        card.textContent = i;
+                        card.draggable = true;
+                        card.dataset.value = i;
+                        cardsContainer.appendChild(card);
+                    }
+                    addDragListenersToPaletteCards();
+                }
+
+                // 状態をリセット
+                slots = [null, null, null];
+                // クリアメッセージを非表示に
+                winMessage.classList.remove('opacity-100');
+                winMessage.classList.add('opacity-0', 'pointer-events-none');
+                
+                // UIを更新
+                updateSlotsUI();
+                checkAllHints();
+                
+                // 次の問題ボタンの表示制御
+                if (currentQuestionIndex >= questions.length - 1) {
+                    nextLevelButton.style.display = 'none';
+                } else {
+                    nextLevelButton.style.display = 'inline-block';
+                }
+            }
+            
+            // --- イベントリスナーの設定 ---
+            function addDragListenersToPaletteCards() {
+                document.querySelectorAll('.number-card').forEach(card => {
+                    card.addEventListener('dragstart', handleDragStartFromPalette);
+                    card.addEventListener('dragend', (e) => e.target.classList.remove('dragging'));
+                });
+            }
+
+            dropSlots.forEach(slot => {
+                slot.addEventListener('dragover', handleDragOver);
+                slot.addEventListener('dragenter', handleDragEnter);
+                slot.addEventListener('dragleave', handleDragLeave);
+                slot.addEventListener('drop', handleDropOnSlot);
+                slot.addEventListener('dragstart', handleDragStartFromSlot);
+                slot.addEventListener('dragend', handleDragEndFromSlot);
+            });
+
+            resetButton.addEventListener('click', initializeGame);
+            backToSelectionButton.addEventListener('click', showQuestionSelection);
+            winBackButton.addEventListener('click', showQuestionSelection);
+            nextLevelButton.addEventListener('click', () => {
+                if (currentQuestionIndex < questions.length - 1) {
+                    startGame(currentQuestionIndex + 1);
+                }
+            });
+
+            // --- ドラッグ＆ドロップのハンドラ ---
+            function handleDragStartFromPalette(e) {
+                draggedCardValue = e.target.dataset.value;
+                draggedFromSlotIndex = null;
+                e.target.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'copyMove';
+            }
+            
+            function handleDragStartFromSlot(e) {
+                const slotIndex = parseInt(e.target.dataset.slotIndex);
+                if (slots[slotIndex] !== null) {
+                    draggedCardValue = slots[slotIndex];
+                    draggedFromSlotIndex = slotIndex;
+                    e.dataTransfer.effectAllowed = 'move';
+                    setTimeout(() => e.target.classList.add('opacity-0'), 0);
+                } else {
+                    e.preventDefault();
+                }
+            }
+            
+            function handleDragEndFromSlot(e) {
+                e.target.classList.remove('opacity-0');
+                if (draggedFromSlotIndex !== null) {
+                    slots[draggedFromSlotIndex] = null;
+                    draggedFromSlotIndex = null;
+                    updateAndCheck();
+                }
+            }
+
+            function handleDragOver(e) { e.preventDefault(); }
+            function handleDragEnter(e) { e.preventDefault(); e.target.classList.add('drag-over'); }
+            function handleDragLeave(e) { e.target.classList.remove('drag-over'); }
+
+            function handleDropOnSlot(e) {
+                e.preventDefault();
+                e.target.classList.remove('drag-over');
+                const targetSlotIndex = parseInt(e.target.dataset.slotIndex);
+
+                if (draggedFromSlotIndex === targetSlotIndex) {
+                    draggedFromSlotIndex = null;
+                    return;
+                }
+                
+                const valueToSwap = slots[targetSlotIndex];
+                slots[targetSlotIndex] = draggedCardValue;
+
+                if (draggedFromSlotIndex !== null) {
+                    slots[draggedFromSlotIndex] = valueToSwap;
+                }
+                
+                draggedCardValue = null;
+                draggedFromSlotIndex = null;
+                updateAndCheck();
+            }
+
+            // --- UI更新とヒントチェック ---
+            function updateAndCheck() {
+                updateSlotsUI();
+                checkAllHints();
+            }
+
+            function updateSlotsUI() {
+                dropSlots.forEach((slot, index) => {
+                    if (slots[index] !== null) {
+                        slot.textContent = slots[index];
+                        slot.classList.add('border-blue-400', 'text-gray-800');
+                        slot.draggable = true;
+                    } else {
+                        slot.textContent = '';
+                        slot.classList.remove('border-blue-400', 'text-gray-800');
+                        slot.draggable = false;
+                    }
+                });
+            }
+
+            function checkAllHints() {
+                const question = questions[currentQuestionIndex];
+                let allCorrect = true;
+
+                question.hints.forEach((hint, index) => {
+                    const status = hint.validator(slots);
+                    const cardElement = document.getElementById(`hint-${index}`);
+                    updateHintCardUI(cardElement, status);
+                    if (status !== 'correct') {
+                        allCorrect = false;
+                    }
+                });
+                
+                if (slots.every(s => s !== null) && allCorrect) {
+                    setTimeout(() => {
+                        correctAnswerEl.textContent = `正解: ${slots.join('')}`;
+                        winMessage.classList.remove('opacity-0', 'pointer-events-none');
+                        winMessage.classList.add('opacity-100');
+                    }, 300); // 0.3秒待ってから表示
+                }
+            }
+            
+            function updateHintCardUI(cardElement, status) {
+                cardElement.classList.remove('bg-gray-200', 'bg-green-200', 'bg-red-200');
+                switch (status) {
+                    case 'correct': cardElement.classList.add('bg-green-200'); break;
+                    case 'incorrect': cardElement.classList.add('bg-red-200'); break;
+                    case 'neutral': default: cardElement.classList.add('bg-gray-200'); break;
+                }
+            }
+
+            // --- ゲーム開始 ---
+            showQuestionSelection();
+        });
+    </script>
+</body>
+</html>

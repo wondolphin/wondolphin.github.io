@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>可視化ゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+        }
+        .game-container { display: none; }
+        .dragging {
+            opacity: 0.5;
+            transform: scale(1.1);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            cursor: grabbing;
+        }
+        .draggable { cursor: grab; }
+        .draggable:active { cursor: grabbing; }
+        .drag-over {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(52, 152, 219, 0.5);
+        }
+        .popup {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .popup.hidden {
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+        }
+        /* 種別ごとの背景色 */
+        .item-name-bg { background-color: #fef3c7; } /* amber-100 */
+        .number-bg { background-color: #dbeafe; } /* blue-100 */
+
+        /* 問題3 棒グラフのスタイル */
+        .bar-chart-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end; /* バーを下揃えにする */
+            width: 100%;
+            height: 250px;
+            padding: 0 20px;
+            border-bottom: 3px solid #333;
+        }
+        .bar-wrapper {
+            display: flex;
+            flex-direction: column; 
+            justify-content: flex-end; 
+            align-items: center;
+            height: 100%; 
+            width: 25%;
+        }
+        .bar-value {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        .bar {
+            width: 50px;
+            transition: height 0.5s ease-in-out;
+        }
+        .bar-label {
+            margin-top: 8px;
+            font-weight: bold;
+            color: #374151;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-5xl mx-auto">
+        <!-- 問題選択画面 -->
+        <div id="menu-screen" class="text-center p-8 bg-white rounded-2xl shadow-lg">
+            <h1 class="text-4xl font-bold text-gray-800 mb-8">可視化ゲーム</h1>
+            <div class="flex flex-col md:flex-row justify-center gap-6">
+                <button id="start-game-1" class="bg-blue-500 hover:bg-blue-600 text-white font-bold text-2xl py-6 px-12 rounded-2xl transition-transform duration-200 hover:scale-105">問題 1</button>
+                <button id="start-game-2" class="bg-green-500 hover:bg-green-600 text-white font-bold text-2xl py-6 px-12 rounded-2xl transition-transform duration-200 hover:scale-105">問題 2</button>
+                <button id="start-game-3" class="bg-purple-500 hover:bg-purple-600 text-white font-bold text-2xl py-6 px-12 rounded-2xl transition-transform duration-200 hover:scale-105">問題 3</button>
+            </div>
+        </div>
+
+        <!-- 問題1のゲーム画面 -->
+        <div id="game-1-container" class="game-container p-6 bg-white rounded-2xl shadow-lg">
+            <h2 class="text-2xl font-bold mb-4">問題1: 長方形の面積</h2>
+            <div id="problem-text-1" class="text-center text-xl md:text-2xl p-4 mb-8 bg-pink-100 rounded-lg">
+                <p>たての長さが <span id="height-answer" class="font-bold text-gray-600 transition-colors duration-300">[４]</span> cm、横の長さが <span id="width-answer" class="font-bold text-gray-600 transition-colors duration-300">[10]</span> cmの長方形があります。</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+                <div class="col-span-1 md:col-span-2 flex justify-center items-center h-80">
+                    <div class="relative flex justify-center items-center">
+                        <div id="drop-height" class="drop-zone-g1 absolute -left-12 flex items-center justify-center w-10 h-10 bg-gray-200 rounded-lg border-2 border-dashed border-gray-400 text-2xl font-bold transition-all duration-200">?</div>
+                        <div id="drop-width" class="drop-zone-g1 absolute -bottom-12 flex items-center justify-center w-10 h-10 bg-gray-200 rounded-lg border-2 border-dashed border-gray-400 text-2xl font-bold transition-all duration-200">?</div>
+                        <div id="rectangle" class="bg-white border-4 border-gray-700 transition-all duration-500 ease-in-out" style="width: 125px; height: 125px;"></div>
+                    </div>
+                </div>
+                <div class="flex md:flex-col justify-around md:justify-center items-center bg-amber-100 p-6 rounded-2xl h-full">
+                    <div data-value="4" draggable="true" class="draggable-g1 flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-md text-4xl font-bold text-gray-700 m-2 transition-transform duration-200">4</div>
+                    <div data-value="10" draggable="true" class="draggable-g1 flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-md text-4xl font-bold text-gray-700 m-2 transition-transform duration-200">10</div>
+                </div>
+            </div>
+            <button class="back-to-menu mt-8 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">もどる</button>
+        </div>
+
+        <!-- 問題2のゲーム画面 -->
+        <div id="game-2-container" class="game-container p-6 bg-white rounded-2xl shadow-lg">
+            <h2 class="text-2xl font-bold mb-4">問題2: 線分図</h2>
+             <div id="problem-text-2" class="text-center text-xl md:text-2xl p-4 mb-8 bg-pink-100 rounded-lg">
+                <p>このクラスの、１月〜６月生まれの子の数は、<br>７月〜１２月生まれの子の数よりも<span id="diff-value-answer-g2" class="font-bold text-gray-600 transition-colors duration-300">[５]</span>人 <span id="compare-word-answer" class="font-bold text-gray-600 transition-colors duration-300">[多い]</span>です。</p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+                <div class="col-span-1 lg:col-span-2 flex flex-col justify-center items-start space-y-20 p-4 h-96">
+                    <!-- ★★★ 修正箇所 ★★★ -->
+                    <!-- 上の線分図（短い方＋差） -->
+                    <div class="w-full relative">
+                        <div class="flex items-center w-full">
+                            <div class="h-8 w-px bg-black shrink-0"></div>
+                            <div class="w-2/3 h-px bg-black"></div>
+                            <div class="w-1/3 h-px bg-black"></div>
+                            <div class="h-8 w-px bg-black shrink-0"></div>
+                        </div>
+                        <div class="absolute h-8 w-px bg-black top-0" style="left: 66.66%;"></div>
+                        <div class="absolute inset-0 flex items-center">
+                            <!-- パラメータA -->
+                            <div class="w-2/3 flex justify-center"><div id="drop-param-a" data-type="item-name" class="drop-zone-g2 item-name-bg w-48 h-12 flex items-center justify-center text-lg font-bold rounded-md border-2 border-dashed border-gray-400">?</div></div>
+                             <!-- パラメータB -->
+                            <div class="w-1/3 flex justify-center"><div id="drop-param-b" data-type="number" class="drop-zone-g2 number-bg w-16 h-12 flex items-center justify-center text-2xl font-bold rounded-md border-2 border-dashed border-gray-400">?</div></div>
+                        </div>
+                    </div>
+                    <!-- 下の線分図（長い方 = 上の合計） -->
+                    <div class="w-full relative">
+                        <div class="flex items-center w-full">
+                            <div class="h-8 w-px bg-black shrink-0"></div>
+                            <div class="w-full h-px bg-black"></div>
+                            <div class="h-8 w-px bg-black shrink-0"></div>
+                        </div>
+                         <!-- パラメータC -->
+                        <div class="absolute inset-0 flex justify-center items-center"><div id="drop-param-c" data-type="item-name" class="drop-zone-g2 item-name-bg w-48 h-12 flex items-center justify-center text-lg font-bold rounded-md border-2 border-dashed border-gray-400">?</div></div>
+                    </div>
+                </div>
+                <div class="flex flex-col justify-center items-center bg-gray-100 p-6 rounded-2xl h-full space-y-4">
+                     <div data-value="１月〜６月生まれの子の数" data-type="item-name" draggable="true" class="draggable-g2 item-name-bg text-center p-3 w-64 h-auto rounded-lg shadow-md">１月〜６月生まれの子の数</div>
+                     <div data-value="７月〜１２月生まれの子の数" data-type="item-name" draggable="true" class="draggable-g2 item-name-bg text-center p-3 w-64 h-auto rounded-lg shadow-md">７月〜１２月生まれの子の数</div>
+                     <div data-value="5" data-type="number" draggable="true" class="draggable-g2 number-bg flex items-center justify-center w-20 h-16 rounded-lg shadow-md text-3xl font-bold">5</div>
+                     <div data-value="12" data-type="number" draggable="true" class="draggable-g2 number-bg flex items-center justify-center w-20 h-16 rounded-lg shadow-md text-3xl font-bold">12</div>
+                </div>
+            </div>
+            <button class="back-to-menu mt-8 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">もどる</button>
+        </div>
+
+        <!-- 問題3のゲーム画面 -->
+        <div id="game-3-container" class="game-container p-6 bg-white rounded-2xl shadow-lg">
+            <h2 class="text-2xl font-bold mb-4">問題3: 棒グラフ</h2>
+            <div id="problem-text-3" class="text-center text-xl md:text-2xl p-4 mb-8 bg-pink-100 rounded-lg">
+                <p>グラフから、ぶどうはりんごよりも<span id="diff-answer-g3" class="font-bold text-gray-600">[３こ]</span>多く、<br>オレンジはりんごの<span id="multiple-answer-g3" class="font-bold text-gray-600">[４倍]</span>の数ある、ということがわかります。</p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+                <!-- グラフと操作エリア -->
+                <div class="col-span-1 lg:col-span-2">
+                    <div class="bar-chart-container">
+                        <div class="bar-wrapper">
+                            <div id="value-apple" class="bar-value">5</div>
+                            <div id="bar-apple" class="bar" style="background-color: #ef4444;"></div>
+                        </div>
+                        <div class="bar-wrapper">
+                            <div id="value-grape" class="bar-value">5</div>
+                            <div id="bar-grape" class="bar" style="background-color: #8b5cf6;"></div>
+                        </div>
+                        <div class="bar-wrapper">
+                            <div id="value-orange" class="bar-value">5</div>
+                            <div id="bar-orange" class="bar" style="background-color: #f97316;"></div>
+                        </div>
+                    </div>
+                    <div class="flex justify-around pt-2">
+                        <div class="bar-label w-1/3 text-center">りんご</div>
+                        <div class="bar-label w-1/3 text-center">ぶどう</div>
+                        <div class="bar-label w-1/3 text-center">オレンジ</div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-8 gap-y-4 text-center text-lg mt-8">
+                        <div class="flex items-center justify-center">ぶどうを + <div id="drop-grape-inc" data-fruit="grape" data-op="inc" class="drop-zone-g3 number-bg w-12 h-12 flex items-center justify-center text-2xl font-bold rounded-md border-2 border-dashed border-gray-400 mx-2">?</div> こ</div>
+                        <div class="flex items-center justify-center">オレンジを + <div id="drop-orange-inc" data-fruit="orange" data-op="inc" class="drop-zone-g3 number-bg w-12 h-12 flex items-center justify-center text-2xl font-bold rounded-md border-2 border-dashed border-gray-400 mx-2">?</div> こ</div>
+                        <div class="flex items-center justify-center">ぶどうを - <div id="drop-grape-dec" data-fruit="grape" data-op="dec" class="drop-zone-g3 number-bg w-12 h-12 flex items-center justify-center text-2xl font-bold rounded-md border-2 border-dashed border-gray-400 mx-2">?</div> こ</div>
+                        <div class="flex items-center justify-center">オレンジを - <div id="drop-orange-dec" data-fruit="orange" data-op="dec" class="drop-zone-g3 number-bg w-12 h-12 flex items-center justify-center text-2xl font-bold rounded-md border-2 border-dashed border-gray-400 mx-2">?</div> こ</div>
+                    </div>
+                </div>
+                 <!-- 解答アイテムエリア -->
+                <div class="flex flex-col justify-center items-center bg-gray-100 p-6 rounded-2xl h-full space-y-4">
+                     <div data-value="1" draggable="true" class="draggable-g3 number-bg flex items-center justify-center w-24 h-16 rounded-lg shadow-md text-3xl font-bold">1</div>
+                     <div data-value="5" draggable="true" class="draggable-g3 number-bg flex items-center justify-center w-24 h-16 rounded-lg shadow-md text-3xl font-bold">5</div>
+                     <div data-value="10" draggable="true" class="draggable-g3 number-bg flex items-center justify-center w-24 h-16 rounded-lg shadow-md text-3xl font-bold">10</div>
+                </div>
+            </div>
+            <button class="back-to-menu mt-8 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">もどる</button>
+        </div>
+
+    </div>
+
+    <!-- 共有ポップアップ/モーダル -->
+    <div id="popup" class="popup hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 text-center max-w-sm w-full">
+            <p id="popup-message" class="text-2xl font-bold mb-6 text-gray-800"></p>
+            <button id="popup-close" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg transition-colors duration-300">とじる</button>
+        </div>
+    </div>
+
+<script>
+    // --- ページナビゲーション ---
+    const menuScreen = document.getElementById('menu-screen');
+    const game1Container = document.getElementById('game-1-container');
+    const game2Container = document.getElementById('game-2-container');
+    const game3Container = document.getElementById('game-3-container');
+    const startGame1Btn = document.getElementById('start-game-1');
+    const startGame2Btn = document.getElementById('start-game-2');
+    const startGame3Btn = document.getElementById('start-game-3');
+    const backToMenuBtns = document.querySelectorAll('.back-to-menu');
+
+    function showScreen(screen) {
+        menuScreen.style.display = 'none';
+        game1Container.style.display = 'none';
+        game2Container.style.display = 'none';
+        game3Container.style.display = 'none';
+        screen.style.display = 'block';
+    }
+
+    startGame1Btn.addEventListener('click', () => showScreen(game1Container));
+    startGame2Btn.addEventListener('click', () => showScreen(game2Container));
+    startGame3Btn.addEventListener('click', () => {
+        showScreen(game3Container);
+        game3Logic.init();
+    });
+    backToMenuBtns.forEach(btn => btn.addEventListener('click', () => showScreen(menuScreen)));
+
+    // --- 共有ポップアップ ---
+    const popup = document.getElementById('popup');
+    const popupMessage = document.getElementById('popup-message');
+    const popupClose = document.getElementById('popup-close');
+    function showPopup(message) {
+        popupMessage.textContent = message;
+        popup.classList.remove('hidden');
+    }
+    popupClose.addEventListener('click', () => popup.classList.add('hidden'));
+    popup.addEventListener('click', (e) => { if (e.target === popup) popup.classList.add('hidden'); });
+
+    // --- ゲーム1のロジック ---
+    (() => {
+        const rectangle = document.getElementById('rectangle');
+        const dropHeight = document.getElementById('drop-height');
+        const dropWidth = document.getElementById('drop-width');
+        const heightAnswerText = document.getElementById('height-answer');
+        const widthAnswerText = document.getElementById('width-answer');
+        const draggables = document.querySelectorAll('.draggable-g1');
+        const dropZones = document.querySelectorAll('.drop-zone-g1');
+        const CORRECT_HEIGHT = 4;
+        const CORRECT_WIDTH = 10;
+        const BASE_SIZE = 25;
+        let currentHeight = null;
+        let currentWidth = null;
+        rectangle.style.height = `${5 * BASE_SIZE}px`;
+        rectangle.style.width = `${5 * BASE_SIZE}px`;
+        draggables.forEach(draggable => {
+            draggable.addEventListener('dragstart', (e) => {
+                e.target.classList.add('dragging');
+                e.dataTransfer.setData('text/plain', e.target.dataset.value);
+            });
+            draggable.addEventListener('dragend', (e) => e.target.classList.remove('dragging'));
+        });
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                const droppedValue = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                if (zone.id === 'drop-height') {
+                    currentHeight = droppedValue;
+                    rectangle.style.height = `${droppedValue * BASE_SIZE}px`;
+                    zone.textContent = droppedValue;
+                } else if (zone.id === 'drop-width') {
+                    currentWidth = droppedValue;
+                    rectangle.style.width = `${droppedValue * BASE_SIZE}px`;
+                    zone.textContent = droppedValue;
+                }
+                checkAnswers();
+            });
+        });
+        function checkAnswers() {
+            let isHeightCorrect = false, isWidthCorrect = false;
+            if (currentHeight !== null) {
+                isHeightCorrect = currentHeight === CORRECT_HEIGHT;
+                heightAnswerText.className = `font-bold ${isHeightCorrect ? 'text-green-600' : 'text-red-500 cursor-pointer'}`;
+            }
+            if (currentWidth !== null) {
+                isWidthCorrect = currentWidth === CORRECT_WIDTH;
+                widthAnswerText.className = `font-bold ${isWidthCorrect ? 'text-green-600' : 'text-red-500 cursor-pointer'}`;
+            }
+            if (isHeightCorrect && isWidthCorrect) showPopup("クリア！");
+        }
+        document.getElementById('problem-text-1').addEventListener('click', (e) => {
+            if (!e.target.classList.contains('text-red-500')) return;
+            if (e.target.id === 'height-answer') showPopup(`たての長さがいま「${currentHeight}」になっています。`);
+            if (e.target.id === 'width-answer') showPopup(`横の長さがいま「${currentWidth}」になっています。`);
+        });
+    })();
+    
+    // --- ゲーム2のロジック ---
+    (() => {
+        const draggables = document.querySelectorAll('.draggable-g2');
+        const dropZones = document.querySelectorAll('.drop-zone-g2');
+        const diffValueAnswer = document.getElementById('diff-value-answer-g2');
+        const compareWordAnswer = document.getElementById('compare-word-answer');
+        let paramA = null, paramB = null, paramC = null;
+        const CORRECT_B = 5;
+        const CORRECT_A = '７月〜１２月生まれの子の数'; // 短い方
+        const CORRECT_C = '１月〜６月生まれの子の数'; // 長い方
+        draggables.forEach(draggable => {
+            draggable.addEventListener('dragstart', e => {
+                e.target.classList.add('dragging');
+                e.dataTransfer.setData('value', e.target.dataset.value);
+                e.dataTransfer.setData('type', e.target.dataset.type);
+            });
+            draggable.addEventListener('dragend', e => e.target.classList.remove('dragging'));
+        });
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', e => {
+                e.preventDefault();
+                if (e.dataTransfer.getData('type') === zone.dataset.type) {
+                     zone.classList.add('drag-over');
+                }
+            });
+            zone.addEventListener('dragleave', e => zone.classList.remove('drag-over'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                if (e.dataTransfer.getData('type') !== zone.dataset.type) return;
+                const value = e.dataTransfer.getData('value');
+                zone.textContent = value;
+                if (zone.dataset.type === 'item-name') zone.classList.add('text-sm', 'p-1');
+                if (zone.id === 'drop-param-a') paramA = value;
+                if (zone.id === 'drop-param-b') paramB = parseInt(value, 10);
+                if (zone.id === 'drop-param-c') paramC = value;
+                checkAnswers();
+            });
+        });
+        function checkAnswers() {
+            let isBNumericCorrect = false, isComparisonCorrect = false;
+            if (paramB !== null) {
+                isBNumericCorrect = paramB === CORRECT_B;
+                diffValueAnswer.className = `font-bold ${isBNumericCorrect ? 'text-green-600' : 'text-red-500 cursor-pointer'}`;
+            }
+            if (paramA !== null && paramC !== null) {
+                // 正解の組み合わせ: Aが「7月〜12月」、Cが「1月〜6月」
+                isComparisonCorrect = (paramA === CORRECT_A && paramC === CORRECT_C);
+                compareWordAnswer.className = `font-bold ${isComparisonCorrect ? 'text-green-600' : 'text-red-500 cursor-pointer'}`;
+            }
+            if (isBNumericCorrect && isComparisonCorrect) showPopup("クリア！");
+        }
+        document.getElementById('problem-text-2').addEventListener('click', e => {
+            if (!e.target.classList.contains('text-red-500')) return;
+            if (e.target.id === 'diff-value-answer-g2') showPopup(`いま「${paramB}」になっています。`);
+            if (e.target.id === 'compare-word-answer') {
+                if (paramC === CORRECT_A && paramA === CORRECT_C) showPopup('いま「少ない」になっています。');
+                else showPopup('項目が正しくありません。');
+            }
+        });
+    })();
+
+    // --- ゲーム3のロジック ---
+    const game3Logic = (() => {
+        const draggables = document.querySelectorAll('.draggable-g3');
+        const dropZones = document.querySelectorAll('.drop-zone-g3');
+        const diffAnswer = document.getElementById('diff-answer-g3');
+        const multipleAnswer = document.getElementById('multiple-answer-g3');
+        const valueApple = document.getElementById('value-apple');
+        const valueGrape = document.getElementById('value-grape');
+        const valueOrange = document.getElementById('value-orange');
+        const barApple = document.getElementById('bar-apple');
+        const barGrape = document.getElementById('bar-grape');
+        const barOrange = document.getElementById('bar-orange');
+        const APPLE_COUNT = 5;
+        const CORRECT_DIFF = 3;
+        const CORRECT_MULTIPLE = 4;
+        const MAX_BAR_VALUE = 25;
+        let grapeCount = 5;
+        let orangeCount = 5;
+        function updateChart() {
+            valueGrape.textContent = grapeCount;
+            valueOrange.textContent = orangeCount;
+            valueApple.textContent = APPLE_COUNT;
+            barGrape.style.height = `${(grapeCount / MAX_BAR_VALUE) * 100}%`;
+            barOrange.style.height = `${(orangeCount / MAX_BAR_VALUE) * 100}%`;
+            barApple.style.height = `${(APPLE_COUNT / MAX_BAR_VALUE) * 100}%`;
+        }
+        function init() {
+            grapeCount = 5;
+            orangeCount = 5;
+            updateChart();
+            checkAnswers(true);
+        }
+        draggables.forEach(draggable => {
+            draggable.addEventListener('dragstart', e => {
+                e.target.classList.add('dragging');
+                e.dataTransfer.setData('text/plain', e.target.dataset.value);
+            });
+            draggable.addEventListener('dragend', e => e.target.classList.remove('dragging'));
+        });
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                const value = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                const fruit = zone.dataset.fruit;
+                const op = zone.dataset.op;
+                if (fruit === 'grape') {
+                    if (op === 'inc') grapeCount += value;
+                    else grapeCount = Math.max(0, grapeCount - value);
+                } else if (fruit === 'orange') {
+                    if (op === 'inc') orangeCount += value;
+                    else orangeCount = Math.max(0, orangeCount - value);
+                }
+                updateChart();
+                checkAnswers();
+            });
+        });
+        function checkAnswers(isInit = false) {
+            let isDiffCorrect = false;
+            let isMultipleCorrect = false;
+            const currentDiff = grapeCount - APPLE_COUNT;
+            const currentMultiple = orangeCount / APPLE_COUNT;
+            
+            if (!isInit) {
+                isDiffCorrect = currentDiff === CORRECT_DIFF;
+                isMultipleCorrect = currentMultiple === CORRECT_MULTIPLE;
+            }
+
+            diffAnswer.className = 'font-bold transition-colors duration-300';
+            if (isDiffCorrect) {
+                diffAnswer.classList.add('text-green-600');
+            } else if (!isInit) {
+                diffAnswer.classList.add('text-red-500', 'cursor-pointer');
+            } else {
+                 diffAnswer.classList.add('text-gray-600');
+            }
+
+            multipleAnswer.className = 'font-bold transition-colors duration-300';
+             if (isMultipleCorrect) {
+                multipleAnswer.classList.add('text-green-600');
+            } else if (!isInit) {
+                multipleAnswer.classList.add('text-red-500', 'cursor-pointer');
+            } else {
+                 multipleAnswer.classList.add('text-gray-600');
+            }
+
+            if (isDiffCorrect && isMultipleCorrect) {
+                showPopup("クリア！");
+            }
+        }
+        document.getElementById('problem-text-3').addEventListener('click', e => {
+            if (!e.target.classList.contains('text-red-500')) return;
+            if (e.target.id === 'diff-answer-g3') {
+                showPopup(`りんごより「${grapeCount - APPLE_COUNT}こ」多い状態です。`);
+            }
+            if (e.target.id === 'multiple-answer-g3') {
+                showPopup(`りんごの「${(orangeCount / APPLE_COUNT).toFixed(1)}倍」の状態です。`);
+            }
+        });
+        return { init };
+    })();
+</script>
+</body>
+</html>
