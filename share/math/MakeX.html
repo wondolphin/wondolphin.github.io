@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MakeX ゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=M+PLUS+Rounded+1c:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        /* フォント設定 */
+        body {
+            font-family: 'Inter', 'M PLUS Rounded 1c', sans-serif;
+        }
+        /* ドラッグ中のカードのスタイル */
+        .dragging {
+            opacity: 0.5;
+            transform: scale(1.1);
+        }
+        /* ドロップ先のハイライト */
+        .drag-over {
+            background-color: #e0f2fe; /* light-blue-100 */
+            box-shadow: inset 0 0 0 2px #38bdf8; /* light-blue-400 */
+        }
+        /* カードのスタイル */
+        .number-card {
+            touch-action: none;
+            user-select: none;
+            cursor: grab;
+        }
+        .number-card:active {
+            cursor: grabbing;
+        }
+        /* ドロップゾーン内のカードはクリック可能であることを示す */
+        .drop-zone .number-card {
+            cursor: pointer;
+        }
+
+        /* 分数表示のスタイル */
+        .fraction {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            font-size: 1.1em;
+        }
+        .numerator {
+            padding: 0 0.2em;
+            border-bottom: 2px solid currentColor;
+        }
+        .denominator {
+            padding: 0.1em 0.2em 0;
+        }
+        /* モーダルのスタイル */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem 3rem;
+            border-radius: 1rem;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            transform: scale(0.95);
+            animation: modal-pop 0.3s ease-out forwards;
+        }
+        @keyframes modal-pop {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div id="game-container" class="w-full max-w-3xl mx-auto relative">
+
+        <!-- 1. お題エリア -->
+        <header class="text-center mb-4 md:mb-6">
+            <h1 class="text-xl md:text-2xl font-bold text-slate-600 mb-2">この数字を作ろう！</h1>
+            <div id="target-number-container" class="bg-white rounded-xl shadow-lg p-3 md:p-4 inline-block">
+                <p id="target-number" class="text-4xl md:text-6xl font-extrabold text-indigo-600"></p>
+            </div>
+        </header>
+
+        <!-- 2. 演算エリア -->
+        <main id="operation-areas-container" class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
+            <!-- 各演算エリアを生成 -->
+        </main>
+
+        <!-- 3. 数字カードエリア -->
+        <footer id="hand-area" class="relative bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-4 min-h-[130px] pt-8">
+            <button id="reset-hand-button" title="手札をリセット" class="absolute top-2 right-2 text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M21 21v-5h-5"></path></svg>
+            </button>
+            <h2 class="text-center text-lg md:text-xl font-bold text-slate-600 mb-4">手持ちのカード</h2>
+            <div id="number-cards-container" class="flex flex-wrap justify-center items-center gap-3 md:gap-4 min-h-[112px]">
+                <!-- 数字カードを生成 -->
+            </div>
+        </footer>
+    </div>
+
+    <!-- 結果表示モーダル -->
+    <div id="result-modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <p id="result-message" class="text-3xl md:text-5xl font-extrabold mb-6"></p>
+            <button id="restart-button" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700 transition-all duration-200">もう一度挑戦！</button>
+        </div>
+    </div>
+
+    <script>
+        // --- ゲーム設定 ---
+        const GAME_LEVELS = [
+            { target: 18, cards: [{n: 3, d: 1}, {n: 3, d: 1}, {n: 5, d: 1}] },
+            { target: 24, cards: [{n: 1, d: 1}, {n: 5, d: 1}, {n: 6, d: 1}, {n: 8, d: 1}] },
+            { target: 7,  cards: [{n: 3, d: 1}, {n: 4, d: 1}, {n: 5, d: 1}] },
+            { target: 5,  cards: [{n: 10, d: 1}, {n: 1, d: 2}] } // 10 * 1/2
+        ];
+        let currentLevel = 0;
+
+        // --- ヘルパー関数: 最大公約数 ---
+        function gcd(a, b) {
+            return b === 0 ? a : gcd(b, a % b);
+        }
+
+        // --- 演算ロジック (分数対応) ---
+        const OPERATIONS = [
+            { id: 'add',      symbol: '＋', color: 'bg-green-400', func: (a, b) => ({ n: a.n * b.d + b.n * a.d, d: a.d * b.d }) },
+            { id: 'subtract', symbol: 'ー', color: 'bg-blue-400',  func: (a, b) => ({ n: a.n * b.d - b.n * a.d, d: a.d * b.d }) },
+            { id: 'multiply', symbol: '×', color: 'bg-red-400',   func: (a, b) => ({ n: a.n * b.n, d: a.d * b.d }) },
+            { id: 'divide',   symbol: '÷', color: 'bg-yellow-400',func: (a, b) => (b.n === 0 ? null : { n: a.n * b.d, d: a.d * b.n }) },
+        ];
+
+        // --- DOM要素の取得 ---
+        const targetNumberEl = document.getElementById('target-number');
+        const operationAreasContainer = document.getElementById('operation-areas-container');
+        const numberCardsContainer = document.getElementById('number-cards-container');
+        const resultModal = document.getElementById('result-modal');
+        const resultMessage = document.getElementById('result-message');
+        const restartButton = document.getElementById('restart-button');
+        const resetHandButton = document.getElementById('reset-hand-button');
+
+        let draggedCardId = null;
+
+        function initGame() {
+            resultModal.classList.add('hidden');
+            operationAreasContainer.innerHTML = '';
+            numberCardsContainer.innerHTML = '';
+
+            const level = GAME_LEVELS[currentLevel];
+            targetNumberEl.textContent = level.target;
+
+            OPERATIONS.forEach(op => {
+                const area = document.createElement('div');
+                area.id = op.id;
+                area.className = `operation-area p-3 rounded-xl shadow-md transition-colors duration-200 ${op.color}`;
+                area.innerHTML = `
+                    <div class="flex justify-center items-center gap-2">
+                        <div class="drop-zone w-20 h-28 bg-white/50 rounded-lg border-2 border-dashed border-white/80 flex justify-center items-center"></div>
+                        <p class="text-3xl md:text-4xl font-bold text-white mx-1 md:mx-2 pointer-events-none">${op.symbol}</p>
+                        <div class="drop-zone w-20 h-28 bg-white/50 rounded-lg border-2 border-dashed border-white/80 flex justify-center items-center"></div>
+                    </div>
+                `;
+                operationAreasContainer.appendChild(area);
+            });
+
+            level.cards.forEach((card, index) => {
+                createNumberCard(card.n, card.d, `card-${index}`);
+            });
+
+            addEventListeners();
+        }
+
+        function createNumberCard(numerator, denominator, id, appendToHand = true) {
+            const card = document.createElement('div');
+            card.id = id;
+            card.className = 'number-card w-20 h-28 bg-white rounded-lg shadow-lg flex justify-center items-center text-3xl md:text-4xl font-bold text-slate-700 transition-transform duration-200';
+            card.draggable = true;
+            
+            if (denominator < 0) {
+                numerator *= -1;
+                denominator *= -1;
+            }
+            card.dataset.numerator = numerator;
+            card.dataset.denominator = denominator;
+
+            if (denominator === 1) {
+                card.textContent = numerator;
+            } else {
+                card.innerHTML = `<div class="fraction pointer-events-none"><span class="numerator">${numerator}</span><span class="denominator">${denominator}</span></div>`;
+            }
+            
+            if (appendToHand) {
+                numberCardsContainer.appendChild(card);
+            }
+            return card;
+        }
+
+        function addEventListeners() {
+            document.querySelectorAll('.number-card').forEach(card => {
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+                card.addEventListener('click', handleCardClick);
+            });
+            document.querySelectorAll('.operation-area').forEach(area => {
+                area.addEventListener('dragover', handleDragOver);
+                area.addEventListener('dragenter', handleDragEnterArea);
+                area.addEventListener('dragleave', handleDragLeaveArea);
+                area.addEventListener('drop', handleAreaDrop);
+            });
+            const handContainer = document.getElementById('hand-area');
+            handContainer.addEventListener('dragover', handleDragOver);
+            handContainer.addEventListener('drop', handleHandDrop);
+        }
+        
+        // --- カードを戻す処理 ---
+        function returnCardToHand(cardElement) {
+            if (!cardElement) return;
+            numberCardsContainer.appendChild(cardElement);
+            cardElement.style.transform = '';
+        }
+
+        // --- ドラッグ＆ドロップのハンドラ ---
+        function handleDragStart(e) {
+            draggedCardId = e.target.id;
+            setTimeout(() => e.target.classList.add('dragging'), 0);
+        }
+
+        function handleDragEnd(e) {
+            draggedCardId = null;
+            document.querySelectorAll('.dragging').forEach(c => c.classList.remove('dragging'));
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleDragEnterArea(e) {
+            e.preventDefault();
+            const area = e.currentTarget;
+            if (area.querySelector('.drop-zone:not(:has(.number-card))')) {
+                 area.classList.add('drag-over');
+            }
+        }
+        
+        function handleDragLeaveArea(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleAreaDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const area = e.currentTarget;
+            area.classList.remove('drag-over');
+            
+            const firstEmptyZone = area.querySelector('.drop-zone:not(:has(.number-card))');
+            const draggedCard = document.getElementById(draggedCardId);
+
+            if (firstEmptyZone && draggedCard) {
+                firstEmptyZone.appendChild(draggedCard);
+                checkCalculation(area);
+            }
+        }
+        
+        function handleHandDrop(e) {
+            e.preventDefault();
+            const draggedCard = document.getElementById(draggedCardId);
+            if (draggedCard && draggedCard.parentElement.classList.contains('drop-zone')) {
+                returnCardToHand(draggedCard);
+            }
+        }
+        
+        function handleCardClick(e) {
+            const card = e.currentTarget;
+            if (card.parentElement.classList.contains('drop-zone')) {
+                returnCardToHand(card);
+            }
+        }
+
+        function checkCalculation(operationArea) {
+            const dropZones = operationArea.querySelectorAll('.drop-zone');
+            const card1El = dropZones[0].querySelector('.number-card');
+            const card2El = dropZones[1].querySelector('.number-card');
+
+            if (card1El && card2El) {
+                // アニメーション中は操作を無効化
+                document.body.style.pointerEvents = 'none';
+
+                const card1 = { n: parseInt(card1El.dataset.numerator), d: parseInt(card1El.dataset.denominator) };
+                const card2 = { n: parseInt(card2El.dataset.numerator), d: parseInt(card2El.dataset.denominator) };
+                
+                const operation = OPERATIONS.find(op => op.id === operationArea.id);
+                const result = operation.func(card1, card2);
+
+                if (result === null) {
+                    showResult(false, '計算できないよ！');
+                    setTimeout(initGame, 2000);
+                    document.body.style.pointerEvents = 'auto'; // 操作を再度有効化
+                    return;
+                }
+                
+                // --- アニメーション開始 ---
+                const flexContainer = operationArea.querySelector('.flex');
+                flexContainer.style.position = 'relative';
+
+                [card1El, card2El].forEach(card => {
+                    const rect = card.getBoundingClientRect();
+                    const parentRect = flexContainer.getBoundingClientRect();
+                    card.style.position = 'absolute';
+                    card.style.top = `${rect.top - parentRect.top}px`;
+                    card.style.left = `${rect.left - parentRect.left}px`;
+                    card.style.transition = 'transform 0.5s ease-in, opacity 0.5s ease-in';
+                });
+
+                requestAnimationFrame(() => {
+                    card1El.style.transform = 'translateX(45px) scale(0.5)';
+                    card1El.style.opacity = '0';
+                    card2El.style.transform = 'translateX(-45px) scale(0.5)';
+                    card2El.style.opacity = '0';
+                });
+
+                const commonDivisor = gcd(Math.abs(result.n), Math.abs(result.d));
+                const simplifiedN = result.n / commonDivisor;
+                const simplifiedD = result.d / commonDivisor;
+
+                setTimeout(() => {
+                    card1El.remove();
+                    card2El.remove();
+
+                    // 新しいカードを作成（まだDOMには追加しない）
+                    const newCardId = `card-${Date.now()}`;
+                    const newCard = createNumberCard(simplifiedN, simplifiedD, newCardId, false);
+                    
+                    const gameContainer = document.getElementById('game-container');
+                    const startRect = operationArea.getBoundingClientRect();
+                    const handRect = numberCardsContainer.getBoundingClientRect();
+                    const gameRect = gameContainer.getBoundingClientRect();
+
+                    // カードの初期位置を計算エリア中央に設定
+                    newCard.style.position = 'absolute';
+                    newCard.style.top = `${startRect.top - gameRect.top + startRect.height / 2 - newCard.offsetHeight / 2}px`;
+                    newCard.style.left = `${startRect.left - gameRect.left + startRect.width / 2 - newCard.offsetWidth / 2}px`;
+                    newCard.style.transition = 'top 0.5s ease-in-out, left 0.5s ease-in-out';
+                    
+                    gameContainer.appendChild(newCard);
+
+                    // 最終位置（手札エリア）へ移動
+                    requestAnimationFrame(() => {
+                        newCard.style.top = `${handRect.top - gameRect.top + 20}px`;
+                        newCard.style.left = `${handRect.left - gameRect.left + handRect.width / 2 - newCard.offsetWidth / 2}px`;
+                    });
+
+                    newCard.addEventListener('transitionend', () => {
+                        newCard.remove();
+                        createNumberCard(simplifiedN, simplifiedD, newCardId); // 手札に正式に追加
+                        
+                        addEventListeners();
+                        checkGameEnd();
+                        document.body.style.pointerEvents = 'auto'; // 操作を再度有効化
+                    }, { once: true });
+
+                }, 500); // 合体アニメーションの時間
+            }
+        }
+        
+        function checkGameEnd() {
+            const allCards = document.querySelectorAll('.number-card');
+            if (allCards.length === 1) {
+                const card = allCards[0];
+                const finalN = parseInt(card.dataset.numerator);
+                const finalD = parseInt(card.dataset.denominator);
+                const targetValue = parseFloat(targetNumberEl.textContent);
+
+                if (finalD !== 0 && finalN / finalD === targetValue) {
+                    showResult(true, 'クリア！🎉');
+                    currentLevel = (currentLevel + 1) % GAME_LEVELS.length;
+                } else {
+                    showResult(false, 'おしい！');
+                }
+            }
+        }
+        
+        function showResult(isClear, message) {
+            resultMessage.textContent = message;
+            resultMessage.className = `text-3xl md:text-5xl font-extrabold mb-6 ${isClear ? 'text-green-500' : 'text-red-500'}`;
+            restartButton.textContent = isClear ? '次の問題へ！' : 'もう一度挑戦！';
+            resultModal.classList.remove('hidden');
+        }
+
+        // --- ボタンのイベントリスナー ---
+        restartButton.addEventListener('click', initGame);
+        resetHandButton.addEventListener('click', initGame);
+
+        // --- ゲーム開始 ---
+        window.onload = initGame;
+    </script>
+</body>
+</html>
+
+
+

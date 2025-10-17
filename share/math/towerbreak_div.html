@@ -366,23 +366,78 @@
                 resultModal.classList.remove('hidden');
             }
 
-            function handleLaneClick(laneIndex) {
+            async function handleLaneClick(laneIndex) {
                 if (!currentNumber || isProcessing) return;
+                isProcessing = true;
 
-                // レーンに空きがあるかチェック
-                const emptySlotIndex = lanesData[laneIndex].findIndex(slot => slot === null);
-                if (emptySlotIndex === -1) {
-                    // レーンが満杯
-                    return;
+                // --- 押し出される数字の発射ロジック ---
+                const pushedOutNumbersToLaunch = [];
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    const topNumber = lanesData[i][LANE_CAPACITY - 1];
+                    if (topNumber) {
+                        pushedOutNumbersToLaunch.push({
+                            laneIndex: i,
+                            rowIndex: LANE_CAPACITY - 1,
+                            number: topNumber
+                        });
+                    }
                 }
 
-                lanesData[laneIndex][emptySlotIndex] = currentNumber;
+                if (pushedOutNumbersToLaunch.length > 0) {
+                    const animationPlan = [];
+                    let tempBlocks = [...blocks];
+                    for (const launch of pushedOutNumbersToLaunch) {
+                        const isDivisible = tempBlocks[launch.laneIndex] % launch.number.value === 0;
+                        animationPlan.push({ ...launch, isDivisible });
+                        if (isDivisible) {
+                            tempBlocks[launch.laneIndex] /= launch.number.value;
+                        }
+                    }
+                    blocks = tempBlocks;
+                    await animateLaunches(animationPlan);
+
+                    if (isGameEnd()) {
+                        showResults();
+                        isProcessing = false;
+                        return; 
+                    }
+                }
+
+                // --- 数字の前進ロジック ---
+                for (let i = 0; i < LANE_COUNT; i++) {
+                    for (let j = LANE_CAPACITY - 1; j > 0; j--) {
+                        lanesData[i][j] = lanesData[i][j - 1];
+                    }
+                    lanesData[i][0] = null; // 一番下を空ける
+                }
+
+                // --- 効果判定ロジック ---
+                let tempBlockValue = blocks[laneIndex];
+                // 配置済みの数字で割り切れるか順に試す
+                for (let i = 0; i < LANE_CAPACITY -1; i++) {
+                    const num = lanesData[laneIndex][i+1]; // これから[i+1]にずれる数字
+                    if(num && tempBlockValue % num.value === 0) {
+                        tempBlockValue /= num.value;
+                    }
+                }
+                // 残った値が、新たに配置する数字で割り切れないか判定
+                if (tempBlockValue % currentNumber.value !== 0) {
+                    ineffectiveCount++; // カウントはGo!の時ではなく配置時に行う
+                    const factors = getPrimeFactors(currentNumber.value);
+                    if (factors.length > 0) {
+                        recycledFactorsQueue.push(...factors);
+                    }
+                }
+                
+                // --- 配置 ---
+                lanesData[laneIndex][0] = currentNumber;
                 
                 currentNumber = nextNumber;
                 nextNumber = getNextNumber();
                 
                 renderAllLanes();
                 updateUI();
+                isProcessing = false;
             }
 
             async function handleGoButtonClick() {
@@ -427,14 +482,8 @@
                             animationPlan.push({ ...launch, isDivisible });
                             if (isDivisible) {
                                 tempBlocks[i] /= launch.number.value;
-                            } else {
-                                ineffectiveCount++;
-                                // 効果がなかった場合、素因数分解してキューに追加
-                                const factors = getPrimeFactors(launch.number.value);
-                                if (factors.length > 0) {
-                                    recycledFactorsQueue.push(...factors);
-                                }
                             }
+                            // ★注意：ここでのineffectiveCountとキュー追加は削除
                         }
                     }
                 }
@@ -526,4 +575,5 @@
     </script>
 </body>
 </html>
+
 

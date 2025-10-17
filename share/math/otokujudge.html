@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お得ジャッジゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+        }
+        .price-tag {
+            background-color: #ffefa6;
+            border: 2px solid #f9c941;
+            box-shadow: 4px 4px 0 #f9c941;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .price-tag:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 #f9c941;
+        }
+        .price-tag.selected {
+            transform: translate(4px, 4px);
+            box-shadow: 0 0 0 #f9c941;
+        }
+        .price-tag.correct {
+            animation:-webkit-box-shadow 2s, 0, 1;
+            -webkit-animation: flash 1s ease-out;
+            -moz-animation: flash 1s ease-out;
+            -o-animation: flash 1s ease-out;
+            animation: flash 1s ease-out;
+            background-color: #a7f3d0; /* green-200 */
+            border-color: #34d399; /* green-400 */
+            box-shadow: 4px 4px 0 #34d399;
+        }
+        .price-tag.incorrect {
+            background-color: #fecaca; /* red-200 */
+            border-color: #f87171; /* red-400 */
+            box-shadow: 4px 4px 0 #f87171;
+        }
+
+        @keyframes flash {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .result-card {
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="bg-amber-50 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div id="game-container" class="w-full max-w-2xl mx-auto text-center">
+        <header class="mb-6">
+            <h1 class="text-4xl font-bold text-amber-600 mb-2">お得判断ゲーム</h1>
+            <p class="text-lg text-gray-600">一番お買い得なのはどれ？</p>
+            <div id="progress-bar" class="w-full bg-gray-200 rounded-full h-4 mt-4 overflow-hidden">
+                <div id="progress" class="bg-green-500 h-4 rounded-full" style="width: 0%;"></div>
+            </div>
+            <p id="question-counter" class="text-sm text-gray-500 mt-1"></p>
+        </header>
+
+        <main id="main-content">
+            <div id="price-tags-container" class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                <!-- 値札はここにJavaScriptで生成されます -->
+            </div>
+        </main>
+
+        <!-- 結果表示用のモーダル -->
+        <div id="result-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 hidden">
+            <div class="result-card bg-white/80 rounded-2xl shadow-xl p-6 md:p-8 w-full max-w-md text-center transform transition-all duration-300 scale-95 opacity-0">
+                <h2 id="result-title" class="text-5xl font-bold mb-4"></h2>
+                <div id="result-explanation" class="text-left bg-white rounded-lg p-4 mb-6 space-y-2">
+                    <!-- 解説はここに表示されます -->
+                </div>
+                <button id="next-button" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-lg text-xl transition-transform duration-200 hover:scale-105">
+                    次の問題へ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const gameData = [
+            // 問題データ (6問)
+            [{grams: 100, price: 150}, {grams: 200, price: 310}, {grams: 300, price: 440}],
+            [{grams: 200, price: 220}, {grams: 300, price: 360}, {grams: 400, price: 480}],
+            [{grams: 80, price: 100}, {grams: 120, price: 140}, {grams: 200, price: 260}],
+            [{grams: 500, price: 450}, {grams: 600, price: 550}, {grams: 700, price: 650}],
+            [{grams: 180, price: 200}, {grams: 240, price: 250}, {grams: 300, price: 320}],
+            [{grams: 350, price: 400}, {grams: 420, price: 490}, {grams: 560, price: 650}]
+        ];
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let isAnswering = false;
+
+        const priceTagsContainer = document.getElementById('price-tags-container');
+        const resultModal = document.getElementById('result-modal');
+        const resultTitle = document.getElementById('result-title');
+        const resultExplanation = document.getElementById('result-explanation');
+        const nextButton = document.getElementById('next-button');
+        const questionCounter = document.getElementById('question-counter');
+        const progressBar = document.getElementById('progress');
+
+        // ユークリッドの互除法で最大公約数を求める
+        const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+        const findGCD = (arr) => arr.reduce((a, b) => gcd(a, b));
+
+        function displayQuestion() {
+            isAnswering = false;
+            priceTagsContainer.innerHTML = '';
+            const question = gameData[currentQuestionIndex];
+
+            // プログレスバーとカウンターを更新
+            const progressPercentage = ((currentQuestionIndex) / gameData.length) * 100;
+            progressBar.style.width = `${progressPercentage}%`;
+            questionCounter.textContent = `第 ${currentQuestionIndex + 1} 問 / ${gameData.length} 問`;
+
+            question.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = 'price-tag p-6 rounded-xl cursor-pointer';
+                card.innerHTML = `
+                    <div class="text-4xl font-bold">${item.grams}g</div>
+                    <div class="text-5xl font-extrabold text-red-600 mt-2">${item.price}<span class="text-3xl">円</span></div>
+                `;
+                card.dataset.index = index;
+                card.addEventListener('click', handleCardClick);
+                priceTagsContainer.appendChild(card);
+            });
+        }
+
+        function handleCardClick(event) {
+            if (isAnswering) return;
+            isAnswering = true;
+
+            const selectedIndex = parseInt(event.currentTarget.dataset.index);
+            event.currentTarget.classList.add('selected');
+            checkAnswer(selectedIndex);
+        }
+
+        function checkAnswer(selectedIndex) {
+            const question = gameData[currentQuestionIndex];
+            const gramsArray = question.map(item => item.grams);
+            const commonDivisor = findGCD(gramsArray);
+
+            const pricesPerUnit = question.map(item => {
+                return {
+                    ...item,
+                    unitPrice: (item.price / item.grams) * commonDivisor
+                };
+            });
+
+            // 最も単価が安いものを見つける
+            const bestDeal = pricesPerUnit.reduce((prev, current) => (prev.unitPrice < current.unitPrice) ? prev : current);
+            const correctIndex = question.findIndex(item => item.grams === bestDeal.grams && item.price === bestDeal.price);
+
+            const isCorrect = selectedIndex === correctIndex;
+            if (isCorrect) {
+                score++;
+            }
+
+            setTimeout(() => {
+                showResult(isCorrect, pricesPerUnit, commonDivisor, selectedIndex, correctIndex);
+            }, 500);
+        }
+
+        function showResult(isCorrect, pricesPerUnit, commonDivisor, selectedIndex, correctIndex) {
+            // モーダル表示
+            resultModal.classList.remove('hidden');
+            setTimeout(() => {
+                const card = resultModal.querySelector('.result-card');
+                card.classList.remove('scale-95', 'opacity-0');
+                card.classList.add('scale-100', 'opacity-100');
+            }, 10);
+
+            // 正解・不正解のタイトルと色設定
+            if (isCorrect) {
+                resultTitle.textContent = '正解！';
+                resultTitle.className = 'text-5xl font-bold mb-4 text-green-500';
+            } else {
+                resultTitle.textContent = '残念！';
+                resultTitle.className = 'text-5xl font-bold mb-4 text-red-500';
+            }
+            
+            // 解説の生成
+            let explanationHTML = `<p class="font-bold text-lg mb-3">【解説】</p><p class="mb-3 text-sm text-gray-600">グラム数を最大公約数の <span class="font-bold text-amber-600">${commonDivisor}g</span> に揃えて計算すると...</p>`;
+            pricesPerUnit.forEach((item, index) => {
+                let highlightClass = '';
+                if(index === correctIndex) highlightClass = 'bg-green-100 font-bold';
+                if(index === selectedIndex && index !== correctIndex) highlightClass = 'bg-red-100';
+
+                explanationHTML += `
+                    <div class="p-2 rounded-md ${highlightClass}">
+                        ${item.grams}g ${item.price}円 → <span class="font-bold text-xl text-red-600">${item.unitPrice.toFixed(1)}円</span>
+                        ${index === correctIndex ? '<span class="text-green-600 font-bold ml-2">🎉お得！</span>' : ''}
+                    </div>
+                `;
+            });
+            resultExplanation.innerHTML = explanationHTML;
+            
+            // カードのハイライト
+            const cards = document.querySelectorAll('.price-tag');
+            cards.forEach((card, index) => {
+                card.removeEventListener('click', handleCardClick); // イベントリスナーを削除
+                if (index === correctIndex) {
+                    card.classList.add('correct');
+                } else if (index === selectedIndex) {
+                    card.classList.add('incorrect');
+                }
+            });
+
+            // 次のボタンの設定
+            currentQuestionIndex++;
+            if (currentQuestionIndex < gameData.length) {
+                nextButton.textContent = '次の問題へ';
+                nextButton.onclick = hideResultAndNext;
+            } else {
+                nextButton.textContent = '結果を見る';
+                nextButton.onclick = showFinalScore;
+            }
+        }
+
+        function hideResultAndNext() {
+            const card = resultModal.querySelector('.result-card');
+            card.classList.add('scale-95', 'opacity-0');
+            card.classList.remove('scale-100', 'opacity-100');
+            setTimeout(() => {
+                resultModal.classList.add('hidden');
+                displayQuestion();
+            }, 300);
+        }
+
+        function showFinalScore() {
+            // プログレスバーを100%に
+            progressBar.style.width = `100%`;
+            
+            resultTitle.textContent = '最終結果';
+            resultTitle.className = 'text-5xl font-bold mb-4 text-amber-600';
+            
+            resultExplanation.innerHTML = `
+                <p class="text-2xl text-center">あなたは...</p>
+                <p class="text-6xl text-center font-bold my-4">${gameData.length}問中 <span class="text-green-500">${score}問</span> 正解！</p>
+                <p class="text-center text-gray-600">${getFinalMessage()}</p>
+            `;
+            
+            nextButton.textContent = 'もう一度挑戦する';
+            nextButton.onclick = () => {
+                location.reload(); // 簡単なリセット方法としてリロード
+            };
+        }
+
+        function getFinalMessage() {
+            const percentage = score / gameData.length;
+            if (percentage === 1) return "パーフェクト！あなたはお買い物の達人ですね！";
+            if (percentage >= 0.8) return "素晴らしい！ほとんど見抜けるお買い物上手！";
+            if (percentage >= 0.5) return "なかなか良いですね！もう少しで達人の域です！";
+            return "また挑戦して、お得の感覚を磨きましょう！";
+        }
+
+        // ゲーム開始
+        document.addEventListener('DOMContentLoaded', displayQuestion);
+    </script>
+</body>
+</html>
