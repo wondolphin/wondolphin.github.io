@@ -78,48 +78,64 @@
         // --- 問題データ ---
         const problems = [
             {
-                title: "問題 1",
+    title: "問題 1",
+    targetShape: '四角形',
+    targetVertexCount: 4,
+    vertices: [
+    { x: 5, y: 4 },     { x: 8, y: 7 },     { x: 11, y: 4 }, 
+    { x: 11, y: 10 },     { x: 8, y: 13 },     { x: 5, y: 10 }
+
+]
+},
+{
+    title: "問題 2",
+    targetShape: '四角形',
+    targetVertexCount: 4,
+    vertices: [
+    { x: 4, y: 6 },     { x: 7, y: 5 },     { x: 11, y: 5 }, 
+    { x: 11, y: 7 },     { x: 12, y: 10 },     { x: 9, y: 11 }, 
+    { x: 9, y: 9 },     { x: 5, y: 9 }
+]
+},
+{
+    title: "問題 3",
+    targetShape: '四角形',
+    targetVertexCount: 4,
+    vertices: [
+    { x: 5, y: 6 },     { x: 7, y: 5 },     { x: 11, y: 5 }, 
+    { x: 12, y: 8 },     { x: 10, y: 9 },     { x: 10, y: 14 }, 
+    { x: 9, y: 11 },     { x: 5, y: 11 }
+]
+},
+
+{
+    title: "問題 4",
+    targetShape: '四角形',
+    targetVertexCount: 4,
+    vertices: [
+    { x: 4, y: 5 },     { x: 6, y: 4 },     { x: 10, y: 7 }, 
+    { x: 12, y: 6 },     { x: 12, y: 11 },     { x: 8, y: 13 }, 
+    { x: 4, y: 10 }
+]
+},
+
+{
+    title: "問題 5",
+    targetShape: '四角形',
+    targetVertexCount: 4,
+    vertices: [
+    { x: 4, y: 4 },     { x: 8, y: 4 },     { x: 9, y: 7 }, 
+    { x: 7, y: 8 },     { x: 7, y: 13 },     { x: 3, y: 13 }, 
+    { x: 3, y: 8 },     { x: 5, y: 7 }
+]
+},
+{
+                title: "問題 6",
                 targetShape: '三角形',
                 targetVertexCount: 3,
                 vertices: [
                     { x: 3, y: 9 }, { x: 6, y: 8 }, { x: 7, y: 6 },
                     { x: 5, y: 5 }, { x: 11, y: 3 },  { x: 8, y: 9 }, { x: 7, y: 11 }
-                ]
-            },
-            {
-                title: "問題 2",
-                targetShape: '四角形',
-                targetVertexCount: 4,
-                vertices: [
-                    { x: 4, y: 8 }, { x: 7, y: 8 }, { x: 7, y: 5 }, { x: 10, y: 5 }, 
-                    { x: 10, y: 2 }, { x: 4, y: 2 }
-                ]
-            },
-            {
-                title: "問題 3",
-                targetShape: '三角形',
-                targetVertexCount: 3,
-                vertices: [
-                    { x: 4, y: 2 }, { x: 10, y: 2 }, { x: 10, y: 6 }, 
-                    { x: 7, y: 9 }, { x: 4, y: 6 }
-                ]
-            },
-            {
-                title: "問題 4",
-                targetShape: '四角形',
-                targetVertexCount: 4,
-                vertices: [
-                    { x: 3, y: 4 }, { x: 6, y: 7 }, { x: 9, y: 4 }, 
-                    { x: 9, y: 10 }, { x: 3, y: 10 }
-                ]
-            },
-            {
-                title: "問題 5",
-                targetShape: '三角形',
-                targetVertexCount: 3,
-                vertices: [
-                    { x: 4, y: 3 }, { x: 9, y: 3 }, { x: 9, y: 5 }, { x: 7, y: 5 }, 
-                    { x: 7, y: 8 }, { x: 4, y: 8 }
                 ]
             }
         ];
@@ -146,7 +162,6 @@
             titleEl.textContent = `${problem.targetShape}を作ろう！`;
             updatePhaseInfo();
             resizeCanvas();
-            // アニメーションフレームが既に要求されている場合、キャンセルは不要
             requestAnimationFrame(gameLoop);
         }
 
@@ -386,6 +401,30 @@
             return null;
         }
 
+        /**
+         * 頂点リストから、隣接する頂点と直線上にある中間頂点を削除する
+         * @param {Array<object>} vertices - 頂点の配列
+         * @returns {Array<object>} 単純化された頂点の配列
+         */
+        function simplifyPolygon(vertices) {
+            if (vertices.length < 3) {
+                return vertices;
+            }
+            const simplified = [];
+            for (let i = 0; i < vertices.length; i++) {
+                const p_prev = vertices[(i - 1 + vertices.length) % vertices.length];
+                const p_curr = vertices[i];
+                const p_next = vertices[(i + 1) % vertices.length];
+                
+                // 現在の点が隣接する点と一直線上でなければ、真の頂点として保持する
+                if (getOrientation(p_prev, p_curr, p_next) !== 0) {
+                    simplified.push(p_curr);
+                }
+            }
+            return simplified;
+        }
+
+
         function splitPolygon() {
             const v1Info = gameState.selectedVertices[0];
             const v2Info = gameState.selectedVertices[1];
@@ -417,8 +456,8 @@
             }
 
             gameState.polygons = [
-                createPolygon(newVertices1),
-                createPolygon(newVertices2),
+                createPolygon(simplifyPolygon(newVertices1)),
+                createPolygon(simplifyPolygon(newVertices2)),
             ];
             gameState.phase = 'combine';
             updatePhaseInfo();
@@ -466,14 +505,7 @@
         }
 
         function checkWinCondition() {
-            // --- DEBUG LOG START ---
-            console.clear();
-            console.log("--- クリア判定開始 ---");
-
-            if (gameState.polygons.length !== 2) {
-                console.log("判定失敗: ポリゴンが2つではありません。数:", gameState.polygons.length);
-                return;
-            }
+            if (gameState.polygons.length !== 2) return;
 
             const poly1 = gameState.polygons[0];
             const poly2 = gameState.polygons[1];
@@ -494,8 +526,6 @@
                 if (isAdjacent) break;
             }
             
-            console.log("図形は隣接しているか？:", isAdjacent);
-
             if (isAdjacent) {
                 const allVertices = [...poly1.vertices, ...poly2.vertices];
                 const uniqueVertices = [];
@@ -506,25 +536,12 @@
                         uniqueVertices.push(v);
                     }
                 });
-                console.log(`ユニークな頂点の数: ${uniqueVertices.length}`, uniqueVertices.map(v => `(${v.x}, ${v.y})`));
-
 
                 const convexHull = calculateConvexHull(uniqueVertices);
 
-                if (convexHull) {
-                    console.log(`凸包の頂点の数: ${convexHull.length}`, convexHull.map(v => `(${v.x}, ${v.y})`));
-                } else {
-                    console.log("凸包を計算できませんでした。");
-                }
-
-
                 if (convexHull && convexHull.length === gameState.targetVertexCount) {
-                    console.log(`...凸包の頂点数(${convexHull.length})が目標(${gameState.targetVertexCount})と一致しました。`);
-                    
                     const convexHullSet = new Set(convexHull.map(v => `${v.x},${v.y}`));
                     const internalVertices = uniqueVertices.filter(v => !convexHullSet.has(`${v.x},${v.y}`));
-                    
-                    console.log(`内部頂点の数: ${internalVertices.length}`, internalVertices.map(v => `(${v.x}, ${v.y})`));
                     
                     let isShapeSolid = true;
                     
@@ -534,26 +551,15 @@
 
                         if (!(inPoly1 && inPoly2)) {
                             isShapeSolid = false;
-                            console.log(`--- 失敗: 内部頂点 (${internalVertex.x}, ${internalVertex.y}) が両方の図形に存在しません。 poly1に存在: ${inPoly1}, poly2に存在: ${inPoly2}`);
                             break;
                         }
                     }
                     
-                    console.log("図形に凹みや空隙がないか (isShapeSolid)？:", isShapeSolid);
-
                     if (isShapeSolid) {
-                         console.log("--- 成功: クリア条件を満たしました！ ---");
                          showClearMessage();
-                    } else {
-                        console.log("--- 失敗: 凹みがあるか、内部に空隙のある図形です。 ---");
                     }
-                } else {
-                     console.log(`--- 失敗: 凸包の頂点数(${convexHull ? convexHull.length : 'N/A'})が目標(${gameState.targetVertexCount})と一致しません。 ---`);
                 }
-            } else {
-                 console.log("--- 失敗: 図形が隣接していません。 ---");
             }
-             // --- DEBUG LOG END ---
         }
         
         function showClearMessage() {
