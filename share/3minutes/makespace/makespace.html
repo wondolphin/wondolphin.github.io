@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ブロック移動パズル</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: none;
+        }
+        .board {
+            position: relative;
+            background-color: #d4d3d8;
+            padding: 8px;
+            display: grid;
+        }
+        .board::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
+            background-image:
+                linear-gradient(to right, #e2e8f0 1px, transparent 1px),
+                linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+            background-size: 80px 80px;
+            z-index: 0;
+            /* Add border for right and bottom grid lines */
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            box-sizing: border-box;
+        }
+        .block {
+            position: absolute;
+            cursor: grab;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            border-radius: 4px;
+            border: 2px solid rgba(0,0,0,0.2);
+            transition: all 0.1s ease-out;
+            user-select: none;
+            box-sizing: border-box;
+            z-index: 5;
+        }
+        .block:active {
+            cursor: grabbing;
+            z-index: 10;
+            filter: brightness(1.1);
+        }
+        .block.connected-right { border-right-color: transparent; border-top-right-radius: 0; border-bottom-right-radius: 0;}
+        .block.connected-left { border-left-color: transparent; border-top-left-radius: 0; border-bottom-left-radius: 0;}
+        .block.connected-bottom { border-bottom-color: transparent; border-bottom-left-radius: 0; border-bottom-right-radius: 0;}
+        .block.connected-top { border-top-color: transparent; border-top-left-radius: 0; border-top-right-radius: 0;}
+        
+        #picture-goal {
+            position: absolute;
+            background-image: url('picture.png');
+            background-size: cover;
+            background-repeat: no-repeat;
+            z-index: 1;
+            opacity: 0.5;
+            transition: opacity 0.5s ease;
+        }
+
+        /* --- Clear Animation --- */
+        #picture-goal.goal-cleared {
+            z-index: 15; /* Bring to front */
+            opacity: 1; /* Make fully visible */
+            animation: glow-effect 1.2s ease-out;
+        }
+
+        @keyframes glow-effect {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 20px 15px rgba(255, 255, 255, 0.9);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md mx-auto flex flex-col items-center space-y-4">
+        
+        <div class="text-center">
+            <h1 class="text-4xl font-bold text-slate-800">ブロック移動パズル</h1>
+            <p class="text-slate-600 mt-2">ブロックを動かして、隠れている絵を見つけよう！</p>
+        </div>
+        
+        <div id="game-area-wrapper">
+
+            <!-- ✅ カスタムドロップダウン -->
+            <div class="mb-4 relative" id="custom-select-wrapper">
+              <!-- Removed the label element -->
+              
+              <button id="custom-select-btn"
+                      class="w-full bg-white border border-gray-300 rounded-md py-2 px-3 text-left shadow-sm 
+                             focus:outline-none focus:ring-2 focus:ring-indigo-500 flex justify-between items-center">
+                <span id="custom-select-label">ステージ 1</span>
+                <svg class="w-4 h-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              <ul id="custom-select-menu"
+                  class="hidden absolute left-0 w-full bg-white border border-gray-300 rounded-md mt-1 shadow-lg z-20">
+              </ul>
+            </div>
+
+            <div id="game-container" class="relative z-0">
+                <div id="board" class="board rounded-lg shadow-lg">
+                    <!-- Game board -->
+                </div>
+                <div id="picture-goal"></div>
+            </div>
+        </div>
+    
+        <button onclick="loadCurrentStage()" 
+                class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow">
+            リセット
+        </button>
+
+    </div>
+    
+    <div id="clear-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
+        <div class="bg-white rounded-lg p-10 text-center shadow-xl">
+            <h2 class="text-4xl font-bold text-green-500 mb-4">ステージクリア！</h2>
+            <p class="text-lg text-slate-700 mb-6">おめでとうございます！</p>
+            <button onclick="loadCurrentStage()" 
+                    class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                もう一度プレイ
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+        const boardElement = document.getElementById('board');
+        const pictureGoalElement = document.getElementById('picture-goal');
+        const clearModal = document.getElementById('clear-modal');
+        const gameAreaWrapper = document.getElementById('game-area-wrapper');
+
+        const CELL_SIZE = 80;
+        const PADDING = 8;
+
+        const STAGES = [
+           {
+                name: "ステージ 1",
+                layout: [
+            ['x', '1', '.', 'x'],
+            ['.', '1', '3', '3'],
+            ['x', '.', '2', 'x'],
+            ['x', '.', '.', 'x']
+                ],
+                goal: { top: 2, left: 1, width: 2, height: 2 }
+            },
+            {
+                name: "ステージ 2",
+                layout: [
+            ['x', '.', '.', 'x'],
+            ['x', '1', '1', 'x'],
+            ['.', '2', '3', '.'],
+            ['4', '2', '.', 'x']
+                ],
+                goal: { top: 0, left: 1, width: 2, height: 2 }
+            },
+            {
+                name: "ステージ 3",
+                layout: [
+                    ['.', 'x', 'x', '.'],
+                    ['1', '.', '4', '4'],
+                    ['1', '1', '3', '.'],
+                    ['2', '2', '3', '.']
+                ],
+                goal: { top: 1, left: 0, width: 2, height: 2 }
+            },
+            {
+                name: "ステージ 4",
+                layout: [
+            ['x', '1', '1', 'x'],
+            ['4', '.', '2', '.'],
+            ['.', '3', '2', '.'],
+            ['x', '3', '.', '.']
+                ],
+                goal: { top: 1, left: 2, width: 2, height: 3 }
+            }
+        ];
+
+        let boardLayout = [];
+        let picturePosition = {};
+        let currentStageIndex = 0;
+
+        const COLORS = {
+            'x': 'bg-slate-700',
+            '1': 'bg-red-500',
+            '2': 'bg-blue-500',
+            '3': 'bg-green-500',
+            '4': 'bg-yellow-500',
+        };
+
+        function setupCustomSelect() {
+          const btn = document.getElementById('custom-select-btn');
+          const menu = document.getElementById('custom-select-menu');
+          const label = document.getElementById('custom-select-label');
+
+          menu.innerHTML = '';
+          STAGES.forEach((stage, index) => {
+            const li = document.createElement('li');
+            li.textContent = stage.name;
+            li.className = "px-3 py-2 hover:bg-indigo-100 cursor-pointer";
+            li.addEventListener('click', () => {
+              label.textContent = stage.name;
+              loadStage(index);
+              menu.classList.add('hidden');
+            });
+            menu.appendChild(li);
+          });
+
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            menu.classList.toggle('hidden');
+          });
+
+          document.addEventListener('click', () => {
+            menu.classList.add('hidden');
+          });
+        }
+
+        function loadStage(index) {
+            currentStageIndex = index;
+            const stage = STAGES[index];
+            boardLayout = JSON.parse(JSON.stringify(stage.layout));
+            picturePosition = { ...stage.goal };
+            pictureGoalElement.classList.remove('goal-cleared'); // Reset animation class
+            clearModal.classList.add('hidden');
+            render();
+        }
+
+        function loadCurrentStage() {
+            loadStage(currentStageIndex);
+        }
+
+        function getBlockPositions(blockId) {
+            const positions = [];
+            for (let r = 0; r < boardLayout.length; r++) {
+                for (let c = 0; c < boardLayout[0].length; c++) {
+                    if (boardLayout[r][c] === blockId) {
+                        positions.push({ r, c });
+                    }
+                }
+            }
+            return positions;
+        }
+
+        function canMove(blockId, dr, dc) {
+            const blockPositions = getBlockPositions(blockId);
+            for (const pos of blockPositions) {
+                const newR = pos.r + dr;
+                const newC = pos.c + dc;
+
+                if (newR < 0 || newR >= boardLayout.length || newC < 0 || newC >= boardLayout[0].length) {
+                    return false;
+                }
+
+                const targetCell = boardLayout[newR][newC];
+                if (targetCell !== '.' && targetCell !== blockId) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function moveBlock(blockId, dr, dc) {
+            if (!canMove(blockId, dr, dc)) return false;
+            const blockPositions = getBlockPositions(blockId);
+            if (dr > 0 || dc > 0) blockPositions.sort((a, b) => (b.r - a.r) || (b.c - a.c));
+            else blockPositions.sort((a, b) => (a.r - b.r) || (a.c - b.c));
+
+            for (const pos of blockPositions) boardLayout[pos.r][pos.c] = '.';
+            for (const pos of blockPositions) boardLayout[pos.r + dr][pos.c + dc] = blockId;
+            checkWinCondition();
+            return true;
+        }
+
+        function checkWinCondition() {
+            let isClear = true;
+            for (let r = 0; r < picturePosition.height; r++) {
+                for (let c = 0; c < picturePosition.width; c++) {
+                    if (boardLayout[picturePosition.top + r][picturePosition.left + c] !== '.') {
+                        isClear = false;
+                        break;
+                    }
+                }
+                if (!isClear) break;
+            }
+
+            if (isClear) {
+                pictureGoalElement.classList.add('goal-cleared');
+                pictureGoalElement.addEventListener('animationend', () => {
+                    clearModal.classList.remove('hidden');
+                }, { once: true });
+            }
+        }
+
+        function render() {
+            const rows = boardLayout.length;
+            const cols = boardLayout[0].length;
+            const boardWidth = cols * CELL_SIZE + PADDING * 2;
+
+            gameAreaWrapper.style.width = `${boardWidth}px`;
+            boardElement.innerHTML = '';
+            boardElement.style.width = `${boardWidth}px`;
+            boardElement.style.height = `${rows * CELL_SIZE + PADDING * 2}px`;
+
+            pictureGoalElement.style.top = `${picturePosition.top * CELL_SIZE + PADDING}px`;
+            pictureGoalElement.style.left = `${picturePosition.left * CELL_SIZE + PADDING}px`;
+            pictureGoalElement.style.width = `${picturePosition.width * CELL_SIZE}px`;
+            pictureGoalElement.style.height = `${picturePosition.height * CELL_SIZE}px`;
+
+            const renderedBlocks = new Set();
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const blockId = boardLayout[r][c];
+                    if (blockId !== '.' && !renderedBlocks.has(blockId)) {
+                        createBlockElement(blockId);
+                        renderedBlocks.add(blockId);
+                    }
+                }
+            }
+        }
+
+        function createBlockElement(blockId) {
+            const blockPositions = getBlockPositions(blockId);
+            blockPositions.forEach(pos => {
+                const blockElement = document.createElement('div');
+                blockElement.className = `block ${COLORS[blockId] || 'bg-gray-400'}`;
+                blockElement.style.width = `${CELL_SIZE}px`;
+                blockElement.style.height = `${CELL_SIZE}px`;
+                blockElement.style.top = `${pos.r * CELL_SIZE + PADDING}px`;
+                blockElement.style.left = `${pos.c * CELL_SIZE + PADDING}px`;
+                blockElement.dataset.id = blockId;
+
+                const hasRight = blockPositions.some(p => p.r === pos.r && p.c === pos.c + 1);
+                const hasLeft = blockPositions.some(p => p.r === pos.r && p.c === pos.c - 1);
+                const hasBottom = blockPositions.some(p => p.r === pos.r + 1 && p.c === pos.c);
+                const hasTop = blockPositions.some(p => p.r === pos.r - 1 && p.c === pos.c);
+
+                if (hasRight) blockElement.classList.add('connected-right');
+                if (hasLeft) blockElement.classList.add('connected-left');
+                if (hasBottom) blockElement.classList.add('connected-bottom');
+                if (hasTop) blockElement.classList.add('connected-top');
+
+                boardElement.appendChild(blockElement);
+                if (blockId !== 'x') addDragHandlers(blockElement);
+            });
+        }
+
+        let dragStart = null;
+        let draggedBlockId = null;
+
+        function addDragHandlers(element) {
+            element.addEventListener('mousedown', onDragStart);
+            element.addEventListener('touchstart', onDragStart, { passive: false });
+        }
+
+        function onDragStart(e) {
+            e.preventDefault();
+            draggedBlockId = e.target.dataset.id;
+            if (!draggedBlockId || draggedBlockId === 'x') return;
+            const pos = e.touches ? e.touches[0] : e;
+            dragStart = { x: pos.clientX, y: pos.clientY };
+            document.addEventListener('mousemove', onDragMove);
+            document.addEventListener('mouseup', onDragEnd);
+            document.addEventListener('touchmove', onDragMove, { passive: false });
+            document.addEventListener('touchend', onDragEnd);
+        }
+
+        function onDragMove(e) {
+            e.preventDefault();
+            if (!dragStart) return;
+            const pos = e.touches ? e.touches[0] : e;
+            const dx = pos.clientX - dragStart.x;
+            const dy = pos.clientY - dragStart.y;
+            if (Math.abs(dx) > CELL_SIZE / 2.5 || Math.abs(dy) > CELL_SIZE / 2.5) {
+                let dr = 0, dc = 0;
+                if (Math.abs(dx) > Math.abs(dy)) dc = dx > 0 ? 1 : -1;
+                else dr = dy > 0 ? 1 : -1;
+                if (moveBlock(draggedBlockId, dr, dc)) {
+                    render();
+                    dragStart = { x: pos.clientX, y: pos.clientY };
+                }
+            }
+        }
+
+        function onDragEnd() {
+            dragStart = null;
+            draggedBlockId = null;
+            document.removeEventListener('mousemove', onDragMove);
+            document.removeEventListener('mouseup', onDragEnd);
+            document.removeEventListener('touchmove', onDragMove);
+            document.removeEventListener('touchend', onDragEnd);
+        }
+
+        // 初期化
+        setupCustomSelect();
+        loadStage(0);
+    </script>
+
+</body>
+</html>
+
