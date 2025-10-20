@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>たどルート</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: none; /* Prevent scrolling on mobile */
+        }
+        canvas {
+            background-color: #f8f9fa;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>');
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1.2em;
+            padding-right: 2.5rem;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+    <div class="flex flex-col items-center p-4">
+        <h1 class="text-3xl font-bold mb-2 text-gray-700">たどルート</h1>
+        <div class="mb-4">
+            <select id="stage-select" class="w-48 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 px-4 py-2 text-lg">
+                <!-- Stages will be populated by JS -->
+            </select>
+        </div>
+        <p id="message" class="text-gray-600 mb-4 h-6">太い線をすべて通ってゴールしよう！</p>
+        <canvas id="mazeCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mazeCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageEl = document.getElementById('message');
+        const stageSelect = document.getElementById('stage-select');
+
+        // --- Maze Data Bank ---
+        const mazes = [
+            {
+                name: "ステージ 1",
+                data: [
+                    "s_,.,.,.r,.",
+                    "._|,.,.,.d,.",
+                    ".,.r,.,.,._",
+                    ".dr,.r,.r,.|,._",
+                    ".,.,.,.,g"
+                ]
+            },
+            {
+                name: "ステージ 2",
+                data: [
+".,._,._,.,.",
+".|,s,.,._r,.",
+".|,.r,.,.r,.",
+".,._,gd,.dr,.",
+".,.,.,.,.",
+                ]
+            }
+        ];
+
+        let mazeTextData = [];
+        
+        // --- Settings ---
+        const GRID_SIZE = 70;
+        const NODE_RADIUS = 15;
+        const PLAYER_RADIUS = 18;
+        const LINE_WIDTH = 6;
+        const REQUIRED_LINE_WIDTH = 12;
+        const MOVE_SPEED = 0.4;
+        
+        const colors = {
+            line: '#d1d5db',
+            requiredLine: '#a5b4fc',
+            start: '#52b788',
+            goal: '#e63946',
+            player: '#52b788',
+            route: '#ffb703',
+        };
+
+        let mazeGrid = [];
+        let player = {};
+        let numCols = 0, numRows = 0;
+        let isDragging = false, isMoving = false, lastMousePos = {};
+        let pathHistory = [];
+        
+        let totalRequiredLines = 0;
+        let traversedRequiredLines = new Set();
+        let showMissingLinesError = false;
+
+        // --- Functions ---
+        
+        function parseMazeData() {
+            mazeGrid = [];
+            totalRequiredLines = 0;
+            const rawGrid = mazeTextData.map(row => row.split(','));
+            numRows = rawGrid.length;
+            numCols = Math.max(...rawGrid.map(row => row.length));
+
+            for (let r = 0; r < numRows; r++) {
+                mazeGrid[r] = [];
+                for (let c = 0; c < numCols; c++) {
+                    const cellData = rawGrid[r]?.[c] || "";
+                    if (cellData.trim() === "") {
+                        mazeGrid[r][c] = { type: 'empty' }; continue;
+                    }
+                    const isRequiredRight = cellData.includes('r');
+                    const isRequiredDown = cellData.includes('d');
+                    
+                    if (isRequiredRight) totalRequiredLines++;
+                    if (isRequiredDown) totalRequiredLines++;
+
+                    mazeGrid[r][c] = {
+                        type: 'path', hasWallRight: cellData.includes('|'), hasWallDown: cellData.includes('_'),
+                        isRequiredRight, isRequiredDown,
+                    };
+
+                    if (cellData.includes('s')) {
+                        mazeGrid[r][c].type = 'start'; player.r = r; player.c = c;
+                    } else if (cellData.includes('g')) {
+                        mazeGrid[r][c].type = 'goal';
+                    }
+                }
+            }
+        }
+        
+        function drawMaze() {
+            ctx.lineCap = 'round';
+            const drawConnection = (r, c, type) => {
+                const node = mazeGrid[r][c];
+                if (!node || node.type === 'empty') return;
+                const x = c * GRID_SIZE + GRID_SIZE / 2;
+                const y = r * GRID_SIZE + GRID_SIZE / 2;
+
+                if (type === 'normal') {
+                    if (c + 1 < numCols && !node.hasWallRight && !node.isRequiredRight) {
+                        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + GRID_SIZE, y); ctx.stroke();
+                    }
+                    if (r + 1 < numRows && !node.hasWallDown && !node.isRequiredDown) {
+                        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + GRID_SIZE); ctx.stroke();
+                    }
+                } else if (type === 'required') {
+                    if (c + 1 < numCols && !node.hasWallRight && node.isRequiredRight) {
+                        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + GRID_SIZE, y); ctx.stroke();
+                    }
+                    if (r + 1 < numRows && !node.hasWallDown && node.isRequiredDown) {
+                        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + GRID_SIZE); ctx.stroke();
+                    }
+                }
+            };
+
+            // 1. Draw normal lines
+            ctx.strokeStyle = colors.line;
+            ctx.lineWidth = LINE_WIDTH;
+            for (let r = 0; r < numRows; r++) for (let c = 0; c < numCols; c++) drawConnection(r, c, 'normal');
+
+            // 2. Draw required lines on top
+            ctx.strokeStyle = colors.requiredLine;
+            ctx.lineWidth = REQUIRED_LINE_WIDTH;
+            for (let r = 0; r < numRows; r++) for (let c = 0; c < numCols; c++) drawConnection(r, c, 'required');
+            
+            // 3. Draw start/goal nodes
+            for (let r = 0; r < numRows; r++) {
+                for (let c = 0; c < numCols; c++) {
+                    const node = mazeGrid[r][c];
+                    if (node && ['start', 'goal'].includes(node.type)) {
+                        const x = c * GRID_SIZE + GRID_SIZE / 2, y = r * GRID_SIZE + GRID_SIZE / 2;
+                        ctx.beginPath(); ctx.arc(x, y, NODE_RADIUS, 0, Math.PI * 2);
+                        ctx.fillStyle = node.type === 'start' ? colors.start : colors.goal;
+                        ctx.fill();
+                    }
+                }
+            }
+        }
+        
+        function drawPath() {
+            if (pathHistory.length < 2) return;
+            ctx.strokeStyle = colors.route; ctx.lineWidth = LINE_WIDTH; ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(pathHistory[0].c * GRID_SIZE + GRID_SIZE / 2, pathHistory[0].r * GRID_SIZE + GRID_SIZE / 2);
+            for (let i = 1; i < pathHistory.length; i++) {
+                ctx.lineTo(pathHistory[i].c * GRID_SIZE + GRID_SIZE / 2, pathHistory[i].r * GRID_SIZE + GRID_SIZE / 2);
+            }
+            ctx.stroke();
+        }
+
+        function drawPlayer() {
+            ctx.beginPath(); ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = colors.player; ctx.strokeStyle = 'white'; ctx.lineWidth = 4;
+            ctx.stroke(); ctx.fill();
+        }
+
+        function updatePlayerPosition() {
+            if (!isMoving) return;
+            const dx = player.targetX - player.x, dy = player.targetY - player.y;
+            if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+                player.x = player.targetX; player.y = player.targetY; isMoving = false;
+                
+                if (mazeGrid[player.r][player.c].type === 'goal') {
+                    if (traversedRequiredLines.size === totalRequiredLines) {
+                        messageEl.textContent = 'クリア！おめでとうございます！';
+                        messageEl.style.color = colors.goal; messageEl.style.fontWeight = 'bold';
+                        isDragging = false;
+                    } else {
+                        messageEl.textContent = '通っていない必要線があります！';
+                        messageEl.style.color = colors.goal;
+                        showMissingLinesError = true; isDragging = false;
+                    }
+                }
+            } else {
+                player.x += dx * MOVE_SPEED; player.y += dy * MOVE_SPEED;
+            }
+        }
+
+        function drawErrorState() {
+            if (!showMissingLinesError || Math.floor(Date.now() / 400) % 2 === 0) return;
+            ctx.strokeStyle = colors.goal; ctx.lineWidth = REQUIRED_LINE_WIDTH; ctx.lineCap = 'round';
+            for (let r = 0; r < numRows; r++) for (let c = 0; c < numCols; c++) {
+                const node = mazeGrid[r][c]; if (!node) continue;
+                if (node.isRequiredRight && !traversedRequiredLines.has(`h-${r}-${c}`)) {
+                    const x = c * GRID_SIZE + GRID_SIZE / 2, y = r * GRID_SIZE + GRID_SIZE / 2;
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + GRID_SIZE, y); ctx.stroke();
+                }
+                if (node.isRequiredDown && !traversedRequiredLines.has(`v-${r}-${c}`)) {
+                    const x = c * GRID_SIZE + GRID_SIZE / 2, y = r * GRID_SIZE + GRID_SIZE / 2;
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + GRID_SIZE); ctx.stroke();
+                }
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawMaze();
+            drawPath();
+            drawErrorState();
+            updatePlayerPosition();
+            drawPlayer();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function canMove(dir) {
+            const { r, c } = player;
+            let destR = r, destC = c;
+            if (dir === 'right') destC++; else if (dir === 'left') destC--; 
+            else if (dir === 'down') destR++; else if (dir === 'up') destR--; else return false;
+
+            if (pathHistory.some(p => p.r === destR && p.c === destC)) {
+                return pathHistory.length > 1 && pathHistory[pathHistory.length - 2].r === destR && pathHistory[pathHistory.length - 2].c === destC;
+            }
+            if (dir === 'right') { if (c + 1 >= numCols || mazeGrid[r][c].hasWallRight) return false; } 
+            else if (dir === 'left') { if (c - 1 < 0 || mazeGrid[r][c - 1]?.hasWallRight) return false; } 
+            else if (dir === 'down') { if (r + 1 >= numRows || mazeGrid[r][c].hasWallDown) return false; } 
+            else if (dir === 'up') { if (r - 1 < 0 || mazeGrid[r - 1][c]?.hasWallDown) return false; }
+            return mazeGrid[destR]?.[destC]?.type !== 'empty';
+        }
+        function getCanonicalLineId(r1, c1, r2, c2) {
+            return r1 === r2 ? `h-${r1}-${Math.min(c1, c2)}` : `v-${Math.min(r1, r2)}-${c1}`;
+        }
+
+        function getEventPos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = evt.clientX || evt.touches[0].clientX, clientY = evt.clientY || evt.touches[0].clientY;
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+        function handleStart(evt) { evt.preventDefault(); const pos = getEventPos(evt); if (Math.hypot(pos.x - player.x, pos.y - player.y) < PLAYER_RADIUS * 1.5) { isDragging = true; lastMousePos = pos; } }
+        function handleEnd(evt) { evt.preventDefault(); isDragging = false; }
+        function handleMove(evt) {
+            if (!isDragging || isMoving) return;
+            evt.preventDefault();
+            const pos = getEventPos(evt), deltaX = pos.x - lastMousePos.x, deltaY = pos.y - lastMousePos.y;
+            const moveThreshold = 35;
+            let moved = false, targetR = player.r, targetC = player.c, moveDir = null;
+
+            if (Math.abs(deltaX) > moveThreshold || Math.abs(deltaY) > moveThreshold) {
+                if (Math.abs(deltaX) > Math.abs(deltaY)) moveDir = deltaX > 0 ? 'right' : 'left';
+                else moveDir = deltaY > 0 ? 'down' : 'up';
+
+                if (canMove(moveDir)) {
+                    moved = true;
+                    if (moveDir === 'right') targetC++; else if (moveDir === 'left') targetC--;
+                    else if (moveDir === 'down') targetR++; else if (moveDir === 'up') targetR--;
+                }
+                if (moved) {
+                    const prevPos = pathHistory[pathHistory.length - 1];
+                    const isBackward = pathHistory.length > 1 && pathHistory[pathHistory.length - 2].r === targetR && pathHistory[pathHistory.length - 2].c === targetC;
+                    if (isBackward) {
+                        traversedRequiredLines.delete(getCanonicalLineId(prevPos.r, prevPos.c, targetR, targetC));
+                        pathHistory.pop();
+                    } else {
+                        const lineId = getCanonicalLineId(prevPos.r, prevPos.c, targetR, targetC);
+                        const node = (moveDir === 'right' || moveDir === 'down') ? mazeGrid[prevPos.r][prevPos.c] : mazeGrid[targetR][targetC];
+                        const isRequired = (moveDir === 'right' || moveDir === 'left') ? node.isRequiredRight : node.isRequiredDown;
+                        if(isRequired) traversedRequiredLines.add(lineId);
+                        pathHistory.push({ r: targetR, c: targetC });
+                    }
+                    player.r = targetR; player.c = targetC;
+                    player.targetX = player.c * GRID_SIZE + GRID_SIZE / 2;
+                    player.targetY = player.r * GRID_SIZE + GRID_SIZE / 2;
+                    isMoving = true;
+                    lastMousePos = { x: player.targetX, y: player.targetY };
+                } else { lastMousePos = pos; }
+            }
+        }
+        function handleTap(evt) {
+            if (isDragging || isMoving) return;
+            const pos = getEventPos(evt), r = Math.floor(pos.y / GRID_SIZE), c = Math.floor(pos.x / GRID_SIZE);
+            const tappedNodeIndex = pathHistory.findIndex(p => p.r === r && p.c === c);
+            if (tappedNodeIndex > -1 && tappedNodeIndex < pathHistory.length - 1) {
+                pathHistory.splice(tappedNodeIndex + 1);
+                traversedRequiredLines.clear();
+                for (let i = 0; i < pathHistory.length - 1; i++) {
+                    const p1 = pathHistory[i], p2 = pathHistory[i+1];
+                    const lineId = getCanonicalLineId(p1.r, p1.c, p2.r, p2.c);
+                    const nodeR = Math.min(p1.r, p2.r), nodeC = p1.r === p2.r ? Math.min(p1.c, p2.c) : p1.c;
+                    const node = mazeGrid[nodeR][nodeC];
+                    const isRequired = (p1.r === p2.r) ? node.isRequiredRight : node.isRequiredDown;
+                    if (isRequired) traversedRequiredLines.add(lineId);
+                }
+                const lastPos = pathHistory[pathHistory.length - 1];
+                player.r = lastPos.r; player.c = lastPos.c;
+                player.x = player.targetX = player.c * GRID_SIZE + GRID_SIZE / 2;
+                player.y = player.targetY = player.r * GRID_SIZE + GRID_SIZE / 2;
+
+                showMissingLinesError = false;
+                messageEl.textContent = '太い線をすべて通ってゴールしよう！';
+                messageEl.style.color = '#4b5563'; messageEl.style.fontWeight = 'normal';
+            }
+        }
+
+        function startGame(stageIndex) {
+            // Reset game state
+            showMissingLinesError = false;
+            isDragging = false;
+            isMoving = false;
+            traversedRequiredLines.clear();
+            messageEl.textContent = '太い線をすべて通ってゴールしよう！';
+            messageEl.style.color = '#4b5563';
+            messageEl.style.fontWeight = 'normal';
+
+            // Load new maze
+            mazeTextData = mazes[stageIndex].data;
+            parseMazeData();
+            pathHistory = [{ r: player.r, c: player.c }];
+
+            // Update canvas and player
+            canvas.width = numCols * GRID_SIZE;
+            canvas.height = numRows * GRID_SIZE;
+            player.x = player.targetX = player.c * GRID_SIZE + GRID_SIZE / 2;
+            player.y = player.targetY = player.r * GRID_SIZE + GRID_SIZE / 2;
+        }
+
+        function init() {
+            // Populate stage selector
+            mazes.forEach((maze, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = maze.name;
+                stageSelect.appendChild(option);
+            });
+            
+            stageSelect.addEventListener('change', (e) => {
+                startGame(parseInt(e.target.value, 10));
+            });
+            
+            const events = {
+                'mousedown': handleStart, 'mouseup': handleEnd, 'mouseleave': handleEnd, 'mousemove': handleMove,
+                'touchstart': handleStart, 'touchend': handleEnd, 'touchcancel': handleEnd, 'touchmove': handleMove,
+                'click': handleTap,
+            };
+            for(const [event, handler] of Object.entries(events)) {
+                canvas.addEventListener(event, handler, { passive: false });
+            }
+
+            startGame(0); // Start the first stage
+            gameLoop(); // Start the animation loop
+        }
+        init();
+    </script>
+</body>
+</html>
+

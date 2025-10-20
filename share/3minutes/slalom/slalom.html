@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スラローム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: none; /* スマホでのスクロールを無効化 */
+        }
+        canvas {
+            background-color: #f8f9fa;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .screen {
+            width: 100%;
+            display: none; /* 初期状態では非表示 */
+        }
+        .screen.active {
+            display: flex; /* .activeクラスで表示 */
+            flex-direction: column;
+            align-items: center;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+    <div class="text-center p-4">
+        <h1 class="text-3xl font-bold mb-4 text-gray-700">スラローム</h1>
+        
+        <!-- ステージ選択画面 -->
+        <div id="stage-select-screen" class="screen active">
+            <h2 class="text-xl text-gray-600 mb-6">ステージを選んでください</h2>
+            <div id="stage-buttons" class="flex flex-col items-center gap-4">
+                <!-- ステージボタンはJSで生成されます -->
+            </div>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <div id="game-screen" class="screen">
+            <p id="message" class="text-gray-500 mb-4">緑の丸をドラッグして、順番通りに全ての円を通り、赤いゴールを目指してください。</p>
+            <canvas id="mazeCanvas"></canvas>
+            <button id="back-button" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition">ステージ選択に戻る</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mazeCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageEl = document.getElementById('message');
+        const stageSelectScreen = document.getElementById('stage-select-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const stageButtonsContainer = document.getElementById('stage-buttons');
+        const backButton = document.getElementById('back-button');
+
+        // --- 迷路データ ---
+        const mazes = [
+{
+                name: "ステージ 1",
+                data: [
+"._|,._|,s|,._|,._",
+
+".,.,._,.,.",
+
+"x|,.|,._|,.|,x",
+
+".,1_,._,2_,.",
+
+".,.,5,.,g"
+                ]
+            },
+            {
+                name: "ステージ 2",
+                data: [
+"s_,.,._,._,x",
+".,._|,x,.|,.",
+"x,.,._,3_|,.",
+".|,._,.,._,.",
+"g,.,x,.,."
+                ]
+            },
+            {
+                name: "ステージ 3",
+                data: [
+                                    ".,1_,.,._,.,4_,.",
+                    "s|,._|,x|,._|,x|,._|,.",
+                    ".,x_,.,x_,.,g_|,.",
+                    ".|,._|,.,._,6_|,._|,.",
+                    "7,.,.,.,.,x,."
+                ]
+            }
+        ];
+        
+        let mazeTextData = [];
+
+        // --- 設定 ---
+        const GRID_SIZE = 80;
+        const NODE_RADIUS = 18;
+        const PLAYER_RADIUS = 20;
+        const LINE_WIDTH = 6;
+        const MOVE_SPEED = 0.5;
+        
+        const colors = {
+            line: '#d8e2dc', node: '#8367c7', start: '#52b788',
+            goal: '#e63946', player: '#52b788', text: '#ffffff',
+            visited: '#ffb703'
+        };
+
+        let mazeGrid = [], player = {}, numCols = 0, numRows = 0;
+        let isDragging = false, isMoving = false, lastMousePos = {};
+        let hasPlayerMoved = false, pathHistory = [], totalCircles = 0;
+        let gameAnimationId = null;
+
+        function parseMazeData() {
+            mazeGrid = [];
+            pathHistory = [];
+            const rawGrid = mazeTextData.map(row => row.split(','));
+            numRows = rawGrid.length;
+            numCols = Math.max(...rawGrid.map(row => row.length));
+
+            let startPos = null;
+
+            for (let r = 0; r < numRows; r++) {
+                mazeGrid[r] = [];
+                for (let c = 0; c < numCols; c++) {
+                    const cellData = rawGrid[r]?.[c] || "";
+                    if (cellData.trim() === "") {
+                        mazeGrid[r][c] = { type: 'empty' }; continue;
+                    }
+                    const node = { type: 'path', hasWallRight: cellData.includes('|'), hasWallDown: cellData.includes('_') };
+                    if (cellData.includes('s')) {
+                        node.type = 'start'; player.r = r; player.c = c; startPos = {r, c};
+                    } else if (cellData.includes('g')) {
+                        node.type = 'goal';
+                    } else if (cellData.includes('x')) {
+                        node.type = 'node';
+                    } else if (!isNaN(parseInt(cellData))) {
+                        node.type = 'number'; node.number = parseInt(cellData);
+                    }
+                    mazeGrid[r][c] = node;
+                }
+            }
+            pathHistory.push(startPos);
+            
+            totalCircles = 0;
+            let goalNode = null;
+            for (let r = 0; r < numRows; r++) {
+                for (let c = 0; c < numCols; c++) {
+                    const nodeType = mazeGrid[r]?.[c]?.type;
+                    if (['number', 'node', 'goal'].includes(nodeType)) totalCircles++;
+                    if (nodeType === 'goal') goalNode = mazeGrid[r][c];
+                }
+            }
+            if (goalNode) goalNode.number = totalCircles;
+        }
+        
+        function getVisitedCircles() {
+            const circles = [], visitedCoords = new Set();
+            for (const pos of pathHistory) {
+                const key = `${pos.r},${pos.c}`;
+                if (visitedCoords.has(key)) continue;
+                const node = mazeGrid[pos.r][pos.c];
+                if (['goal', 'number', 'node'].includes(node.type)) {
+                    circles.push(node); visitedCoords.add(key);
+                }
+            }
+            return circles;
+        }
+
+        function drawMaze() {
+            ctx.strokeStyle = colors.line; ctx.lineWidth = LINE_WIDTH; ctx.lineCap = 'round';
+            for (let r = 0; r < numRows; r++) {
+                for (let c = 0; c < numCols; c++) {
+                    const node = mazeGrid[r][c];
+                    if (!node || node.type === 'empty') continue;
+                    const x = c * GRID_SIZE + GRID_SIZE / 2, y = r * GRID_SIZE + GRID_SIZE / 2;
+                    if (c + 1 < numCols && mazeGrid[r][c+1]?.type !== 'empty' && !node.hasWallRight) {
+                        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + GRID_SIZE, y); ctx.stroke();
+                    }
+                    if (r + 1 < numRows && mazeGrid[r+1][c]?.type !== 'empty' && !node.hasWallDown) {
+                        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + GRID_SIZE); ctx.stroke();
+                    }
+                }
+            }
+            const visitedCoords = new Set(pathHistory.map(p => `${p.r},${p.c}`));
+            for (let r = 0; r < numRows; r++) {
+                for (let c = 0; c < numCols; c++) {
+                    const node = mazeGrid[r][c];
+                    if (!node || (node.type === 'start' && hasPlayerMoved)) continue;
+                    if (['start', 'goal', 'number', 'node'].includes(node.type)) {
+                        const x = c * GRID_SIZE + GRID_SIZE / 2, y = r * GRID_SIZE + GRID_SIZE / 2;
+                        let color = node.type === 'start' ? colors.start : node.type === 'goal' ? colors.goal : colors.node;
+                        if (visitedCoords.has(`${r},${c}`) && node.type !== 'start') color = colors.visited;
+                        ctx.beginPath(); ctx.arc(x, y, NODE_RADIUS, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+                        ctx.fillStyle = colors.text; ctx.font = 'bold 20px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                        if (node.type === 'number' || node.type === 'goal') ctx.fillText(node.number, x, y);
+                        else if (node.type === 'node' && node.writtenNumber) ctx.fillText(node.writtenNumber, x, y);
+                    }
+                }
+            }
+        }
+        
+        function drawPlayer() {
+            ctx.beginPath(); ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = colors.player; ctx.strokeStyle = 'white'; ctx.lineWidth = 4;
+            ctx.stroke(); ctx.fill();
+        }
+
+        function updatePlayerPosition() {
+            if (!isMoving) return;
+            const dx = player.targetX - player.x, dy = player.targetY - player.y;
+            if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+                player.x = player.targetX; player.y = player.targetY; isMoving = false;
+                const currentNode = mazeGrid[player.r][player.c];
+                const visitedCircles = getVisitedCircles();
+                if (currentNode.type === 'goal' && visitedCircles.length === totalCircles) {
+                    messageEl.textContent = 'クリア！おめでとうございます！';
+                    messageEl.style.color = colors.goal; messageEl.style.fontWeight = 'bold';
+                    isDragging = false;
+                }
+            } else {
+                player.x += dx * MOVE_SPEED; player.y += dy * MOVE_SPEED;
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawMaze();
+            updatePlayerPosition();
+            drawPlayer();
+            gameAnimationId = requestAnimationFrame(gameLoop);
+        }
+
+        function isValidMove(destR, destC) {
+            const destNode = mazeGrid[destR]?.[destC];
+            if (!destNode || destNode.type === 'empty') return false;
+            if (['path', 'start'].includes(destNode.type)) return true;
+            const prevPos = pathHistory[pathHistory.length - 2];
+            if (prevPos && prevPos.r === destR && prevPos.c === destC) return true;
+            for(const pos of pathHistory) {
+                if (pos.r === destR && pos.c === destC) {
+                     if (['goal', 'number', 'node'].includes(mazeGrid[pos.r][pos.c].type)) return false;
+                }
+            }
+            const nextStepNumber = getVisitedCircles().length + 1;
+            if (['number', 'goal'].includes(destNode.type)) return destNode.number === nextStepNumber;
+            return true;
+        }
+
+        function canMove(dir) {
+            const { r, c } = player;
+            let destR = r, destC = c, canCross = false;
+            if (dir === 'right') { destC++; if (c + 1 < numCols && !mazeGrid[r][c].hasWallRight) canCross = true; } 
+            else if (dir === 'left') { destC--; if (c - 1 >= 0 && !mazeGrid[r][c-1]?.hasWallRight) canCross = true; } 
+            else if (dir === 'down') { destR++; if (r + 1 < numRows && !mazeGrid[r][c].hasWallDown) canCross = true; } 
+            else if (dir === 'up') { destR--; if (r - 1 >= 0 && !mazeGrid[r-1][c]?.hasWallDown) canCross = true; }
+            return canCross && isValidMove(destR, destC);
+        }
+
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = evt.clientX || evt.touches[0].clientX;
+            const clientY = evt.clientY || evt.touches[0].clientY;
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function handleStart(evt) {
+            evt.preventDefault(); const pos = getMousePos(evt);
+            const dx = pos.x - player.x, dy = pos.y - player.y;
+            if (Math.sqrt(dx * dx + dy * dy) < PLAYER_RADIUS) { isDragging = true; lastMousePos = pos; }
+        }
+        function handleEnd(evt) { evt.preventDefault(); isDragging = false; }
+        function handleMove(evt) {
+            if (!isDragging || isMoving) return;
+            evt.preventDefault();
+            const pos = getMousePos(evt), deltaX = pos.x - lastMousePos.x, deltaY = pos.y - lastMousePos.y;
+            const moveThreshold = 40; let moved = false, targetR = player.r, targetC = player.c;
+            if (Math.abs(deltaX) > moveThreshold || Math.abs(deltaY) > moveThreshold) {
+                 if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    if (deltaX > 0 && canMove('right')) { targetC++; moved = true; } 
+                    else if (deltaX < 0 && canMove('left')) { targetC--; moved = true; }
+                } else {
+                    if (deltaY > 0 && canMove('down')) { targetR++; moved = true; } 
+                    else if (deltaY < 0 && canMove('up')) { targetR--; moved = true; }
+                }
+                if (moved) {
+                    player.r = targetR; player.c = targetC;
+                    player.targetX = player.c * GRID_SIZE + GRID_SIZE / 2;
+                    player.targetY = player.r * GRID_SIZE + GRID_SIZE / 2;
+                    isMoving = true; if (!hasPlayerMoved) hasPlayerMoved = true;
+                    const prevPos = pathHistory[pathHistory.length - 2];
+                    if (prevPos && prevPos.r === player.r && prevPos.c === player.c) {
+                        const lastNodePos = pathHistory.pop();
+                        if (mazeGrid[lastNodePos.r][lastNodePos.c].type === 'node') delete mazeGrid[lastNodePos.r][lastNodePos.c].writtenNumber;
+                    } else {
+                        pathHistory.push({ r: player.r, c: player.c });
+                        const visitedCircles = getVisitedCircles();
+                        const currentNode = mazeGrid[player.r][player.c];
+                        if (currentNode.type === 'node' && !currentNode.writtenNumber) currentNode.writtenNumber = visitedCircles.length;
+                    }
+                    lastMousePos = { x: player.targetX, y: player.targetY };
+                } else { lastMousePos = pos; }
+            }
+        }
+        
+        function showStageSelect() {
+            stageSelectScreen.classList.add('active');
+            gameScreen.classList.remove('active');
+            if (gameAnimationId) {
+                cancelAnimationFrame(gameAnimationId);
+                gameAnimationId = null;
+            }
+        }
+
+        function startGame(mazeIndex) {
+            mazeTextData = mazes[mazeIndex].data;
+            // リセット
+            hasPlayerMoved = false;
+            isMoving = false;
+            isDragging = false;
+            messageEl.textContent = '緑の丸をドラッグして、順番通りに全ての円を通り、赤いゴールを目指してください。';
+            messageEl.style.color = ''; messageEl.style.fontWeight = '';
+            
+            parseMazeData();
+            canvas.width = numCols * GRID_SIZE;
+            canvas.height = numRows * GRID_SIZE;
+            player.x = player.targetX = player.c * GRID_SIZE + GRID_SIZE / 2;
+            player.y = player.targetY = player.r * GRID_SIZE + GRID_SIZE / 2;
+            
+            stageSelectScreen.classList.remove('active');
+            gameScreen.classList.add('active');
+            
+            if (gameAnimationId) cancelAnimationFrame(gameAnimationId);
+            gameLoop();
+        }
+
+        function init() {
+            mazes.forEach((maze, index) => {
+                const button = document.createElement('button');
+                button.textContent = maze.name;
+                button.className = "px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition w-48";
+                button.onclick = () => startGame(index);
+                stageButtonsContainer.appendChild(button);
+            });
+            backButton.onclick = showStageSelect;
+            
+            const events = {
+                'mousedown': handleStart, 'mouseup': handleEnd, 'mouseleave': handleEnd, 'mousemove': handleMove,
+                'touchstart': handleStart, 'touchend': handleEnd, 'touchcancel': handleEnd, 'touchmove': handleMove,
+            };
+            for(const [event, handler] of Object.entries(events)) {
+                canvas.addEventListener(event, handler, { passive: false });
+            }
+
+            showStageSelect();
+        }
+
+        init();
+    </script>
+</body>
+</html>
+

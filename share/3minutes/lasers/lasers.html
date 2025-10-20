@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>レーザーパズル</title>
+    <!-- Tailwind CSS を読み込みます -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* レーザー光のスタイル */
+        .laser-line {
+            stroke: #f87171; /* red-400 */
+            stroke-width: 3;
+            stroke-linecap: round;
+            filter: drop-shadow(0 0 3px #f87171);
+        }
+
+        /* 照射対象が光っている時のスタイル */
+        .target.lit .target-orb {
+            background-color: #facc15; /* yellow-400 */
+            box-shadow: 0 0 15px #facc15, inset 0 0 5px rgba(255,255,255,0.5);
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-white flex flex-col items-center justify-center min-h-screen font-sans p-4">
+
+    <div class="text-center mb-6">
+        <h1 class="text-4xl font-bold">レーザーパズル</h1>
+        <p class="text-gray-400">光源をタップして向きを変え、すべてのターゲットを照らそう！</p>
+    </div>
+
+    <!-- ゲーム盤面とレーザー描画用のSVGを重ねるコンテナ -->
+    <div id="game-container" class="relative rounded-lg shadow-2xl">
+        <div id="game-board" class="grid gap-1 p-2 bg-gray-700 rounded-lg">
+            <!-- ゲームのセルはJavaScriptによって動的に生成されます -->
+        </div>
+        <!-- レーザーを描画するためのSVGオーバーレイ -->
+        <svg id="laser-overlay" class="absolute top-0 left-0 w-full h-full pointer-events-none"></svg>
+    </div>
+
+    <button id="reset-button-main" class="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+        リセット
+    </button>
+
+    <!-- クリア時に表示されるメッセージ -->
+    <div id="message-container" class="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden transition-opacity duration-300">
+        <div class="bg-gray-700 p-8 rounded-lg text-center shadow-xl transform scale-95 transition-transform duration-300">
+            <h2 class="text-3xl font-bold text-yellow-400 mb-4">クリア！</h2>
+            <button id="close-modal-button" class="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg">とじる</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 定数と変数の定義 ---
+
+            // ゲーム盤面の初期状態
+            const initialBoard = [
+                ['t', '0', 'n', '0', '0', 'e'],
+                ['0', '0', '0', '0', '0', '0'],
+                ['w', '0', '0', '0', '0', 't'],
+                ['0', '0', 't', 'sw', '0', '0'],
+                ['0', 't', '0', '0', '0', '0'],
+                ['0', '0', '0', '0', '0', 't']
+            ];
+            
+            // 現在のゲーム盤面の状態
+            let boardState;
+            
+            // 光源の向き（時計回り）
+            const directions = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
+            
+            // 各向きのベクトルと回転角度
+            const directionMap = {
+                'n':  { dr: -1, dc: 0,  deg: 0 },
+                'ne': { dr: -1, dc: 1,  deg: 45 },
+                'e':  { dr: 0,  dc: 1,  deg: 90 },
+                'se': { dr: 1,  dc: 1,  deg: 135 },
+                's':  { dr: 1,  dc: 0,  deg: 180 },
+                'sw': { dr: 1,  dc: -1, deg: 225 },
+                'w':  { dr: 0,  dc: -1, deg: 270 },
+                'nw': { dr: -1, dc: -1, deg: 315 }
+            };
+
+            // HTML要素の取得
+            const gameBoard = document.getElementById('game-board');
+            const laserOverlay = document.getElementById('laser-overlay');
+            const messageContainer = document.getElementById('message-container');
+            const resetButtonMain = document.getElementById('reset-button-main');
+            const closeModalButton = document.getElementById('close-modal-button');
+
+            // --- 関数定義 ---
+
+            /**
+             * ゲームを初期化またはリセットする関数
+             */
+            function initGame() {
+                // 初期状態の盤面をディープコピーして現在の状態とする
+                boardState = JSON.parse(JSON.stringify(initialBoard));
+                
+                // クリアメッセージを非表示にする
+                closeModal();
+
+                gameBoard.innerHTML = '';
+                const rows = boardState.length;
+                const cols = boardState[0].length;
+
+                // CSS Gridの列数を設定
+                gameBoard.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+
+                // 盤面のセルを生成
+                boardState.forEach((row, r) => {
+                    row.forEach((cellType, c) => {
+                        const cellDiv = document.createElement('div');
+                        cellDiv.className = 'w-16 h-16 md:w-20 md:h-20 flex items-center justify-center rounded-md bg-gray-900 transition-all duration-300';
+                        cellDiv.dataset.row = r;
+                        cellDiv.dataset.col = c;
+
+                        if (cellType === 't') {
+                            // 照射対象のセル
+                            cellDiv.classList.add('target');
+                            cellDiv.innerHTML = `<div class="target-orb w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-600 border-2 border-gray-500 transition-all duration-300"></div>`;
+                        } else if (cellType !== '0') {
+                            // 光源のセル
+                            cellDiv.classList.remove('bg-gray-900'); // デフォルトの背景色を削除
+                            cellDiv.classList.add('bg-slate-800', 'light-source', 'cursor-pointer', 'hover:bg-slate-700'); // 新しい背景色とホバー効果を追加
+                            cellDiv.innerHTML = getLightSourceSVG(cellType);
+                            cellDiv.addEventListener('click', () => rotateLightSource(r, c));
+                        }
+                        gameBoard.appendChild(cellDiv);
+                    });
+                });
+                
+                // 遅延させてからゲーム状態を更新（DOM描画後のサイズ計算のため）
+                setTimeout(updateGame, 0);
+            }
+
+            /**
+             * クリアメッセージモーダルを閉じる関数
+             */
+            function closeModal() {
+                messageContainer.classList.add('opacity-0');
+                messageContainer.querySelector('div').classList.add('scale-95');
+                // アニメーションが終わってからhiddenクラスを追加
+                setTimeout(() => {
+                    messageContainer.classList.add('hidden');
+                }, 300); // transition-durationと合わせる
+            }
+
+            /**
+             * 光源の向きを示す矢印のSVG文字列を返す
+             * @param {string} dir - 方向 ('n', 'ne', ...)
+             * @returns {string} SVGのHTML文字列
+             */
+            function getLightSourceSVG(dir) {
+                const rotation = directionMap[dir].deg;
+                return `
+                    <svg class="w-10 h-10 md:w-12 md:h-12 text-cyan-400 transition-transform duration-300" style="transform: rotate(${rotation}deg);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 19V5M5 12l7-7 7 7"/>
+                    </svg>
+                `;
+            }
+
+            /**
+             * 指定された光源を時計回りに45度回転させる
+             * @param {number} r - 光源の行番号
+             * @param {number} c - 光源の列番号
+             */
+            function rotateLightSource(r, c) {
+                const currentDir = boardState[r][c];
+                const currentIndex = directions.indexOf(currentDir);
+                const nextIndex = (currentIndex + 1) % directions.length;
+                boardState[r][c] = directions[nextIndex];
+
+                updateGame();
+            }
+
+            /**
+             * ゲーム全体の表示を更新する
+             */
+            function updateGame() {
+                updateBoardDisplay();
+                updateLasersAndTargets();
+                checkClearCondition();
+            }
+
+            /**
+             * 盤面の光源の表示（アイコンの向き）を更新する
+             */
+            function updateBoardDisplay() {
+                boardState.forEach((row, r) => {
+                    row.forEach((cellType, c) => {
+                         if (cellType !== 't' && cellType !== '0') {
+                            const cellDiv = gameBoard.querySelector(`[data-row='${r}'][data-col='${c}']`);
+                            if(cellDiv) cellDiv.innerHTML = getLightSourceSVG(cellType);
+                         }
+                    });
+                });
+            }
+
+            /**
+             * レーザーを描画し、照射対象の状態を更新する
+             */
+            function updateLasersAndTargets() {
+                laserOverlay.innerHTML = '';
+                const firstCell = gameBoard.querySelector('div');
+                if (!firstCell) return;
+                
+                // ゲーム盤面のpaddingとgapを動的に取得して計算のズレを補正
+                const computedStyle = getComputedStyle(gameBoard);
+                const gap = parseFloat(computedStyle.gap) || 0;
+                const padding = parseFloat(computedStyle.paddingTop) || 0;
+
+                const cellSize = firstCell.offsetWidth;
+                // viewBoxをコンテナの実際のピクセルサイズに合わせる
+                laserOverlay.setAttribute('viewBox', `0 0 ${gameBoard.offsetWidth} ${gameBoard.offsetHeight}`);
+
+                const rows = boardState.length;
+                const cols = boardState[0].length;
+                
+                // 全てのターゲットを「消灯」状態にする
+                document.querySelectorAll('.target').forEach(t => t.classList.remove('lit'));
+                // 光が当たっているターゲットの座標を保存するSet
+                let litTargets = new Set();
+
+                // 全ての光源からレーザーを計算
+                boardState.forEach((row, r) => {
+                    row.forEach((cellType, c) => {
+                        if (cellType !== 't' && cellType !== '0') {
+                            const dir = directionMap[cellType];
+                            let currentR = r;
+                            let currentC = c;
+                            
+                            // 盤面の端に到達するまでレーザーの経路を計算
+                            while(true) {
+                                currentR += dir.dr;
+                                currentC += dir.dc;
+                                if (currentR < 0 || currentR >= rows || currentC < 0 || currentC >= cols) {
+                                    break; // 盤面の外に出たので終了
+                                }
+                                // 経路上に照射対象があれば、litTargetsに追加
+                                if (initialBoard[currentR][currentC] === 't') {
+                                   litTargets.add(`${currentR},${currentC}`);
+                                }
+                            }
+
+                            // レーザー光（SVGのline）を描画
+                            // レーザー光の座標をpaddingとgapを考慮して計算
+                            const startX = padding + c * (cellSize + gap) + cellSize / 2;
+                            const startY = padding + r * (cellSize + gap) + cellSize / 2;
+                            const endX = padding + currentC * (cellSize + gap) + cellSize / 2;
+                            const endY = padding + currentR * (cellSize + gap) + cellSize / 2;
+                            
+                            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                            line.setAttribute('x1', startX);
+                            line.setAttribute('y1', startY);
+                            line.setAttribute('x2', endX);
+                            line.setAttribute('y2', endY);
+                            line.classList.add('laser-line');
+                            laserOverlay.appendChild(line);
+                        }
+                    });
+                });
+
+                // 光が当たったターゲットを「点灯」状態にする
+                litTargets.forEach(coord => {
+                    const [r, c] = coord.split(',');
+                    const targetCell = gameBoard.querySelector(`[data-row='${r}'][data-col='${c}']`);
+                    if(targetCell) targetCell.classList.add('lit');
+                });
+            }
+
+            /**
+             * クリア条件を満たしているかチェックする
+             */
+            function checkClearCondition() {
+                const allTargets = document.querySelectorAll('.target');
+                const litTargets = document.querySelectorAll('.target.lit');
+
+                if (allTargets.length > 0 && allTargets.length === litTargets.length) {
+                    messageContainer.classList.remove('hidden');
+                    setTimeout(() => {
+                        messageContainer.classList.remove('opacity-0');
+                        messageContainer.querySelector('div').classList.remove('scale-95');
+                    }, 10);
+                }
+            }
+
+            // --- イベントリスナーの設定 ---
+            resetButtonMain.addEventListener('click', initGame);
+            closeModalButton.addEventListener('click', closeModal);
+            
+            // ウィンドウのリサイズ時にレーザーを再描画
+            window.addEventListener('resize', updateLasersAndTargets);
+
+            // --- ゲーム開始 ---
+            initGame();
+        });
+    </script>
+
+</body>
+</html>
+

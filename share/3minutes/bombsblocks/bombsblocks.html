@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ブロック破壊ゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* フォント設定 */
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+
+        /* ゲームボードのグリッド設定 */
+        .game-board {
+            display: grid;
+            /* grid-template-columns/rows are now set by JS */
+            gap: 0;
+            padding: 4px;
+            background-color: transparent; /* 背景を透明に */
+            border-radius: 8px;
+            width: 100%;
+            max-width: 320px;
+            aspect-ratio: 1 / 1;
+            border: 4px solid transparent;
+        }
+        
+        /* ブロックの基本スタイル */
+        .block {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+            aspect-ratio: 1 / 1;
+            border: 2px solid #f1f5f9; /* 背景色に合わせた境界線 */
+            box-sizing: border-box;
+            z-index: 1;
+        }
+
+        /* 爆弾ブロックのスタイル */
+        .block.bg-red-700,
+        .block.bg-blue-700,
+        .block.bg-green-700 {
+            z-index: 2;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .block:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+            z-index: 3;
+        }
+        
+        /* 連結ブロックの境界線を透明に */
+        .block.connected-right { border-right-color: transparent; }
+        .block.connected-left { border-left-color: transparent; }
+        .block.connected-bottom { border-bottom-color: transparent; }
+        .block.connected-top { border-top-color: transparent; }
+
+        /* 破壊アニメーション */
+        .destroy {
+            animation: destroy-animation 0.3s forwards;
+        }
+
+        @keyframes destroy-animation {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        /* --- 爆発エフェクト --- */
+        .explosion-effect {
+            position: absolute;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0;
+            border-radius: 50%;
+        }
+
+        .effect-area {
+            width: 25%;
+            height: 25%;
+            background: rgba(239, 68, 68, 0.6); /* red-500 */
+            transform: translate(-50%, -50%) scale(0);
+            animation: expand-circle 0.4s ease-out forwards;
+        }
+
+        @keyframes expand-circle {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(5); opacity: 0; }
+        }
+
+        .effect-line-h {
+            left: 0;
+            width: 100%;
+            height: 12.5%;
+            background: rgba(59, 130, 246, 0.6); /* blue-500 */
+            border-radius: 8px;
+            transform: translateY(-50%) scaleX(0);
+            animation: expand-line-h 0.3s ease-out forwards;
+        }
+
+        @keyframes expand-line-h {
+            0% { transform: translateY(-50%) scaleX(0); opacity: 1; }
+            100% { transform: translateY(-50%) scaleX(1); opacity: 0; }
+        }
+
+        .effect-line-v {
+            top: 0;
+            width: 12.5%;
+            height: 100%;
+            background: rgba(34, 197, 94, 0.6); /* green-500 */
+            border-radius: 8px;
+            transform: translateX(-50%) scaleY(0);
+            animation: expand-line-v 0.3s ease-out forwards;
+        }
+
+        @keyframes expand-line-v {
+            0% { transform: translateX(-50%) scaleY(0); opacity: 1; }
+            100% { transform: translateX(-50%) scaleY(1); opacity: 0; }
+        }
+
+        /* リセットボタンのバウンスアニメーション */
+        .bounce {
+            animation: bounce-animation 0.8s ease;
+        }
+        @keyframes bounce-animation {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-15px); }
+            60% { transform: translateY(-8px); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md text-center">
+        <h1 class="text-4xl font-bold mb-2 text-cyan-600">ブロック破壊ゲーム</h1>
+        <p class="text-slate-600 mb-6">全てのブロックを破壊しよう！</p>
+    </div>
+
+    <!-- ステージ選択UI -->
+    <div class="w-full max-w-sm mb-4">
+        <select id="stage-select" class="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+            <!-- JavaScriptによってステージがここに生成されます -->
+        </select>
+    </div>
+
+    <!-- ゲーム情報表示エリア -->
+    <div class="flex items-center justify-between w-full max-w-sm mb-4 bg-white p-4 rounded-lg shadow-lg">
+        <div class="text-center">
+            <span class="text-sm text-slate-500">残りタップ数</span>
+            <p id="taps-left" class="text-3xl font-bold text-amber-500">2</p>
+        </div>
+        <button id="reset-button" class="px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg font-semibold transition-colors duration-200">
+            リセット
+        </button>
+    </div>
+    
+    <!-- ゲーム盤エリア -->
+    <div id="game-container" class="relative w-full max-w-sm">
+        <div id="game-board" class="game-board mx-auto">
+            <!-- JavaScriptによってブロックがここに生成されます -->
+        </div>
+
+        <!-- ゲームオーバー/クリアメッセージのモーダル -->
+        <div id="modal" class="absolute inset-0 bg-white bg-opacity-80 flex-col items-center justify-center rounded-lg hidden">
+            <div id="modal-content" class="text-center">
+                <h2 id="modal-title" class="text-5xl font-extrabold mb-4"></h2>
+                <p id="modal-message" class="text-lg mb-6"></p>
+                <button id="modal-button" class="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-xl transition-colors duration-200">
+                    もう一度プレイ
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- 地面 -->
+    <div class="w-full max-w-sm h-3 bg-stone-600 rounded-b-lg -mt-1 relative z-[-1]"></div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const gameBoard = document.getElementById('game-board');
+            const tapsLeftDisplay = document.getElementById('taps-left');
+            const resetButton = document.getElementById('reset-button');
+            const modal = document.getElementById('modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMessage = document.getElementById('modal-message');
+            const modalButton = document.getElementById('modal-button');
+            const stageSelect = document.getElementById('stage-select');
+
+            const STAGES = [
+                            {
+                    name: "ステージ1",
+                    layout: [
+                        ['.', '4', '.', '5'],
+                        ['a', '4', 'a', '5'],
+                        ['2', '2', '2', '2'],
+                        ['.', '1', '.', '3']
+                    ],
+                    taps: 2
+                },
+                {
+                    name: "ステージ2",
+                    layout: [
+                        ['.', '.', '4', 'l'],
+                        ['.', '.', '4', '3'],
+                        ['l', '2', '2', '3'],
+                        ['1', '1', '.', '3']
+                    ],
+                    taps: 2
+                },
+{
+                    name: "ステージ3",
+                    layout: [
+                        ['v', '.', 'l', '10'],
+                        ['8', '.', '11', '9'],
+                        ['5', '6', 'a', '7'],
+                        ['1', '2', '3', '4']
+                    ],
+                    taps: 2
+                },
+                {
+                    name: "ステージ4",
+                    layout: [
+                        ['5', 'a', '.', '.'],
+                        ['4', '4', 'a', '.'],
+                        ['3', '3', '3', '6'],
+                        ['.', '2', '.', '1'],
+                        ['2', '2', '1', '1']
+                    ],
+                    taps: 2
+                },
+                                {
+                    name: "ステージ 5",
+                    layout: [
+                        ['9', '4', '.', '.'],
+                        ['9', 'a', '10', '2'],
+                        ['8', 'l', '6', '5'],
+                        ['1', '7', '3', 'v']
+                    ],
+                    taps: 2
+                }
+            ];
+            
+            let ROWS, COLS;
+
+            function getColorForType(type) {
+                if (type === 'a') return 'bg-red-700';
+                if (type === 'l') return 'bg-blue-700';
+                if (type === 'v') return 'bg-green-700';
+                if (type === '.') return 'bg-transparent';
+                if (!isNaN(type)) return 'bg-amber-800';
+                return 'bg-transparent'; // Fallback for any other case
+            }
+
+            let board = [];
+            let tapsLeft;
+            let currentStageIndex = 0;
+            let isProcessing = false;
+
+            function populateStages() {
+                STAGES.forEach((stage, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = stage.name;
+                    stageSelect.appendChild(option);
+                });
+            }
+
+            function initGame() {
+                const stage = STAGES[currentStageIndex];
+                const layout = stage.layout;
+                ROWS = layout.length;
+                COLS = layout[0] ? layout[0].length : 0;
+
+                gameBoard.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+                gameBoard.style.gridTemplateRows = `repeat(${ROWS}, 1fr)`;
+                
+                tapsLeft = stage.taps;
+                isProcessing = false;
+                board = [];
+                let groupIdCounter = 1;
+                const visited = new Set();
+                
+                for (let r = 0; r < ROWS; r++) {
+                    board[r] = [];
+                    for (let c = 0; c < COLS; c++) {
+                        const type = layout[r][c];
+                        board[r][c] = (type !== '.') ? { type, id: `${r}-${c}`, groupId: null, element: null } : null;
+                    }
+                }
+                
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        if (board[r][c] && !isNaN(board[r][c].type) && !visited.has(`${r}-${c}`)) {
+                            findConnections(r, c, board[r][c].type, groupIdCounter++);
+                        }
+                    }
+                }
+                
+                function findConnections(r, c, type, groupId) {
+                    if (r < 0 || r >= ROWS || c < 0 || c >= COLS || visited.has(`${r}-${c}`) || !board[r][c] || board[r][c].type !== type) return;
+                    visited.add(`${r}-${c}`);
+                    board[r][c].groupId = groupId;
+                    findConnections(r + 1, c, type, groupId);
+                    findConnections(r - 1, c, type, groupId);
+                    findConnections(r, c + 1, type, groupId);
+                    findConnections(r, c - 1, type, groupId);
+                }
+                
+                updateDisplay();
+                renderBoard();
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            function renderBoard() {
+                gameBoard.innerHTML = '';
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        const blockData = board[r][c];
+                        if (blockData) {
+                            const blockElement = document.createElement('div');
+                            blockElement.className = 'block';
+                            blockElement.classList.add(getColorForType(blockData.type));
+
+                            if (blockData.type === 'a') {
+                                blockElement.style.backgroundImage = `url(./bomb_a.png)`;
+                            } else if (blockData.type === 'l') {
+                                blockElement.style.backgroundImage = `url(./bomb_l.png)`;
+                            } else if (blockData.type === 'v') {
+                                blockElement.style.backgroundImage = `url(./bomb_v.png)`;
+                            }
+                            if (['a', 'l', 'v'].includes(blockData.type)) {
+                                blockElement.style.backgroundSize = 'contain';
+                                blockElement.style.backgroundRepeat = 'no-repeat';
+                                blockElement.style.backgroundPosition = 'center';
+                            }
+                            
+                            blockElement.dataset.r = r;
+                            blockElement.dataset.c = c;
+                            blockElement.addEventListener('click', handleBlockClick);
+                            blockElement.style.gridRowStart = r + 1;
+                            blockElement.style.gridColumnStart = c + 1;
+                            gameBoard.appendChild(blockElement);
+                            blockData.element = blockElement;
+                        }
+                    }
+                }
+
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        const blockData = board[r][c];
+                        if (blockData && blockData.element && blockData.groupId) {
+                            if (c < COLS - 1 && board[r][c + 1]?.groupId === blockData.groupId) {
+                                blockData.element.classList.add('connected-right');
+                                board[r][c + 1].element.classList.add('connected-left');
+                            }
+                            if (r < ROWS - 1 && board[r + 1][c]?.groupId === blockData.groupId) {
+                                blockData.element.classList.add('connected-bottom');
+                                board[r + 1][c].element.classList.add('connected-top');
+                            }
+                        }
+                    }
+                }
+            }
+            
+            function updateDisplay() {
+                tapsLeftDisplay.textContent = tapsLeft;
+            }
+
+            async function handleBlockClick(event) {
+                if (isProcessing || tapsLeft <= 0) return;
+                isProcessing = true;
+                const r = parseInt(event.target.dataset.r);
+                const c = parseInt(event.target.dataset.c);
+                if (board[r][c]) {
+                    tapsLeft--;
+                    updateDisplay();
+                    await destroyBlocks(r, c);
+                    await applyGravity();
+
+                    if (checkForClear()) {
+                        setTimeout(() => showModal('クリア!', 'おめでとう！全てのブロックを破壊しました！', 'green'), 500);
+                        return;
+                    }
+                    
+                    checkGameState();
+                }
+                
+                if (tapsLeft > 0 && modal.classList.contains('hidden')) {
+                   isProcessing = false;
+                }
+            }
+            
+            function showExplosionEffect(blockData) {
+                const gameContainer = document.getElementById('game-container');
+                const blockElement = blockData?.element;
+                if (!blockElement) return;
+
+                const containerRect = gameContainer.getBoundingClientRect();
+                const blockRect = blockElement.getBoundingClientRect();
+                const type = blockData.type;
+
+                const effect = document.createElement('div');
+                effect.className = 'explosion-effect';
+                
+                const centerX = (blockRect.left - containerRect.left) + blockRect.width / 2;
+                const centerY = (blockRect.top - containerRect.top) + blockRect.height / 2;
+                
+                // Adjust effect size based on board size
+                const effectWidthPercent = 100 / COLS;
+                const effectHeightPercent = 100 / ROWS;
+
+                if (type === 'a') {
+                    effect.classList.add('effect-area');
+                    effect.style.width = `${effectWidthPercent}%`;
+                    effect.style.height = `${effectHeightPercent}%`;
+                    effect.style.top = `${centerY}px`;
+                    effect.style.left = `${centerX}px`;
+                } else if (type === 'l') {
+                    effect.classList.add('effect-line-h');
+                    effect.style.height = `${effectHeightPercent * 0.5}%`;
+                    effect.style.top = `${centerY}px`;
+                } else if (type === 'v') {
+                    effect.classList.add('effect-line-v');
+                    effect.style.width = `${effectWidthPercent * 0.5}%`;
+                    effect.style.left = `${centerX}px`;
+                }
+
+                gameContainer.appendChild(effect);
+                effect.addEventListener('animationend', () => effect.remove());
+            }
+
+            async function destroyBlocks(startR, startC) {
+                const explosionQueue = [{ r: startR, c: startC, delay: 0 }];
+                const allAffectedBlocks = new Map();
+                const processedIds = new Set();
+                let queueIndex = 0;
+
+                while (queueIndex < explosionQueue.length) {
+                    const { r, c, delay } = explosionQueue[queueIndex++];
+                    const triggerBlock = board[r][c];
+                    if (!triggerBlock || processedIds.has(triggerBlock.id)) continue;
+                    
+                    const type = triggerBlock.type;
+                    if (['a', 'l', 'v'].includes(type)) {
+                         setTimeout(() => showExplosionEffect(triggerBlock), delay);
+                         processedIds.add(triggerBlock.id);
+                    }
+
+                    let victims = [];
+                    if (!isNaN(type)) {
+                        victims.push(triggerBlock);
+                    } else if (type === 'a') {
+                        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+                            const nr = r + dr, nc = c + dc;
+                            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc]) victims.push(board[nr][nc]);
+                        }
+                    } else if (type === 'l') {
+                        for (let i = 0; i < COLS; i++) if (board[r][i]) victims.push(board[r][i]);
+                    } else if (type === 'v') {
+                        for (let i = 0; i < ROWS; i++) if (board[i][c]) victims.push(board[i][c]);
+                    }
+
+                    for (const victim of victims) {
+                        const newDelay = victim.id === triggerBlock.id ? delay : delay + 500;
+                        
+                        if (victim.groupId) {
+                            for (let row = 0; row < ROWS; row++) for (let col = 0; col < COLS; col++) {
+                                const member = board[row][col];
+                                if (member && member.groupId === victim.groupId && !allAffectedBlocks.has(member.id)) {
+                                    allAffectedBlocks.set(member.id, { blockData: member, delay: newDelay });
+                                    if (['a', 'l', 'v'].includes(member.type) && !processedIds.has(member.id)) {
+                                        explosionQueue.push({ r: row, c: col, delay: newDelay });
+                                    }
+                                }
+                            }
+                        } else if (!allAffectedBlocks.has(victim.id)) {
+                            allAffectedBlocks.set(victim.id, { blockData: victim, delay: newDelay });
+                            if (['a', 'l', 'v'].includes(victim.type) && !processedIds.has(victim.id)) {
+                                const [vr, vc] = victim.id.split('-').map(Number);
+                                explosionQueue.push({ r: vr, c: vc, delay: newDelay });
+                            }
+                        }
+                    }
+                }
+                
+                const destroyPromises = [];
+                for (const { blockData, delay } of allAffectedBlocks.values()) {
+                    destroyPromises.push(new Promise(resolve => {
+                        setTimeout(() => {
+                            if (blockData.element) {
+                                blockData.element.classList.add('destroy');
+                                blockData.element.addEventListener('animationend', resolve, { once: true });
+                            } else resolve();
+                        }, delay);
+                    }));
+                    const [r_del, c_del] = blockData.id.split('-').map(Number);
+                    board[r_del][c_del] = null;
+                }
+                
+                await Promise.all(destroyPromises);
+                document.querySelectorAll('.destroy').forEach(el => el.remove());
+            }
+
+            async function applyGravity() {
+                let movedInLoop;
+                do {
+                    movedInLoop = false;
+                    const processedGroups = new Set();
+                    
+                    for (let r = ROWS - 2; r >= 0; r--) {
+                        for (let c = 0; c < COLS; c++) {
+                            const block = board[r][c];
+                            if (!block) continue;
+
+                            if (block.groupId) {
+                                if (processedGroups.has(block.groupId)) {
+                                    continue;
+                                }
+                                
+                                const groupBlocks = [];
+                                for (let gr = 0; gr < ROWS; gr++) {
+                                    for (let gc = 0; gc < COLS; gc++) {
+                                        if (board[gr][gc]?.groupId === block.groupId) {
+                                            groupBlocks.push({ r: gr, c: gc });
+                                        }
+                                    }
+                                }
+
+                                const canFall = groupBlocks.every(({ r, c }) => 
+                                    r + 1 < ROWS && (board[r + 1][c] === null || board[r + 1][c].groupId === block.groupId)
+                                );
+
+                                if (canFall) {
+                                    movedInLoop = true;
+                                    groupBlocks.sort((a, b) => b.r - a.r).forEach(({ r, c }) => {
+                                        board[r + 1][c] = board[r][c];
+                                        board[r][c] = null;
+                                    });
+                                }
+                                processedGroups.add(block.groupId);
+                            } else {
+                                if (board[r + 1][c] === null) {
+                                    movedInLoop = true;
+                                    board[r + 1][c] = block;
+                                    board[r][c] = null;
+                                }
+                            }
+                        }
+                    }
+
+                    if (movedInLoop) {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        renderBoard();
+                    }
+                } while (movedInLoop);
+
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        if(board[r][c]){
+                            board[r][c].id = `${r}-${c}`;
+                        }
+                    }
+                }
+            }
+            
+            function checkForClear() {
+                return !board.some(row => row.some(cell => cell !== null));
+            }
+
+            function checkGameState() {
+                if (tapsLeft > 0) return;
+                
+                if (checkForClear()) {
+                     setTimeout(() => showModal('クリア!', 'おめでとう！全てのブロックを破壊しました！', 'green'), 500);
+                } else {
+                    resetButton.classList.add('bounce');
+                    resetButton.addEventListener('animationend', () => {
+                        resetButton.classList.remove('bounce');
+                    }, { once: true });
+                }
+            }
+
+            function showModal(title, message, color) {
+                modalTitle.textContent = title;
+                modalMessage.textContent = message;
+                modalTitle.className = `text-5xl font-extrabold mb-4 ${color === 'green' ? 'text-green-500' : 'text-red-500'}`;
+                modalButton.className = `px-8 py-3 rounded-lg font-bold text-xl transition-colors duration-200 text-white ${color === 'green' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            stageSelect.addEventListener('change', () => {
+                currentStageIndex = parseInt(stageSelect.value);
+                initGame();
+            });
+            resetButton.addEventListener('click', initGame);
+            modalButton.addEventListener('click', initGame);
+            
+            populateStages();
+            initGame();
+        });
+    </script>
+</body>
+</html>
+

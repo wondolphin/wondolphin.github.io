@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>経路計画ゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: none; /* スマホでのダブルタップズームを無効化 */
+        }
+        canvas {
+            background-color: #f3f4f6; /* bg-gray-100 */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-200 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-2xl mx-auto p-4">
+        <header class="text-center mb-4">
+            <h1 class="text-3xl font-bold text-gray-800">経路計画ゲーム</h1>
+            <p class="text-gray-600 mt-1">壁を避け、すべてのコインを集めよう！</p>
+        </header>
+
+        <!-- ステージ選択UI -->
+        <div class="mb-4 text-center">
+            <label for="stage-select" class="mr-2 font-semibold text-gray-700">ステージ選択:</label>
+            <select id="stage-select" class="p-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"></select>
+        </div>
+
+        <div class="relative bg-white p-4 rounded-lg shadow-lg">
+            <!-- ゲーム情報表示エリア -->
+            <div id="info-panel" class="absolute top-4 right-4 bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow text-center">
+                <p class="text-sm font-semibold text-gray-700">打てる点の数</p>
+                <p id="dots-count" class="text-2xl font-bold text-indigo-600">3</p>
+            </div>
+            
+            <!-- メッセージ表示エリア -->
+            <div id="message-overlay" class="absolute inset-0 bg-black/50 flex-col items-center justify-center rounded-lg text-white text-center text-3xl font-bold hidden">
+                <p id="message-text"></p>
+                <button id="retry-button" class="mt-4 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-xl font-semibold transition-colors duration-200">もう一度</button>
+            </div>
+
+            <!-- ゲームキャンバス -->
+            <canvas id="gameCanvas" width="600" height="400"></canvas>
+        </div>
+
+        <footer class="text-center mt-4">
+            <p class="text-sm text-gray-500">遊び方：画面をタップしてプレイヤーの移動経路を作ってください。</p>
+        </footer>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI要素
+        const dotsCountElement = document.getElementById('dots-count');
+        const messageOverlay = document.getElementById('message-overlay');
+        const messageText = document.getElementById('message-text');
+        const retryButton = document.getElementById('retry-button');
+        const stageSelectElement = document.getElementById('stage-select');
+
+        // ゲーム設定
+        const PLAYER_SPEED = 10;
+        const PLAYER_RADIUS = 10;
+        const COIN_RADIUS = 16; // コインのサイズを2倍に変更
+        let MAX_DOTS; // ステージごとに設定
+
+        // ゲーム状態
+        let gameState = 'standby'; // 'standby' or 'playing' or 'finished'
+        let player, coins, walls, plannedPath;
+        let currentTargetIndex = 0;
+        let animationFrameId;
+        let currentStageIndex = 0;
+
+        // ステージデータ
+        const stages = [
+{
+    playerStart: { x: 60, y: 39 },
+    coins: [
+        { x: 235, y: 76 },
+        { x: 392, y: 209 },
+        { x: 248, y: 309 }
+    ],
+    walls: [
+        { start: { x: 67, y: 10 }, end: { x: 473, y: 98 } },
+        { start: { x: 13, y: 62 }, end: { x: 309, y: 123 } },
+        { start: { x: 472, y: 100 }, end: { x: 485, y: 376 } },
+        { start: { x: 484, y: 378 }, end: { x: 61, y: 342 } },
+        { start: { x: 61, y: 341 }, end: { x: 59, y: 238 } },
+        { start: { x: 59, y: 238 }, end: { x: 310, y: 268 } },
+        { start: { x: 310, y: 268 }, end: { x: 308, y: 121 } }
+    ],
+    maxDots: 3
+},
+            { // Stage 2
+                playerStart: { x: 30, y: 30 },
+                coins: [
+                    { x: 470, y: 340 },
+                    { x: 300, y: 200 }
+                ],
+                walls: [
+                    { start: { x: 0, y: 150 }, end: { x: 330, y: 150 } },
+                    { start: { x: 270, y: 250 }, end: { x: 600, y: 250 } },
+                ],
+                maxDots: 3
+            },
+            { // Stage 1
+                playerStart: { x: 50, y: 200 },
+                coins: [
+                    { x: 200, y: 100 },
+                    { x: 400, y: 300 },
+                    { x: 500, y: 150 }
+                ],
+                walls: [
+                    { start: { x: 100, y: 80 }, end: { x: 100, y: 250 } },
+                    { start: { x: 450, y: 50 }, end: { x: 550, y: 100 } },
+                ],
+                maxDots: 3
+            },
+{
+    playerStart: { x: 265, y: 176 },
+    coins: [
+        { x: 117, y: 353 },
+        { x: 203, y: 45 },
+        { x: 421, y: 201 }
+    ],
+    walls: [
+        { start: { x: 36, y: 201 }, end: { x: 173, y: 201 } },
+        { start: { x: 357, y: 203 }, end: { x: 386, y: 256 } }
+    ],
+    maxDots: 3
+},
+{
+    playerStart: { x: 493, y: 111 },
+    coins: [
+        { x: 210, y: 290 },
+        { x: 300, y: 290 },
+        { x: 390, y: 290 },
+        { x: 300, y: 200 },
+        { x: 300, y: 110 },
+        { x: 210, y: 110 },
+        { x: 210, y: 200 },
+        { x: 390, y: 200 },
+        { x: 390, y: 110 }
+    ],
+    walls: [
+        { start: { x: 448, y: 140 }, end: { x: 448, y: 306 } },
+        { start: { x: 169, y: 50 }, end: { x: 324, y: 50 } }
+    ],
+    maxDots: 4
+}
+        ];
+
+        // ゲームの初期化・リセット
+        function resetGame() {
+            const currentStage = stages[currentStageIndex];
+            MAX_DOTS = currentStage.maxDots;
+            
+            gameState = 'standby';
+            player = { ...currentStage.playerStart, radius: PLAYER_RADIUS };
+            coins = JSON.parse(JSON.stringify(currentStage.coins)).map(c => ({ ...c, radius: COIN_RADIUS, collected: false }));
+            walls = currentStage.walls;
+            plannedPath = [];
+            currentTargetIndex = 0;
+            dotsCountElement.textContent = MAX_DOTS;
+            messageOverlay.classList.add('hidden');
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            draw(); // 初期状態を描画
+        }
+
+        // 描画関数
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 壁の描画
+            walls.forEach(wall => {
+                ctx.beginPath();
+                ctx.moveTo(wall.start.x, wall.start.y);
+                ctx.lineTo(wall.end.x, wall.end.y);
+                ctx.strokeStyle = '#1f2937'; // bg-gray-800
+                ctx.lineWidth = 4;
+                ctx.stroke();
+            });
+
+            // コインの描画
+            coins.forEach(coin => {
+                if (!coin.collected) {
+                    ctx.beginPath();
+                    ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#f59e0b'; // bg-amber-500
+                    ctx.fill();
+                    ctx.strokeStyle = '#b45309'; // bg-amber-700
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            });
+
+            // プレイヤーの描画
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#4f46e5'; // bg-indigo-600
+            ctx.fill();
+            ctx.strokeStyle = '#312e81'; // bg-indigo-800
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // スタンバイモードまたは再生モード時の経路描画
+            if ((gameState === 'standby' || gameState === 'playing') && plannedPath.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(stages[currentStageIndex].playerStart.x, stages[currentStageIndex].playerStart.y);
+                plannedPath.forEach(point => {
+                    ctx.lineTo(point.x, point.y);
+                });
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = 'rgba(79, 70, 229, 0.6)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.setLineDash([]); // 破線をリセット
+
+                // 点の描画
+                plannedPath.forEach(point => {
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = '#4f46e5';
+                    ctx.fill();
+                });
+            }
+        }
+        
+        // メッセージ表示
+        function showMessage(text, showButton = true) {
+            messageText.textContent = text;
+            retryButton.style.display = showButton ? 'block' : 'none';
+            messageOverlay.classList.remove('hidden');
+            messageOverlay.classList.add('flex');
+        }
+
+        // キャンバスクリック時の処理
+        function handleCanvasClick(event) {
+            if (gameState !== 'standby') return;
+
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (event.clientX - rect.left) * scaleX;
+            const y = (event.clientY - rect.top) * scaleY;
+
+            plannedPath.push({ x, y });
+            dotsCountElement.textContent = MAX_DOTS - plannedPath.length;
+
+            draw();
+
+            if (plannedPath.length >= MAX_DOTS) {
+                gameState = 'playing';
+                const fullPath = [stages[currentStageIndex].playerStart, ...plannedPath];
+                currentTargetIndex = 1;
+                gameLoop(fullPath);
+            }
+        }
+        
+        // 点と線分の最短距離を計算するヘルパー関数
+        function pointLineSegmentDistance(p, a, b) {
+            const l2 = (a.x - b.x)**2 + (a.y - b.y)**2;
+            if (l2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+            let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            const closestPoint = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) };
+            return Math.hypot(p.x - closestPoint.x, p.y - closestPoint.y);
+        }
+
+        // 2つの線分が交差するかどうかを判定するヘルパー関数
+        function lineSegmentsIntersect(p1, p2, p3, p4) {
+            const den = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
+            if (den === 0) {
+                return false; // 平行または同一直線上
+            }
+            const t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / den;
+            const u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / den;
+
+            // tとuが0と1の間にある場合、線分は交差している
+            return t > 0 && t < 1 && u > 0 && u < 1;
+        }
+
+        // ゲームループ
+        function gameLoop(fullPath) {
+            if (gameState !== 'playing') return;
+
+            const prevPlayerPos = { x: player.x, y: player.y };
+
+            const target = fullPath[currentTargetIndex];
+            const dx = target.x - player.x;
+            const dy = target.y - player.y;
+            const distance = Math.hypot(dx, dy);
+
+            if (distance < PLAYER_SPEED) {
+                player.x = target.x;
+                player.y = target.y;
+                currentTargetIndex++;
+                if (currentTargetIndex >= fullPath.length) {
+                    // 全ての経路を移動完了
+                    const allCoinsCollected = coins.every(c => c.collected);
+                    if (allCoinsCollected) {
+                         showMessage('クリア！');
+                    } else {
+                         showMessage('コインが残っています');
+                    }
+                    gameState = 'finished';
+                    return;
+                }
+            } else {
+                player.x += (dx / distance) * PLAYER_SPEED;
+                player.y += (dy / distance) * PLAYER_SPEED;
+            }
+            
+            const currentPlayerPos = { x: player.x, y: player.y };
+
+            // 衝突判定
+            // 1. コインとの衝突
+            coins.forEach(coin => {
+                if (!coin.collected) {
+                    const dist = Math.hypot(currentPlayerPos.x - coin.x, currentPlayerPos.y - coin.y);
+                    if (dist < player.radius + coin.radius) {
+                        coin.collected = true;
+                    }
+                }
+            });
+
+            // 2. 壁との衝突 (トンネリング対策済みのロジック)
+            for (const wall of walls) {
+                let collided = false;
+
+                // Case 1: プレイヤーの中心点の移動経路が壁の線と直接交差する場合
+                if (lineSegmentsIntersect(prevPlayerPos, currentPlayerPos, wall.start, wall.end)) {
+                    collided = true;
+                } else {
+                    // Case 2: プレイヤーの体が壁に接触する場合（経路は交差しない）
+                    // プレイヤーの移動経路と壁の線分の最短距離を計算
+                    const dist1 = pointLineSegmentDistance(wall.start, prevPlayerPos, currentPlayerPos);
+                    const dist2 = pointLineSegmentDistance(wall.end, prevPlayerPos, currentPlayerPos);
+                    const dist3 = pointLineSegmentDistance(prevPlayerPos, wall.start, wall.end);
+                    const dist4 = pointLineSegmentDistance(currentPlayerPos, wall.start, wall.end);
+                    
+                    const minDistance = Math.min(dist1, dist2, dist3, dist4);
+
+                    // 最短距離がプレイヤーの半径と壁の太さの半分より小さい場合、衝突とみなす
+                    if (minDistance < player.radius + 2) {
+                        collided = true;
+                    }
+                }
+
+                if (collided) {
+                    showMessage('壁にぶつかった！');
+                    gameState = 'finished';
+                    // 衝突した場合、プレイヤーを衝突前の位置に戻して見た目を自然にする
+                    player.x = prevPlayerPos.x;
+                    player.y = prevPlayerPos.y;
+                    draw(); // 最終フレームを描画して停止
+                    return;
+                }
+            }
+            
+            draw();
+            animationFrameId = requestAnimationFrame(() => gameLoop(fullPath));
+        }
+
+        // ステージセレクターの初期化
+        function initStageSelector() {
+            stages.forEach((stage, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `ステージ ${index + 1}`;
+                stageSelectElement.appendChild(option);
+            });
+
+            stageSelectElement.addEventListener('change', (e) => {
+                currentStageIndex = parseInt(e.target.value, 10);
+                resetGame();
+            });
+        }
+
+        // イベントリスナー
+        canvas.addEventListener('click', handleCanvasClick);
+        retryButton.addEventListener('click', resetGame);
+
+        // ウィンドウリサイズ対応
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const size = Math.min(container.clientWidth, window.innerHeight * 0.6);
+            canvas.style.width = `${size}px`;
+            canvas.style.height = `${size * (canvas.height / canvas.width)}px`;
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        
+        // 初期化
+        initStageSelector();
+        resizeCanvas();
+        resetGame();
+
+    </script>
+</body>
+</html>
+
+

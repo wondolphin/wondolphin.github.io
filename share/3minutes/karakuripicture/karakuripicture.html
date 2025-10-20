@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>からくりピクチャーパネル</title>
+    <style>
+        :root {
+            --background-color: #fcfdfa; /* 明るい水色 */
+            --board-bg-color: #ffffff;   /* ホワイト */
+            --panel-bg-color: #fff9f0;  /* ごく薄いブルー */
+            --button-bg-color: #bae6fd; /* 明るい青 */
+            --button-hover-bg-color: #7dd3fc; /* 少し濃い青 */
+            --text-color: #0c4a6e; /* 濃い青系のテキスト */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 2vmin 2vmin 6vmin;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3vmin;
+            max-width: 500px;
+            width: min(95vw, calc(100vh - 25vmin));
+        }
+
+        h1 {
+            font-size: clamp(1.75rem, 8vmin, 2.5rem);
+            font-weight: bold;
+            color: var(--text-color);
+            margin: 0;
+        }
+
+        /* --- ゲームボード --- */
+        .game-board {
+            display: grid;
+            grid-template-columns: 12% repeat(4, 1fr) 12%;
+            grid-template-rows: 12% repeat(4, 1fr) 12%;
+            gap: 0.8vmin; /* 隙間をさらに狭く */
+            width: 100%;
+            aspect-ratio: 1 / 1;
+        }
+
+        /* --- パネル --- */
+        .panel-grid {
+            grid-column: 2 / 6;
+            grid-row: 2 / 6;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 0.8vmin; /* 隙間をさらに狭く */
+            background-color: var(--board-bg-color);
+            padding: 1.2vmin; /* パディングをさらに狭く */
+            border-radius: 2vmin;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); /* 影を調整 */
+        }
+
+        .panel {
+            width: 100%;
+            height: 100%;
+            border-radius: 5px; /* 角丸を少し小さく */
+            background-color: var(--panel-bg-color);
+            box-shadow: none;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            color: var(--text-color);
+        }
+        
+        .panel img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+        }
+
+
+        /* --- ボタン --- */
+        .control-button {
+            background-color: var(--button-bg-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .control-button:hover {
+            background-color: var(--button-hover-bg-color);
+        }
+
+        .arrow {
+            border: solid var(--text-color);
+            border-width: 0 4px 4px 0;
+            display: inline-block;
+            padding: 4px;
+        }
+        
+        .up { transform: rotate(-135deg); }
+        .down { transform: rotate(45deg); }
+        .left { transform: rotate(135deg); }
+        .right { transform: rotate(-45deg); }
+
+        /* ボタンコンテナのスタイル */
+        .button-container {
+            display: grid;
+            gap: 0.8vmin; /* 隙間をさらに狭く */
+            box-sizing: border-box;
+        }
+
+        .button-container-top {
+            grid-row: 1;
+            grid-column: 2 / 6;
+            grid-template-columns: repeat(4, 1fr);
+            padding: 0 1.2vmin;
+        }
+
+        .button-container-down {
+            grid-row: 6;
+            grid-column: 2 / 6;
+            grid-template-columns: repeat(4, 1fr);
+            padding: 0 1.2vmin;
+        }
+
+        .button-container-left {
+            grid-row: 2 / 6;
+            grid-column: 1;
+            grid-template-rows: repeat(4, 1fr);
+            padding: 1.2vmin 0;
+        }
+
+        .button-container-right {
+            grid-row: 2 / 6;
+            grid-column: 6;
+            grid-template-rows: repeat(4, 1fr);
+            padding: 1.2vmin 0;
+        }
+
+        /* --- クリア表示 --- */
+        .clear-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            cursor: pointer;
+        }
+        .clear-modal-text {
+            font-size: 8vw;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 0 20px #ffdd44, 0 0 30px #ffdd44;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>からくりピクチャーパネル</h1>
+
+        <div class="game-board">
+            <div class="panel-grid">
+                <!-- JavaScriptでパネルを生成 -->
+            </div>
+            <!-- JavaScriptでボタンを生成 -->
+        </div>
+    </div>
+    
+    <div id="clear-modal" class="clear-modal hidden">
+        <span class="clear-modal-text">CLEAR!</span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- ゲーム設定 ---
+            const initialBoard = [
+                [0, 0, 0, 0],
+                [0, '1_1', 0, '1_2'],
+                [0, '1_3', 0, '1_4'],
+                [0, '2_1', 0, '2_2']
+            ];
+            const gridSize = 4;
+            let board = JSON.parse(JSON.stringify(initialBoard));
+
+            // --- DOM要素 ---
+            const panelGrid = document.querySelector('.panel-grid');
+            const gameBoard = document.querySelector('.game-board');
+            const clearModal = document.getElementById('clear-modal');
+
+            // --- ゲーム要素の生成 ---
+
+            // パネルの生成
+            const panelElements = [];
+            for (let r = 0; r < gridSize; r++) {
+                panelElements[r] = [];
+                for (let c = 0; c < gridSize; c++) {
+                    const panel = document.createElement('div');
+                    panel.classList.add('panel');
+                    panel.dataset.row = r;
+                    panel.dataset.col = c;
+                    panelGrid.appendChild(panel);
+                    panelElements[r][c] = panel;
+                }
+            }
+            
+            // ボタンコンテナの生成
+            const btnContainers = {
+                up: document.createElement('div'),
+                down: document.createElement('div'),
+                left: document.createElement('div'),
+                right: document.createElement('div')
+            };
+
+            btnContainers.up.className = 'button-container button-container-top';
+            btnContainers.down.className = 'button-container button-container-down';
+            btnContainers.left.className = 'button-container button-container-left';
+            btnContainers.right.className = 'button-container button-container-right';
+
+            gameBoard.appendChild(btnContainers.up);
+            gameBoard.appendChild(btnContainers.down);
+            gameBoard.appendChild(btnContainers.left);
+            gameBoard.appendChild(btnContainers.right);
+
+            // ボタンの生成
+            for (let i = 0; i < gridSize; i++) {
+                btnContainers.up.appendChild(createButton('up', i));
+                btnContainers.down.appendChild(createButton('down', i));
+                btnContainers.left.appendChild(createButton('left', i));
+                btnContainers.right.appendChild(createButton('right', i));
+            }
+            
+            function createButton(direction, index) {
+                const button = document.createElement('button');
+                button.classList.add('control-button');
+                const arrow = document.createElement('i');
+                arrow.classList.add('arrow', direction);
+
+                if (direction === 'up' || direction === 'down') {
+                    button.dataset.col = index;
+                    button.addEventListener('click', () => handleColumnShift(index, direction));
+                } else {
+                    button.dataset.row = index;
+                    button.addEventListener('click', () => handleRowShift(index, direction));
+                }
+                button.appendChild(arrow);
+                return button;
+            }
+
+            // --- ゲームロジック ---
+
+            function handleRowShift(rowIndex, direction) {
+                const row = board[rowIndex];
+                if (direction === 'left') {
+                    row.push(row.shift());
+                } else { // right
+                    row.unshift(row.pop());
+                }
+                updateGame();
+            }
+
+            function handleColumnShift(colIndex, direction) {
+                const column = board.map(row => row[colIndex]);
+                if (direction === 'up') {
+                    column.push(column.shift());
+                } else { // down
+                    column.unshift(column.pop());
+                }
+                board.forEach((row, i) => {
+                    row[colIndex] = column[i];
+                });
+                updateGame();
+            }
+
+            function renderBoard() {
+                for (let r = 0; r < gridSize; r++) {
+                    for (let c = 0; c < gridSize; c++) {
+                        const panel = panelElements[r][c];
+                        const panelValue = board[r][c];
+                        panel.innerHTML = '';
+                        // Reset background color in case of previous error
+                        panel.style.backgroundColor = '';
+
+                        if (panelValue === 0) {
+                            // Blank panel
+                        } else {
+                            const img = document.createElement('img');
+                            img.src = `images/picture${panelValue}.png`;
+                            // 画像が見つからない場合のフォールバック
+                            img.onerror = () => {
+                                panel.innerHTML = panelValue.replace('_', '-');
+                                panel.style.backgroundColor = '#d1d5db';
+                            };
+                            panel.appendChild(img);
+                        }
+                    }
+                }
+            }
+            
+            // クリア条件の判定
+            function checkClearConditions() {
+                // グループ1のクリア条件チェック: "1_1"と"1_2"、"1_3"と"1_4"が2x2の形で並ぶ
+                let group1Clear = false;
+                for (let r = 0; r <= gridSize - 2; r++) {
+                    for (let c = 0; c <= gridSize - 2; c++) {
+                        if (board[r][c] === '1_1' && board[r][c + 1] === '1_2' &&
+                            board[r + 1][c] === '1_3' && board[r + 1][c + 1] === '1_4') {
+                            group1Clear = true;
+                            break;
+                        }
+                    }
+                    if (group1Clear) break;
+                }
+
+                // グループ2のクリア条件チェック: "2_1"と"2_2"が隣接する
+                let group2Clear = false;
+                const panelLocations = {};
+                for (let r = 0; r < gridSize; r++) {
+                    for (let c = 0; c < gridSize; c++) {
+                        if (board[r][c] === '2_1' || board[r][c] === '2_2') {
+                            panelLocations[board[r][c]] = { r, c };
+                        }
+                    }
+                }
+
+                if (panelLocations['2_1'] && panelLocations['2_2']) {
+                    const p1 = panelLocations['2_1'];
+                    const p2 = panelLocations['2_2'];
+                    const dr = Math.abs(p1.r - p2.r);
+                    const dc = Math.abs(p1.c - p2.c);
+                    // 縦または横に隣接しているか
+                    if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
+                        group2Clear = true;
+                    }
+                }
+                
+                return group1Clear && group2Clear;
+            }
+
+            function checkClear(isCleared) {
+                if (isCleared) {
+                    setTimeout(() => {
+                        clearModal.classList.remove('hidden');
+                    }, 500); // 0.5秒待ってから表示
+                }
+            }
+            
+            clearModal.addEventListener('click', () => {
+                clearModal.classList.add('hidden');
+            });
+
+            function updateGame() {
+                renderBoard();
+                const isCleared = checkClearConditions();
+                checkClear(isCleared);
+            }
+            
+            // --- 初期化 ---
+            updateGame();
+        });
+    </script>
+</body>
+</html>
+
