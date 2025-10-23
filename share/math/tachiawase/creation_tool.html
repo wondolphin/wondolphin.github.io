@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>図形パズル 問題作成ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+        canvas {
+            cursor: crosshair;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        #outputCode {
+            white-space: pre;
+            overflow-wrap: normal;
+            overflow-x: scroll;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex flex-col lg:flex-row justify-center items-start min-h-screen p-4 gap-8">
+
+    <div class="w-full lg:w-auto">
+        <h1 class="text-2xl font-bold text-slate-700 mb-4">問題作成ツール</h1>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-lg font-semibold text-slate-600 border-b pb-2 mb-4">1. 問題設定</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="problem-title" class="block text-sm font-medium text-slate-700">問題タイトル</label>
+                    <input type="text" id="problem-title" value="問題 6" class="mt-1 block w-full p-2 rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="target-shape" class="block text-sm font-medium text-slate-700">お題の形</label>
+                    <select id="target-shape" class="mt-1 block w-full p-2 rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option>三角形</option>
+                        <option>四角形</option>
+                        <option>五角形</option>
+                    </select>
+                </div>
+                 <div>
+                    <label for="target-vertex-count" class="block text-sm font-medium text-slate-700">お題の頂点数</label>
+                    <input type="number" id="target-vertex-count" value="3" class="mt-1 block w-full p-2 rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+            </div>
+             <h2 class="text-lg font-semibold text-slate-600 border-b pb-2 mt-6 mb-4">2. 図形作成</h2>
+             <p class="text-sm text-slate-500 mb-4">下のグリッドをクリックして、図形の頂点を追加してください。</p>
+             <div class="flex gap-2">
+                 <button id="undoButton" class="w-full bg-slate-500 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200">元に戻す</button>
+                 <button id="clearButton" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200">クリア</button>
+             </div>
+        </div>
+    </div>
+    
+    <div class="w-full max-w-xl mx-auto flex-shrink-0">
+         <canvas id="editorCanvas"></canvas>
+    </div>
+
+    <div class="w-full lg:w-auto mt-8 lg:mt-0">
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-lg font-semibold text-slate-600 border-b pb-2 mb-4">3. コード出力</h2>
+            <button id="outputButton" class="w-full mb-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-all duration-200">
+                コードを生成
+            </button>
+            <textarea id="outputCode" rows="12" class="w-full p-2 font-mono text-sm bg-slate-800 text-green-300 rounded-md border-slate-600" readonly placeholder="ここに問題データが出力されます..."></textarea>
+            <button id="copyButton" class="w-full mt-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200">クリップボードにコピー</button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- 初期設定 ---
+        const canvas = document.getElementById('editorCanvas');
+        const ctx = canvas.getContext('2d');
+        const undoButton = document.getElementById('undoButton');
+        const clearButton = document.getElementById('clearButton');
+        const outputButton = document.getElementById('outputButton');
+        const copyButton = document.getElementById('copyButton');
+        const outputCodeEl = document.getElementById('outputCode');
+        const problemTitleEl = document.getElementById('problem-title');
+        const targetShapeEl = document.getElementById('target-shape');
+        const targetVertexCountEl = document.getElementById('target-vertex-count');
+
+        const GRID_SIZE = 30;
+        const VERTEX_RADIUS = 5;
+
+        let vertices = [];
+
+        function resizeCanvas() {
+            const size = Math.min(window.innerWidth, 510);
+            canvas.width = size;
+            canvas.height = size;
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            drawPolygon();
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= canvas.width; x += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= canvas.height; y += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawPolygon() {
+            if (vertices.length === 0) return;
+
+            // 図形を塗りつぶし
+            if (vertices.length > 2) {
+                ctx.fillStyle = 'rgba(71, 85, 105, 0.3)'; // slate-500 with opacity
+                ctx.beginPath();
+                ctx.moveTo(vertices[0].x * GRID_SIZE, vertices[0].y * GRID_SIZE);
+                for (let i = 1; i < vertices.length; i++) {
+                    ctx.lineTo(vertices[i].x * GRID_SIZE, vertices[i].y * GRID_SIZE);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 線を描画
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(vertices[0].x * GRID_SIZE, vertices[0].y * GRID_SIZE);
+            for (let i = 1; i < vertices.length; i++) {
+                ctx.lineTo(vertices[i].x * GRID_SIZE, vertices[i].y * GRID_SIZE);
+            }
+             if (vertices.length > 2) {
+                ctx.closePath();
+            }
+            ctx.stroke();
+
+            // 頂点を描画
+            vertices.forEach((v, index) => {
+                ctx.fillStyle = (index === 0) ? '#ef4444' : '#3b82f6'; // 始点は赤、他は青
+                ctx.beginPath();
+                ctx.arc(v.x * GRID_SIZE, v.y * GRID_SIZE, VERTEX_RADIUS, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        
+        // --- イベントハンドラ ---
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const gridX = Math.round(mouseX / GRID_SIZE);
+            const gridY = Math.round(mouseY / GRID_SIZE);
+
+            // 重複する頂点を追加しない
+            if (!vertices.some(v => v.x === gridX && v.y === gridY)) {
+                vertices.push({ x: gridX, y: gridY });
+                draw();
+            }
+        });
+
+        undoButton.addEventListener('click', () => {
+            vertices.pop();
+            draw();
+        });
+
+        clearButton.addEventListener('click', () => {
+            vertices = [];
+            draw();
+        });
+
+        outputButton.addEventListener('click', () => {
+            if (vertices.length < 3) {
+                outputCodeEl.value = "エラー: 頂点が3つ未満です。図形を作成してください。";
+                return;
+            }
+
+            let verticesString = "vertices: [\n";
+            vertices.forEach((v, i) => {
+                verticesString += `    { x: ${v.x}, y: ${v.y} }`;
+                if (i < vertices.length - 1) {
+                    verticesString += ", ";
+                }
+                if ((i + 1) % 3 === 0) { // 3つごとに改行
+                     verticesString += "\n";
+                }
+            });
+            verticesString += "\n]";
+
+            const code = 
+`{
+    title: "${problemTitleEl.value}",
+    targetShape: '${targetShapeEl.value}',
+    targetVertexCount: ${targetVertexCountEl.value},
+    ${verticesString}
+},`;
+            outputCodeEl.value = code;
+        });
+        
+        copyButton.addEventListener('click', () => {
+             if (!outputCodeEl.value) return;
+             outputCodeEl.select();
+             document.execCommand('copy');
+             copyButton.textContent = 'コピーしました！';
+             setTimeout(() => {
+                copyButton.textContent = 'クリップボードにコピー';
+             }, 2000);
+        });
+        
+        // ターゲットの形が変更されたら、頂点数も自動で更新する
+        targetShapeEl.addEventListener('change', (e) => {
+            switch(e.target.value) {
+                case '三角形':
+                    targetVertexCountEl.value = 3;
+                    break;
+                case '四角形':
+                    targetVertexCountEl.value = 4;
+                    break;
+                case '五角形':
+                    targetVertexCountEl.value = 5;
+                    break;
+            }
+        });
+
+
+        // --- 初期化 ---
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>図形パズルゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            touch-action: none; /* スマホでのタッチ操作時に画面がスクロールしないようにする */
+        }
+        canvas {
+            cursor: pointer;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .message-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 3rem;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            border-radius: 0.5rem;
+            pointer-events: none; /* メッセージが表示されていても下のキャンバスを操作できるようにする */
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+        .message-overlay.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex flex-col justify-center items-center min-h-screen p-4">
+
+    <div id="game-container" class="w-full max-w-3xl mx-auto text-center">
+        <h1 id="title" class="text-3xl font-bold text-slate-700 mb-2"></h1>
+        
+        <div class="mb-4">
+            <label for="problem-select" class="text-slate-600 mr-2">問題を選択:</label>
+            <select id="problem-select" class="p-2 rounded-md border border-slate-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+            </select>
+        </div>
+
+        <p id="phase-info" class="text-lg text-slate-500 mb-4">カットフェーズ: 図形の頂点を2つ選んでカットしよう。</p>
+        
+        <div class="relative">
+            <canvas id="gameCanvas"></canvas>
+            <div id="message" class="message-overlay"></div>
+        </div>
+
+        <button id="resetButton" class="mt-6 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-all duration-200">
+            リセット
+        </button>
+    </div>
+
+    <script>
+        // --- 初期設定 ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const titleEl = document.getElementById('title');
+        const phaseInfoEl = document.getElementById('phase-info');
+        const resetButton = document.getElementById('resetButton');
+        const messageEl = document.getElementById('message');
+        const problemSelectEl = document.getElementById('problem-select');
+
+        const GRID_SIZE = 30; // グリッドのサイズ
+        const VERTEX_RADIUS = 8; // 頂点の半径
+
+        // --- 問題データ ---
+        const problems = [
+            {
+    title: "問題 1",
+    targetShape: '四角形',
+    targetVertexCount: 4,
+    vertices: [
+    { x: 5, y: 4 },     { x: 8, y: 7 },     { x: 11, y: 4 }, 
+    { x: 11, y: 10 },     { x: 8, y: 13 },     { x: 5, y: 10 }
+
+]
+},
+{
+    title: "問題 2",
+    targetShape: '四角形',
+    targetVertexCount: 4,
+    vertices: [
+    { x: 4, y: 6 },     { x: 7, y: 5 },     { x: 11, y: 5 }, 
+    { x: 11, y: 7 },     { x: 12, y: 10 },     { x: 9, y: 11 }, 
+    { x: 9, y: 9 },     { x: 5, y: 9 }
+]
+},
+{
+    title: "問題 3",
+    targetShape: '四角形',
+    targetVertexCount: 4,
+    vertices: [
+    { x: 5, y: 6 },     { x: 7, y: 5 },     { x: 11, y: 5 }, 
+    { x: 12, y: 8 },     { x: 10, y: 9 },     { x: 10, y: 14 }, 
+    { x: 9, y: 11 },     { x: 5, y: 11 }
+]
+},
+
+{
+    title: "問題 4",
+    targetShape: '四角形',
+    targetVertexCount: 4,
+    vertices: [
+    { x: 4, y: 5 },     { x: 6, y: 4 },     { x: 10, y: 7 }, 
+    { x: 12, y: 6 },     { x: 12, y: 11 },     { x: 8, y: 13 }, 
+    { x: 4, y: 10 }
+]
+},
+
+{
+    title: "問題 5",
+    targetShape: '四角形',
+    targetVertexCount: 4,
+    vertices: [
+    { x: 4, y: 4 },     { x: 8, y: 4 },     { x: 9, y: 7 }, 
+    { x: 7, y: 8 },     { x: 7, y: 13 },     { x: 3, y: 13 }, 
+    { x: 3, y: 8 },     { x: 5, y: 7 }
+]
+},
+{
+                title: "問題 6",
+                targetShape: '三角形',
+                targetVertexCount: 3,
+                vertices: [
+                    { x: 3, y: 9 }, { x: 6, y: 8 }, { x: 7, y: 6 },
+                    { x: 5, y: 5 }, { x: 11, y: 3 },  { x: 8, y: 9 }, { x: 7, y: 11 }
+                ]
+            }
+        ];
+
+        // ゲームの状態を管理するオブジェクト
+        let gameState = {};
+
+        // 初期化関数
+        function init(problemId = 0) {
+            const problem = problems[problemId];
+
+            gameState = {
+                problemId: problemId,
+                phase: 'cut', // 'cut' または 'combine'
+                polygons: [createPolygon(problem.vertices)],
+                targetShape: problem.targetShape,
+                targetVertexCount: problem.targetVertexCount,
+                selectedVertices: [],
+                hoveredVertex: null,
+                draggedPolygon: null,
+                dragOffset: { x: 0, y: 0 },
+            };
+            
+            titleEl.textContent = `${problem.targetShape}を作ろう！`;
+            updatePhaseInfo();
+            resizeCanvas();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ポリゴンオブジェクトを作成するヘルパー関数
+        function createPolygon(vertices) {
+            return {
+                vertices: vertices.map(v => ({...v})), // ディープコピー
+                color: `hsla(${Math.random() * 360}, 70%, 60%, 0.8)`,
+            };
+        }
+        
+        // --- キャンバスと描画 ---
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            const size = Math.min(container.clientWidth, 600);
+            canvas.width = size;
+            canvas.height = size;
+        }
+
+        function gameLoop() {
+            draw();
+            if (gameState.phase !== 'cleared') {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            drawPolygons();
+            drawHighlights();
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#e2e8f0'; // slate-200
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= canvas.width; x += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= canvas.height; y += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawPolygons() {
+            gameState.polygons.forEach(poly => {
+                ctx.fillStyle = poly.color;
+                ctx.strokeStyle = '#1e293b'; // slate-800
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                const startPos = toCanvasCoords(poly.vertices[0]);
+                ctx.moveTo(startPos.x, startPos.y);
+                for (let i = 1; i < poly.vertices.length; i++) {
+                    const pos = toCanvasCoords(poly.vertices[i]);
+                    ctx.lineTo(pos.x, pos.y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            });
+        }
+        
+        function drawHighlights() {
+            if (gameState.phase === 'cut') {
+                gameState.selectedVertices.forEach(vInfo => {
+                    const pos = toCanvasCoords(vInfo.vertex);
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.9)'; // red-500
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, VERTEX_RADIUS, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                if (gameState.hoveredVertex) {
+                     const pos = toCanvasCoords(gameState.hoveredVertex.vertex);
+                    ctx.fillStyle = 'rgba(249, 115, 22, 0.9)'; // orange-500
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, VERTEX_RADIUS, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // --- 座標変換 ---
+        function toCanvasCoords(gridPoint) {
+            return {
+                x: gridPoint.x * GRID_SIZE,
+                y: gridPoint.y * GRID_SIZE
+            };
+        }
+
+        // --- イベントハンドラ ---
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
+            const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+        
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('touchmove', handleMouseMove);
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('touchstart', handleMouseDown);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('touchend', handleMouseUp);
+        window.addEventListener('resize', resizeCanvas);
+        
+        resetButton.addEventListener('click', () => init(gameState.problemId));
+
+        function setupProblemSelect() {
+            problems.forEach((p, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = p.title;
+                problemSelectEl.appendChild(option);
+            });
+            problemSelectEl.addEventListener('change', (e) => {
+                init(parseInt(e.target.value, 10));
+            });
+        }
+
+
+        function handleMouseMove(e) {
+            e.preventDefault();
+            const mousePos = getMousePos(e);
+
+            if (gameState.phase === 'cut') {
+                gameState.hoveredVertex = findVertexAt(mousePos);
+            } else if (gameState.phase === 'combine' && gameState.draggedPolygon) {
+                const newVertices = gameState.draggedPolygon.vertices.map(v => ({
+                    x: (mousePos.x - gameState.dragOffset.x) / GRID_SIZE + v.original.x,
+                    y: (mousePos.y - gameState.dragOffset.y) / GRID_SIZE + v.original.y
+                }));
+                gameState.draggedPolygon.poly.vertices = newVertices;
+            }
+        }
+        
+        function handleMouseDown(e) {
+            e.preventDefault();
+            const mousePos = getMousePos(e);
+
+            if (gameState.phase === 'cut') {
+                const clickedVertexInfo = findVertexAt(mousePos);
+                if (clickedVertexInfo) {
+                    const isAlreadySelected = gameState.selectedVertices.some(v => 
+                        v.polygonIndex === clickedVertexInfo.polygonIndex && v.vertexIndex === clickedVertexInfo.vertexIndex
+                    );
+                    if (!isAlreadySelected) {
+                        gameState.selectedVertices.push(clickedVertexInfo);
+                        if (gameState.selectedVertices.length === 2) {
+                            splitPolygon();
+                        }
+                    }
+                }
+            } else if (gameState.phase === 'combine') {
+                const clickedPoly = findPolygonAt(mousePos);
+                if (clickedPoly) {
+                    gameState.dragOffset = getMousePos(e);
+                    gameState.draggedPolygon = {
+                        poly: clickedPoly,
+                        vertices: clickedPoly.vertices.map(v => ({ original: {...v} }))
+                    };
+                }
+            }
+        }
+        
+        function handleMouseUp(e) {
+            if (gameState.phase === 'combine' && gameState.draggedPolygon) {
+                const poly = gameState.draggedPolygon.poly;
+                const originalVertices = gameState.draggedPolygon.vertices;
+                const startMousePos = gameState.dragOffset;
+                const finalMousePos = getMousePos(e);
+
+                const canvasDx = finalMousePos.x - startMousePos.x;
+                const canvasDy = finalMousePos.y - startMousePos.y;
+
+                const gridDx = Math.round(canvasDx / GRID_SIZE);
+                const gridDy = Math.round(canvasDy / GRID_SIZE);
+
+                for (let i = 0; i < poly.vertices.length; i++) {
+                    poly.vertices[i].x = originalVertices[i].original.x + gridDx;
+                    poly.vertices[i].y = originalVertices[i].original.y + gridDy;
+                }
+
+                checkWinCondition();
+                gameState.draggedPolygon = null;
+            }
+        }
+
+        // --- ゲームロジック ---
+
+        function updatePhaseInfo() {
+            if (gameState.phase === 'cut') {
+                phaseInfoEl.textContent = 'カットフェーズ: 図形の頂点を2つ選んでカットしよう。';
+            } else {
+                phaseInfoEl.textContent = '合体フェーズ: 図形をドラッグして、お題の形を完成させよう。';
+            }
+        }
+
+        function findVertexAt(pos) {
+            for (let i = 0; i < gameState.polygons.length; i++) {
+                const poly = gameState.polygons[i];
+                for (let j = 0; j < poly.vertices.length; j++) {
+                    const v = poly.vertices[j];
+                    const vPos = toCanvasCoords(v);
+                    const dist = Math.hypot(vPos.x - pos.x, vPos.y - pos.y);
+                    if (dist < VERTEX_RADIUS) {
+                        return { polygonIndex: i, vertexIndex: j, vertex: v };
+                    }
+                }
+            }
+            return null;
+        }
+        
+        function findPolygonAt(pos) {
+            for (let i = gameState.polygons.length - 1; i >= 0; i--) {
+                const poly = gameState.polygons[i];
+                ctx.beginPath();
+                const startPos = toCanvasCoords(poly.vertices[0]);
+                ctx.moveTo(startPos.x, startPos.y);
+                for (let j = 1; j < poly.vertices.length; j++) {
+                    const p = toCanvasCoords(poly.vertices[j]);
+                    ctx.lineTo(p.x, p.y);
+                }
+                ctx.closePath();
+                if (ctx.isPointInPath(pos.x, pos.y)) {
+                    return poly;
+                }
+            }
+            return null;
+        }
+
+        /**
+         * 頂点リストから、隣接する頂点と直線上にある中間頂点を削除する
+         * @param {Array<object>} vertices - 頂点の配列
+         * @returns {Array<object>} 単純化された頂点の配列
+         */
+        function simplifyPolygon(vertices) {
+            if (vertices.length < 3) {
+                return vertices;
+            }
+            const simplified = [];
+            for (let i = 0; i < vertices.length; i++) {
+                const p_prev = vertices[(i - 1 + vertices.length) % vertices.length];
+                const p_curr = vertices[i];
+                const p_next = vertices[(i + 1) % vertices.length];
+                
+                // 現在の点が隣接する点と一直線上でなければ、真の頂点として保持する
+                if (getOrientation(p_prev, p_curr, p_next) !== 0) {
+                    simplified.push(p_curr);
+                }
+            }
+            return simplified;
+        }
+
+
+        function splitPolygon() {
+            const v1Info = gameState.selectedVertices[0];
+            const v2Info = gameState.selectedVertices[1];
+            
+            if (v1Info.polygonIndex !== v2Info.polygonIndex) {
+                gameState.selectedVertices = [];
+                return;
+            }
+
+            const originalPoly = gameState.polygons[v1Info.polygonIndex];
+            const vertices = originalPoly.vertices;
+            
+            let idx1 = v1Info.vertexIndex;
+            let idx2 = v2Info.vertexIndex;
+
+            if (idx1 > idx2) [idx1, idx2] = [idx2, idx1];
+
+            const newVertices1 = [];
+            for (let i = idx1; i <= idx2; i++) {
+                newVertices1.push(vertices[i]);
+            }
+            
+            const newVertices2 = [];
+            for (let i = idx2; i < vertices.length; i++) {
+                newVertices2.push(vertices[i]);
+            }
+            for (let i = 0; i <= idx1; i++) {
+                newVertices2.push(vertices[i]);
+            }
+
+            gameState.polygons = [
+                createPolygon(simplifyPolygon(newVertices1)),
+                createPolygon(simplifyPolygon(newVertices2)),
+            ];
+            gameState.phase = 'combine';
+            updatePhaseInfo();
+        }
+        
+        function getOrientation(p, q, r) {
+            const val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+            if (Math.abs(val) < 0.001) return 0;
+            return (val > 0) ? 1 : 2;
+        }
+
+        function calculateConvexHull(points) {
+            const n = points.length;
+            if (n < 3) return points;
+
+            let hull = [];
+            let l = 0;
+            for (let i = 1; i < n; i++) {
+                if (points[i].x < points[l].x) {
+                    l = i;
+                }
+            }
+
+            let p = l, q;
+            do {
+                hull.push(points[p]);
+                q = (p + 1) % n;
+                for (let i = 0; i < n; i++) {
+                    const orientation = getOrientation(points[p], points[i], points[q]);
+                    if (orientation === 2) {
+                        q = i;
+                    } 
+                    else if (orientation === 0) {
+                        const dist_pq_sq = (points[q].x - points[p].x)**2 + (points[q].y - points[p].y)**2;
+                        const dist_pi_sq = (points[i].x - points[p].x)**2 + (points[i].y - points[p].y)**2;
+                        if (dist_pi_sq > dist_pq_sq) {
+                            q = i;
+                        }
+                    }
+                }
+                p = q;
+            } while (p !== l);
+
+            return hull;
+        }
+
+        function checkWinCondition() {
+            if (gameState.polygons.length !== 2) return;
+
+            const poly1 = gameState.polygons[0];
+            const poly2 = gameState.polygons[1];
+            let isAdjacent = false;
+            
+            for (let i = 0; i < poly1.vertices.length; i++) {
+                const p1v1 = poly1.vertices[i];
+                const p1v2 = poly1.vertices[(i + 1) % poly1.vertices.length];
+                for (let j = 0; j < poly2.vertices.length; j++) {
+                    const p2v1 = poly2.vertices[j];
+                    const p2v2 = poly2.vertices[(j + 1) % poly2.vertices.length];
+                    if (Math.hypot(p1v1.x - p2v2.x, p1v1.y - p2v2.y) < 0.1 &&
+                        Math.hypot(p1v2.x - p2v1.x, p1v2.y - p2v1.y) < 0.1) {
+                        isAdjacent = true;
+                        break;
+                    }
+                }
+                if (isAdjacent) break;
+            }
+            
+            if (isAdjacent) {
+                const allVertices = [...poly1.vertices, ...poly2.vertices];
+                const uniqueVertices = [];
+                const epsilon = 0.01;
+
+                allVertices.forEach(v => {
+                    if (!uniqueVertices.some(uv => Math.hypot(uv.x - v.x, uv.y - v.y) < epsilon)) {
+                        uniqueVertices.push(v);
+                    }
+                });
+
+                const convexHull = calculateConvexHull(uniqueVertices);
+
+                if (convexHull && convexHull.length === gameState.targetVertexCount) {
+                    const convexHullSet = new Set(convexHull.map(v => `${v.x},${v.y}`));
+                    const internalVertices = uniqueVertices.filter(v => !convexHullSet.has(`${v.x},${v.y}`));
+                    
+                    let isShapeSolid = true;
+                    
+                    for (const internalVertex of internalVertices) {
+                        const inPoly1 = poly1.vertices.some(v => Math.hypot(v.x - internalVertex.x, v.y - internalVertex.y) < epsilon);
+                        const inPoly2 = poly2.vertices.some(v => Math.hypot(v.x - internalVertex.x, v.y - internalVertex.y) < epsilon);
+
+                        if (!(inPoly1 && inPoly2)) {
+                            isShapeSolid = false;
+                            break;
+                        }
+                    }
+                    
+                    if (isShapeSolid) {
+                         showClearMessage();
+                    }
+                }
+            }
+        }
+        
+        function showClearMessage() {
+            messageEl.textContent = 'クリア！';
+            messageEl.classList.add('show');
+            gameState.phase = 'cleared';
+            setTimeout(() => {
+                messageEl.classList.remove('show');
+                 init(gameState.problemId);
+            }, 3000);
+        }
+
+        // --- ゲーム開始 ---
+        setupProblemSelect();
+        init();
+    </script>
+</body>
+</html>
+
