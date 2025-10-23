@@ -78,58 +78,55 @@
         // --- 問題データ ---
         const problems = [
             {
-    title: "問題 1",
-    targetShape: '四角形',
-    targetVertexCount: 4,
-    vertices: [
-    { x: 5, y: 4 },     { x: 8, y: 7 },     { x: 11, y: 4 }, 
-    { x: 11, y: 10 },     { x: 8, y: 13 },     { x: 5, y: 10 }
-
-]
-},
-{
-    title: "問題 2",
-    targetShape: '四角形',
-    targetVertexCount: 4,
-    vertices: [
-    { x: 4, y: 6 },     { x: 7, y: 5 },     { x: 11, y: 5 }, 
-    { x: 11, y: 7 },     { x: 12, y: 10 },     { x: 9, y: 11 }, 
-    { x: 9, y: 9 },     { x: 5, y: 9 }
-]
-},
-{
-    title: "問題 3",
-    targetShape: '四角形',
-    targetVertexCount: 4,
-    vertices: [
-    { x: 5, y: 6 },     { x: 7, y: 5 },     { x: 11, y: 5 }, 
-    { x: 12, y: 8 },     { x: 10, y: 9 },     { x: 10, y: 14 }, 
-    { x: 9, y: 11 },     { x: 5, y: 11 }
-]
-},
-
-{
-    title: "問題 4",
-    targetShape: '四角形',
-    targetVertexCount: 4,
-    vertices: [
-    { x: 4, y: 5 },     { x: 6, y: 4 },     { x: 10, y: 7 }, 
-    { x: 12, y: 6 },     { x: 12, y: 11 },     { x: 8, y: 13 }, 
-    { x: 4, y: 10 }
-]
-},
-
-{
-    title: "問題 5",
-    targetShape: '四角形',
-    targetVertexCount: 4,
-    vertices: [
-    { x: 4, y: 4 },     { x: 8, y: 4 },     { x: 9, y: 7 }, 
-    { x: 7, y: 8 },     { x: 7, y: 13 },     { x: 3, y: 13 }, 
-    { x: 3, y: 8 },     { x: 5, y: 7 }
-]
-},
-{
+                title: "問題 1",
+                targetShape: '四角形',
+                targetVertexCount: 4,
+                vertices: [
+                    { x: 5, y: 4 }, { x: 8, y: 7 }, { x: 11, y: 4 }, 
+                    { x: 11, y: 10 }, { x: 8, y: 13 }, { x: 5, y: 10 }
+                ]
+            },
+            {
+                title: "問題 2",
+                targetShape: '四角形',
+                targetVertexCount: 4,
+                vertices: [
+                    { x: 4, y: 6 }, { x: 7, y: 5 }, { x: 11, y: 5 }, 
+                    { x: 11, y: 7 }, { x: 12, y: 10 }, { x: 9, y: 11 }, 
+                    { x: 9, y: 9 }, { x: 5, y: 9 }
+                ]
+            },
+            {
+                title: "問題 3",
+                targetShape: '四角形',
+                targetVertexCount: 4,
+                vertices: [
+                    { x: 5, y: 6 }, { x: 7, y: 5 }, { x: 11, y: 5 }, 
+                    { x: 12, y: 8 }, { x: 10, y: 9 }, { x: 10, y: 14 }, 
+                    { x: 9, y: 11 }, { x: 5, y: 11 }
+                ]
+            },
+            {
+                title: "問題 4",
+                targetShape: '四角形',
+                targetVertexCount: 4,
+                vertices: [
+                    { x: 4, y: 5 }, { x: 6, y: 4 }, { x: 10, y: 7 }, 
+                    { x: 12, y: 6 }, { x: 12, y: 11 }, { x: 8, y: 13 }, 
+                    { x: 4, y: 10 }
+                ]
+            },
+            {
+                title: "問題 5",
+                targetShape: '四角形',
+                targetVertexCount: 4,
+                vertices: [
+                    { x: 4, y: 4 }, { x: 8, y: 4 }, { x: 9, y: 7 }, 
+                    { x: 7, y: 8 }, { x: 7, y: 13 }, { x: 3, y: 13 }, 
+                    { x: 3, y: 8 }, { x: 5, y: 7 }
+                ]
+            },
+            {
                 title: "問題 6",
                 targetShape: '三角形',
                 targetVertexCount: 3,
@@ -198,6 +195,7 @@
         function drawGrid() {
             ctx.strokeStyle = '#e2e8f0'; // slate-200
             ctx.lineWidth = 1;
+            // エラー箇所を修正: `// ... existing code ... -->` を削除し、正しい描画ロジックを復元
             for (let x = 0; x <= canvas.width; x += GRID_SIZE) {
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
@@ -232,6 +230,20 @@
         
         function drawHighlights() {
             if (gameState.phase === 'cut') {
+                
+                // カットフェーズ中はすべての頂点を常に表示
+                if (gameState.polygons.length > 0) {
+                    // カット対象は常に最初のポリゴン
+                    gameState.polygons[0].vertices.forEach(v => {
+                        const pos = toCanvasCoords(v);
+                        ctx.fillStyle = 'rgba(59, 130, 246, 0.4)'; // blue-500 with alpha
+                        ctx.beginPath();
+                        ctx.arc(pos.x, pos.y, VERTEX_RADIUS, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                }
+
+                // 選択済みの頂点（上書き）
                 gameState.selectedVertices.forEach(vInfo => {
                     const pos = toCanvasCoords(vInfo.vertex);
                     ctx.fillStyle = 'rgba(239, 68, 68, 0.9)'; // red-500
@@ -239,6 +251,8 @@
                     ctx.arc(pos.x, pos.y, VERTEX_RADIUS, 0, Math.PI * 2);
                     ctx.fill();
                 });
+                
+                // ホバー中の頂点（上書き）
                 if (gameState.hoveredVertex) {
                      const pos = toCanvasCoords(gameState.hoveredVertex.vertex);
                     ctx.fillStyle = 'rgba(249, 115, 22, 0.9)'; // orange-500

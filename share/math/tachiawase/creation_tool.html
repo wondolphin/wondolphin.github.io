@@ -8,11 +8,15 @@
     <style>
         body {
             font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            touch-action: none; /* スマホでのドラッグ操作を許可 */
         }
         canvas {
             cursor: crosshair;
             border-radius: 0.5rem;
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        canvas.grabbing {
+            cursor: grabbing;
         }
         #outputCode {
             white-space: pre;
@@ -35,18 +39,18 @@
                 <div>
                     <label for="target-shape" class="block text-sm font-medium text-slate-700">お題の形</label>
                     <select id="target-shape" class="mt-1 block w-full p-2 rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option>三角形</option>
-                        <option>四角形</option>
-                        <option>五角形</option>
+                        <option value="3">三角形</option>
+                        <option value="4">四角形</option>
+                        <option value="5">五角形</option>
                     </select>
                 </div>
-                 <div>
-                    <label for="target-vertex-count" class="block text-sm font-medium text-slate-700">お題の頂点数</label>
-                    <input type="number" id="target-vertex-count" value="3" class="mt-1 block w-full p-2 rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                </div>
+                 <!-- お題の頂点数入力欄を削除 -->
             </div>
              <h2 class="text-lg font-semibold text-slate-600 border-b pb-2 mt-6 mb-4">2. 図形作成</h2>
-             <p class="text-sm text-slate-500 mb-4">下のグリッドをクリックして、図形の頂点を追加してください。</p>
+             <p class="text-sm text-slate-500 mb-4">
+                グリッドをクリックして頂点を追加します。<br>
+                既存の頂点をドラッグして移動できます。
+             </p>
              <div class="flex gap-2">
                  <button id="undoButton" class="w-full bg-slate-500 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200">元に戻す</button>
                  <button id="clearButton" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-200">クリア</button>
@@ -81,12 +85,15 @@
         const outputCodeEl = document.getElementById('outputCode');
         const problemTitleEl = document.getElementById('problem-title');
         const targetShapeEl = document.getElementById('target-shape');
-        const targetVertexCountEl = document.getElementById('target-vertex-count');
+        // targetVertexCountEl への参照を削除
 
         const GRID_SIZE = 30;
-        const VERTEX_RADIUS = 5;
+        const VERTEX_RADIUS = 5; // 描画用の頂点半径
+        const CLICK_RADIUS = 10; // クリック判定用の半径
 
         let vertices = [];
+        let isDragging = false;
+        let draggedVertexIndex = null;
 
         function resizeCanvas() {
             const size = Math.min(window.innerWidth, 510);
@@ -155,21 +162,87 @@
             });
         }
         
-        // --- イベントハンドラ ---
-        canvas.addEventListener('mousedown', (e) => {
+        // --- 座標変換ヘルパー ---
+        function getMousePos(evt) {
             const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+            // タッチイベントにも対応
+            const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
+            const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
 
-            const gridX = Math.round(mouseX / GRID_SIZE);
-            const gridY = Math.round(mouseY / GRID_SIZE);
-
-            // 重複する頂点を追加しない
-            if (!vertices.some(v => v.x === gridX && v.y === gridY)) {
-                vertices.push({ x: gridX, y: gridY });
-                draw();
+        function toGridCoords(pos) {
+             return {
+                x: Math.round(pos.x / GRID_SIZE),
+                y: Math.round(pos.y / GRID_SIZE)
+            };
+        }
+        
+        // --- イベントハンドラ ---
+        function handleMouseDown(e) {
+            e.preventDefault();
+            const mousePos = getMousePos(e);
+            
+            // 既存の頂点をクリックしたかチェック
+            draggedVertexIndex = null;
+            for (let i = 0; i < vertices.length; i++) {
+                const vPos = { x: vertices[i].x * GRID_SIZE, y: vertices[i].y * GRID_SIZE };
+                const dist = Math.hypot(vPos.x - mousePos.x, vPos.y - mousePos.y);
+                if (dist < CLICK_RADIUS) {
+                    draggedVertexIndex = i;
+                    break;
+                }
             }
-        });
+            
+            if (draggedVertexIndex !== null) {
+                // 頂点ドラッグ開始
+                isDragging = true;
+                canvas.classList.add('grabbing');
+            } else {
+                // 新しい頂点を追加
+                isDragging = false;
+                const gridPos = toGridCoords(mousePos);
+                // 重複する頂点を追加しない
+                if (!vertices.some(v => v.x === gridPos.x && v.y === gridPos.y)) {
+                    vertices.push(gridPos);
+                    draw();
+                }
+            }
+        }
+        
+        function handleMouseMove(e) {
+            if (!isDragging || draggedVertexIndex === null) return;
+            e.preventDefault();
+            
+            const mousePos = getMousePos(e);
+            const gridPos = toGridCoords(mousePos);
+            
+            // 座標が変化した場合のみ更新
+            if (vertices[draggedVertexIndex].x !== gridPos.x || vertices[draggedVertexIndex].y !== gridPos.y) {
+                 vertices[draggedVertexIndex] = gridPos;
+                 draw();
+            }
+        }
+        
+        function handleMouseUp(e) {
+            isDragging = false;
+            draggedVertexIndex = null;
+            canvas.classList.remove('grabbing');
+        }
+
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('mouseleave', handleMouseUp); // キャンバス外に出てもドラッグ終了
+
+        // タッチイベントのサポート
+        canvas.addEventListener('touchstart', handleMouseDown);
+        canvas.addEventListener('touchmove', handleMouseMove);
+        canvas.addEventListener('touchend', handleMouseUp);
+        canvas.addEventListener('touchcancel', handleMouseUp);
 
         undoButton.addEventListener('click', () => {
             vertices.pop();
@@ -193,17 +266,21 @@
                 if (i < vertices.length - 1) {
                     verticesString += ", ";
                 }
-                if ((i + 1) % 3 === 0) { // 3つごとに改行
+                if ((i + 1) % 3 === 0 && i < vertices.length - 1) { // 3つごと、かつ最後でないなら改行
                      verticesString += "\n";
                 }
             });
             verticesString += "\n]";
 
+            // 選択されたお題の形から頂点数を自動決定
+            const targetShapeText = targetShapeEl.options[targetShapeEl.selectedIndex].text;
+            const targetVertexCount = parseInt(targetShapeEl.value, 10);
+
             const code = 
 `{
     title: "${problemTitleEl.value}",
-    targetShape: '${targetShapeEl.value}',
-    targetVertexCount: ${targetVertexCountEl.value},
+    targetShape: '${targetShapeText}',
+    targetVertexCount: ${targetVertexCount},
     ${verticesString}
 },`;
             outputCodeEl.value = code;
@@ -220,20 +297,7 @@
         });
         
         // ターゲットの形が変更されたら、頂点数も自動で更新する
-        targetShapeEl.addEventListener('change', (e) => {
-            switch(e.target.value) {
-                case '三角形':
-                    targetVertexCountEl.value = 3;
-                    break;
-                case '四角形':
-                    targetVertexCountEl.value = 4;
-                    break;
-                case '五角形':
-                    targetVertexCountEl.value = 5;
-                    break;
-            }
-        });
-
+        // targetShapeEl.addEventListener('change', ...); // 以前のロジックは不要になったため削除
 
         // --- 初期化 ---
         window.addEventListener('resize', resizeCanvas);
@@ -242,3 +306,4 @@
     </script>
 </body>
 </html>
+
