@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>パズルレベルエディタ</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .main-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        /* 盤面 */
+        #editor-board {
+            width: 500px;
+            height: 500px;
+            border: 2px solid #333;
+            position: relative;
+            background-color: #fff;
+            background-image:
+                linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px; /* グリッド表示 */
+            overflow: hidden;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        /* ツールパネル */
+        .tools-panel {
+            width: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .tools-panel h3 {
+            margin: 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            text-align: center;
+        }
+        
+        /* ツールボタン */
+        .tool-button {
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            background-color: #4a90e2;
+            color: white;
+            transition: background-color 0.2s;
+        }
+        .tool-button:hover {
+            background-color: #3a7ac2;
+        }
+        .tool-button.danger {
+            background-color: #d0021b;
+        }
+        .tool-button.danger:hover {
+            background-color: #a00115;
+        }
+        
+        /* 情報パネル */
+        #info-panel {
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+        #info-panel div {
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #info-panel label {
+            font-size: 13px;
+            font-weight: bold;
+        }
+        #info-panel input[type="number"] {
+            width: 60px;
+            padding: 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #info-panel p {
+            font-size: 12px;
+            color: #888;
+            margin: 0;
+            text-align: center;
+        }
+
+        /* ブロック設定 */
+        #blocks-config-area {
+            display: flex;
+            gap: 10px;
+        }
+        #blocks-config-area input {
+            flex-grow: 1;
+            width: 50px; /* flex-grow があるため目安 */
+        }
+        #blocks-config-area button {
+            padding: 0 15px;
+            font-size: 14px;
+        }
+        #blocks-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 100px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #blocks-list li {
+            font-size: 14px;
+            padding: 5px 8px;
+            background-color: #f9f9f9;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #blocks-list li:last-child {
+            border-bottom: none;
+        }
+        #blocks-list span {
+            cursor: pointer;
+            color: #d0021b;
+            font-weight: bold;
+        }
+        
+        /* 出力エリア */
+        #output-area {
+            width: 100%;
+            height: 150px;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box; /* padding を含める */
+            white-space: pre; /* 整形済みテキストとして表示 */
+            overflow: auto;
+        }
+
+        /* 盤面上のオブジェクト (ゲーム本体のスタイルを流用) */
+        .edit-object {
+            position: absolute;
+            cursor: grab;
+            border: 2px dashed transparent; /* 選択状態を示す枠線（通常は透明） */
+            box-sizing: border-box;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            z-index: 10;
+        }
+        .edit-object:active {
+            cursor: grabbing;
+            z-index: 100;
+        }
+        .edit-object.selected {
+            border-color: #4a90e2;
+            box-shadow: 0 0 10px rgba(74, 144, 226, 0.5);
+        }
+        .edit-object.player {
+            width: 40px;
+            height: 40px;
+            background-image: url('player.png');
+            border-radius: 50%;
+        }
+        .edit-object.goal {
+            width: 40px;
+            height: 40px;
+            background-image: url('goal.png');
+            border-radius: 50%;
+        }
+        .edit-object.wall {
+            background-color: #777;
+            border-radius: 4px;
+            z-index: 5;
+            width: 100px; /* デフォルト幅 */
+            height: 40px; /* デフォルト高 */
+        }
+        
+        /* リサイズハンドル */
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #4a90e2;
+            border: 1px solid white;
+            border-radius: 50%;
+            z-index: 110;
+        }
+        .resize-handle.nw { /* North-West (左上) */
+            top: -5px;
+            left: -5px;
+            cursor: nwse-resize;
+        }
+        .resize-handle.ne { /* North-East (右上) */
+            top: -5px;
+            right: -5px;
+            cursor: nesw-resize;
+        }
+        .resize-handle.sw { /* South-West (左下) */
+            bottom: -5px;
+            left: -5px;
+            cursor: nesw-resize;
+        }
+        .resize-handle.se { /* South-East (右下) */
+            bottom: -5px;
+            right: -5px;
+            cursor: nwse-resize;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div id="editor-board">
+            <!-- オブジェクトはJSでここに追加されます -->
+        </div>
+        <div class="tools-panel">
+            <h3>オブジェクト追加</h3>
+            <button id="add-player" class="tool-button">プレイヤー追加</button>
+            <button id="add-goal" class="tool-button">ゴール追加</button>
+            <button id="add-wall" class="tool-button">壁追加</button>
+            
+            <h3>選択中オブジェクト</h3>
+            <div id="info-panel">
+                <p>オブジェクトをクリックして選択</p>
+                <!-- 選択中の情報がここに表示されます -->
+            </div>
+            <button id="delete-object" class="tool-button danger" disabled>選択中を削除</button>
+
+            <h3>方向転換ブロック</h3>
+            <div id="blocks-config-area">
+                <input type="number" id="block-angle-input" placeholder="角度 (例: 90)">
+                <button id="add-block-button" class="tool-button">+</button>
+            </div>
+            <ul id="blocks-list">
+                <!-- ブロックリストがここに表示されます -->
+            </ul>
+
+            <h3>レベルデータ出力</h3>
+            <button id="generate-output" class="tool-button">出力</button>
+            <textarea id="output-area" readonly></textarea>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM要素の取得 ---
+        const editorBoard = document.getElementById('editor-board');
+        const addPlayerButton = document.getElementById('add-player');
+        const addGoalButton = document.getElementById('add-goal');
+        const addWallButton = document.getElementById('add-wall');
+        const infoPanel = document.getElementById('info-panel');
+        const deleteButton = document.getElementById('delete-object');
+        const blockAngleInput = document.getElementById('block-angle-input');
+        const addBlockButton = document.getElementById('add-block-button');
+        const blocksList = document.getElementById('blocks-list');
+        const generateButton = document.getElementById('generate-output');
+        const outputArea = document.getElementById('output-area');
+
+        // --- エディタの状態管理 ---
+        const BOARD_SIZE = 500;
+        let placedObjects = []; // { id, el, type, data, resizeHandles: [] }
+        let directionBlocks = []; // { angle }
+        let selectedObject = null;
+        let objectCounter = 0; // オブジェクトの一意なID用
+
+        // --- ドラッグ＆ドロップ関連 ---
+        let draggedElement = null;
+        let offsetX, offsetY;
+
+        // --- リサイズ関連 ---
+        let isResizing = false;
+        let resizeHandleDirection = '';
+        const MIN_WALL_SIZE = 20; // 壁の最小サイズ
+        
+        // --- オブジェクト追加処理 ---
+        function addObject(type) {
+            if (type === 'player' && placedObjects.some(obj => obj.type === 'player')) {
+                alert("プレイヤーは1つしか配置できません。");
+                return;
+            }
+
+            const id = `obj-${objectCounter++}`;
+            const el = document.createElement('div');
+            el.id = id;
+            el.className = `edit-object ${type}`;
+            
+            // デフォルトデータ
+            const data = { x: 50, y: 50, w: 40, h: 40, angle: 0 };
+            if (type === 'wall') {
+                data.w = 100;
+            }
+
+            el.style.left = `${data.x}px`;
+            el.style.top = `${data.y}px`;
+            el.style.width = `${data.w}px`;
+            el.style.height = `${data.h}px`;
+            if (type === 'player') {
+                el.style.transform = `rotate(${data.angle}deg)`;
+            }
+
+            el.addEventListener('mousedown', onDragStart);
+            el.addEventListener('click', (e) => {
+                e.stopPropagation(); // ボードのクリックイベントが発火しないように
+                selectObject(newObject);
+            });
+            el.addEventListener('dblclick', deleteSelectedObject); // ダブルクリックで削除
+
+            const newObject = { id, el, type, data, resizeHandles: [] };
+            placedObjects.push(newObject);
+            editorBoard.appendChild(el);
+            selectObject(newObject); // 追加したものを選択
+        }
+
+        // --- オブジェクトの選択 ---
+        function selectObject(obj) {
+            if (isResizing) return;
+            
+            if (selectedObject) {
+                selectedObject.el.classList.remove('selected');
+                if (selectedObject.type === 'wall') {
+                    removeResizeHandles(selectedObject);
+                }
+            }
+
+            selectedObject = obj;
+            
+            if (selectedObject) {
+                selectedObject.el.classList.add('selected');
+                deleteButton.disabled = false;
+                if (selectedObject.type === 'wall') {
+                    createResizeHandles(selectedObject);
+                }
+            } else {
+                deleteButton.disabled = true;
+            }
+            updateInfoPanel();
+        }
+
+        // --- リサイズハンドルの管理 ---
+        function createResizeHandles(wallObject) {
+            const directions = ['nw', 'ne', 'sw', 'se'];
+            directions.forEach(dir => {
+                const handle = document.createElement('div');
+                handle.className = `resize-handle ${dir}`;
+                handle.dataset.direction = dir;
+                handle.addEventListener('mousedown', onResizeStart);
+                wallObject.el.appendChild(handle);
+                wallObject.resizeHandles.push(handle);
+            });
+        }
+        
+        function removeResizeHandles(wallObject) {
+            wallObject.resizeHandles.forEach(handle => handle.remove());
+            wallObject.resizeHandles = [];
+        }
+
+
+        // --- 情報パネルの更新 ---
+        function updateInfoPanel() {
+            if (!selectedObject) {
+                infoPanel.innerHTML = '<p>オブジェクトをクリックして選択</p>';
+                return;
+            }
+            
+            const { type, data } = selectedObject;
+            let html = `<div><label>Type:</label> <span>${type}</span></div>`;
+            html += `
+                <div>
+                    <label>X:</label>
+                    <input type="number" id="info-x" value="${data.x}" data-key="x">
+                </div>
+                <div>
+                    <label>Y:</label>
+                    <input type="number" id="info-y" value="${data.y}" data-key="y">
+                </div>
+            `;
+
+            if (type === 'wall') {
+                 html += `
+                    <div>
+                        <label>W:</label>
+                        <input type="number" id="info-w" value="${data.w}" data-key="w">
+                    </div>
+                    <div>
+                        <label>H:</label>
+                        <input type="number" id="info-h" value="${data.h}" data-key="h">
+                    </div>
+                `;
+            }
+            
+            if (type === 'player') {
+                 html += `
+                    <div>
+                        <label>Angle:</label>
+                        <input type="number" id="info-angle" value="${data.angle}" data-key="angle">
+                    </div>
+                `;
+            }
+            
+            infoPanel.innerHTML = html;
+
+            // 情報パネルの入力イベントリスナーを追加
+            infoPanel.querySelectorAll('input').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    if (!selectedObject) return;
+                    const key = e.target.dataset.key;
+                    const value = parseInt(e.target.value) || 0;
+                    
+                    selectedObject.data[key] = value;
+                    updateObjectElement(selectedObject);
+                });
+            });
+        }
+        
+        // 情報パネルの「値」だけを更新する
+        function updateInfoPanelValues() {
+            if (!selectedObject) return;
+            const { data } = selectedObject;
+            
+            const inputX = infoPanel.querySelector('#info-x');
+            const inputY = infoPanel.querySelector('#info-y');
+            const inputW = infoPanel.querySelector('#info-w');
+            const inputH = infoPanel.querySelector('#info-h');
+
+            if (inputX) inputX.value = data.x;
+            if (inputY) inputY.value = data.y;
+            if (inputW) inputW.value = data.w;
+            if (inputH) inputH.value = data.h;
+        }
+
+        // --- オブジェクトのDOM要素をデータに基づいて更新 ---
+        function updateObjectElement(obj) {
+            obj.el.style.left = `${obj.data.x}px`;
+            obj.el.style.top = `${obj.data.y}px`;
+            
+            if (obj.type === 'wall') {
+                obj.el.style.width = `${obj.data.w}px`;
+                obj.el.style.height = `${obj.data.h}px`;
+            }
+            if (obj.type === 'player') {
+                obj.el.style.transform = `rotate(${obj.data.angle}deg)`;
+            }
+        }
+        
+        // --- オブジェクトの削除 ---
+        function deleteSelectedObject() {
+            if (!selectedObject) return;
+
+            // DOMから削除
+            selectedObject.el.remove();
+            
+            // 配列から削除
+            placedObjects = placedObjects.filter(obj => obj.id !== selectedObject.id);
+            
+            selectObject(null); // 選択を解除
+        }
+
+        // --- ドラッグ＆ドロップ（移動）処理 ---
+        function onDragStart(e) {
+            if (isResizing) return; // リサイズ中は移動しない
+            e.preventDefault();
+            draggedElement = e.target;
+            
+            // selectedObject もドラッグ対象に合わせる
+            const obj = placedObjects.find(o => o.id === draggedElement.id);
+            if(obj) selectObject(obj);
+
+            const rect = draggedElement.getBoundingClientRect();
+            
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+
+            draggedElement.style.zIndex = 1000;
+            document.addEventListener('mousemove', onDragMove);
+            document.addEventListener('mouseup', onDragEnd);
+        }
+
+        function onDragMove(e) {
+            if (!draggedElement || !selectedObject || isResizing) return;
+
+            const boardRect = editorBoard.getBoundingClientRect();
+            let x = e.clientX - boardRect.left - offsetX;
+            let y = e.clientY - boardRect.top - offsetY;
+
+            // グリッドスナップしない場合 (ピクセル単位)
+            x = Math.round(x);
+            y = Math.round(y);
+
+            // 盤面内に収める
+            x = Math.max(0, Math.min(x, BOARD_SIZE - selectedObject.data.w));
+            y = Math.max(0, Math.min(y, BOARD_SIZE - selectedObject.data.h));
+
+            // データ更新
+            selectedObject.data.x = x;
+            selectedObject.data.y = y;
+
+            // DOM更新
+            draggedElement.style.left = `${x}px`;
+            draggedElement.style.top = `${y}px`;
+            
+            // 情報パネルも更新
+            updateInfoPanelValues();
+        }
+
+        function onDragEnd() {
+            if (draggedElement) {
+                draggedElement.style.zIndex = 10;
+            }
+            document.removeEventListener('mousemove', onDragMove);
+            document.removeEventListener('mouseup', onDragEnd);
+            draggedElement = null;
+        }
+
+        // --- リサイズ処理 ---
+        function onResizeStart(e) {
+            e.preventDefault();
+            e.stopPropagation(); // 親要素（壁）の onDragStart が発火するのを防ぐ
+
+            isResizing = true;
+            resizeHandleDirection = e.target.dataset.direction;
+            
+            // selectedObject が壁であることを確認 (念のため)
+            if (!selectedObject || selectedObject.type !== 'wall') return;
+
+            document.addEventListener('mousemove', onResizeMove);
+            document.addEventListener('mouseup', onResizeEnd);
+        }
+
+        function onResizeMove(e) {
+            if (!isResizing || !selectedObject) return;
+
+            const boardRect = editorBoard.getBoundingClientRect();
+            const data = selectedObject.data;
+            
+            // マウスの現在位置 (盤面基準)
+            let mouseX = e.clientX - boardRect.left;
+            let mouseY = e.clientY - boardRect.top;
+
+            // 盤面内に収める
+            mouseX = Math.max(0, Math.min(mouseX, BOARD_SIZE));
+            mouseY = Math.max(0, Math.min(mouseY, BOARD_SIZE));
+
+            // 元の座標とサイズ
+            let newX = data.x;
+            let newY = data.y;
+            let newW = data.w;
+            let newH = data.h;
+            
+            const rightEdge = data.x + data.w;
+            const bottomEdge = data.y + data.h;
+
+            // ハンドルの方向に応じて座標とサイズを計算
+            if (resizeHandleDirection.includes('e')) { // East (右)
+                newW = Math.max(MIN_WALL_SIZE, mouseX - data.x);
+            }
+            if (resizeHandleDirection.includes('s')) { // South (下)
+                newH = Math.max(MIN_WALL_SIZE, mouseY - data.y);
+            }
+            if (resizeHandleDirection.includes('w')) { // West (左)
+                newW = Math.max(MIN_WALL_SIZE, rightEdge - mouseX);
+                newX = rightEdge - newW;
+            }
+            if (resizeHandleDirection.includes('n')) { // North (上)
+                newH = Math.max(MIN_WALL_SIZE, bottomEdge - mouseY);
+                newY = bottomEdge - newH;
+            }
+            
+            // データを更新
+            data.x = newX;
+            data.y = newY;
+            data.w = newW;
+            data.h = newH;
+            
+            // DOM要素と情報パネルを更新
+            updateObjectElement(selectedObject);
+            updateInfoPanelValues();
+        }
+        
+        function onResizeEnd() {
+            isResizing = false;
+            document.removeEventListener('mousemove', onResizeMove);
+            document.removeEventListener('mouseup', onResizeEnd);
+        }
+
+
+        // --- 方向転換ブロックの管理 ---
+        function addDirectionBlock() {
+            const angle = parseInt(blockAngleInput.value);
+            if (isNaN(angle)) return;
+
+            directionBlocks.push({ angle });
+            blockAngleInput.value = '';
+            renderBlocksList();
+        }
+
+        function renderBlocksList() {
+            blocksList.innerHTML = '';
+            directionBlocks.forEach((block, index) => {
+                const li = document.createElement('li');
+                li.textContent = `${block.angle > 0 ? '+' : ''}${block.angle}°`;
+                
+                const removeSpan = document.createElement('span');
+                removeSpan.textContent = '×';
+                removeSpan.title = '削除';
+                removeSpan.addEventListener('click', () => {
+                    directionBlocks.splice(index, 1);
+                    renderBlocksList();
+                });
+                
+                li.appendChild(removeSpan);
+                blocksList.appendChild(li);
+            });
+        }
+
+        // --- 出力データ生成 ---
+        function generateOutput() {
+            const player = placedObjects.find(obj => obj.type === 'player');
+            const goals = placedObjects.filter(obj => obj.type === 'goal');
+            const walls = placedObjects.filter(obj => obj.type === 'wall');
+
+            if (!player) {
+                alert("プレイヤーが配置されていません。");
+                return;
+            }
+            
+            let output = "{\n";
+            
+            // player (x, y, angle)
+            output += `    player: { x: ${player.data.x}, y: ${player.data.y}, angle: ${player.data.angle} },\n`;
+            
+            // goals (x, y)
+            output += "    goals: [\n";
+            goals.forEach(goal => {
+                output += `        { x: ${goal.data.x}, y: ${goal.data.y} },\n`;
+            });
+            output += "    ],\n";
+            
+            // walls (x, y, w, h)
+            output += "    walls: [\n";
+            walls.forEach(wall => {
+                output += `        { x: ${wall.data.x}, y: ${wall.data.y}, w: ${wall.data.w}, h: ${wall.data.h} },\n`;
+            });
+            output += "    ],\n";
+            
+            // blocks (angle)
+            output += "    blocks: [\n";
+            directionBlocks.forEach(block => {
+                output += `        { angle: ${block.angle} },\n`;
+            });
+            output += "    ]\n";
+            
+            output += "},"; // levels配列の次の要素として追加できるようにカンマを追加
+            
+            outputArea.value = output;
+        }
+
+        // --- イベントリスナーの設定 ---
+        addPlayerButton.addEventListener('click', () => addObject('player'));
+        addGoalButton.addEventListener('click', () => addObject('goal'));
+        addWallButton.addEventListener('click', () => addObject('wall'));
+        deleteButton.addEventListener('click', deleteSelectedObject);
+        addBlockButton.addEventListener('click', addDirectionBlock);
+        generateButton.addEventListener('click', generateOutput);
+        
+        // 盤面の何もないところをクリックしたら選択解除
+        editorBoard.addEventListener('click', () => {
+             selectObject(null);
+        });
+
+    </script>
+</body>
+</html>
+
