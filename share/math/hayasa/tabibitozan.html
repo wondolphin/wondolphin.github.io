@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>算数問題</title>
+    <!-- Tailwind CSSを読み込みます -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントを読み込みます */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* ふきだしの「しっぽ」のスタイル */
+        .bubble {
+            position: absolute;
+            bottom: 90px; /* キャラクター画像の上に来るように調整 */
+            width: 260px; /* 幅を固定 */
+            background-color: white; /* Tailwindのbg-whiteが効かない場合があるため */
+            z-index: 10;
+        }
+
+        .bubble > div { /* ふきだしの中身がしっぽより手前に来るように */
+            position: relative;
+            z-index: 2;
+        }
+
+        .bubble-left {
+            left: 100px; /* キャラクター画像の右側に配置 */
+        }
+        
+        .bubble-right {
+            right: 100px; /* キャラクター画像の左側に配置 */
+        }
+
+        /* しっぽの本体（枠線と同じ色で三角形を作る） */
+        .bubble::before {
+            content: '';
+            position: absolute;
+            bottom: -13px; /* 枠線の太さ分、少しずらす */
+            width: 0;
+            height: 0;
+            border-style: solid;
+            z-index: 1;
+        }
+        
+        /* しっぽの背景（背景色で三角形を作り、枠線より内側に配置） */
+        .bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -11px;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            z-index: 3; /* 枠線より手前 */
+        }
+
+        /* 左のふきだしのしっぽ（左下向き） */
+        .bubble-left::before {
+            left: -13px; /* しっぽの位置 */
+            border-width: 0 26px 26px 0;
+            border-color: transparent #d1d5db transparent transparent; /* border-gray-300 */
+        }
+        .bubble-left::after {
+            left: -11px;
+            border-width: 0 24px 24px 0;
+            border-color: transparent white transparent transparent; /* bg-white */
+        }
+
+        /* 右のふきだしのしっぽ（右下向き） */
+        .bubble-right::before {
+            right: -13px; /* しっぽの位置 */
+            border-width: 0 0 26px 26px;
+            border-color: transparent transparent transparent #d1d5db; /* border-gray-300 */
+        }
+        .bubble-right::after {
+            right: -11px;
+            border-width: 0 0 24px 24px;
+            border-color: transparent transparent transparent white; /* bg-white */
+        }
+
+        /* ? のスタイル */
+        .question-mark {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            text-align: center;
+            background-color: #cffafe; /* cyan-100 */
+            border: 2px solid #06b6d4; /* cyan-600 */
+            border-radius: 8px;
+            color: #0891b2; /* cyan-700 */
+            font-weight: bold;
+        }
+
+        /* アバターのスタイル */
+        .avatar {
+            position: absolute;
+            bottom: 2rem; /* 数直線の上に配置 */
+            width: 80px; /* 5rem */
+            height: 80px; /* 5rem */
+            z-index: 20;
+            transition: left 0.1s linear;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
+
+    <!-- ★ 全体のラッパー -->
+    <div class="max-w-5xl w-full">
+
+        <!-- ★ 問題選択ボタン -->
+        <div id="problem-selector" class="flex justify-center gap-4 mb-4">
+            <button id="problem-1-btn" class="problem-btn w-full font-bold py-3 px-6 rounded-lg text-xl transition">
+                もんだい１
+            </button>
+            <button id="problem-2-btn" class="problem-btn w-full font-bold py-3 px-6 rounded-lg text-xl transition">
+                もんだい２
+            </button>
+        </div>
+
+        <!-- 問題全体のコンテナ -->
+        <div class="bg-white p-8 md:p-12 rounded-lg shadow-xl w-full">
+
+            <!-- 1. キャラクターとふきだしエリア -->
+            <div class="relative flex justify-between items-end h-52">
+            
+                <!-- 左のキャラクターグループ -->
+                <div class="relative w-32 h-32">
+                    <img id="chara1" src="chara1.png" alt="キャラクター1" 
+                         class="absolute bottom-0 left-0 w-32 h-32 object-contain"
+                         onerror="this.src='https://placehold.co/120x120/f0f0f0/aaa?text=chara1';">
+                    
+                    <!-- 左のふきだし -->
+                    <div class="bubble bubble-left border border-gray-300 rounded-lg shadow-md">
+                        <div class="p-4 space-y-3">
+                            <div class="flex items-center text-2xl font-bold gap-3">
+                                <span class="text-3xl">⏳</span>
+                                <span id="time1">3</span>
+                                <span>びょう</span>
+                            </div>
+                            <div class="flex items-center text-3xl font-bold gap-3">
+                                <span class="text-3xl">👟</span>
+                                <!-- ★★★ 修正箇所 スタート ★★★ -->
+                                <span id="speed1">100</span>
+                                <span>m/s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            
+                <!-- 右のキャラクターグループ -->
+                <div class="relative w-32 h-32">
+                    <img id="chara2" src="chara2.png" alt="キャラクター2" 
+                         class="absolute bottom-0 right-0 w-32 h-32 object-contain"
+                         onerror="this.src='https://placehold.co/120x120/f0f0f0/aaa?text=chara2';">
+                    
+                    <!-- 右のふきだし -->
+                    <div class="bubble bubble-right border border-gray-300 rounded-lg shadow-md">
+                    <!-- ★★★ 修正箇所 エンド ★★★ -->
+                        <div class="p-4 space-y-3">
+                            <div class="flex items-center text-2xl font-bold gap-3">
+                                <span class="text-3xl">⏳</span>
+                                <span id="time2" class="question-mark">?</span>
+                                <span>びょう</span>
+                            </div>
+                            <div class="flex items-center text-3xl font-bold gap-3">
+                                <span class="text-3xl">👟</span>
+                                <span id="speed2">250</span>
+                                <span>m/s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 数直線エリア -->
+        <div class="relative w-full h-24 mt-8">
+            <!-- 背景の灰色の線 -->
+            <div class="absolute top-1/2 -translate-y-1/2 w-full h-2 bg-gray-300 rounded-full"></div>
+            
+            <!-- 左の黄色い線 -->
+            <div id="line-part1" class="absolute top-1/2 -translate-y-1/2 left-0 h-2 bg-yellow-500 rounded-l-full"></div>
+            
+            <!-- 右の青緑色の線 -->
+            <div id="line-part2" class="absolute top-1/2 -translate-y-1/2 right-0 h-2 bg-teal-500 rounded-r-full"></div>
+
+            <!-- 目盛りを描画するコンテナ -->
+            <div id="ticks" class="absolute top-0 left-0 w-full h-full"></div>
+            
+            <!-- 0m地点の丸とラベル -->
+            <div class="absolute top-1/2 -translate-y-1/2 left-0">
+                <div class="w-4 h-4 bg-yellow-600 rounded-full border-2 border-white -translate-x-1/2"></div>
+                <span id="start-label" class="absolute top-full left-0 -translate-x-1/2 mt-2 text-lg font-bold text-gray-700">0m</span>
+            </div>
+
+            <!-- 1200m地点の丸とラベル -->
+            <div class="absolute top-1/2 -translate-y-1/2 right-0">
+                <div class="w-4 h-4 bg-teal-600 rounded-full border-2 border-white translate-x-1/2"></div>
+                <span id="end-label" class="absolute top-full right-0 translate-x-1/2 mt-2 text-lg font-bold text-gray-700">1200m</span>
+            </div>
+            
+            <!-- 出会う地点の星とラベル -->
+            <div id="meeting-point-container" class="absolute top-1/2 -translate-y-1/2">
+                <span id="meeting-point" class="text-5xl text-pink-500 -translate-x-1/2 -translate-y-1">★</span>
+            </div>
+            <div id="meeting-label-container" class="absolute top-full">
+                 <span id="meeting-label" class="absolute top-0 left-0 -translate-x-1/2 mt-2 text-lg font-bold text-gray-700">700m</span>
+            </div>
+
+            <!-- ★ アバター（移動するキャラクター）を追加 -->
+            <img id="chara1-avatar" src="chara1.png" alt="" class="avatar -translate-x-1/2" style="left: 0%;" onerror="this.src='https://placehold.co/80x80/f0f0f0/aaa?text=chara1';">
+            <img id="chara2-avatar" src="chara2.png" alt="" class="avatar -translate-x-1/2" style="left: 100%;" onerror="this.src='https://placehold.co/80x80/f0f0f0/aaa?text=chara2';">
+        </div>
+
+        <!-- 3. 選択肢エリア -->
+        <div id="options" class="flex flex-wrap justify-center gap-6 md:gap-12 mt-20">
+            <!-- 選択肢ボタンはJavaScriptで生成されます -->
+        </div>
+    </div>
+
+    <!-- ★ 結果表示モーダル -->
+    <div id="result-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl p-8 max-w-sm w-full text-center border-4">
+            <h2 id="result-text" class="text-4xl font-bold mb-6">正解！</h2>
+            <button id="reset-button" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-xl transition">
+                やりなおす
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- 問題データを設定 ---
+
+        // ★ もんだい１ (速さが ? )
+        const problem1Data = {
+            time1: 2,
+            speed1: 100,
+            time2: 0, 
+            speed2: '?', // '?' もしくは数値
+            startPos: 0,    // 左端の位置
+            endPos: 1200,   // 右端の位置
+            meetingPos: 600, // 出会う位置
+            options: [30, 50, 75], // 選択肢の配列
+            correctAnswer: 75 // ★ 正解の値
+        };
+        
+        // ★ もんだい２ (時間が ? )
+        const problem2Data = {
+            time1: 3,
+            speed1: 100,
+            time2: '?',
+            speed2: 250,
+            startPos: 0,
+            endPos: 1200,
+            meetingPos: 700,
+            options: [4, 8, 12],
+            correctAnswer: 8
+        };
+
+        // --- グローバル状態管理 ---
+        let currentProblemData = problem1Data; // ★ 現在の問題データを保持
+        let problemData = {}; // 現在の問題データのコピー
+        let gameState = {
+            timer1: 0,
+            timer2: 0,
+            pos1: 0, // chara1 の位置 (% from left)
+            pos2: 100, // chara2 の位置 (% from left)
+            startTime: 0, // アニメーション開始時刻 (ms)
+            lastTimestamp: 0, // 前フレームのタイムスタンプ (ms)
+            gameTime: 0, // ゲーム内経過時間 (ms)
+            chara1State: 'idle', // 'idle', 'countdown', 'moving'
+            chara2State: 'idle', // 'idle', 'countdown', 'moving'
+            animationFrameId: null,
+            selectedAnswer: null,
+            questionType: null, // ★ 'time' または 'speed'
+        };
+
+        // --- DOM要素 ---
+        let chara1Avatar, chara2Avatar, resultModal, resultText, resetButton, optionsContainer;
+        let problem1Btn, problem2Btn; // ★ 問題選択ボタン
+
+        /**
+         * 結果を表示するモーダル
+         * @param {boolean} isCorrect - 正解かどうか
+         */
+        function showResult(isCorrect) {
+            if (isCorrect) {
+                resultText.textContent = '正解！';
+                resultModal.classList.remove('border-red-500');
+                resultModal.classList.add('border-green-500');
+            } else {
+                resultText.textContent = '残念！';
+                resultModal.classList.remove('border-green-500');
+                resultModal.classList.add('border-red-500');
+            }
+            resultModal.classList.remove('hidden');
+        }
+
+        /**
+         * アニメーションループ
+         */
+        function gameLoop(timestamp) {
+            if (gameState.startTime === 0) {
+                gameState.startTime = timestamp;
+                gameState.lastTimestamp = timestamp;
+            }
+
+            const elapsedMs = timestamp - gameState.lastTimestamp;
+            gameState.gameTime += elapsedMs;
+            gameState.lastTimestamp = timestamp;
+
+            const gameTimeSeconds = gameState.gameTime / 1000;
+            
+            // ★ wait/speed を gameState と problemData から決定
+            const wait1 = problemData.time1;
+            const speed1 = problemData.speed1;
+            const wait2 = (gameState.questionType === 'time') ? gameState.selectedAnswer : problemData.time2;
+            const speed2 = (gameState.questionType === 'speed') ? gameState.selectedAnswer : problemData.speed2;
+
+            // 1. カウントダウン処理
+            let remainingTime1 = wait1 - gameTimeSeconds;
+            let remainingTime2 = wait2 - gameTimeSeconds;
+            
+            // chara1
+            if (gameState.chara1State === 'countdown') {
+                if (remainingTime1 <= 0) {
+                    remainingTime1 = 0;
+                    gameState.chara1State = 'moving';
+                }
+                document.getElementById('time1').textContent = Math.ceil(remainingTime1);
+            }
+            
+            // chara2
+            if (gameState.chara2State === 'countdown') {
+                if (remainingTime2 <= 0) {
+                    remainingTime2 = 0;
+                    gameState.chara2State = 'moving';
+                }
+                const time2El = document.getElementById('time2');
+                // ★ time2 が '?' の場合でも、固定値の場合でも、カウントダウン（0以下にならないように）
+                time2El.textContent = Math.max(0, Math.ceil(remainingTime2));
+            }
+            
+            // 2. 移動処理
+            const totalTicks = 12; // 目盛りの総数
+            // 100m/s = 1目盛/s = (100 / 12) %/s
+            const speed1PercentPerSec = (speed1 / 100) * (100 / totalTicks);
+            // 250m/s = 2.5目盛/s = (100 / 12) * 2.5 %/s
+            const speed2PercentPerSec = (speed2 / 100) * (100 / totalTicks);
+
+            if (gameState.chara1State === 'moving') {
+                const moveTime1 = gameTimeSeconds - wait1;
+                gameState.pos1 = Math.max(0, moveTime1 * speed1PercentPerSec);
+                chara1Avatar.style.left = `${gameState.pos1}%`;
+            }
+            
+            if (gameState.chara2State === 'moving') {
+                const moveTime2 = gameTimeSeconds - wait2;
+                gameState.pos2 = 100 - Math.max(0, moveTime2 * speed2PercentPerSec);
+                chara2Avatar.style.left = `${gameState.pos2}%`;
+            }
+
+            // 3. 衝突判定
+            if (gameState.pos1 >= gameState.pos2) {
+                // 衝突
+                cancelAnimationFrame(gameState.animationFrameId);
+                
+                // 最終位置を確定 (chara1 が追い越さないように)
+                chara1Avatar.style.left = `${gameState.pos2}%`;
+                gameState.pos1 = gameState.pos2;
+
+                const isCorrect = gameState.selectedAnswer === problemData.correctAnswer;
+                // 少し遅れて結果を表示
+                setTimeout(() => showResult(isCorrect), 300);
+                return;
+            }
+            
+            // 4. 次のフレームをリクエスト
+            gameState.animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        /**
+         * 選択肢がクリックされた時の処理
+         * @param {number} selectedValue - 選ばれた値
+         */
+        function handleOptionClick(selectedValue) {
+            // 選択肢を無効化
+            optionsContainer.querySelectorAll('button').forEach(btn => {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+            });
+
+            gameState.selectedAnswer = selectedValue;
+            
+            // ★ '?' の種類に応じて更新する要素を変更
+            if (gameState.questionType === 'time') {
+                const time2El = document.getElementById('time2');
+                time2El.textContent = selectedValue;
+                time2El.classList.remove('question-mark');
+            } else if (gameState.questionType === 'speed') {
+                const speed2El = document.getElementById('speed2');
+                speed2El.textContent = selectedValue;
+                speed2El.classList.remove('question-mark');
+            }
+            
+            // アニメーション状態をリセット・初期化
+            gameState.timer1 = problemData.time1;
+            // gameState.timer2 = selectedValue; // gameLoop内で処理されるため不要
+            gameState.pos1 = 0;
+            gameState.pos2 = 100;
+            gameState.startTime = 0;
+            gameState.lastTimestamp = 0;
+            gameState.gameTime = 0;
+            gameState.chara1State = 'countdown';
+            gameState.chara2State = 'countdown';
+            
+            // アニメーション開始
+            gameState.animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        /**
+         * ★ ふきだしのフィールドを更新するヘルパー関数
+         */
+        function updateField(element, value) {
+            if (value === '?') {
+                element.textContent = '?';
+                element.classList.add('question-mark');
+            } else {
+                element.textContent = value;
+                element.classList.remove('question-mark');
+            }
+        }
+
+        /**
+         * 問題データに基づいて表示を更新する関数
+         * @param {object} data - 問題データオブジェクト
+         */
+        function updateProblem(data) {
+            problemData = JSON.parse(JSON.stringify(data)); // データをディープコピーして保存
+
+            // ★ 1. ふきだしの値を更新 (ヘルパー関数を使用)
+            updateField(document.getElementById('time1'), data.time1);
+            updateField(document.getElementById('speed1'), data.speed1);
+            updateField(document.getElementById('time2'), data.time2);
+            updateField(document.getElementById('speed2'), data.speed2);
+            
+            // ★ 1.b gameState の questionType を設定
+            if (data.time2 === '?') {
+                gameState.questionType = 'time';
+            } else if (data.speed2 === '?') {
+                gameState.questionType = 'speed';
+            } else {
+                gameState.questionType = null;
+            }
+
+            // 2. 数直線のラベルを更新
+            document.getElementById('start-label').textContent = data.startPos + 'm';
+            document.getElementById('meeting-label').textContent = data.meetingPos + 'm';
+            document.getElementById('end-label').textContent = data.endPos + 'm';
+
+            // 3. 数直線の色と星の位置を計算
+            const totalDistance = data.endPos - data.startPos;
+            
+            if (totalDistance === 0) return; 
+
+            const part1Percent = (data.meetingPos - data.startPos) / totalDistance * 100;
+            const part2Percent = (data.endPos - data.meetingPos) / totalDistance * 100;
+
+            document.getElementById('line-part1').style.width = part1Percent + '%';
+            document.getElementById('line-part2').style.width = part2Percent + '%';
+            document.getElementById('meeting-point-container').style.left = part1Percent + '%';
+            document.getElementById('meeting-label-container').style.left = part1Percent + '%';
+
+            // 4. 目盛りを生成 (12区切り)
+            const ticksContainer = document.getElementById('ticks');
+            ticksContainer.innerHTML = '';
+            
+            const numTicks = 12;
+            for (let i = 1; i < numTicks; i++) {
+                const tickPercent = (i / numTicks) * 100;
+                
+                const tick = document.createElement('div');
+                tick.className = 'absolute w-0.5 h-4 bg-gray-400 top-1/2 -translate-y-1/2 -translate-x-1/2';
+                tick.style.left = tickPercent + '%';
+                
+                ticksContainer.appendChild(tick);
+            }
+            
+            // 5. 選択肢を更新
+            optionsContainer.innerHTML = '';
+            data.options.forEach(opt => {
+                const button = document.createElement('button');
+                button.className = 'bg-white border-2 border-gray-400 rounded-lg px-10 py-5 text-4xl font-bold hover:bg-gray-100 transition shadow-md min-w-[150px]';
+                button.textContent = opt;
+                // ★ クリックイベントリスナーを追加
+                button.addEventListener('click', () => handleOptionClick(opt));
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        /**
+         * ★ 選択中の問題ボタンのスタイルを更新
+         */
+        function updateProblemButtonStyles() {
+            if (currentProblemData === problem1Data) {
+                problem1Btn.classList.add('bg-blue-500', 'text-white', 'shadow-md');
+                problem1Btn.classList.remove('bg-gray-200', 'text-gray-700');
+                problem2Btn.classList.add('bg-gray-200', 'text-gray-700');
+                problem2Btn.classList.remove('bg-blue-500', 'text-white', 'shadow-md');
+            } else {
+                problem2Btn.classList.add('bg-blue-500', 'text-white', 'shadow-md');
+                problem2Btn.classList.remove('bg-gray-200', 'text-gray-700');
+                problem1Btn.classList.add('bg-gray-200', 'text-gray-700');
+                problem1Btn.classList.remove('bg-blue-500', 'text-white', 'shadow-md');
+            }
+        }
+
+        /**
+         * 問題をリセットする関数
+         */
+        function resetProblem() {
+            // アニメーションを停止
+            if (gameState.animationFrameId) {
+                cancelAnimationFrame(gameState.animationFrameId);
+            }
+            
+            // モーダルを非表示
+            resultModal.classList.add('hidden');
+            
+            // アバターを初期位置に戻す
+            chara1Avatar.style.left = '0%';
+            chara2Avatar.style.left = '100%';
+
+            // グローバル状態をリセット
+            gameState = {
+                timer1: 0,
+                timer2: 0,
+                pos1: 0,
+                pos2: 100,
+                startTime: 0,
+                lastTimestamp: 0,
+                gameTime: 0,
+                chara1State: 'idle', // ★ 修正
+                chara2State: 'idle',
+                animationFrameId: null,
+                selectedAnswer: null,
+                questionType: null, // ★ リセット
+            };
+            
+            // ★ 問題の表示を「現在選択中の問題」で初期状態に戻す
+            updateProblem(currentProblemData);
+            
+            // ★ 問題選択ボタンのスタイルを更新
+            updateProblemButtonStyles();
+        }
+
+        // --- ページ読み込み時の処理 ---
+        window.onload = () => {
+            // DOM要素を取得
+            chara1Avatar = document.getElementById('chara1-avatar');
+            chara2Avatar = document.getElementById('chara2-avatar');
+            resultModal = document.getElementById('result-modal');
+            resultText = document.getElementById('result-text');
+            resetButton = document.getElementById('reset-button');
+            optionsContainer = document.getElementById('options');
+            problem1Btn = document.getElementById('problem-1-btn'); // ★
+            problem2Btn = document.getElementById('problem-2-btn'); // ★
+
+            // リセットボタンにイベントリスナーを追加
+            resetButton.addEventListener('click', resetProblem);
+
+            // ★ 問題選択ボタンにイベントリスナーを追加
+            problem1Btn.addEventListener('click', () => {
+                currentProblemData = problem1Data;
+                resetProblem();
+            });
+            problem2Btn.addEventListener('click', () => {
+                currentProblemData = problem2Data;
+                resetProblem();
+            });
+
+            // 初期化 (もんだい1で開始)
+            currentProblemData = problem1Data;
+            resetProblem();
+        };
+
+    </script>
+</body>
+</html>
+

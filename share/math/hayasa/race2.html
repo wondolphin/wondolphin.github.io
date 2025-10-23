@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>キャラ競争ゲーム</title>
+    <!-- Tailwind CSSを読み込みます -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* HTML要素のドラッグをスムーズにするための基本スタイル */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* ゲームコンテナ */
+        #game-container {
+            background-color: #f0f4f8;
+            /* 画面サイズに応じたレスポンシブな高さ */
+            height: 60vh; /* キャラ3人用に少し高さを増やす */
+            min-height: 500px;
+        }
+
+        /* キャラクターの移動アニメーション */
+        .chara {
+            /* leftプロパティの変更をアニメーションさせます */
+            transition-property: left;
+            transition-timing-function: linear;
+            /* JSで動的にleftを設定するため、初期値はインラインから削除 */
+            z-index: 10; /* ▼ 追加: スタートラインより手前に表示 */
+        }
+
+        /* タイム表示 */
+        .time-display {
+            /* 初期状態では非表示 */
+            display: none;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* ドラッグ中のパネル */
+        .panel.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+
+        /* ドロップゾーンのハイライト */
+        .dropzone.drag-over {
+            background-color: #dbeafe; /* Tailwindのblue-100 */
+            border-color: #3b82f6; /* Tailwindのblue-500 */
+        }
+
+        /* ゴールランプ（クリア時） */
+        #goal-lamp.clear {
+            background-color: #fde047; /* Tailwindのyellow-300 */
+            box-shadow: 0 0 15px 5px #fde047;
+        }
+        
+        /* 問題選択ボタン */
+        .problem-btn {
+            transition: all 0.2s;
+        }
+        .problem-btn.active {
+            background-color: #1d4ed8; /* Tailwindのblue-700 */
+            color: white;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-8">
+
+    <div class="w-full max-w-5xl mx-auto">
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">めざせ同時ゴール！</h1>
+
+        <!-- 問題選択 -->
+        <div id="problem-select-container" class="flex justify-center gap-4 mb-4">
+            <!-- JavaScriptでボタンがここに挿入されます -->
+        </div>
+
+        <!-- ゲームコンテナ -->
+        <div id="game-container" class="w-full relative border-2 border-gray-300 rounded-lg shadow-lg overflow-hidden">
+
+            <!-- Go! ボタン -->
+            <button id="go-button" class="absolute top-4 left-24 md:left-32 w-28 h-12 bg-green-500 text-white text-2xl font-bold rounded-lg shadow-md hover:bg-green-600 active:shadow-inner transition z-10 opacity-50 cursor-not-allowed" disabled>
+                Go!
+            </button>
+
+            <!-- スタートライン -->
+            <!-- スタート位置が可変になるため、ラインは目安として残す -->
+            <!-- <div id="start-line" class="absolute top-20 left-40 md:left-48 w-0.5 h-64 bg-gray-500 rounded-full"></div> --> <!-- この行を削除またはコメントアウト -->
+
+            <!-- ゴールラインとランプ -->
+            <!-- ▼ 修正: シンプルなデザインに変更 -->
+            <div id="goal-line" class="absolute top-16 right-12 md:right-24 w-1.5 h-64 bg-black rounded-full">
+                <!-- ランプ -->
+                <div id="goal-lamp" class="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-8 bg-gray-700 rounded-full border-2 border-black transition-all duration-300"></div>
+                <!-- ゴールの飾りは削除 -->
+            </div>
+            <!-- ▲ 修正完了 -->
+
+            <!-- キャラクタートラック (動的生成エリア) -->
+            <div id="character-tracks" class="relative top-24 w-full h-full">
+                <!-- 
+                    ここにJavaScriptでキャラクターが挿入されます
+                    (例)
+                    <div class="absolute w-full h-16 flex items-center" style="top: 0px;">
+                        <div id="dropzone-chara1" data-chara="chara1" class="dropzone ..."></div>
+                        <div id="chara1" class="chara absolute ..." style="left: 10.5rem;">
+                            <img src="chara1.png" ...>
+                            <span id="time-chara1" class="time-display ..."></span>
+                        </div>
+                    </div> 
+                -->
+            </div>
+        </div>
+
+        <!-- 演算パネル置き場 -->
+        <div id="panel-box" class="dropzone w-full max-w-5xl mx-auto mt-6 h-20 p-4 bg-white rounded-lg shadow-md flex justify-center items-center gap-4 flex-wrap">
+            <!-- ▼ 修正: パネルをJavaScriptで動的に生成するため、ここは空にする -->
+            <!-- ▲ 修正完了 -->
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- 問題データ ---
+            // ここを編集して問題を追加・変更できます
+            const problems = [
+                {
+                    id: 'problem1',
+                    title: 'もんだい１',
+                    characters: [
+                        // ▼ 修正: startPosRem (12.6) -> distanceToGoal (360)
+                        { id: 'chara1', imgSrc: 'chara1.png', placeholder: 'f97316/Chara1', baseSpeed: 5.0, distanceToGoal: 360, hasDropzone: true },
+                        { id: 'chara2', imgSrc: 'chara2.png', placeholder: '84cc16/Chara2', baseSpeed: 10.0, distanceToGoal: 360, hasDropzone: true }
+                        // ▲ 修正完了
+                    ],
+                    // ▼ 追加: 問題ごとのパネル設定
+                    panels: [
+                        { id: 'p1-1', op: 'multiply', value: 1.3, text: '×1.3' },
+                        { id: 'p1-2', op: 'multiply', value: 0.8, text: '×0.8' },
+                        { id: 'p1-3', op: 'divide', value: 0.2, text: '÷0.2' },
+                        { id: 'p1-4', op: 'multiply', value: 1.6, text: '×1.6' }
+                    ]
+                    // ▲ 追加完了
+                },
+                {
+                    id: 'problem2',
+                    title: 'もんだい２',
+                    characters: [
+                        // ▼ 修正: startPosRem (12.6) -> distanceToGoal (360)
+                        { id: 'chara1', imgSrc: 'chara1.png', placeholder: 'f97316/Chara1', baseSpeed: 5.0, distanceToGoal: 360, hasDropzone: true },
+                        { id: 'chara2', imgSrc: 'chara2.png', placeholder: '84cc16/Chara2', baseSpeed: 10.0, distanceToGoal: 360, hasDropzone: true },
+                        { id: 'chara3', imgSrc: 'chara3.png', placeholder: '3b82f6/Chara3', baseSpeed: 8.0, distanceToGoal: 360, hasDropzone: false } // 3人目、ドロップゾーンなし
+                        // ▲ 修正完了
+                    ],
+                    // ▼ 追加: 問題ごとのパネル設定
+                    panels: [
+                        { id: 'p2-1', op: 'multiply', value: 1.2, text: '×1.2' },
+                        { id: 'p2-2', op: 'multiply', value: 0.5, text: '×0.5' },
+                        { id: 'p2-3', op: 'divide', value: 0.625, text: '÷0.625' },
+                        { id: 'p2-4', op: 'divide', value: 1.25, text: '÷1.25' }
+                    ]
+                    // ▲ 追加完了
+                },
+                {
+                    id: 'problem3',
+                    title: 'もんだい３',
+                    characters: [
+                        // ▼ 修正: スタート位置を distanceToGoal で再定義
+                        { id: 'chara1', imgSrc: 'chara1.png', placeholder: 'f97316/Chara1', baseSpeed: 5.0, distanceToGoal: 360, hasDropzone: true }, // 基準より遠い
+                        { id: 'chara2', imgSrc: 'chara2.png', placeholder: '84cc16/Chara2', baseSpeed: 5.0, distanceToGoal: 240, hasDropzone: true } // 基準位置
+                        // ▲ 修正完了
+                    ],
+                    // ▼ 追加: 問題ごとのパネル設定 (パネルのテキストと値を修正)
+                    panels: [
+                        { id: 'p3-1', op: 'multiply', value: 1.3, text: '×1.3' },
+                        { id: 'p3-2', op: 'multiply', value: 1.5, text: '×1.5' },
+                        { id: 'p3-3', op: 'divide', value: 0.3, text: '÷0.3' },
+                        { id: 'p3-4', op: 'divide', value: 0.8, text: '÷0.8' } // テキストに合わせて divide に修正
+                    ]
+                    // ▲ 修正完了
+                }
+            ];
+
+            // --- 定数とグローバル変数 ---
+            // const DISTANCE = 18.0; // 速度10.0 * 1.80秒 = 18.0 (この定義は使わなくなります)
+            const BASE_SPEED_FOR_CALC = 10.0; // 計算基準となる速度
+            const BASE_TIME_FOR_CALC = 1.80;  // 計算基準となるタイム
+            const BASE_START_REM = 12.6; // ▼ 修正: 計算基準となるスタート位置(rem) (名前変更)
+            const BASE_DISTANCE_U = 360; // ▼ 追加: 基準となる距離の「単位」
+            const CLEAR_THRESHOLD = 0.001; // 同時ゴールとみなす時間差（秒）
+
+            let gameState = 'standby'; // 'standby', 'racing', 'result'
+            let draggedElement = null; // ドラッグ中のパネル
+            let currentProblem = null; // 現在選択中の問題データ
+            let charaElements = {}; // { chara1: { elem: DOM, startPx: 168 }, ... }
+            let goalLeftPx = 0; // ゴールラインのピクセル位置
+
+            // --- DOM要素の取得 ---
+            const goButton = document.getElementById('go-button');
+            const goalLamp = document.getElementById('goal-lamp');
+            // const panels = document.querySelectorAll('.panel'); // ▼ 修正: 動的生成のため削除
+            const panelBox = document.getElementById('panel-box');
+            const gameContainer = document.getElementById('game-container');
+            const goalLine = document.getElementById('goal-line');
+            const problemSelectContainer = document.getElementById('problem-select-container');
+            const characterTracksContainer = document.getElementById('character-tracks');
+            
+            // --- 初期化処理 ---
+            
+            // 1. 問題選択ボタンを生成
+            problems.forEach(problem => {
+                const btn = document.createElement('button');
+                btn.id = `btn-${problem.id}`;
+                btn.textContent = problem.title;
+                btn.className = 'problem-btn px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600';
+                btn.dataset.problemId = problem.id;
+                btn.addEventListener('click', () => loadProblem(problem.id));
+                problemSelectContainer.appendChild(btn);
+            });
+
+            // 2. ゴール位置を計算（リサイズ対応）
+            function calculateGoalPosition() {
+                // ゴール位置 (ゴールラインの左端 - キャラクターの幅(64px))
+                // キャラ幅は固定(w-16 = 4rem = 64px)と仮定
+                const charaWidth = 64; 
+                goalLeftPx = goalLine.offsetLeft - charaWidth;
+            }
+            calculateGoalPosition();
+            window.addEventListener('resize', calculateGoalPosition);
+
+            // 3. ドラッグ＆ドロップのリスナー設定
+            setupDragDropListeners(); // ▼ 修正: dragstart/dragend以外を設定
+
+
+            // --- 問題読み込み ---
+            function loadProblem(problemId) {
+                // 選択された問題データを取得
+                currentProblem = problems.find(p => p.id === problemId);
+                if (!currentProblem) return;
+
+                // 問題選択ボタンのアクティブ化
+                document.querySelectorAll('.problem-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.problemId === problemId);
+                });
+
+                // キャラクタートラックをクリア
+                characterTracksContainer.innerHTML = '';
+                charaElements = {};
+
+                // UIをリセット
+                resetUIBeforeRace();
+
+                // ▼ 修正: スタート位置の計算方法を変更
+                const remSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+                const charaWidthPx = 64; // w-16
+                const startLineMarginPx = remSize * 0.25; // ml-1
+
+                // 基準となるピクセル位置を計算
+                const baseStartPx = remSize * BASE_START_REM;
+                // 基準となる走行距離（ピクセル）(これが BASE_DISTANCE_U に相当)
+                const baseDistancePx = goalLeftPx - baseStartPx;
+                
+                // 1単位(U)あたりのピクセル数
+                const pxPerUnit = baseDistancePx / BASE_DISTANCE_U;
+
+                // キャラクターを動的に生成
+                currentProblem.characters.forEach((charaData, index) => {
+                    const trackY = index * 100; // キャラ間のY座標 (top-24(96px)からの相対)
+                    
+                    const trackDiv = document.createElement('div');
+                    trackDiv.className = 'absolute w-full h-16 flex items-center';
+                    trackDiv.style.top = `${trackY}px`;
+
+                    let dropzoneHTML = '';
+                    if (charaData.hasDropzone) {
+                        dropzoneHTML = `
+                            <div id="dropzone-${charaData.id}" data-chara-id="${charaData.id}" class="dropzone w-20 h-10 bg-gray-100 border-2 border-dashed border-gray-400 rounded-lg relative left-8 md:left-16 transition-all"></div>
+                        `;
+                    } else {
+                        // ドロップゾーンがない場合、同じ幅のスペーサーを置く
+                        dropzoneHTML = `<div class="w-20 h-10 relative left-8 md:left-16"></div>`;
+                    }
+
+                    // ▼ 修正: style.left をピクセルで指定
+                    // このキャラのゴールまでの距離（ピクセル）
+                    const charaDistancePx = charaData.distanceToGoal * pxPerUnit;
+                    // このキャラのスタート位置（ピクセル）
+                    const charaStartPx = goalLeftPx - charaDistancePx;
+
+                    const charaHTML = `
+                        <div id="${charaData.id}" class="chara absolute top-0 w-16 h-16" style="left: ${charaStartPx}px;">
+                            <!-- ... img と span ... -->
+                            <img src="${charaData.imgSrc}" alt="${charaData.id}" class="w-full h-full object-contain" 
+                                 onerror="this.src='https://placehold.co/64x64/${charaData.placeholder}'; this.onerror=null;">
+                            <span id="time-${charaData.id}" class="time-display absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded text-sm font-semibold whitespace-nowrap"></span>
+                        </div>
+                    `;
+
+                    // ▼ 修正: スタートラインの位置もピクセルで指定
+                    const startLineLeftPx = charaStartPx + charaWidthPx + startLineMarginPx;
+                    const startLineHTML = `
+                        <div class="absolute top-0 w-0.5 h-16 bg-gray-500 rounded-full" style="left: ${startLineLeftPx}px; opacity: 0.8;"></div>
+                    `;
+                    // ▲ 修正完了
+
+                    trackDiv.innerHTML = dropzoneHTML + charaHTML + startLineHTML; // スタートラインHTMLを追加
+                    characterTracksContainer.appendChild(trackDiv);
+
+                    // 生成したキャラのDOMとスタート位置（ピクセル）を保持
+                    const charaElem = document.getElementById(charaData.id);
+                    charaElements[charaData.id] = {
+                        elem: charaElem,
+                        startPx: charaStartPx, // ▼ 修正: 計算済みのピクセル位置を保存
+                        data: charaData // 元データも保持
+                    };
+                });
+
+                // パネルを初期位置（パネルボックス）に戻す
+                // ▼ 修正: 問題データに基づいてパネルを動的生成
+                panelBox.innerHTML = ''; // 既存のパネルをクリア
+                if (currentProblem.panels) { // panels定義がある場合のみ
+                    currentProblem.panels.forEach(panelData => {
+                        const panel = document.createElement('div');
+                        panel.id = panelData.id;
+                        panel.className = 'panel w-24 h-12 bg-yellow-100 border-2 border-gray-400 rounded-lg flex items-center justify-center font-mono text-lg font-bold cursor-move shadow transition-all';
+                        panel.draggable = true;
+                        panel.dataset.op = panelData.op;
+                        panel.dataset.value = panelData.value;
+                        panel.textContent = panelData.text;
+
+                        // ドラッグイベントリスナーをここで設定
+                        panel.addEventListener('dragstart', (e) => {
+                            if (gameState !== 'standby') {
+                                e.preventDefault();
+                                return;
+                            }
+                            draggedElement = e.target;
+                            setTimeout(() => e.target.classList.add('dragging'), 0);
+                            e.dataTransfer.setData('text/plain', e.target.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                        });
+
+                        panel.addEventListener('dragend', (e) => {
+                            e.target.classList.remove('dragging');
+                            draggedElement = null;
+                        });
+
+                        panelBox.appendChild(panel);
+                    });
+                }
+                // ▲ 修正完了
+
+                // Goボタンを有効化
+                gameState = 'standby';
+                goButton.disabled = false;
+                goButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+
+            // --- ドラッグ＆ドロップ処理 ---
+            function setupDragDropListeners() {
+                // ▼ 修正: dragstart と dragend は loadProblem でパネル生成時に設定
+                /*
+                panels.forEach(panel => {
+                    panel.addEventListener('dragstart', (e) => {
+                        ...
+                    });
+                    panel.addEventListener('dragend', (e) => {
+                        ...
+                    });
+                });
+                */
+                // ▲ 修正完了
+
+                // ドロップゾーン（パネルボックス含む）
+                // イベント委譲を使って、動的に生成されるドロップゾーンに対応
+                document.body.addEventListener('dragover', (e) => {
+                    const zone = e.target.closest('.dropzone');
+                    if (zone) {
+                        e.preventDefault(); // ドロップを許可
+                        e.dataTransfer.dropEffect = 'move';
+                        zone.classList.add('drag-over');
+                    }
+                });
+
+                document.body.addEventListener('dragleave', (e) => {
+                    const zone = e.target.closest('.dropzone');
+                    if (zone) {
+                        zone.classList.remove('drag-over');
+                    }
+                });
+
+                document.body.addEventListener('drop', (e) => {
+                    const zone = e.target.closest('.dropzone');
+                    if (!zone || !draggedElement) return;
+
+                    e.preventDefault();
+                    zone.classList.remove('drag-over');
+
+                    const existingPanel = zone.querySelector('.panel');
+                    const sourceContainer = draggedElement.parentNode;
+
+                    zone.appendChild(draggedElement);
+
+                    // if (existingPanel) {
+                    //    sourceContainer.appendChild(existingPanel);
+                    // }
+                    
+                    // ▼ 修正: ドロップ先がパネルボックス「以外」の場合のみスワップ
+                    if (existingPanel && !zone.matches('#panel-box')) {
+                        sourceContainer.appendChild(existingPanel);
+                    }
+                    // ▲ 修正完了
+                });
+            }
+
+
+            // --- ゲームロジック ---
+
+            // 現在の速度を計算する
+            function calculateSpeed(charaId) {
+                const charaData = currentProblem.characters.find(c => c.id === charaId);
+                const baseSpeed = charaData.baseSpeed;
+
+                if (!charaData.hasDropzone) {
+                    return baseSpeed;
+                }
+                
+                const zone = document.getElementById(`dropzone-${charaId}`);
+                const panel = zone ? zone.querySelector('.panel') : null;
+
+                if (!panel) {
+                    return baseSpeed; // パネルがなければ基本速度
+                }
+
+                const op = panel.dataset.op;
+                const value = parseFloat(panel.dataset.value);
+
+                if (op === 'multiply') {
+                    return baseSpeed * value;
+                } else if (op === 'divide') {
+                    return (value !== 0) ? (baseSpeed / value) : baseSpeed;
+                }
+                return baseSpeed;
+            }
+
+            // Go! ボタンが押された時の処理
+            goButton.addEventListener('click', () => {
+                if (gameState !== 'standby' || !currentProblem) return;
+
+                gameState = 'racing';
+                goButton.disabled = true;
+                goButton.classList.add('opacity-50', 'cursor-not-allowed');
+
+                resetUIBeforeRace();
+
+                let allTimes = [];
+                let raceResults = {}; // { chara1: 1.8, chara2: 2.5 }
+
+                // --- タイム計算ロジック修正 ---
+                
+                // 1. 基準となるスタート位置 (rem) のピクセル値を取得
+                const remSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+                const baseStartPx = remSize * BASE_START_REM; // ▼ 修正: 定数名変更
+
+                // 2. 基準となる走行距離（ピクセル）
+                const baseDistancePx = goalLeftPx - baseStartPx;
+
+                // 3. 基準速度(10.0)のピクセル/秒を計算
+                //    (基準距離(baseDistancePx)を 基準タイム(BASE_TIME_FOR_CALC)秒で走る)
+                const basePxPerSec = baseDistancePx / BASE_TIME_FOR_CALC;
+
+                // 4. 速度1.0あたりの (ピクセル/秒)
+                const pxSpeedScale = basePxPerSec / BASE_SPEED_FOR_CALC;
+                
+                // --- ここまで ---
+
+                currentProblem.characters.forEach(charaData => {
+                    const charaId = charaData.id;
+                    const speed = calculateSpeed(charaId);
+
+                    if (speed <= 0 && (!raceResults[charaId])) { // タイムが未設定の場合のみ
+                        console.error(`速度が0以下です: ${charaId}`);
+                        raceResults[charaId] = Infinity;
+                        allTimes.push(Infinity);
+                        // このキャラは走らない
+                    }
+
+                    // --- タイム計算修正 ---
+                    
+                    // 5. このキャラの走行距離（ピクセル）
+                    const charaStartPx = charaElements[charaId].startPx; // loadProblemで計算済みの値
+                    const charaDistancePx = goalLeftPx - charaStartPx;
+
+                    // 6. このキャラのピクセル速度 (ピクセル/秒)
+                    const charaPxPerSec = speed * pxSpeedScale;
+
+                    // 7. タイム（秒）
+                    let time = Infinity; // デフォルトはゴール不可
+
+                    if (charaDistancePx <= 0) {
+                        time = 0.0; // スタート時点でゴール済み
+                    } else if (charaPxPerSec > 0) {
+                        time = charaDistancePx / charaPxPerSec;
+                    }
+                    // --- 修正ここまで ---
+
+                    allTimes.push(time);
+                    raceResults[charaId] = time;
+
+                    // アニメーション実行 (ゴール済みの場合はアニメーション不要)
+                    if (time > 0 && time !== Infinity) {
+                        const charaElem = charaElements[charaId].elem;
+                        charaElem.style.transition = `left ${time.toFixed(3)}s linear`;
+                        charaElem.style.left = `${goalLeftPx}px`;
+                    }
+                });
+
+                // Infinityを除外した有効なタイムのみをフィルタリング
+                const validTimes = allTimes.filter(t => t !== Infinity);
+
+                if (validTimes.length === 0) { // 誰も走らない（またはゴール不可）場合
+                    showResult(raceResults); // 結果表示（タイムなし）だけ行う
+                    return; 
+                }
+
+                // レース終了判定
+                const maxTime = Math.max(...validTimes);
+                setTimeout(() => {
+                    showResult(raceResults);
+                }, maxTime * 1000);
+            });
+
+            // レース結果の表示
+            function showResult(results) {
+                gameState = 'result';
+
+                const times = Object.values(results);
+                const minTime = Math.min(...times);
+                const maxTime = Math.max(...times);
+
+                // タイム表示
+                Object.keys(results).forEach(charaId => {
+                    const time = results[charaId];
+                    const timeDisplay = document.getElementById(`time-${charaId}`);
+                    if (timeDisplay) {
+                        if (time === Infinity) {
+                            timeDisplay.textContent = 'ゴール不可';
+                        } else {
+                            timeDisplay.textContent = time.toFixed(2) + '秒';
+                        }
+                        timeDisplay.style.display = 'block';
+                    }
+                });
+
+                // クリア判定（Infinityを除外して計算）
+                const validTimes = Object.values(results).filter(t => t !== Infinity);
+                if (validTimes.length > 0) {
+                    const minTime = Math.min(...validTimes);
+                    const maxTime = Math.max(...validTimes);
+                    
+                    if ((maxTime - minTime) < CLEAR_THRESHOLD) {
+                        // --- クリア！ ---
+                        goalLamp.classList.add('clear');
+                    }
+                } else {
+                    // --- 失敗（誰もゴールしない） ---
+                }
+                
+                // 2秒後にスタンバイに戻る
+                setTimeout(resetToStandby, 2000);
+            }
+
+            // レース開始前にUIをリセット
+            function resetUIBeforeRace() {
+                // タイム非表示
+                Object.keys(charaElements).forEach(id => {
+                    const timeDisplay = document.getElementById(`time-${id}`);
+                    if (timeDisplay) timeDisplay.style.display = 'none';
+                });
+                // ランプを消す
+                goalLamp.classList.remove('clear');
+            }
+
+            // スタンバイ状態に戻す（キャラの位置もリセット）
+            function resetToStandby() {
+                if (!currentProblem) return; // 問題がロードされていなければ何もしない
+                
+                gameState = 'standby';
+                resetUIBeforeRace();
+
+                // キャラクターをスタート位置に戻す（アニメーションなしで）
+                Object.keys(charaElements).forEach(id => {
+                    const chara = charaElements[id];
+                    chara.elem.style.transition = 'none';
+                    chara.elem.style.left = `${chara.startPx}px`;
+                });
+
+                // Goボタンを有効化
+                setTimeout(() => {
+                    goButton.disabled = false;
+                    goButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                }, 50);
+            }
+        });
+    </script>
+
+</body>
+</html>
+
+
+
+
+
