@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Block Puzzle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=M+PLUS+Rounded+1c:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'M PLUS Rounded 1c', sans-serif;
+            touch-action: none;
+        }
+        .grid-cell {
+            width: 60px;
+            height: 60px;
+            border: 1px solid #dbeafe; /* Light blue border */
+            box-sizing: border-box;
+            background-color: #f0f9ff; /* Very light blue background */
+        }
+        .wall-cell {
+            width: 60px;
+            height: 60px;
+            box-sizing: border-box;
+        }
+        .block {
+            width: 60px;
+            height: 60px;
+            text-align: center;
+            line-height: 60px; /* Vertically center the text */
+            font-size: 1.25rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: grab;
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease, background-color 0.3s ease;
+            user-select: none;
+            color: white;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 5; /* Base z-index for blocks */
+        }
+        .block-a { background-color: #59ee56; }
+        .block-i { background-color: #39ab3b; }
+        .block-t { 
+            background-color: transparent;
+            cursor: default; 
+            background-image: url('target.png');
+            background-size: cover;
+            background-position: center;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+        } 
+        .block-n { background-color: #a16207; } /* Normal */
+
+        .wall-right { border-right: 4px solid #374151; }
+        .wall-bottom { border-bottom: 4px solid #374151; }
+
+        .dragging {
+            transform: scale(1.1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+            cursor: grabbing;
+        }
+
+        .pop-effect {
+            animation: popAndShrink 0.3s ease-out forwards;
+        }
+
+        @keyframes popAndShrink {
+            0% { transform: translate(var(--tx, 0), var(--ty, 0)) scale(1); }
+            50% { transform: translate(var(--tx, 0), var(--ty, 0)) scale(1.2); }
+            100% { transform: translate(var(--tx, 0), var(--ty, 0)) scale(1); }
+        }
+        
+        /* New styles for level buttons */
+        .level-button {
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .level-button.active {
+            background-color: #4f46e5; /* Indigo */
+            color: white;
+            border-color: #4f46e5;
+        }
+
+        @media (max-width: 640px) {
+            .grid-cell, .wall-cell {
+                width: 15vw;
+                height: 15vw;
+                max-width: 60px;
+                max-height: 60px;
+            }
+            .block {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="text-center mb-6">
+        <h1 class="text-3xl sm:text-4xl font-bold text-slate-800">Number Block Puzzle</h1>
+
+        <div id="level-buttons-container" class="flex justify-center space-x-2 my-4">
+            <!-- Buttons will be populated by JS -->
+        </div>
+        
+        <p class="text-slate-600">氷山の数字を全部０にしよう！</p>
+    </div>
+
+    <div class="bg-white p-4 rounded-xl shadow-lg">
+        <div id="game-board" class="relative">
+            <!-- Game board will be generated here -->
+        </div>
+    </div>
+    
+    <div class="mt-6">
+        <button id="reset-button" class="px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
+            リセット
+        </button>
+    </div>
+
+    <!-- Clear Modal --><div id="clear-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-8 sm:p-12 text-center transform scale-95 transition-transform duration-300">
+            <h2 class="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-4">CLEAR!</h2>
+            <p class="text-slate-700 text-lg mb-6">おめでとうございます！</p>
+            <button id="next-level-button" class="px-8 py-3 bg-green-500 text-white font-bold rounded-lg shadow-lg hover:bg-green-600 transition-colors">
+                次のレベルへ
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const gameBoard = document.getElementById('game-board');
+        const resetButton = document.getElementById('reset-button');
+        const clearModal = document.getElementById('clear-modal');
+        const nextLevelButton = document.getElementById('next-level-button');
+        const levelButtonsContainer = document.getElementById('level-buttons-container');
+
+        let blockIdCounter = 0; // Unique ID for each block
+
+        const levels = [
+            [
+".,.|,.,.,.",
+"a3,.,.,t12,.",
+".|,.,.,.,.",
+".|,.,.,a4|,.",
+".,.,.,.,."
+            ],
+            [
+".,.,a4,.,.",
+".,t15,.,t16,.",
+".,.,n,.,.",
+"a5,.,.,.,a4",
+".,.,a3,.,."
+            ],
+            [
+".,.|,t19|,.,.",
+".,.,.,.,.",
+"a5,.,.,.,a2",
+".,.,n,.,.",
+"a2,.,.,.,a3"
+            ]
+        ];
+
+        let currentLevel = 0;
+        let board = [];
+        let rows, cols;
+        const CELL_SIZE = 60; // px, defined in CSS
+
+        let draggedElement = null;
+        let startX, startY;
+        let startRow, startCol;
+
+        function parseLevelData(levelData) {
+            blockIdCounter = 0; // Reset for each level
+            const parsedBoard = levelData.map(rowData => {
+                const cells = rowData.split(',');
+                return cells.map(cellData => {
+                    const cell = {
+                        type: 'empty',
+                        value: null,
+                        walls: { right: false, bottom: false },
+                        id: null
+                    };
+
+                    // First extract walls
+                    if (cellData.includes('_')) cell.walls.bottom = true;
+                    if (cellData.includes('|')) cell.walls.right = true;
+
+                    // Then clean data for type and value
+                    const cleanData = cellData.replace(/[|_]/g, '');
+
+                    if (cleanData !== '.' && cleanData !== '') {
+                        cell.id = blockIdCounter++;
+                        if (cleanData === 'n') {
+                            cell.type = 'n';
+                        } else {
+                            cell.type = cleanData.charAt(0);
+                            cell.value = parseInt(cleanData.substring(1));
+                        }
+                    }
+                    return cell;
+                });
+            });
+            return parsedBoard;
+        }
+
+        function renderBlocks(popTarget = null) {
+            const currentBlockIds = new Set();
+            const blockContainer = document.getElementById('block-container');
+            if (!blockContainer) return;
+
+            // Create or update blocks based on the board state
+            board.forEach((row, r) => {
+                row.forEach((cell, c) => {
+                    if (cell.type === 'empty') return;
+
+                    currentBlockIds.add(cell.id);
+                    let blockElement = blockContainer.querySelector(`.block[data-id='${cell.id}']`);
+
+                    // If block doesn't exist in DOM, create it
+                    if (!blockElement) {
+                        blockElement = document.createElement('div');
+                        blockElement.dataset.id = cell.id;
+                        blockContainer.appendChild(blockElement);
+
+                        if (['a', 'i', 'n'].includes(cell.type)) {
+                            blockElement.addEventListener('mousedown', handleDragStart);
+                            blockElement.addEventListener('touchstart', handleDragStart, { passive: false });
+                        }
+                    }
+
+                    // Update all properties
+                    blockElement.className = `block block-${cell.type}`;
+                    blockElement.textContent = cell.value !== null ? cell.value : '';
+                    blockElement.dataset.row = r;
+                    blockElement.dataset.col = c;
+                    
+                    // Set transform using CSS variables for animation
+                    const tx = c * CELL_SIZE;
+                    const ty = r * CELL_SIZE;
+                    blockElement.style.setProperty('--tx', `${tx}px`);
+                    blockElement.style.setProperty('--ty', `${ty}px`);
+                    blockElement.style.transform = `translate(var(--tx), var(--ty))`;
+
+                    // Handle pop effect on value change
+                    if (popTarget && popTarget.row === r && popTarget.col === c) {
+                        blockElement.classList.add('pop-effect');
+                        blockElement.addEventListener('animationend', () => {
+                            blockElement.classList.remove('pop-effect');
+                        }, { once: true });
+                    }
+                });
+            });
+
+            // Remove any blocks from DOM that are no longer in the board state (i.e., absorbed)
+            const allBlockElements = blockContainer.querySelectorAll('.block');
+            allBlockElements.forEach(blockEl => {
+                const id = parseInt(blockEl.dataset.id);
+                if (!currentBlockIds.has(id)) {
+                    blockEl.remove();
+                }
+            });
+        }
+        
+        function handleDragStart(e) {
+            e.preventDefault();
+            draggedElement = e.target;
+            draggedElement.classList.add('dragging');
+            
+            const touch = e.type === 'touchstart' ? e.touches[0] : e;
+            startX = touch.clientX;
+            startY = touch.clientY;
+            startRow = parseInt(draggedElement.dataset.row);
+            startCol = parseInt(draggedElement.dataset.col);
+
+            document.addEventListener('mousemove', handleDragMove);
+            document.addEventListener('touchmove', handleDragMove, { passive: false });
+            document.addEventListener('mouseup', handleDragEnd);
+            document.addEventListener('touchend', handleDragEnd);
+        }
+
+        function handleDragMove(e) {
+            if (!draggedElement) return;
+            e.preventDefault();
+        }
+
+        function handleDragEnd(e) {
+            if (!draggedElement) return;
+
+            draggedElement.classList.remove('dragging');
+            
+            const touch = e.type === 'touchend' ? e.changedTouches[0] : e;
+            const endX = touch.clientX;
+            const endY = touch.clientY;
+            
+            const dx = endX - startX;
+            const dy = endY - startY;
+
+            if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+                let direction;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    direction = dx > 0 ? 'right' : 'left';
+                } else {
+                    direction = dy > 0 ? 'down' : 'up';
+                }
+                moveBlock(startRow, startCol, direction);
+            }
+
+            draggedElement = null;
+            document.removeEventListener('mousemove', handleDragMove);
+            document.removeEventListener('touchmove', handleDragMove);
+            document.removeEventListener('mouseup', handleDragEnd);
+            document.removeEventListener('touchend', handleDragEnd);
+        }
+
+        async function moveBlock(r, c, direction) {
+            const movingBlockData = { ...board[r][c] }; // Clone block data
+            if (movingBlockData.type === 'empty') return;
+
+            let dr = 0, dc = 0;
+            if (direction === 'up') dr = -1;
+            if (direction === 'down') dr = 1;
+            if (direction === 'left') dc = -1;
+            if (direction === 'right') dc = 1;
+
+            let finalR = r;
+            let finalC = c;
+            let hitBlockInfo = null;
+
+            let tempR = r + dr;
+            let tempC = c + dc;
+
+            while (true) {
+                // Check wall from current position to next
+                if (direction === 'up' && finalR > 0 && board[finalR - 1][finalC].walls.bottom) break;
+                if (direction === 'down' && finalR < rows - 1 && board[finalR][finalC].walls.bottom) break;
+                if (direction === 'left' && finalC > 0 && board[finalR][finalC - 1].walls.right) break;
+                if (direction === 'right' && finalC < cols - 1 && board[finalR][finalC].walls.right) break;
+                
+                // Check board boundaries
+                if (tempR < 0 || tempR >= rows || tempC < 0 || tempC >= cols) break;
+
+                // Check for other blocks at the target position
+                if (board[tempR][tempC].type !== 'empty') {
+                    hitBlockInfo = { ...board[tempR][tempC], r: tempR, c: tempC };
+                    break;
+                }
+
+                finalR = tempR;
+                finalC = tempC;
+                tempR += dr;
+                tempC += dc;
+            }
+            
+            const canMove = (finalR !== r || finalC !== c);
+            const interactionResult = hitBlockInfo ? handleCollision(movingBlockData, r, c, hitBlockInfo, hitBlockInfo.r, hitBlockInfo.c) : { interactionOccurred: false };
+
+            if (interactionResult.interactionOccurred) {
+                // A merge will happen. Animate the mover to the target position.
+                const moverElement = document.querySelector(`.block[data-id='${movingBlockData.id}']`);
+                if (moverElement) {
+                    const targetX = hitBlockInfo.c * CELL_SIZE;
+                    const targetY = hitBlockInfo.r * CELL_SIZE;
+                    moverElement.style.setProperty('--tx', `${targetX}px`);
+                    moverElement.style.setProperty('--ty', `${targetY}px`);
+                    moverElement.style.transform = `translate(var(--tx), var(--ty))`;
+                    moverElement.style.zIndex = '4'; // Move it behind the target block
+                }
+
+                // Wait for the move animation to finish
+                await new Promise(resolve => setTimeout(resolve, 200)); // 200ms is transition duration
+
+                // Now, update the board data structure
+                board[hitBlockInfo.r][hitBlockInfo.c] = { ...board[hitBlockInfo.r][hitBlockInfo.c], ...interactionResult.updatedTarget };
+                const originalWalls = board[r][c].walls;
+                board[r][c] = { type: 'empty', value: null, id: null, walls: originalWalls };
+                
+                // Re-render. This will remove the mover element and update the target with a pop effect.
+                const popEffectCoords = { row: hitBlockInfo.r, col: hitBlockInfo.c };
+                renderBlocks(popEffectCoords);
+
+                // Wait a bit for the pop effect to be appreciated before checking win
+                await new Promise(resolve => setTimeout(resolve, 100));
+                checkWin();
+
+            } else if (canMove) {
+                // Just moving to an empty space or stopping before a non-interactive block.
+                // Update board data first
+                board[finalR][finalC] = { ...board[finalR][finalC], type: movingBlockData.type, value: movingBlockData.value, id: movingBlockData.id };
+                const originalWalls = board[r][c].walls;
+                board[r][c] = { type: 'empty', value: null, id: null, walls: originalWalls };
+                
+                // Then render. renderBlocks will find the block and update its transform, triggering animation.
+                renderBlocks();
+
+                // Wait for animation to finish before allowing another move and check win.
+                await new Promise(resolve => setTimeout(resolve, 300));
+                checkWin();
+            }
+        }
+
+        function handleCollision(mover, fromR, fromC, target, toR, toC) {
+            const updatedTarget = { ...target };
+            let interactionOccurred = false;
+
+            // Active -> Active
+            if (mover.type === 'a' && target.type === 'a') {
+                updatedTarget.value *= mover.value;
+                updatedTarget.type = 'i'; // Become inactive
+                interactionOccurred = true;
+            }
+            // Active/Inactive -> Target
+            else if (['a', 'i'].includes(mover.type) && target.type === 't') {
+                updatedTarget.value -= mover.value;
+                if (updatedTarget.value < 0) updatedTarget.value = 0; // Negative values are not allowed
+                interactionOccurred = true;
+            }
+            
+            return { interactionOccurred, updatedTarget };
+        }
+        
+        function checkWin() {
+            const allTargetsZero = board.flat().filter(cell => cell.type === 't').every(cell => cell.value === 0);
+            if (allTargetsZero) {
+                clearModal.classList.remove('hidden');
+                setTimeout(() => {
+                    clearModal.querySelector('div').classList.add('scale-100');
+                }, 10);
+            }
+        }
+        
+        function loadLevel(levelIndex) {
+            currentLevel = levelIndex;
+            if (levelIndex >= levels.length) {
+                alert("すべてのレベルをクリアしました！");
+                currentLevel = 0;
+            }
+            
+            // Update active button style
+            const buttons = document.querySelectorAll('#level-buttons-container button');
+            buttons.forEach(button => {
+                button.classList.remove('active');
+                if (parseInt(button.dataset.level) === levelIndex) {
+                    button.classList.add('active');
+                }
+            });
+
+            board = parseLevelData(levels[currentLevel]);
+            rows = board.length;
+            cols = board[0].length;
+            
+            gameBoard.innerHTML = '';
+
+            const backgroundGridContainer = document.createElement('div');
+            backgroundGridContainer.style.position = 'absolute';
+            backgroundGridContainer.style.top = '0';
+            backgroundGridContainer.style.left = '0';
+            backgroundGridContainer.style.zIndex = '1';
+            gameBoard.appendChild(backgroundGridContainer);
+
+            const blockContainer = document.createElement('div');
+            blockContainer.id = 'block-container';
+            blockContainer.style.position = 'relative';
+            blockContainer.style.zIndex = '5';
+            gameBoard.appendChild(blockContainer);
+
+            const wallContainer = document.createElement('div');
+            wallContainer.id = 'wall-container';
+            wallContainer.style.position = 'absolute';
+            wallContainer.style.top = '0';
+            wallContainer.style.left = '0';
+            wallContainer.style.pointerEvents = 'none';
+            wallContainer.style.zIndex = '20';
+            gameBoard.appendChild(wallContainer);
+            
+            gameBoard.style.height = `${rows * CELL_SIZE}px`;
+            gameBoard.style.width = `${cols * CELL_SIZE}px`;
+            gameBoard.style.border = '4px solid #374151';
+            gameBoard.style.boxSizing = 'content-box';
+
+            board.forEach((row, r) => {
+                const bgRowElement = document.createElement('div');
+                bgRowElement.className = 'flex';
+                const wallRowElement = document.createElement('div');
+                wallRowElement.className = 'flex';
+
+                row.forEach((cell, c) => {
+                    const bgCellElement = document.createElement('div');
+                    bgCellElement.className = 'grid-cell';
+                    bgRowElement.appendChild(bgCellElement);
+
+                    const wallCellElement = document.createElement('div');
+                    wallCellElement.className = 'wall-cell';
+                    if (cell.walls.right) wallCellElement.classList.add('wall-right');
+                    if (cell.walls.bottom) wallCellElement.classList.add('wall-bottom');
+                    wallRowElement.appendChild(wallCellElement);
+                });
+                backgroundGridContainer.appendChild(bgRowElement);
+                wallContainer.appendChild(wallRowElement);
+            });
+
+            renderBlocks();
+            
+            clearModal.classList.add('hidden');
+            clearModal.querySelector('div').classList.remove('scale-100');
+        }
+
+        function initGame() {
+            // Populate stage buttons
+            levelButtonsContainer.innerHTML = '';
+            levels.forEach((_, index) => {
+                const button = document.createElement('button');
+                button.textContent = `ステージ ${index + 1}`;
+                button.dataset.level = index;
+                button.className = 'level-button px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 font-semibold';
+                levelButtonsContainer.appendChild(button);
+            });
+
+            // Add event listeners
+            levelButtonsContainer.addEventListener('click', (e) => {
+                if (e.target.classList.contains('level-button')) {
+                    const levelIndex = parseInt(e.target.dataset.level);
+                    if (levelIndex !== currentLevel) {
+                        loadLevel(levelIndex);
+                    }
+                }
+            });
+
+            resetButton.addEventListener('click', () => loadLevel(currentLevel));
+            nextLevelButton.addEventListener('click', () => {
+                let next = currentLevel + 1;
+                if (next >= levels.length) {
+                    next = 0; // Loop back to first level
+                }
+                loadLevel(next);
+            });
+
+            // Load the initial level
+            loadLevel(currentLevel);
+        }
+
+        initGame();
+
+    </script>
+</body>
+</html>
+
