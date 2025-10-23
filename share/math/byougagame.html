@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>図形描画ツール</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 共通スタイル */
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+        
+        /* カスタムスライダー (フリーモード用) */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px; /* トラック(溝)の高さ */
+            background: #e5e7eb; /* gray-200 */
+            border-radius: 9999px;
+            outline: none;
+            opacity: 0.9;
+            transition: opacity 0.2s;
+        }
+        input[type=range]:hover { opacity: 1; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #3b82f6; /* blue-500 */
+            border-radius: 50%;
+            cursor: pointer;
+            border: 4px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: #3b82f6;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 4px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        /* ★ 起動画面ラジオボタン / 問題モードタブボタン */
+        .tab-btn {
+            /* @apply px-6 py-2 text-lg font-semibold text-gray-700 bg-white border-2 border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 hover:border-blue-400 transition-all duration-150 m-2 cursor-pointer; */
+            padding-left: 1.5rem; padding-right: 1.5rem;
+            padding-top: 0.5rem; padding-bottom: 0.5rem;
+            font-size: 1.125rem; line-height: 1.75rem;
+            font-weight: 600;
+            color: #374151; /* text-gray-700 */
+            background-color: #ffffff; /* bg-white */
+            border-width: 2px;
+            border-color: #d1d5db; /* border-gray-300 */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+            margin: 0.5rem; /* m-2 */
+            cursor: pointer;
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+        .tab-btn:hover {
+            background-color: #f9fafb; /* hover:bg-gray-50 */
+            border-color: #60a5fa; /* hover:border-blue-400 */
+        }
+        
+        /* ★ 起動画面ラジオボタン選択時 */
+        input[type="radio"].peer:checked + label.tab-btn {
+            /* @apply bg-blue-500 text-white border-blue-600 shadow-md hover:bg-blue-600; */
+            background-color: #3b82f6; /* bg-blue-500 */
+            color: #ffffff; /* text-white */
+            border-color: #2563eb; /* border-blue-600 */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1); /* shadow-md */
+        }
+        input[type="radio"].peer:checked + label.tab-btn:hover {
+            background-color: #2563eb; /* hover:bg-blue-600 */
+        }
+        
+        /* ★ 問題モードタブ選択時 (JSでクラス付与) */
+        .tab-btn.active {
+            /* @apply bg-blue-500 text-white border-blue-600 shadow-md hover:bg-blue-600; */
+            background-color: #3b82f6;
+            color: #ffffff;
+            border-color: #2563eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        .tab-btn.active:hover {
+            background-color: #2563eb;
+        }
+
+    </style>
+</head>
+<body class="font-sans bg-gray-100 h-screen w-screen overflow-hidden">
+
+    <!-- 1. モード選択画面 (初期表示) -->
+    <div id="modeSelectionScreen" class="flex flex-col items-center justify-center h-full">
+        <h1 class="text-4xl font-bold text-gray-800 mb-8">図形描画ツール</h1>
+        
+        <!-- ★ 図形選択ラジオボタン (修正) -->
+        <div class="mb-8 flex justify-center flex-wrap" id="shapeSelectionContainer">
+            <input type="radio" id="radioShape1" name="shapeSelection" value="shape1" class="hidden peer" checked>
+            <label for="radioShape1" class="tab-btn">図形1</label>
+            
+            <input type="radio" id="radioShape2" name="shapeSelection" value="shape2" class="hidden peer">
+            <label for="radioShape2" class="tab-btn">図形2</label>
+            
+            <input type="radio" id="radioShape3" name="shapeSelection" value="shape3" class="hidden peer">
+            <label for="radioShape3" class="tab-btn">図形3</label>
+
+            <input type="radio" id="radioShape4" name="shapeSelection" value="shape4" class="hidden peer">
+            <label for="radioShape4" class="tab-btn">図形4</label>
+        </div>
+        
+        <!-- モード選択ボタン -->
+        <div class="flex space-x-8">
+            <button id="selectFreeMode" class="w-64 h-48 bg-white shadow-xl rounded-lg border border-gray-200 flex flex-col items-center justify-center transition-all duration-200 hover:shadow-2xl hover:scale-105">
+                <span class="text-2xl font-semibold text-blue-600">フリーモード</span>
+                <span class="text-gray-500 mt-2">自由に図形を作成</span>
+            </button>
+            <button id="selectProblemMode" class="w-64 h-48 bg-white shadow-xl rounded-lg border border-gray-200 flex flex-col items-center justify-center transition-all duration-200 hover:shadow-2xl hover:scale-105">
+                <span class="text-2xl font-semibold text-green-600">問題モード</span>
+                <span class="text-gray-500 mt-2">見本と同じ図形を作成</span>
+            </button>
+        </div>
+
+        <button id="backToModeSelection" class="hidden absolute top-4 left-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+            ← メニューに戻る
+        </button>
+    </div>
+
+    <!-- 2. フリーモード画面 (初期時 hidden) -->
+    <div id="freeModeScreen" class="hidden h-full flex flex-col lg:flex-row overflow-hidden">
+        <!-- 2.1 コントロールパネル (UI) -->
+        <div class="w-full lg:w-96 bg-white shadow-xl p-6 overflow-y-auto rounded-lg m-4 border border-gray-200">
+            <h1 id="freeModeTitle" class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">フリーモード</h1>
+
+            <!-- ★ 図形1用スライダー -->
+            <div id="shape1Sliders" class="hidden space-y-6">
+                <!-- L1長さ -->
+                <div class="space-y-2">
+                    <label for="s1_l1Length" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s1_label_icon_l1" width="40" height="30" class="border border-gray-300 rounded" title="L1長さ"></canvas>
+                        <span id="s1_l1LengthValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">100</span>
+                    </label>
+                    <input type="range" id="s1_l1Length" data-param="l1" min="0" max="250" value="100" class="w-full cursor-pointer">
+                </div>
+                <!-- 1辺の長さ -->
+                <div class="space-y-2">
+                    <label for="s1_sideLength" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s1_label_icon_side" width="40" height="30" class="border border-gray-300 rounded" title="1辺の長さ"></canvas>
+                        <span id="s1_sideLengthValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">50</span>
+                    </label>
+                    <input type="range" id="s1_sideLength" data-param="side" min="0" max="150" value="50" class="w-full cursor-pointer">
+                </div>
+                <!-- 回転角 -->
+                <div class="space-y-2">
+                    <label for="s1_triangleRotation" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s1_label_icon_rot" width="40" height="30" class="border border-gray-300 rounded" title="回転角"></canvas>
+                        <span id="s1_triangleRotationValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">0°</span>
+                    </label>
+                    <input type="range" id="s1_triangleRotation" data-param="rot" min="0" max="360" value="0" class="w-full cursor-pointer">
+                </div>
+                <!-- コピー角度 -->
+                <div class="space-y-2">
+                    <label for="s1_copyAngle" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s1_label_icon_copy" width="40" height="30" class="border border-gray-300 rounded" title="コピー角度"></canvas>
+                        <span id="s1_copyAngleValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">30°</span>
+                    </label>
+                    <input type="range" id="s1_copyAngle" data-param="copy" min="1" max="180" value="30" class="w-full cursor-pointer">
+                </div>
+                <!-- ハイライト表示設定 -->
+                <div class="space-y-3 pt-4 border-t border-gray-200">
+                    <label class="text-sm font-medium text-gray-700">ハイライト表示</label>
+                    <div class="grid grid-cols-4 gap-2 text-sm">
+                        <!-- s1_hl_l1 -->
+                        <div class="flex items-center justify-center">
+                            <input id="s1_hl_l1" name="s1_highlight" type="checkbox" data-param="l1" class="h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500">
+                            <label for="s1_hl_l1" class="ml-2 block cursor-pointer" title="L1長さ">
+                               <canvas id="s1_icon_l1" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                        <!-- s1_hl_side -->
+                        <div class="flex items-center justify-center">
+                            <input id="s1_hl_side" name="s1_highlight" type="checkbox" data-param="side" class="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                            <label for="s1_hl_side" class="ml-2 block cursor-pointer" title="1辺の長さ">
+                               <canvas id="s1_icon_side" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                        <!-- s1_hl_triRot -->
+                        <div class="flex items-center justify-center">
+                            <input id="s1_hl_rot" name="s1_highlight" type="checkbox" data-param="rot" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                            <label for="s1_hl_rot" class="ml-2 block cursor-pointer" title="回転角">
+                               <canvas id="s1_icon_rot" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                        <!-- s1_hl_copyRot -->
+                        <div class="flex items-center justify-center">
+                            <input id="s1_hl_copy" name="s1_highlight" type="checkbox" data-param="copy" class="h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                            <label for="s1_hl_copy" class="ml-2 block cursor-pointer" title="コピー角度">
+                               <canvas id="s1_icon_copy" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ★ 図形2用スライダー -->
+            <div id="shape2Sliders" class="hidden space-y-6">
+                <!-- L1長さ (X) -->
+                <div class="space-y-2">
+                    <label for="s2_x" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s2_label_icon_x" width="40" height="30" class="border border-gray-300 rounded" title="L1長さ (X)"></canvas>
+                        <span id="s2_xValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">80</span>
+                    </label>
+                    <input type="range" id="s2_x" data-param="x" min="0" max="250" value="80" class="w-full cursor-pointer">
+                </div>
+                <!-- L2長さ (Y) -->
+                <div class="space-y-2">
+                    <label for="s2_y" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s2_label_icon_y" width="40" height="30" class="border border-gray-300 rounded" title="L2長さ (Y)"></canvas>
+                        <span id="s2_yValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">60</span>
+                    </label>
+                    <input type="range" id="s2_y" data-param="y" min="0" max="150" value="60" class="w-full cursor-pointer">
+                </div>
+                <!-- L2角度 (α) -->
+                <div class="space-y-2">
+                    <label for="s2_alpha" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s2_label_icon_alpha" width="40" height="30" class="border border-gray-300 rounded" title="L2角度 (α)"></canvas>
+                        <span id="s2_alphaValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">30°</span>
+                    </label>
+                    <input type="range" id="s2_alpha" data-param="alpha" min="0" max="180" value="30" class="w-full cursor-pointer">
+                </div>
+                <!-- コピー角度 (β) -->
+                <div class="space-y-2">
+                    <label for="s2_beta" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s2_label_icon_beta" width="40" height="30" class="border border-gray-300 rounded" title="コピー角度 (β)"></canvas>
+                        <span id="s2_betaValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">45°</span>
+                    </label>
+                    <input type="range" id="s2_beta" data-param="beta" min="1" max="180" value="45" class="w-full cursor-pointer">
+                </div>
+                <!-- ハイライト表示設定 -->
+                <div class="space-y-3 pt-4 border-t border-gray-200">
+                    <label class="text-sm font-medium text-gray-700">ハイライト表示</label>
+                    <div class="grid grid-cols-4 gap-2 text-sm">
+                        <!-- s2_hl_x -->
+                        <div class="flex items-center justify-center">
+                            <input id="s2_hl_x" name="s2_highlight" type="checkbox" data-param="x" class="h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500">
+                            <label for="s2_hl_x" class="ml-2 block cursor-pointer" title="L1長さ (X)">
+                               <canvas id="s2_icon_x" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                        <!-- s2_hl_y -->
+                        <div class="flex items-center justify-center">
+                            <input id="s2_hl_y" name="s2_highlight" type="checkbox" data-param="y" class="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                            <label for="s2_hl_y" class="ml-2 block cursor-pointer" title="L2長さ (Y)">
+                               <canvas id="s2_icon_y" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                        <!-- s2_hl_alpha -->
+                        <div class="flex items-center justify-center">
+                            <input id="s2_hl_alpha" name="s2_highlight" type="checkbox" data-param="alpha" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                            <label for="s2_hl_alpha" class="ml-2 block cursor-pointer" title="L2角度 (α)">
+                               <canvas id="s2_icon_alpha" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                        <!-- s2_hl_beta -->
+                        <div class="flex items-center justify-center">
+                            <input id="s2_hl_beta" name="s2_highlight" type="checkbox" data-param="beta" class="h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                            <label for="s2_hl_beta" class="ml-2 block cursor-pointer" title="コピー角度 (β)">
+                               <canvas id="s2_icon_beta" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ★ 図形3用スライダー -->
+            <div id="shape3Sliders" class="hidden space-y-6">
+                <!-- 底辺 (A) -->
+                <div class="space-y-2">
+                    <label for="s3_a" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s3_label_icon_a" width="40" height="30" class="border border-gray-300 rounded" title="底辺 (A)"></canvas>
+                        <span id="s3_aValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">100</span>
+                    </label>
+                    <input type="range" id="s3_a" data-param="a" min="10" max="200" value="100" class="w-full cursor-pointer">
+                </div>
+                <!-- 高さ (B) -->
+                <div class="space-y-2">
+                    <label for="s3_b" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s3_label_icon_b" width="40" height="30" class="border border-gray-300 rounded" title="高さ (B)"></canvas>
+                        <span id="s3_bValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">80</span>
+                    </label>
+                    <input type="range" id="s3_b" data-param="b" min="10" max="150" value="80" class="w-full cursor-pointer">
+                </div>
+                <!-- ずれ (C) -->
+                <div class="space-y-2">
+                    <label for="s3_c" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s3_label_icon_c" width="40" height="30" class="border border-gray-300 rounded" title="ずれ/幹高さ (C)"></canvas>
+                        <span id="s3_cValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">40</span>
+                    </label>
+                    <input type="range" id="s3_c" data-param="c" min="10" max="100" value="40" class="w-full cursor-pointer">
+                </div>
+                <!-- 幹幅 (D) -->
+                <div class="space-y-2">
+                    <label for="s3_d" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s3_label_icon_d" width="40" height="30" class="border border-gray-300 rounded" title="幹幅 (D)"></canvas>
+                        <span id="s3_dValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">30</span>
+                    </label>
+                    <input type="range" id="s3_d" data-param="d" min="5" max="100" value="30" class="w-full cursor-pointer">
+                </div>
+                <!-- ハイライト表示設定 -->
+                <div class="space-y-3 pt-4 border-t border-gray-200">
+                    <label class="text-sm font-medium text-gray-700">ハイライト表示</label>
+                    <div class="grid grid-cols-4 gap-2 text-sm">
+                        <div class="flex items-center justify-center">
+                            <input id="s3_hl_a" name="s3_highlight" type="checkbox" data-param="a" class="h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500">
+                            <label for="s3_hl_a" class="ml-2 block cursor-pointer" title="底辺 (A)">
+                               <canvas id="s3_icon_a" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                        <div class="flex items-center justify-center">
+                            <input id="s3_hl_b" name="s3_highlight" type="checkbox" data-param="b" class="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                            <label for="s3_hl_b" class="ml-2 block cursor-pointer" title="高さ (B)">
+                               <canvas id="s3_icon_b" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                        <div class="flex items-center justify-center">
+                            <input id="s3_hl_c" name="s3_highlight" type="checkbox" data-param="c" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                            <label for="s3_hl_c" class="ml-2 block cursor-pointer" title="ずれ/幹高さ (C)">
+                               <canvas id="s3_icon_c" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                        <div class="flex items-center justify-center">
+                            <input id="s3_hl_d" name="s3_highlight" type="checkbox" data-param="d" class="h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                            <label for="s3_hl_d" class="ml-2 block cursor-pointer" title="幹幅 (D)">
+                               <canvas id="s3_icon_d" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ★ 図形4用スライダー (修正) -->
+            <div id="shape4Sliders" class="hidden space-y-6">
+                <!-- 円半径 (R) -->
+                <div class="space-y-2">
+                    <label for="s4_r" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s4_label_icon_r" width="40" height="30" class="border border-gray-300 rounded" title="円半径 (R)"></canvas>
+                        <span id="s4_rValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">100</span>
+                    </label>
+                    <input type="range" id="s4_r" data-param="r" min="10" max="250" value="100" class="w-full cursor-pointer">
+                </div>
+                <!-- 楕円短半径 (SA) -->
+                <div class="space-y-2">
+                    <label for="s4_sa" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s4_label_icon_sa" width="40" height="30" class="border border-gray-300 rounded" title="楕円短半径 (SA)"></canvas>
+                        <span id="s4_saValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">75</span>
+                    </label>
+                    <input type="range" id="s4_sa" data-param="sa" min="10" max="150" value="75" class="w-full cursor-pointer">
+                </div>
+                <!-- 楕円長半径 (LA) -->
+                <div class="space-y-2">
+                    <label for="s4_la" class="flex justify-between items-center text-sm font-medium text-gray-700">
+                        <canvas id="s4_label_icon_la" width="40" height="30" class="border border-gray-300 rounded" title="楕円長半径 (LA)"></canvas>
+                        <span id="s4_laValue" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">100</span>
+                    </label>
+                    <input type="range" id="s4_la" data-param="la" min="10" max="200" value="100" class="w-full cursor-pointer">
+                </div>
+                <!-- ハイライト表示設定 -->
+                <div class="space-y-3 pt-4 border-t border-gray-200">
+                    <label class="text-sm font-medium text-gray-700">ハイライト表示</label>
+                    <div class="grid grid-cols-4 gap-2 text-sm">
+                        <div class="flex items-center justify-center">
+                            <input id="s4_hl_r" name="s4_highlight" type="checkbox" data-param="r" class="h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500">
+                            <label for="s4_hl_r" class="ml-2 block cursor-pointer" title="円半径 (R)">
+                               <canvas id="s4_icon_r" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                        <div class="flex items-center justify-center">
+                            <input id="s4_hl_sa" name="s4_highlight" type="checkbox" data-param="sa" class="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                            <label for="s4_hl_sa" class="ml-2 block cursor-pointer" title="楕円短半径 (SA)">
+                               <canvas id="s4_icon_sa" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                        <div class="flex items-center justify-center">
+                            <input id="s4_hl_la" name="s4_highlight" type="checkbox" data-param="la" class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                            <label for="s4_hl_la" class="ml-2 block cursor-pointer" title="楕円長半径 (LA)">
+                               <canvas id="s4_icon_la" width="40" height="30" class="border border-gray-300 rounded hover:bg-gray-50"></canvas>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <!-- 2.2 キャンバスエリア (フリーモード) -->
+        <div id="freeModeCanvasContainer" class="flex-1 flex items-center justify-center bg-gray-200 p-4 min-h-0">
+            <canvas id="drawingCanvas" class="bg-white rounded-lg shadow-inner border border-gray-300"></canvas>
+        </div>
+    </div>
+
+    <!-- 3. 問題モード画面 (初期時 hidden) -->
+    <div id="problemModeScreen" class="hidden h-full flex flex-col overflow-hidden">
+        <!-- 3.1 問題選択タブ -->
+        <div class="w-full bg-gray-100 flex justify-center p-2">
+            <h2 id="problemModeTitle" class="text-xl font-bold text-gray-800 self-center mr-6">問題モード</h2>
+            <button id="problemTab1" class="tab-btn active" data-problem="1">問題 1</button>
+            <button id="problemTab2" class="tab-btn" data-problem="2">問題 2</button>
+            <button id="problemTab3" class="tab-btn" data-problem="3">問題 3</button>
+        </div>
+
+        <!-- 3.2 問題モードメインエリア (設定 + キャンバス) -->
+        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <!-- 3.2.1 パラメータ設定 (問題モード) -->
+            <div class="w-full lg:w-96 bg-white shadow-xl p-6 space-y-6 overflow-y-auto m-4 rounded-lg border border-gray-200">
+                <h2 class="text-xl font-bold text-gray-800">パラメータ設定</h2>
+                
+                <!-- パラメータ選択肢はJSで動的に生成 -->
+                <div id="paramSelectionContainer" class="space-y-4">
+                    <!-- JSで生成 -->
+                </div>
+
+                <button id="submitAnswerBtn" class="w-full px-6 py-3 bg-green-600 text-white font-bold rounded-lg shadow-md hover:bg-green-700 transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    OK
+                </button>
+            </div>
+
+            <!-- 3.2.2 キャンバスエリア (問題モード) -->
+            <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 bg-gray-200 overflow-y-auto">
+                <!-- あなたの回答 -->
+                <div class="flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-inner border border-gray-300 min-h-[300px]">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">あなたの回答</h3>
+                    <div id="userCanvasContainer" class="w-full flex-1 flex items-center justify-center min-h-0">
+                         <canvas id="userCanvas"></canvas>
+                    </div>
+                </div>
+                <!-- 見本 -->
+                <div class="flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-inner border border-gray-300 min-h-[300px]">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">見本</h3>
+                    <div id="answerCanvasContainer" class="w-full flex-1 flex items-center justify-center min-h-0">
+                         <canvas id="answerCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- クリアメッセージ (モーダル) -->
+    <div id="clearMessage" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-12 rounded-lg shadow-2xl">
+            <span class="text-5xl font-bold text-yellow-500">クリア！</span>
+        </div>
+    </div>
+
+
+    <script>
+        // --- グローバル変数・定数 ---
+        let currentShape = 'shape1'; // 'shape1', 'shape2', 'shape3', 'shape4'
+        let currentMode = null; // 'free' or 'problem'
+        let currentProblem = 1;
+        let userSelections = {}; // 問題モードでのユーザーの選択
+        let currentUserParams = {}; // 問題モードで現在表示中のパラメータ (アニメーション用)
+        let freeModeParams = {
+            shape1: { l1: 100, side: 50, rot: 0, copy: 30 },
+            shape2: { x: 80, y: 60, alpha: 30, beta: 45 },
+            shape3: { a: 100, b: 80, c: 40, d: 30 },
+            shape4: { r: 100, sa: 75, la: 100 } // ★ 修正: sa/la は半径
+        };
+        let freeModeHighlights = {
+            shape1: { l1: false, side: false, rot: false, copy: false },
+            shape2: { x: false, y: false, alpha: false, beta: false },
+            shape3: { a: false, b: false, c: false, d: false },
+            shape4: { r: false, sa: false, la: false }
+        };
+
+        // ハイライト色
+        const HL_L1 = '#ef4444'; // Red
+        const HL_SIDE = '#22c55e'; // Green
+        const HL_TRI_ROT = '#a855f7'; // Purple
+        const HL_COPY_ROT = '#f97316'; // Orange
+        const HL_POINT = '#eab308'; // Yellow
+        const DEFAULT_STROKE_ICON = '#2563eb'; // Blue
+        
+        // 問題モード用 パラメータ選択ボタンスタイル (JSで定義)
+        const paramBtnBase = 'px-4 py-2 border-2 border-transparent rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 shadow-sm';
+        const paramBtnSelected = 'bg-green-600 text-white border-green-700 shadow-md font-semibold';
+        const paramBtnFixed = 'bg-gray-200 text-gray-600 cursor-not-allowed border-gray-300';
+        const paramBtnUnselected = 'bg-green-50 text-green-800 border-green-200 hover:bg-green-100 hover:border-green-300';
+
+        // --- 問題データ ---
+        const problemSetShape1 = {
+            1: {
+                options: [
+                    { id: 'l1', label: 'L1長さ', unit: '', fixed: 100 },
+                    { id: 'side', label: '1辺の長さ', unit: '', values: [90, 120, 150] },
+                    { id: 'rot', label: '回転角', unit: '°', values: [45, 50, 60] },
+                    { id: 'copy', label: 'コピー角度', unit: '°', values: [20, 30, 45, 60] }
+                ],
+                initial: { l1: 100, side: 140, rot: 90, copy: 90 },
+                answer: { l1: 100, side: 120, rot: 60, copy: 30 }
+            },
+            2: {
+                options: [
+                    { id: 'l1', label: 'L1長さ', unit: '', values: [50, 100, 150] },
+                    { id: 'side', label: '1辺の長さ', unit: '', fixed: 80 },
+                    { id: 'rot', label: '回転角', unit: '°', values: [0, 90, 180] },
+                    { id: 'copy', label: 'コピー角度', unit: '°', values: [45, 60, 90] }
+                ],
+                initial: { l1: 50, side: 80, rot: 0, copy: 90 },
+                answer: { l1: 100, side: 80, rot: 90, copy: 45 }
+            },
+            3: {
+                options: [
+                    { id: 'l1', label: 'L1長さ', unit: '', values: [80, 120] },
+                    { id: 'side', label: '1辺の長さ', unit: '', values: [40, 60, 80] },
+                    { id: 'rot', label: '回転角', unit: '°', fixed: 0 },
+                    { id: 'copy', label: 'コピー角度', unit: '°', values: [15, 30, 60] }
+                ],
+                initial: { l1: 80, side: 40, rot: 0, copy: 15 },
+                answer: { l1: 120, side: 60, rot: 0, copy: 30 }
+            }
+        };
+
+        const problemSetShape2 = {
+            1: {
+                options: [
+                    { id: 'x', label: 'L1長さ(X)', unit: '', fixed: 100 },
+                    { id: 'y', label: 'L2長さ(Y)', unit: '', values: [40, 60, 80] },
+                    { id: 'alpha', label: 'L2角度(α)', unit: '°', values: [20, 30, 45] },
+                    { id: 'beta', label: 'コピー角度(β)', unit: '°', values: [30, 45, 60] }
+                ],
+                initial: { x: 100, y: 40, alpha: 20, beta: 30 },
+                answer: { x: 100, y: 60, alpha: 30, beta: 45 }
+            },
+            2: {
+                options: [
+                    { id: 'x', label: 'L1長さ(X)', unit: '', values: [60, 90, 120] },
+                    { id: 'y', label: 'L2長さ(Y)', unit: '', fixed: 50 },
+                    { id: 'alpha', label: 'L2角度(α)', unit: '°', values: [45, 60, 90] },
+                    { id: 'beta', label: 'コピー角度(β)', unit: '°', values: [15, 20, 30] }
+                ],
+                initial: { x: 70, y: 50, alpha: 30, beta: 60 },
+                answer: { x: 90, y: 50, alpha: 60, beta: 20 }
+            },
+            3: {
+                options: [
+                    { id: 'x', label: 'L1長さ(X)', unit: '', values: [70, 100] },
+                    { id: 'y', label: 'L2長さ(Y)', unit: '', values: [30, 50, 70] },
+                    { id: 'alpha', label: 'L2角度(α)', unit: '°', fixed: 90 },
+                    { id: 'beta', label: 'コピー角度(β)', unit: '°', values: [45, 90] }
+                ],
+                initial: { x: 70, y: 30, alpha: 90, beta: 45 },
+                answer: { x: 100, y: 70, alpha: 90, beta: 90 }
+            }
+        };
+        
+        const problemSetShape3 = {
+            1: {
+                options: [
+                    { id: 'a', label: '底辺(A)', unit: '', fixed: 80 },
+                    { id: 'b', label: '高さ(B)', unit: '', values: [50, 60, 70] },
+                    { id: 'c', label: 'ずれ(C)', unit: '', values: [20, 30, 40] },
+                    { id: 'd', label: '幹幅(D)', unit: '', values: [20, 30, 40] }
+                ],
+                initial: { a: 80, b: 50, c: 40, d: 20 },
+                answer: { a: 80, b: 60, c: 30, d: 30 } 
+            },
+            2: {
+                options: [
+                    { id: 'a', label: '底辺(A)', unit: '', values: [80, 100, 120] },
+                    { id: 'b', label: '高さ(B)', unit: '', fixed: 50 },
+                    { id: 'c', label: 'ずれ(C)', unit: '', values: [30, 40] },
+                    { id: 'd', label: '幹幅(D)', unit: '', fixed: 40 }
+                ],
+                initial: { a: 120, b: 50, c: 40, d: 40 },
+                answer: { a: 100, b: 50, c: 30, d: 40 }
+            },
+            3: {
+                options: [
+                    { id: 'a', label: '底辺(A)', unit: '', values: [60, 80] },
+                    { id: 'b', label: '高さ(B)', unit: '', values: [60, 80] },
+                    { id: 'c', label: 'ずれ(C)', unit: '', values: [20, 30] },
+                    { id: 'd', label: '幹幅(D)', unit: '', values: [20, 30] }
+                ],
+                initial: { a: 60, b: 60, c: 20, d: 20 },
+                answer: { a: 80, b: 80, c: 30, d: 30 }
+            }
+        };
+
+        // ★ 図形4用 問題データ (修正)
+        const problemSetShape4 = {
+            1: {
+                options: [
+                    { id: 'r', label: '円半径(R)', unit: '', values: [80, 100, 120] },
+                    { id: 'sa', label: '楕円短半径(SA)', unit: '', fixed: 75 },
+                    { id: 'la', label: '楕円長半径(LA)', unit: '', values: [100, 125] }
+                ],
+                initial: { r: 80, sa: 75, la: 100 },
+                answer: { r: 100, sa: 75, la: 125 }
+            },
+            2: {
+                options: [
+                    { id: 'r', label: '円半径(R)', unit: '', fixed: 100 },
+                    { id: 'sa', label: '楕円短半径(SA)', unit: '', values: [50, 75, 100] },
+                    { id: 'la', label: '楕円長半径(LA)', unit: '', values: [50, 75, 100] }
+                ],
+                initial: { r: 100, sa: 100, la: 50 },
+                answer: { r: 100, sa: 75, la: 75 } // 短半径=長半径 -> 円
+            },
+            3: {
+                options: [
+                    { id: 'r', label: '円半径(R)', unit: '', values: [50, 70] },
+                    { id: 'sa', label: '楕円短半径(SA)', unit: '', values: [50, 60] },
+                    { id: 'la', label: '楕円長半径(LA)', unit: '', values: [75, 90] }
+                ],
+                initial: { r: 50, sa: 50, la: 75 },
+                answer: { r: 70, sa: 60, la: 90 }
+            }
+        };
+
+        // ★ 図形定義
+        const shapeDefs = {
+            shape1: {
+                name: '図形1',
+                params: ['l1', 'side', 'rot', 'copy'],
+                sliderContainer: document.getElementById('shape1Sliders'),
+                sliders: document.querySelectorAll('#shape1Sliders input[type="range"]'),
+                sliderIdMap: { l1: 's1_l1Length', side: 's1_sideLength', rot: 's1_triangleRotation', copy: 's1_copyAngle' },
+                valueLabels: {
+                    l1: document.getElementById('s1_l1LengthValue'),
+                    side: document.getElementById('s1_sideLengthValue'),
+                    rot: document.getElementById('s1_triangleRotationValue'),
+                    copy: document.getElementById('s1_copyAngleValue')
+                },
+                highlightCheckboxes: document.querySelectorAll('input[name="s1_highlight"]'),
+                drawFn: drawShape1,
+                drawIconFns: {
+                    l1: (id) => drawS1L1Icon(id),
+                    side: (id) => drawS1SideIcon(id),
+                    rot: (id) => drawS1TriRotIcon(id),
+                    copy: (id) => drawS1CopyRotIcon(id)
+                },
+                problemSet: problemSetShape1,
+                iconCanvasIds: ['s1_label_icon_l1', 's1_label_icon_side', 's1_label_icon_rot', 's1_label_icon_copy', 's1_icon_l1', 's1_icon_side', 's1_icon_rot', 's1_icon_copy']
+            },
+            shape2: {
+                name: '図形2',
+                params: ['x', 'y', 'alpha', 'beta'],
+                sliderContainer: document.getElementById('shape2Sliders'),
+                sliders: document.querySelectorAll('#shape2Sliders input[type="range"]'),
+                sliderIdMap: { x: 's2_x', y: 's2_y', alpha: 's2_alpha', beta: 's2_beta' },
+                valueLabels: {
+                    x: document.getElementById('s2_xValue'),
+                    y: document.getElementById('s2_yValue'),
+                    alpha: document.getElementById('s2_alphaValue'),
+                    beta: document.getElementById('s2_betaValue')
+                },
+                highlightCheckboxes: document.querySelectorAll('input[name="s2_highlight"]'),
+                drawFn: drawShape2,
+                drawIconFns: {
+                    x: (id) => drawS2XIcon(id),
+                    y: (id) => drawS2YIcon(id),
+                    alpha: (id) => drawS2AlphaIcon(id),
+                    beta: (id) => drawS2BetaIcon(id)
+                },
+                problemSet: problemSetShape2,
+                iconCanvasIds: ['s2_label_icon_x', 's2_label_icon_y', 's2_label_icon_alpha', 's2_label_icon_beta', 's2_icon_x', 's2_icon_y', 's2_icon_alpha', 's2_icon_beta']
+            },
+            shape3: {
+                name: '図形3',
+                params: ['a', 'b', 'c', 'd'],
+                sliderContainer: document.getElementById('shape3Sliders'),
+                sliders: document.querySelectorAll('#shape3Sliders input[type="range"]'),
+                sliderIdMap: { a: 's3_a', b: 's3_b', c: 's3_c', d: 's3_d' },
+                valueLabels: {
+                    a: document.getElementById('s3_aValue'),
+                    b: document.getElementById('s3_bValue'),
+                    c: document.getElementById('s3_cValue'),
+                    d: document.getElementById('s3_dValue')
+                },
+                highlightCheckboxes: document.querySelectorAll('input[name="s3_highlight"]'),
+                drawFn: drawShape3,
+                drawIconFns: {
+                    a: (id) => drawS3AIcon(id),
+                    b: (id) => drawS3BIcon(id),
+                    c: (id) => drawS3CIcon(id),
+                    d: (id) => drawS3DIcon(id)
+                },
+                problemSet: problemSetShape3,
+                iconCanvasIds: ['s3_label_icon_a', 's3_label_icon_b', 's3_label_icon_c', 's3_label_icon_d', 's3_icon_a', 's3_icon_b', 's3_icon_c', 's3_icon_d']
+            },
+            shape4: {
+                name: '図形4',
+                params: ['r', 'sa', 'la'],
+                sliderContainer: document.getElementById('shape4Sliders'),
+                sliders: document.querySelectorAll('#shape4Sliders input[type="range"]'),
+                sliderIdMap: { r: 's4_r', sa: 's4_sa', la: 's4_la' },
+                valueLabels: {
+                    r: document.getElementById('s4_rValue'),
+                    sa: document.getElementById('s4_saValue'),
+                    la: document.getElementById('s4_laValue')
+                },
+                highlightCheckboxes: document.querySelectorAll('input[name="s4_highlight"]'),
+                drawFn: drawShape4,
+                drawIconFns: {
+                    r: (id) => drawS4RIcon(id),
+                    sa: (id) => drawS4SAIcon(id),
+                    la: (id) => drawS4LAIcon(id)
+                },
+                problemSet: problemSetShape4,
+                iconCanvasIds: ['s4_label_icon_r', 's4_label_icon_sa', 's4_label_icon_la', 's4_icon_r', 's4_icon_sa', 's4_icon_la']
+            }
+        };
+
+
+        // --- DOM要素の取得 ---
+        const modeSelectionScreen = document.getElementById('modeSelectionScreen');
+        const freeModeScreen = document.getElementById('freeModeScreen');
+        const problemModeScreen = document.getElementById('problemModeScreen');
+        const backToModeSelectionBtn = document.getElementById('backToModeSelection');
+        
+        // 起動画面
+        const shapeSelectionContainer = document.getElementById('shapeSelectionContainer');
+        const selectFreeModeBtn = document.getElementById('selectFreeMode');
+        const selectProblemModeBtn = document.getElementById('selectProblemMode');
+
+        // フリーモード用
+        const freeCanvas = document.getElementById('drawingCanvas');
+        const freeCanvasContainer = document.getElementById('freeModeCanvasContainer');
+        const freeModeTitle = document.getElementById('freeModeTitle');
+        // (スライダー等は shapeDefs 内で取得)
+
+        // 問題モード用
+        const problemModeTitle = document.getElementById('problemModeTitle');
+        const paramSelectionContainer = document.getElementById('paramSelectionContainer');
+        let submitAnswerBtn = document.getElementById('submitAnswerBtn'); // ★ let に修正済み
+        const userCanvas = document.getElementById('userCanvas');
+        const userCanvasContainer = document.getElementById('userCanvasContainer');
+        const answerCanvas = document.getElementById('answerCanvas');
+        const answerCanvasContainer = document.getElementById('answerCanvasContainer');
+        const problemTabs = document.querySelectorAll('#problemModeScreen .tab-btn'); // 問題モードのタブのみ
+        const clearMessage = document.getElementById('clearMessage');
+
+        // --- 汎用描画関数 ---
+
+        function drawShape1(canvas, params, highlights) {
+            const ctx = canvas.getContext('2d');
+            const { l1, side, rot, copy } = params;
+            const { l1: hl_l1, side: hl_side, rot: hl_rot, copy: hl_copy } = highlights;
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const defaultStroke = '#2563eb';
+            const defaultFill = 'rgba(59, 130, 246, 0.1)';
+            const toRad = Math.PI / 180;
+
+            if (copy <= 0) return;
+            const numCopies = Math.floor(360 / copy);
+
+            // コピー角度ハイライト
+            if (hl_copy && numCopies > 1 && l1 > 0) {
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                const rad0 = -Math.PI / 2;
+                const rad1 = (copy * toRad) - (Math.PI / 2);
+                ctx.strokeStyle = HL_COPY_ROT;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, Math.max(20, l1 / 2), rad0, rad1);
+                ctx.stroke();
+                ctx.fillStyle = HL_POINT;
+                ctx.beginPath();
+                ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 中心点Oハイライト
+            if (hl_l1 || hl_rot) {
+                 ctx.save();
+                 ctx.translate(centerX, centerY);
+                 ctx.fillStyle = (hl_l1) ? HL_POINT : '#cccccc';
+                 ctx.beginPath();
+                 ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                 ctx.fill();
+                 ctx.restore();
+            }
+
+            for (let i = 0; i < numCopies; i++) {
+                const totalRotationRad = (i * copy) * toRad;
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(totalRotationRad);
+
+                // L1
+                const isHighlightL1 = (i === 0 && hl_l1);
+                ctx.strokeStyle = isHighlightL1 ? HL_L1 : defaultStroke;
+                ctx.lineWidth = isHighlightL1 ? 3 : 2;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, -l1);
+                ctx.stroke();
+
+                // 三角形
+                ctx.save();
+                ctx.translate(0, -l1);
+                const triangleRotationRad = rot * toRad;
+                
+                const h = side * Math.sqrt(3) / 2;
+                const r_top = h * 2 / 3;
+                const r_bottom = h / 3;
+
+                // 回転角ハイライト (回転前)
+                if (i === 0 && hl_rot && side > 0) {
+                    ctx.fillStyle = HL_POINT;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = HL_TRI_ROT;
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(0, -r_top);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, Math.max(10, r_top * 0.5), -Math.PI / 2, triangleRotationRad - (Math.PI / 2));
+                    ctx.stroke();
+                }
+
+                ctx.rotate(triangleRotationRad);
+
+                const p1 = { x: 0, y: -r_top };
+                const p2 = { x: side / 2, y: r_bottom };
+                const p3 = { x: -side / 2, y: r_bottom };
+
+                const isHighlightSide = (i === 0 && hl_side);
+                ctx.strokeStyle = isHighlightSide ? HL_SIDE : defaultStroke;
+                ctx.fillStyle = defaultFill;
+                ctx.lineWidth = isHighlightSide ? 3 : 2;
+
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.lineTo(p3.x, p3.y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // 回転角ハイライト (回転後)
+                if (i === 0 && hl_rot && side > 0) {
+                    ctx.strokeStyle = HL_TRI_ROT;
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(p1.x, p1.y); 
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    ctx.fillStyle = HL_POINT;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+                ctx.restore();
+            }
+        }
+
+        function drawShape2(canvas, params, highlights) {
+            const ctx = canvas.getContext('2d');
+            const { x, y, alpha, beta } = params;
+            const { x: hl_x, y: hl_y, alpha: hl_alpha, beta: hl_beta } = highlights;
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const defaultStroke = '#2563eb';
+            const toRad = Math.PI / 180;
+
+            if (beta <= 0) return;
+            const numCopies = Math.floor(360 / beta);
+            const alphaRad = alpha * toRad;
+
+            // コピー角度 (β) ハイライト
+            if (hl_beta && numCopies > 1 && x > 0) {
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                const rad0 = -Math.PI / 2;
+                const rad1 = (beta * toRad) - (Math.PI / 2);
+                ctx.strokeStyle = HL_COPY_ROT;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, Math.max(20, x / 2), rad0, rad1);
+                ctx.stroke();
+                ctx.fillStyle = HL_POINT;
+                ctx.beginPath();
+                ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // 中心点Oハイライト
+            if (hl_x || hl_alpha) {
+                 ctx.save();
+                 ctx.translate(centerX, centerY);
+                 ctx.fillStyle = (hl_x) ? HL_POINT : '#cccccc';
+                 ctx.beginPath();
+                 ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                 ctx.fill();
+                 ctx.restore();
+            }
+
+            for (let i = 0; i < numCopies; i++) {
+                const totalRotationRad = (i * beta) * toRad;
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(totalRotationRad);
+
+                // L1 (長さ X)
+                const isHighlightX = (i === 0 && hl_x);
+                ctx.strokeStyle = isHighlightX ? HL_L1 : defaultStroke;
+                ctx.lineWidth = isHighlightX ? 3 : 2;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, -x);
+                ctx.stroke();
+
+                // L2 (3本, 長さ Y)
+                ctx.translate(0, -x); // 端点Mへ
+                
+                const isHighlightY = (i === 0 && hl_y);
+                const isHighlightAlpha = (i === 0 && hl_alpha);
+                
+                // L2 - 真ん中
+                ctx.strokeStyle = (isHighlightY) ? HL_SIDE : defaultStroke;
+                ctx.lineWidth = (isHighlightY) ? 3 : 2;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, -y);
+                ctx.stroke();
+
+                // L2 - 右 (+α)
+                ctx.strokeStyle = (isHighlightY) ? HL_SIDE : defaultStroke;
+                ctx.lineWidth = (isHighlightY) ? 3 : 2;
+                ctx.save();
+                ctx.rotate(alphaRad);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, -y);
+                ctx.stroke();
+                ctx.restore();
+
+                // L2 - 左 (-α)
+                ctx.strokeStyle = (isHighlightY) ? HL_SIDE : defaultStroke;
+                ctx.lineWidth = (isHighlightY) ? 3 : 2;
+                ctx.save();
+                ctx.rotate(-alphaRad);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, -y);
+                ctx.stroke();
+                ctx.restore();
+                
+                // L2角度 (α) ハイライト
+                if (isHighlightAlpha && y > 0) {
+                    ctx.fillStyle = HL_POINT;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 4, 0, Math.PI * 2); // M点
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = HL_TRI_ROT; // 紫
+                    ctx.lineWidth = 2;
+                    // 基準線 (真ん中)
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(0, -y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    // 円弧 (★ 右のみ)
+                    ctx.beginPath();
+                    ctx.arc(0, 0, Math.max(10, y * 0.5), -Math.PI / 2, alphaRad - (Math.PI / 2));
+                    ctx.stroke();
+                }
+                ctx.restore(); // (i * beta) * toRad の回転を戻す
+            }
+        }
+
+        // ★ 図形3 描画関数 (修正)
+        function drawShape3(canvas, params, highlights) {
+            const ctx = canvas.getContext('2d');
+            const { a, b, c, d } = params;
+            const { a: hl_a, b: hl_b, c: hl_c, d: hl_d } = highlights;
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const trunkFill = '#854d0e'; // brown-700
+            const leafFill = '#16a34a'; // green-600
+            const leafStroke = '#15803d'; // green-700
+            
+            ctx.save();
+            // 描画原点を図形全体の底辺中心に移動
+            ctx.translate(centerX, centerY + (c * 3 + b) / 2);
+
+            // 幹 (D, C)
+            const trunkX = -d / 2;
+            const trunkY = -c;
+            ctx.fillStyle = trunkFill;
+            ctx.strokeStyle = '#5f370e'; // brown-900
+            ctx.lineWidth = 1;
+            ctx.fillRect(trunkX, trunkY, d, c);
+            ctx.strokeRect(trunkX, trunkY, d, c);
+            
+            if (hl_d) {
+                ctx.strokeStyle = HL_COPY_ROT; // Orange
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(trunkX, trunkY + c); // ★ 修正: 下側の辺
+                ctx.lineTo(trunkX + d, trunkY + c); // ★ 修正: 下側の辺
+                ctx.stroke();
+            }
+            if (hl_c) {
+                ctx.strokeStyle = HL_TRI_ROT; // Purple
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(trunkX, trunkY);
+                ctx.lineTo(trunkX, trunkY + c);
+                ctx.stroke();
+            }
+
+            // 葉 (三角形3つ) (A, B, C)
+            // ★ 修正: 下 (i=0) から描画して、上 (i=2) が手前になるようにする
+            for (let i = 0; i < 3; i++) {
+                ctx.save();
+                const leafCenterY = -(c + i * c + b / 2);
+                ctx.translate(0, leafCenterY);
+                
+                const p1 = { x: 0, y: -b / 2 };
+                const p2 = { x: a / 2, y: b / 2 };
+                const p3 = { x: -a / 2, y: b / 2 };
+                
+                ctx.fillStyle = leafFill;
+                ctx.strokeStyle = leafStroke;
+                ctx.lineWidth = 2;
+
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.lineTo(p3.x, p3.y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // ハイライト (一番下の葉 i=0 のみ)
+                if (i === 0) {
+                    if (hl_a) {
+                        ctx.strokeStyle = HL_L1; // Red
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(p3.x, p3.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+                    }
+                    if (hl_b) {
+                        ctx.strokeStyle = HL_SIDE; // Green
+                        ctx.lineWidth = 3;
+                        ctx.setLineDash([3, 3]);
+                        ctx.beginPath();
+                        ctx.moveTo(0, p1.y);
+                        ctx.lineTo(0, p2.y);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                }
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+        
+        // ★ 図形4 描画関数 (修正)
+        function drawShape4(canvas, params, highlights) {
+            const ctx = canvas.getContext('2d');
+            const { r, sa, la } = params; // sa, la は半径
+            const { r: hl_r, sa: hl_sa, la: hl_la } = highlights;
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const defaultStroke = '#2563eb';
+            const defaultFill = 'rgba(59, 130, 246, 0.1)';
+
+            // 楕円
+            ctx.strokeStyle = defaultStroke;
+            ctx.fillStyle = defaultFill;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.ellipse(centerX, centerY, la, sa, 0, 0, 2 * Math.PI); // ★ 修正: /2 を削除
+            ctx.fill();
+            ctx.stroke();
+
+            // 円
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, r, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+            
+            // ハイライト
+            if (hl_r) {
+                ctx.strokeStyle = HL_L1; // Red
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX + r, centerY);
+                ctx.stroke();
+            }
+            if (hl_sa) {
+                ctx.strokeStyle = HL_SIDE; // Green
+                ctx.lineWidth = 3;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY - sa); // ★ 修正: /2 を削除
+                ctx.lineTo(centerX, centerY + sa); // ★ 修正: /2 を削除
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+            if (hl_la) {
+                ctx.strokeStyle = HL_TRI_ROT; // Purple
+                ctx.lineWidth = 3;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(centerX - la, centerY); // ★ 修正: /2 を削除
+                ctx.lineTo(centerX + la, centerY); // ★ 修正: /2 を削除
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+
+        // --- 汎用リサイズ関数 ---
+        function resizeAllCanvases() {
+            if (currentMode === 'free') {
+                const size = Math.min(freeCanvasContainer.clientWidth, freeCanvasContainer.clientHeight) - 32;
+                freeCanvas.width = size;
+                freeCanvas.height = size;
+                drawFreeMode();
+            } else if (currentMode === 'problem') {
+                const userSize = Math.min(userCanvasContainer.clientWidth, userCanvasContainer.clientHeight) - 16;
+                userCanvas.width = userSize;
+                userCanvas.height = userSize;
+                
+                const answerSize = Math.min(answerCanvasContainer.clientWidth, answerCanvasContainer.clientHeight) - 16;
+                answerCanvas.width = answerSize;
+                answerCanvas.height = answerSize;
+                
+                drawProblemMode(); // 現在の問題を再描画
+            }
+        }
+        
+        // --- モード切替ロジック ---
+        function switchMode(mode) {
+            currentMode = mode;
+            modeSelectionScreen.classList.add('hidden');
+            freeModeScreen.classList.add('hidden');
+            problemModeScreen.classList.add('hidden');
+            backToModeSelectionBtn.classList.remove('hidden');
+
+            if (mode === 'free') {
+                freeModeScreen.classList.remove('hidden');
+                initFreeMode();
+            } else if (mode === 'problem') {
+                problemModeScreen.classList.remove('hidden');
+                initProblemMode();
+            }
+        }
+
+        // ★ 起動画面 - モード選択
+        selectFreeModeBtn.addEventListener('click', () => {
+            const selectedShape = document.querySelector('input[name="shapeSelection"]:checked').value;
+            currentShape = selectedShape;
+            switchMode('free');
+        });
+        selectProblemModeBtn.addEventListener('click', () => {
+            const selectedShape = document.querySelector('input[name="shapeSelection"]:checked').value;
+            currentShape = selectedShape;
+            switchMode('problem');
+        });
+        
+        backToModeSelectionBtn.addEventListener('click', () => {
+            currentMode = null;
+            modeSelectionScreen.classList.remove('hidden');
+            freeModeScreen.classList.add('hidden');
+            problemModeScreen.classList.add('hidden');
+            backToModeSelectionBtn.classList.add('hidden');
+            window.removeEventListener('resize', resizeAllCanvases);
+        });
+
+        // --- フリーモード初期化・描画 ---
+        function initFreeMode() {
+            const shapeDef = shapeDefs[currentShape];
+            
+            // ★ UI切り替え (全スライダーを隠してから該当を表示)
+            Object.values(shapeDefs).forEach(def => {
+                if (def.sliderContainer) def.sliderContainer.classList.add('hidden');
+            });
+            shapeDef.sliderContainer.classList.remove('hidden');
+            
+            freeModeTitle.textContent = `フリーモード - ${shapeDef.name}`;
+
+            drawHighlightIcons(); // アイコンを描画
+            
+            // スライダーイベント
+            shapeDef.sliders.forEach(slider => {
+                // 古いリスナーを削除 (モード切替時の重複防止)
+                slider.replaceWith(slider.cloneNode(true));
+            });
+            // 新しいスライダー要素を再取得してリスナーを追加
+            shapeDefs[currentShape].sliders = document.querySelectorAll(`#${shapeDef.sliderContainer.id} input[type="range"]`);
+            shapeDefs[currentShape].sliders.forEach(slider => {
+                slider.addEventListener('input', drawFreeMode);
+            });
+
+            // ハイライトイベント
+            shapeDef.highlightCheckboxes.forEach(checkbox => {
+                 // 古いリスナーを削除
+                checkbox.replaceWith(checkbox.cloneNode(true));
+            });
+            // 新しいチェックボックス要素を再取得してリスナーを追加
+            const highlightName = `s${currentShape.replace('shape', '')}_highlight`;
+            shapeDefs[currentShape].highlightCheckboxes = document.querySelectorAll(`input[name="${highlightName}"]`);
+            shapeDefs[currentShape].highlightCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', drawFreeMode);
+            });
+            
+            window.addEventListener('resize', resizeAllCanvases);
+            
+            // ★ スライダーの値をグローバル変数から復元 (リファクタリング)
+            shapeDef.params.forEach(paramId => {
+                const value = freeModeParams[currentShape][paramId];
+                const sliderId = shapeDef.sliderIdMap[paramId];
+                const slider = document.getElementById(sliderId);
+                if (slider) slider.value = value;
+            });
+            
+            // ハイライトの値をグローバル変数から復元
+            shapeDef.highlightCheckboxes.forEach(checkbox => {
+                const paramId = checkbox.dataset.param;
+                checkbox.checked = freeModeHighlights[currentShape][paramId];
+            });
+
+            resizeAllCanvases();
+        }
+
+        function drawFreeMode() {
+            const shapeDef = shapeDefs[currentShape];
+            
+            // スライダーから値を取得
+            shapeDef.sliders.forEach(slider => {
+                const paramId = slider.dataset.param;
+                const value = parseInt(slider.value);
+                freeModeParams[currentShape][paramId] = value;
+                
+                // 値をUIラベルに反映
+                let label = `${value}`;
+                if (['rot', 'copy', 'alpha', 'beta'].includes(paramId)) {
+                    label = `${value}°`;
+                }
+                shapeDef.valueLabels[paramId].textContent = label;
+            });
+            
+            // ハイライト状態を取得
+            shapeDef.highlightCheckboxes.forEach(checkbox => {
+                const paramId = checkbox.dataset.param;
+                freeModeHighlights[currentShape][paramId] = checkbox.checked;
+            });
+
+            const params = freeModeParams[currentShape];
+            const highlights = freeModeHighlights[currentShape];
+            
+            shapeDef.drawFn(freeCanvas, params, highlights);
+        }
+
+        // --- 問題モード初期化・描画 ---
+        function initProblemMode() {
+            const shapeDef = shapeDefs[currentShape];
+            problemModeTitle.textContent = `問題モード - ${shapeDef.name}`;
+            
+            // タブイベント
+            problemTabs.forEach(tab => tab.addEventListener('click', (e) => {
+                currentProblem = parseInt(e.target.dataset.problem);
+                problemTabs.forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                setupProblemUI();
+            }));
+            
+            // OKボタンイベント
+            const oldBtn = submitAnswerBtn;
+            const newBtn = oldBtn.cloneNode(true);
+            oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+            submitAnswerBtn = newBtn; // グローバル変数を更新
+            
+            submitAnswerBtn.addEventListener('click', () => {
+                animateParameters(userSelections);
+            });
+
+            window.addEventListener('resize', resizeAllCanvases);
+            currentProblem = 1; // 常に問題1から
+            problemTabs.forEach((t, i) => t.classList.toggle('active', i === 0));
+            setupProblemUI();
+        }
+        
+        // 問題UIを構築
+        function setupProblemUI() {
+            const shapeDef = shapeDefs[currentShape];
+            const problem = shapeDef.problemSet[currentProblem];
+            if (!problem) return;
+
+            paramSelectionContainer.innerHTML = '';
+            userSelections = {}; // 選択をリセット
+            currentUserParams = { ...problem.initial }; // ★ 現在値を初期値にリセット
+            
+            problem.options.forEach(opt => {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'space-y-2';
+                
+                // ラベル (アイコン)
+                const label = document.createElement('label');
+                label.className = 'flex items-center space-x-2';
+                const canvas = document.createElement('canvas');
+                canvas.id = `label_icon_prob_${currentShape}_${opt.id}`; // 固有ID
+                canvas.width = 40;
+                canvas.height = 30;
+                canvas.className = 'border border-gray-300 rounded';
+                canvas.title = opt.label;
+                label.appendChild(canvas);
+                groupDiv.appendChild(label);
+                
+                const btnContainer = document.createElement('div');
+                btnContainer.className = 'flex flex-wrap gap-2';
+                
+                if (opt.fixed !== undefined) {
+                    // 固定値
+                    const btn = document.createElement('button');
+                    btn.className = `${paramBtnBase} ${paramBtnFixed}`;
+                    btn.textContent = `${opt.fixed}${opt.unit || ''}`;
+                    btnContainer.appendChild(btn);
+                    userSelections[opt.id] = opt.fixed;
+                } else if (opt.values) {
+                    // 選択肢
+                    opt.values.forEach(val => {
+                        const btn = document.createElement('button');
+                        btn.className = `${paramBtnBase} ${paramBtnUnselected}`;
+                        btn.textContent = `${val}${opt.unit || ''}`;
+                        btn.dataset.param = opt.id;
+                        btn.dataset.value = val;
+                        
+                        btn.addEventListener('click', () => {
+                            userSelections[opt.id] = val;
+                            btnContainer.querySelectorAll('button').forEach(b => {
+                                if (b !== btn) {
+                                    if (!b.className.includes(paramBtnFixed)) {
+                                        b.className = `${paramBtnBase} ${paramBtnUnselected}`;
+                                    }
+                                }
+                            });
+                            btn.className = `${paramBtnBase} ${paramBtnSelected}`;
+                            checkAllParamsSelected();
+                        });
+                        btnContainer.appendChild(btn);
+                    });
+                }
+                groupDiv.appendChild(btnContainer);
+                paramSelectionContainer.appendChild(groupDiv);
+            });
+            
+            checkAllParamsSelected(); // OKボタンの初期状態
+            
+            // 問題モード用のアイコンを描画
+            problem.options.forEach(opt => {
+                const canvasId = `label_icon_prob_${currentShape}_${opt.id}`;
+                shapeDef.drawIconFns[opt.id](canvasId);
+            });
+
+            resizeAllCanvases(); // キャンバスサイズを調整して描画
+        }
+
+        // 問題モードのキャンバスを描画 (リサイズ時にも呼ばれる)
+        function drawProblemMode() {
+            const shapeDef = shapeDefs[currentShape];
+            const problem = shapeDef.problemSet[currentProblem];
+            if (!problem) return;
+            
+            // ★ 全ハイライトオブジェクト (全図形の全パラメータ)
+            const allHighlights = { 
+                l1: true, side: true, rot: true, copy: true, 
+                x: true, y: true, alpha: true, beta: true,
+                a: true, b: true, c: true, d: true,
+                r: true, sa: true, la: true
+            };
+            shapeDef.drawFn(userCanvas, currentUserParams, allHighlights); // 常時全ハイライト
+            shapeDef.drawFn(answerCanvas, problem.answer, {}); // ハイライトなし
+        }
+        
+        // 全てのパラメータが選択されたかチェック
+        function checkAllParamsSelected() {
+            const shapeDef = shapeDefs[currentShape];
+            const problem = shapeDef.problemSet[currentProblem];
+            if (!problem) {
+                submitAnswerBtn.disabled = true;
+                return;
+            }
+            const allSelected = problem.options.every(opt => userSelections[opt.id] !== undefined);
+            submitAnswerBtn.disabled = !allSelected;
+        }
+        
+        // 回答をチェック
+        function checkAnswer() {
+            const shapeDef = shapeDefs[currentShape];
+            const problem = shapeDef.problemSet[currentProblem];
+            if (!problem) return;
+            
+            const isCorrect = Object.keys(problem.answer).every(key => 
+                problem.answer[key] === userSelections[key]
+            );
+            
+            if (isCorrect) {
+                clearMessage.classList.remove('hidden');
+                setTimeout(() => {
+                    clearMessage.classList.add('hidden');
+                }, 1500);
+            }
+        }
+        
+        // 線形補間ヘルパー関数
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
+        }
+
+        // OKボタンのアニメーション関数
+        function animateParameters(targetParams) {
+            const shapeDef = shapeDefs[currentShape];
+            const startParams = { ...currentUserParams }; 
+            const animationOrder = shapeDef.params; // ★ 現在の図形のパラメータ順
+            const paramBaseDuration = 400; 
+
+            submitAnswerBtn.disabled = true; 
+            
+            let animations = [];
+            let cumulativeTime = 0;
+            
+            animationOrder.forEach(paramId => {
+                const startVal = startParams[paramId];
+                const endVal = targetParams[paramId];
+                const duration = (startVal !== endVal) ? paramBaseDuration : 0; 
+                
+                animations.push({
+                    id: paramId,
+                    startVal: startVal,
+                    endVal: endVal,
+                    startTime: cumulativeTime, 
+                    endTime: cumulativeTime + duration 
+                });
+                
+                cumulativeTime += duration; 
+            });
+
+            const totalDuration = cumulativeTime; 
+            let startTime = null;
+
+            function animationLoop(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const elapsed = timestamp - startTime;
+                
+                let frameParams = { ...startParams };
+
+                animations.forEach(anim => {
+                    if (elapsed < anim.startTime) {
+                        frameParams[anim.id] = anim.startVal;
+                    } else if (elapsed >= anim.endTime) {
+                        frameParams[anim.id] = anim.endVal;
+                    } else {
+                        if (anim.endTime === anim.startTime) { 
+                             frameParams[anim.id] = anim.endVal;
+                        } else {
+                            const progress = (elapsed - anim.startTime) / (anim.endTime - anim.startTime);
+                            frameParams[anim.id] = Math.round(lerp(anim.startVal, anim.endVal, progress));
+                        }
+                    }
+                });
+                
+                // ★ 全ハイライトオブジェクト (全図形の全パラメータ)
+                const allHighlights = { 
+                    l1: true, side: true, rot: true, copy: true, 
+                    x: true, y: true, alpha: true, beta: true,
+                    a: true, b: true, c: true, d: true,
+                    r: true, sa: true, la: true
+                };
+                shapeDef.drawFn(userCanvas, frameParams, allHighlights);
+                
+                if (elapsed < totalDuration) {
+                    requestAnimationFrame(animationLoop);
+                } else {
+                    shapeDef.drawFn(userCanvas, targetParams, allHighlights);
+                    currentUserParams = { ...targetParams }; 
+                    checkAllParamsSelected(); 
+                    setTimeout(checkAnswer, 500);
+                }
+            }
+            requestAnimationFrame(animationLoop);
+        }
+
+
+        // --- アイコン描画 ---
+        
+        // 図形1 - L1長さ
+        function drawS1L1Icon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            ctx.clearRect(0, 0, w, h); ctx.strokeStyle = HL_L1; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(w / 2, h * 0.8); ctx.lineTo(w / 2, h * 0.2); ctx.stroke();
+            ctx.fillStyle = HL_POINT; ctx.beginPath(); ctx.arc(w / 2, h * 0.2, 3, 0, Math.PI * 2); ctx.fill();
+        }
+        // 図形1 - 1辺の長さ
+        function drawS1SideIcon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            ctx.clearRect(0, 0, w, h); ctx.strokeStyle = HL_SIDE; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(w * 0.2, h * 0.5); ctx.lineTo(w * 0.8, h * 0.5); ctx.stroke();
+        }
+        // 図形1 - 回転角
+        function drawS1TriRotIcon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            const [cx, cy] = [w / 2, h * 0.7]; const r = h * 0.5; const angle = Math.PI / 4;
+            ctx.clearRect(0, 0, w, h); ctx.fillStyle = HL_POINT;
+            ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = HL_TRI_ROT; ctx.lineWidth = 2; ctx.setLineDash([2, 2]);
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - r); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + r * Math.cos(angle - Math.PI/2), cy + r * Math.sin(angle - Math.PI/2));
+            ctx.stroke(); ctx.setLineDash([]);
+            ctx.beginPath(); ctx.arc(cx, cy, r * 0.5, -Math.PI / 2, angle - Math.PI / 2); ctx.stroke();
+        }
+        // 図形1 - コピー角度
+        function drawS1CopyRotIcon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            const [cx, cy] = [w / 2, h / 2]; const r = h * 0.4; const angle = Math.PI / 3;
+            ctx.clearRect(0, 0, w, h); ctx.fillStyle = HL_POINT;
+            ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = DEFAULT_STROKE_ICON; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - r); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + r * Math.cos(angle - Math.PI/2), cy + r * Math.sin(angle - Math.PI/2));
+            ctx.stroke(); ctx.strokeStyle = HL_COPY_ROT; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(cx, cy, r * 0.7, -Math.PI / 2, angle - Math.PI / 2); ctx.stroke();
+        }
+        
+        // 図形2 - L1長さ (X)
+        function drawS2XIcon(canvasId) {
+            drawS1L1Icon(canvasId); // 図形1のL1アイコンと同じ
+        }
+        // 図形2 - L2長さ (Y)
+        function drawS2YIcon(canvasId) {
+            drawS1SideIcon(canvasId); // 図形1の辺アイコンと同じ (緑の線)
+        }
+        // 図形2 - L2角度 (α)
+        function drawS2AlphaIcon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            const [cx, cy] = [w / 2, h * 0.8]; const r = h * 0.6; const angle = Math.PI / 5; // 36度
+            ctx.clearRect(0, 0, w, h); ctx.fillStyle = HL_POINT;
+            ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill(); // 中心点
+            ctx.strokeStyle = HL_TRI_ROT; ctx.lineWidth = 2;
+            
+            // 基準線 (上)
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - r); ctx.stroke();
+            // 右の線
+            ctx.beginPath(); ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + r * Math.cos(angle - Math.PI/2), cy + r * Math.sin(angle - Math.PI/2));
+            ctx.stroke();
+            
+            // 左の線 (描画はするが、ハイライト対象ではない)
+            ctx.strokeStyle = DEFAULT_STROKE_ICON; // 色を変える
+            ctx.beginPath(); ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + r * Math.cos(-angle - Math.PI/2), cy + r * Math.sin(-angle - Math.PI/2));
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // 円弧 (★ 右のみ)
+            ctx.strokeStyle = HL_TRI_ROT; // 色を戻す
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 0.5, -Math.PI / 2, angle - Math.PI / 2);
+            ctx.stroke();
+        }
+        // 図形2 - コピー角度 (β)
+        function drawS2BetaIcon(canvasId) {
+            drawS1CopyRotIcon(canvasId); // 図形1のコピー角度アイコンと同じ
+        }
+
+        // ★ 図形3 アイコン (修正)
+        // A (底辺)
+        function drawS3AIcon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#16a34a'; // green-600
+            ctx.beginPath();
+            ctx.moveTo(w/2, h*0.2); ctx.lineTo(w*0.8, h*0.8); ctx.lineTo(w*0.2, h*0.8);
+            ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = HL_L1; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(w*0.2, h*0.8); ctx.lineTo(w*0.8, h*0.8); ctx.stroke();
+        }
+        // B (高さ)
+        function drawS3BIcon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#16a34a'; // green-600
+            ctx.beginPath();
+            ctx.moveTo(w/2, h*0.2); ctx.lineTo(w*0.8, h*0.8); ctx.lineTo(w*0.2, h*0.8);
+            ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = HL_SIDE; ctx.lineWidth = 2; ctx.setLineDash([2, 2]);
+            ctx.beginPath(); ctx.moveTo(w/2, h*0.2); ctx.lineTo(w/2, h*0.8); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        // C (ずれ/幹高さ)
+        function drawS3CIcon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#854d0e'; // brown-700
+            ctx.fillRect(w*0.4, h*0.5, w*0.2, h*0.4);
+            ctx.strokeStyle = HL_TRI_ROT; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(w*0.4, h*0.5); ctx.lineTo(w*0.4, h*0.9); ctx.stroke();
+        }
+        // D (幹幅)
+        function drawS3DIcon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#854d0e'; // brown-700
+            ctx.fillRect(w*0.3, h*0.3, w*0.4, h*0.4);
+            ctx.strokeStyle = HL_COPY_ROT; ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(w*0.3, h*0.7); // ★ 修正: 下側の辺
+            ctx.lineTo(w*0.7, h*0.7); // ★ 修正: 下側の辺
+            ctx.stroke();
+        }
+
+        // ★ 図形4 アイコン
+        // R (円半径)
+        function drawS4RIcon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            const [cx, cy] = [w/2, h/2]; const r = h * 0.35;
+            ctx.clearRect(0, 0, w, h);
+            ctx.strokeStyle = DEFAULT_STROKE_ICON; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = HL_L1; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + r, cy); ctx.stroke();
+        }
+        // SA (楕円短半径)
+        function drawS4SAIcon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            const [cx, cy] = [w/2, h/2]; const [rx, ry] = [w*0.4, h*0.3];
+            ctx.clearRect(0, 0, w, h);
+            ctx.strokeStyle = DEFAULT_STROKE_ICON; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = HL_SIDE; ctx.lineWidth = 2; ctx.setLineDash([2, 2]);
+            ctx.beginPath(); ctx.moveTo(cx, cy-ry); ctx.lineTo(cx, cy+ry); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        // LA (楕円長半径)
+        function drawS4LAIcon(canvasId) {
+            const c = document.getElementById(canvasId); if (!c) return;
+            const ctx = c.getContext('2d'); const [w, h] = [c.width, c.height];
+            const [cx, cy] = [w/2, h/2]; const [rx, ry] = [w*0.4, h*0.3];
+            ctx.clearRect(0, 0, w, h);
+            ctx.strokeStyle = DEFAULT_STROKE_ICON; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = HL_TRI_ROT; ctx.lineWidth = 2; ctx.setLineDash([2, 2]);
+            ctx.beginPath(); ctx.moveTo(cx-rx, cy); ctx.lineTo(cx+rx, cy); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+
+        // --- ハイライトアイコンの描画 (フリーモード用) ---
+        function drawHighlightIcons() {
+            const shapeDef = shapeDefs[currentShape];
+            // アイコンIDリストをループして、対応する描画関数を実行
+            shapeDef.iconCanvasIds.forEach(canvasId => {
+                const paramId = canvasId.split('_').pop(); // 'l1', 'side', 'x', 'a', 'r' など
+                if (shapeDef.drawIconFns[paramId]) {
+                    shapeDef.drawIconFns[paramId](canvasId);
+                }
+            });
+        }
+
+        // --- 初期化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // (初期化処理はモード選択時に移動)
+        });
+
+    </script>
+</body>
+</html>
+
