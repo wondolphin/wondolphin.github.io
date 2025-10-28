@@ -14,6 +14,8 @@
             cursor: pointer;
             border-radius: 0.5rem;
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            display: block; /* canvas下の余白削除 */
+            margin: auto; /* 中央寄せ */
         }
         .message-overlay {
             position: absolute;
@@ -37,43 +39,59 @@
         .message-overlay.show {
             opacity: 1;
         }
+        /* リセットボタン用 */
+        #resetButton {
+            position: absolute;
+            top: 0.75rem; /* 12px */
+            right: 0.75rem; /* 12px */
+            z-index: 10;
+        }
     </style>
 </head>
 <body class="bg-slate-100 flex flex-col justify-center items-center min-h-screen p-4">
 
-    <div id="game-container" class="w-full max-w-3xl mx-auto text-center">
-        <h1 id="title" class="text-3xl font-bold text-slate-700 mb-2"></h1>
+    <div id="game-container" class="w-full max-w-xl mx-auto text-center">
         
         <div class="mb-4">
             <label for="problem-select" class="text-slate-600 mr-2">問題を選択:</label>
             <select id="problem-select" class="p-2 rounded-md border border-slate-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
             </select>
         </div>
-
-        <p id="phase-info" class="text-lg text-slate-500 mb-4">カットフェーズ: 図形の頂点を2つ選んでカットしよう。</p>
         
-        <div class="relative">
+        <!-- 目標表示 -->
+        <h1 id="targetDisplay" class="text-xl font-bold text-slate-700 mb-4">もくひょう： </h1> 
+        
+        <!-- フェーズ説明文を削除 -->
+        
+        <div class="relative w-full max-w-xl mx-auto"> <!-- コンテナに幅制限と中央寄せ -->
             <canvas id="gameCanvas"></canvas>
             <div id="message" class="message-overlay"></div>
+            <!-- リセットボタン -->
+            <button id="resetButton" class="bg-slate-600 hover:bg-slate-700 text-white font-bold p-2 rounded-full shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+            </button>
         </div>
 
-        <button id="resetButton" class="mt-6 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-all duration-200">
-            リセット
-        </button>
+        <!-- ボタンを削除 (右上に移動) -->
+        
     </div>
 
     <script>
         // --- 初期設定 ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const titleEl = document.getElementById('title');
-        const phaseInfoEl = document.getElementById('phase-info');
+        // titleEl を targetDisplayEl に変更
+        const targetDisplayEl = document.getElementById('targetDisplay'); 
+        // phaseInfoEl を削除
         const resetButton = document.getElementById('resetButton');
         const messageEl = document.getElementById('message');
         const problemSelectEl = document.getElementById('problem-select');
 
         const GRID_SIZE = 30; // グリッドのサイズ
         const VERTEX_RADIUS = 8; // 頂点の半径
+        const MAX_GRID_ROWS = 15; // 最大縦マス数
 
         // --- 問題データ ---
         const problems = [
@@ -143,6 +161,15 @@
         // 初期化関数
         function init(problemId = 0) {
             const problem = problems[problemId];
+            
+            // 目標表示を更新
+            let targetShapeJa = '';
+            switch(problem.targetShape) {
+                case '三角形': targetShapeJa = 'さんかく'; break;
+                case '四角形': targetShapeJa = 'しかく'; break;
+                default: targetShapeJa = problem.targetShape;
+            }
+            targetDisplayEl.textContent = `もくひょう： ${targetShapeJa}`;
 
             gameState = {
                 problemId: problemId,
@@ -156,8 +183,7 @@
                 dragOffset: { x: 0, y: 0 },
             };
             
-            titleEl.textContent = `${problem.targetShape}を作ろう！`;
-            updatePhaseInfo();
+            // フェーズ表示削除
             resizeCanvas();
             requestAnimationFrame(gameLoop);
         }
@@ -173,9 +199,14 @@
         // --- キャンバスと描画 ---
         function resizeCanvas() {
             const container = document.getElementById('game-container');
-            const size = Math.min(container.clientWidth, 600);
+            // 横幅に合わせてサイズ決定、最大600px
+            const size = Math.min(container.clientWidth, 600); 
             canvas.width = size;
-            canvas.height = size;
+             // 高さは横幅の3/4程度、または最大マス数に制限
+            canvas.height = Math.min(size * 0.75, GRID_SIZE * MAX_GRID_ROWS); 
+            // 縦横比を保つ場合
+            // canvas.height = size; 
+            // canvas.height = Math.min(size, GRID_SIZE * MAX_GRID_ROWS); // 高さを制限する場合
         }
 
         function gameLoop() {
@@ -195,17 +226,18 @@
         function drawGrid() {
             ctx.strokeStyle = '#e2e8f0'; // slate-200
             ctx.lineWidth = 1;
-            // エラー箇所を修正: `// ... existing code ... -->` を削除し、正しい描画ロジックを復元
-            for (let x = 0; x <= canvas.width; x += GRID_SIZE) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            }
+            // 横線 (y座標) は canvas.height まで描画
             for (let y = 0; y <= canvas.height; y += GRID_SIZE) {
                 ctx.beginPath();
                 ctx.moveTo(0, y);
                 ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+             // 縦線 (x座標) は canvas.width まで描画
+            for (let x = 0; x <= canvas.width; x += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height); // 線をキャンバスの高さまで引く
                 ctx.stroke();
             }
         }
@@ -216,9 +248,12 @@
                 ctx.strokeStyle = '#1e293b'; // slate-800
                 ctx.lineWidth = 2;
                 ctx.beginPath();
+                // 座標がnull/undefinedでないことを確認
+                 if (!poly.vertices || poly.vertices.length === 0 || !poly.vertices[0]) return; 
                 const startPos = toCanvasCoords(poly.vertices[0]);
                 ctx.moveTo(startPos.x, startPos.y);
                 for (let i = 1; i < poly.vertices.length; i++) {
+                     if (!poly.vertices[i]) continue; // 念のため
                     const pos = toCanvasCoords(poly.vertices[i]);
                     ctx.lineTo(pos.x, pos.y);
                 }
@@ -232,9 +267,10 @@
             if (gameState.phase === 'cut') {
                 
                 // カットフェーズ中はすべての頂点を常に表示
-                if (gameState.polygons.length > 0) {
+                if (gameState.polygons.length > 0 && gameState.polygons[0]?.vertices) {
                     // カット対象は常に最初のポリゴン
                     gameState.polygons[0].vertices.forEach(v => {
+                         if (!v) return; // 念のため
                         const pos = toCanvasCoords(v);
                         ctx.fillStyle = 'rgba(59, 130, 246, 0.4)'; // blue-500 with alpha
                         ctx.beginPath();
@@ -245,6 +281,7 @@
 
                 // 選択済みの頂点（上書き）
                 gameState.selectedVertices.forEach(vInfo => {
+                     if (!vInfo || !vInfo.vertex) return; // 念のため
                     const pos = toCanvasCoords(vInfo.vertex);
                     ctx.fillStyle = 'rgba(239, 68, 68, 0.9)'; // red-500
                     ctx.beginPath();
@@ -253,7 +290,7 @@
                 });
                 
                 // ホバー中の頂点（上書き）
-                if (gameState.hoveredVertex) {
+                if (gameState.hoveredVertex && gameState.hoveredVertex.vertex) {
                      const pos = toCanvasCoords(gameState.hoveredVertex.vertex);
                     ctx.fillStyle = 'rgba(249, 115, 22, 0.9)'; // orange-500
                     ctx.beginPath();
@@ -265,6 +302,7 @@
 
         // --- 座標変換 ---
         function toCanvasCoords(gridPoint) {
+             if (!gridPoint) return { x: 0, y: 0 }; // エラー回避
             return {
                 x: gridPoint.x * GRID_SIZE,
                 y: gridPoint.y * GRID_SIZE
@@ -276,6 +314,11 @@
             const rect = canvas.getBoundingClientRect();
             const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
             const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
+            // clientX/Y が null/undefined の場合のフォールバック
+            if (clientX === undefined || clientY === undefined) {
+                console.error("Could not get clientX/Y from event:", evt);
+                return { x: 0, y: 0 }; // または適切なエラー処理
+            }
             return {
                 x: clientX - rect.left,
                 y: clientY - rect.top
@@ -293,25 +336,36 @@
         resetButton.addEventListener('click', () => init(gameState.problemId));
 
         function setupProblemSelect() {
+            // プルダウンをクリア
+            problemSelectEl.innerHTML = '';
             problems.forEach((p, index) => {
                 const option = document.createElement('option');
                 option.value = index;
                 option.textContent = p.title;
                 problemSelectEl.appendChild(option);
             });
-            problemSelectEl.addEventListener('change', (e) => {
-                init(parseInt(e.target.value, 10));
-            });
+            // イベントリスナーが重複しないように一旦削除してから追加
+            problemSelectEl.removeEventListener('change', handleProblemChange); 
+            problemSelectEl.addEventListener('change', handleProblemChange);
+        }
+        
+        function handleProblemChange(e) {
+             init(parseInt(e.target.value, 10));
         }
 
 
         function handleMouseMove(e) {
-            e.preventDefault();
+            // touchmove時もpreventDefaultが必要
+            if (e.type === 'touchmove' || (gameState.phase === 'combine' && gameState.draggedPolygon)) {
+                e.preventDefault();
+            }
             const mousePos = getMousePos(e);
 
             if (gameState.phase === 'cut') {
                 gameState.hoveredVertex = findVertexAt(mousePos);
             } else if (gameState.phase === 'combine' && gameState.draggedPolygon) {
+                 if (!gameState.draggedPolygon.poly?.vertices) return; // エラー回避
+                // ドラッグ中の座標計算 (浮動小数点)
                 const newVertices = gameState.draggedPolygon.vertices.map(v => ({
                     x: (mousePos.x - gameState.dragOffset.x) / GRID_SIZE + v.original.x,
                     y: (mousePos.y - gameState.dragOffset.y) / GRID_SIZE + v.original.y
@@ -321,77 +375,123 @@
         }
         
         function handleMouseDown(e) {
-            e.preventDefault();
+             // touchstart時もpreventDefaultが必要
+            if (e.type === 'touchstart') {
+                e.preventDefault();
+            }
             const mousePos = getMousePos(e);
 
             if (gameState.phase === 'cut') {
                 const clickedVertexInfo = findVertexAt(mousePos);
                 if (clickedVertexInfo) {
                     const isAlreadySelected = gameState.selectedVertices.some(v => 
-                        v.polygonIndex === clickedVertexInfo.polygonIndex && v.vertexIndex === clickedVertexInfo.vertexIndex
+                         v && clickedVertexInfo && // nullチェック
+                        v.polygonIndex === clickedVertexInfo.polygonIndex && 
+                        v.vertexIndex === clickedVertexInfo.vertexIndex
                     );
                     if (!isAlreadySelected) {
                         gameState.selectedVertices.push(clickedVertexInfo);
                         if (gameState.selectedVertices.length === 2) {
-                            splitPolygon();
+                            // --- 分割可否チェックを追加 ---
+                            if (isValidCut(gameState.selectedVertices[0], gameState.selectedVertices[1])) {
+                                console.log("--- カット有効 ---");
+                                splitPolygon();
+                            } else {
+                                console.log("--- カット無効 ---");
+                                // 選択をリセット
+                                gameState.selectedVertices = []; 
+                                // ここでユーザーにフィードバックを表示しても良い
+                            }
                         }
                     }
                 }
             } else if (gameState.phase === 'combine') {
                 const clickedPoly = findPolygonAt(mousePos);
                 if (clickedPoly) {
-                    gameState.dragOffset = getMousePos(e);
+                    gameState.dragOffset = mousePos; // ドラッグ開始座標を保存
                     gameState.draggedPolygon = {
                         poly: clickedPoly,
+                        // ドラッグ開始時の整数座標を保存
                         vertices: clickedPoly.vertices.map(v => ({ original: {...v} }))
                     };
                 }
             }
         }
         
+        // --- handleMouseUp の修正 (タッチ対応、スナップロジック改善) ---
         function handleMouseUp(e) {
+             // touchend でも preventDefault (場合によるが、意図しないスクロールを防ぐ)
+             // if (e.type === 'touchend') e.preventDefault(); 
+            
             if (gameState.phase === 'combine' && gameState.draggedPolygon) {
                 const poly = gameState.draggedPolygon.poly;
-                const originalVertices = gameState.draggedPolygon.vertices;
-                const startMousePos = gameState.dragOffset;
-                const finalMousePos = getMousePos(e);
-
-                const canvasDx = finalMousePos.x - startMousePos.x;
-                const canvasDy = finalMousePos.y - startMousePos.y;
-
-                const gridDx = Math.round(canvasDx / GRID_SIZE);
-                const gridDy = Math.round(canvasDy / GRID_SIZE);
-
-                for (let i = 0; i < poly.vertices.length; i++) {
-                    poly.vertices[i].x = originalVertices[i].original.x + gridDx;
-                    poly.vertices[i].y = originalVertices[i].original.y + gridDy;
+                
+                // poly.vertices が存在し、要素があることを確認
+                if (!poly.vertices || poly.vertices.length === 0) {
+                     console.error("Dragged polygon has no vertices on mouse/touch end.");
+                     gameState.draggedPolygon = null; // Reset drag state
+                     return; 
                 }
+
+                // ドラッグ終了時の図形の「現在の」浮動小数点座標を取得
+                 // Handle potential undefined vertices during drag
+                const currentVertices = poly.vertices.map(v => v ? {...v} : null).filter(v => v !== null); 
+                
+                if (currentVertices.length > 0) {
+                    const firstVertexCurrent = currentVertices[0];
+
+                    // 最初の頂点の目標グリッド座標を計算
+                    const snappedGridX = Math.round(firstVertexCurrent.x);
+                    const snappedGridY = Math.round(firstVertexCurrent.y);
+
+                    // スナップに必要な移動量を計算 (浮動小数点 -> 整数)
+                    const snapDx = snappedGridX - firstVertexCurrent.x;
+                    const snapDy = snappedGridY - firstVertexCurrent.y;
+
+                    // すべての頂点にスナップ移動量を適用して整数座標にする
+                    poly.vertices.forEach(v => {
+                         if (v) { // null チェック
+                            v.x += snapDx;
+                            v.y += snapDy;
+                         }
+                    });
+                     // 念のため整数化 (丸め誤差対策)
+                     poly.vertices.forEach(v => {
+                         if (v) {
+                            v.x = Math.round(v.x);
+                            v.y = Math.round(v.y);
+                         }
+                     });
+                } else {
+                     console.error("No valid vertices found after drag.");
+                }
+
 
                 checkWinCondition();
                 gameState.draggedPolygon = null;
             }
         }
 
+
         // --- ゲームロジック ---
 
-        function updatePhaseInfo() {
-            if (gameState.phase === 'cut') {
-                phaseInfoEl.textContent = 'カットフェーズ: 図形の頂点を2つ選んでカットしよう。';
-            } else {
-                phaseInfoEl.textContent = '合体フェーズ: 図形をドラッグして、お題の形を完成させよう。';
-            }
-        }
+        // フェーズ表示削除
 
         function findVertexAt(pos) {
-            for (let i = 0; i < gameState.polygons.length; i++) {
-                const poly = gameState.polygons[i];
-                for (let j = 0; j < poly.vertices.length; j++) {
-                    const v = poly.vertices[j];
-                    const vPos = toCanvasCoords(v);
-                    const dist = Math.hypot(vPos.x - pos.x, vPos.y - pos.y);
-                    if (dist < VERTEX_RADIUS) {
-                        return { polygonIndex: i, vertexIndex: j, vertex: v };
-                    }
+            // カットフェーズでなければ何もしない
+             if (gameState.phase !== 'cut' || !gameState.polygons || gameState.polygons.length === 0 || !gameState.polygons[0]?.vertices) {
+                return null;
+            }
+            // カット対象は常に最初のポリゴン
+            const poly = gameState.polygons[0]; 
+            for (let j = 0; j < poly.vertices.length; j++) {
+                const v = poly.vertices[j];
+                 if (!v) continue; // null チェック
+                const vPos = toCanvasCoords(v);
+                const dist = Math.hypot(vPos.x - pos.x, vPos.y - pos.y);
+                if (dist < VERTEX_RADIUS) {
+                    // カット対象ポリゴンのインデックスは常に0
+                    return { polygonIndex: 0, vertexIndex: j, vertex: v }; 
                 }
             }
             return null;
@@ -400,10 +500,12 @@
         function findPolygonAt(pos) {
             for (let i = gameState.polygons.length - 1; i >= 0; i--) {
                 const poly = gameState.polygons[i];
+                 if (!poly?.vertices || poly.vertices.length < 1 || !poly.vertices[0]) continue; // 安全チェック
                 ctx.beginPath();
                 const startPos = toCanvasCoords(poly.vertices[0]);
                 ctx.moveTo(startPos.x, startPos.y);
                 for (let j = 1; j < poly.vertices.length; j++) {
+                     if (!poly.vertices[j]) continue; // 安全チェック
                     const p = toCanvasCoords(poly.vertices[j]);
                     ctx.lineTo(p.x, p.y);
                 }
@@ -421,21 +523,26 @@
          * @returns {Array<object>} 単純化された頂点の配列
          */
         function simplifyPolygon(vertices) {
-            if (vertices.length < 3) {
-                return vertices;
+            if (!vertices || vertices.length < 3) {
+                return vertices || []; // null/undefined または少なすぎる場合はそのまま返す
             }
             const simplified = [];
-            for (let i = 0; i < vertices.length; i++) {
-                const p_prev = vertices[(i - 1 + vertices.length) % vertices.length];
+            const n = vertices.length;
+            for (let i = 0; i < n; i++) {
+                const p_prev = vertices[(i - 1 + n) % n];
                 const p_curr = vertices[i];
-                const p_next = vertices[(i + 1) % vertices.length];
+                const p_next = vertices[(i + 1) % n];
                 
+                // null/undefined チェックを追加
+                if (!p_prev || !p_curr || !p_next) continue;
+
                 // 現在の点が隣接する点と一直線上でなければ、真の頂点として保持する
                 if (getOrientation(p_prev, p_curr, p_next) !== 0) {
                     simplified.push(p_curr);
                 }
             }
-            return simplified;
+            // 頂点が2つ以下になった場合は元のリストを返す（縮退を避ける）
+            return simplified.length < 3 ? vertices : simplified;
         }
 
 
@@ -443,7 +550,8 @@
             const v1Info = gameState.selectedVertices[0];
             const v2Info = gameState.selectedVertices[1];
             
-            if (v1Info.polygonIndex !== v2Info.polygonIndex) {
+            // isValidCut でチェック済みのはずだが念のため
+            if (!v1Info || !v2Info || v1Info.polygonIndex !== v2Info.polygonIndex || !gameState.polygons[v1Info.polygonIndex]?.vertices) { 
                 gameState.selectedVertices = [];
                 return;
             }
@@ -458,123 +566,672 @@
 
             const newVertices1 = [];
             for (let i = idx1; i <= idx2; i++) {
-                newVertices1.push(vertices[i]);
+                 if (vertices[i]) newVertices1.push(vertices[i]); // null チェック
             }
             
             const newVertices2 = [];
             for (let i = idx2; i < vertices.length; i++) {
-                newVertices2.push(vertices[i]);
+                 if (vertices[i]) newVertices2.push(vertices[i]); // null チェック
             }
             for (let i = 0; i <= idx1; i++) {
-                newVertices2.push(vertices[i]);
+                 if (vertices[i]) newVertices2.push(vertices[i]); // null チェック
+            }
+            
+            const simplified1 = simplifyPolygon(newVertices1);
+            const simplified2 = simplifyPolygon(newVertices2);
+
+            // 分割後のポリゴンが有効か（頂点が3つ以上あるか）チェック
+             if (!simplified1 || simplified1.length < 3 || !simplified2 || simplified2.length < 3) {
+                console.warn("分割により無効なポリゴンが生成されました。カットをキャンセルします。");
+                gameState.selectedVertices = [];
+                return;
             }
 
             gameState.polygons = [
-                createPolygon(simplifyPolygon(newVertices1)),
-                createPolygon(simplifyPolygon(newVertices2)),
+                createPolygon(simplified1),
+                createPolygon(simplified2),
             ];
             gameState.phase = 'combine';
-            updatePhaseInfo();
+            // フェーズ表示削除
+            gameState.selectedVertices = []; // 選択解除
         }
         
+        // 3点の向きを調べる
         function getOrientation(p, q, r) {
+             // null/undefined チェック
+             if (!p || !q || !r) return 0; // 不正な入力は同一直線扱い
+            // 浮動小数点を含む可能性があるため、許容誤差を設定
+            const epsilon = 0.001; 
             const val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
-            if (Math.abs(val) < 0.001) return 0;
-            return (val > 0) ? 1 : 2;
+            if (Math.abs(val) < epsilon) return 0; // 同一直線上
+            return (val > 0) ? 1 : 2; // 時計回り or 反時計回り
         }
-
-        function calculateConvexHull(points) {
-            const n = points.length;
-            if (n < 3) return points;
-
-            let hull = [];
-            let l = 0;
-            for (let i = 1; i < n; i++) {
-                if (points[i].x < points[l].x) {
-                    l = i;
-                }
+        
+        // --- カット有効性チェック関数 ---
+        function isValidCut(v1Info, v2Info) {
+            console.log("--- カット有効性チェック開始 ---");
+            // null チェック
+             if (!v1Info || !v2Info || !v1Info.vertex || !v2Info.vertex) {
+                console.log("エラー: 選択された頂点情報が無効です。");
+                return false;
+             }
+            // カット対象は常に最初のポリゴン
+            if (v1Info.polygonIndex !== 0 || v2Info.polygonIndex !== 0) {
+                console.log("エラー: カット対象のポリゴンインデックスが不正です。");
+                return false; 
+            }
+            const polygon = gameState.polygons[0];
+            // null チェック
+             if (!polygon?.vertices) {
+                 console.log("エラー: カット対象のポリゴンまたは頂点リストが無効です。");
+                 return false;
+             }
+            const vertices = polygon.vertices.filter(v => v !== null); // nullを除去
+            const n = vertices.length;
+            let idx1 = v1Info.vertexIndex;
+            let idx2 = v2Info.vertexIndex;
+            const p1 = v1Info.vertex;
+            const p2 = v2Info.vertex;
+            
+            if (idx1 === idx2) {
+                 console.log("チェック失敗: 同じ頂点が選択されています。");
+                 return false; // 同じ点は選べない
             }
 
-            let p = l, q;
-            do {
-                hull.push(points[p]);
-                q = (p + 1) % n;
-                for (let i = 0; i < n; i++) {
-                    const orientation = getOrientation(points[p], points[i], points[q]);
-                    if (orientation === 2) {
-                        q = i;
-                    } 
-                    else if (orientation === 0) {
-                        const dist_pq_sq = (points[q].x - points[p].x)**2 + (points[q].y - points[p].y)**2;
-                        const dist_pi_sq = (points[i].x - points[p].x)**2 + (points[i].y - points[p].y)**2;
-                        if (dist_pi_sq > dist_pq_sq) {
-                            q = i;
-                        }
-                    }
-                }
-                p = q;
-            } while (p !== l);
+            // インデックスを昇順に (オリジナルのインデックスを使う)
+            const original_idx1 = v1Info.vertexIndex;
+            const original_idx2 = v2Info.vertexIndex;
+             if (original_idx1 > original_idx2) {
+                idx1 = original_idx2;
+                idx2 = original_idx1;
+             } else {
+                 idx1 = original_idx1;
+                 idx2 = original_idx2;
+             }
 
-            return hull;
+
+            // 1. 隣接チェック
+             const original_n = polygon.vertices.length; // 元の頂点数でチェック
+            const areAdjacent = (idx2 === idx1 + 1) || (idx1 === 0 && idx2 === original_n - 1);
+            console.log(`1. 隣接チェック: 選択された頂点は隣接しているか？ -> ${areAdjacent}`);
+            if (areAdjacent) {
+                console.log("   ...分割不可 (隣接する頂点)");
+                return false;
+            }
+
+            // 2. 線上チェック (修正: 間にある頂点の *どれか1つでも* 線上にあれば分割不可)
+            let anyIntermediateCollinear = false;
+            console.log(`2. 線上チェック: 間にある頂点のいずれかが線分上にあるか？`);
+            // idx1からidx2への経路 (元の頂点リストで)
+            for (let i = idx1 + 1; i < idx2; i++) {
+                const intermediateVertex = polygon.vertices[i];
+                 if (!intermediateVertex) continue; // null スキップ
+                if (onSegment(p1, intermediateVertex, p2)) {
+                    anyIntermediateCollinear = true;
+                    console.log(`   ...頂点 ${i} (${intermediateVertex.x}, ${intermediateVertex.y}) は線分上にあります (経路1)。`);
+                    break; 
+                } else {
+                     console.log(`   ...頂点 ${i} (${intermediateVertex.x}, ${intermediateVertex.y}) は線分上にありません (経路1)。`);
+                }
+            }
+            // idx2からidx1への経路 (ラップアラウンド, 元の頂点リストで)
+            if (!anyIntermediateCollinear) { // 最初の経路で線上頂点が見つからなかった場合のみチェック
+                 for (let i = (idx2 + 1) % original_n; i !== idx1; i = (i + 1) % original_n) {
+                     const intermediateVertex = polygon.vertices[i];
+                      if (!intermediateVertex) continue; // null スキップ
+                     if (onSegment(p1, intermediateVertex, p2)) {
+                         anyIntermediateCollinear = true;
+                         console.log(`   ...頂点 ${i} (${intermediateVertex.x}, ${intermediateVertex.y}) は線分上にあります (経路2)。`);
+                         break;
+                     } else {
+                          console.log(`   ...頂点 ${i} (${intermediateVertex.x}, ${intermediateVertex.y}) は線分上にありません (経路2)。`);
+                     }
+                 }
+            }
+             console.log(`   -> 結果: ${anyIntermediateCollinear}`);
+            if (anyIntermediateCollinear) {
+                console.log("   ...分割不可 (中間の頂点のいずれかが同一直線上)");
+                return false;
+            }
+
+
+            // 3. 交差チェック (線分p1-p2が他の辺と交差するか)
+            let intersectsOtherEdge = false;
+            console.log(`3. 交差チェック (カット線分: (${p1.x},${p1.y})-(${p2.x},${p2.y}))`);
+            for (let i = 0; i < original_n; i++) {
+                const edgeP1 = polygon.vertices[i];
+                const edgeP2 = polygon.vertices[(i + 1) % original_n];
+                
+                // null チェック
+                if (!edgeP1 || !edgeP2) continue;
+
+                // カット線分の端点を含む辺はチェック対象外
+                 if (i === idx1 || (i + 1) % original_n === idx1 || i === idx2 || (i + 1) % original_n === idx2) {
+                     console.log(`   ...辺 ${i} (${edgeP1.x},${edgeP1.y})-(${edgeP2.x},${edgeP2.y}) は選択点を含むためスキップ`);
+                     continue; 
+                 }
+
+                if (doSegmentsIntersect(p1, p2, edgeP1, edgeP2)) {
+                    intersectsOtherEdge = true;
+                     console.log(`   ...辺 ${i} (${edgeP1.x},${edgeP1.y})-(${edgeP2.x},${edgeP2.y}) と交差しました。`);
+                    break;
+                }
+            }
+            console.log(`   -> 結果: ${intersectsOtherEdge}`);
+            if (intersectsOtherEdge) {
+                console.log("   ...分割不可 (カット線が他の辺と交差)");
+                return false;
+            }
+            
+            // 4. 内部線分チェック (修正: 線分p1-p2の中点がポリゴンの厳密な内部にあるか？ trueなら分割可)
+            const midPoint = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+            console.log(`4. 内部線分チェック (中点: (${midPoint.x}, ${midPoint.y}))`);
+            
+            // isPointStrictlyInside は浮動小数点に対応する必要があるため、ここで判定
+            let midPointOnEdge = false;
+            for (let i = 0; i < original_n; i++) {
+                 const edgeP1 = polygon.vertices[i];
+                 const edgeP2 = polygon.vertices[(i + 1) % original_n];
+                  if (!edgeP1 || !edgeP2) continue; // null チェック
+                 if (onSegment(edgeP1, midPoint, edgeP2)) {
+                      midPointOnEdge = true;
+                      console.log(`   ...中点が辺 ${i} (${edgeP1.x},${edgeP1.y})-(${edgeP2.x},${edgeP2.y}) 上にあります。`);
+                      break;
+                 }
+            }
+            
+            // isPointInPath を使って内部・境界上判定
+             ctx.beginPath(); // isPointInPath のためにパスを再構築
+             const startPos = toCanvasCoords(polygon.vertices[0]);
+             ctx.moveTo(startPos.x, startPos.y);
+             for (let j = 1; j < original_n; j++) {
+                 const pt = toCanvasCoords(polygon.vertices[j]);
+                 if (pt) ctx.lineTo(pt.x, pt.y); // null チェック
+             }
+             ctx.closePath();
+            const midPointCanvas = toCanvasCoords(midPoint);
+            const isMidpointInsideOrOnEdge = ctx.isPointInPath(midPointCanvas.x, midPointCanvas.y); 
+            
+            // 厳密に内部にあるのは、isPointInPathがtrueで、かつどの辺上にもない場合
+            const isMidpointStrictlyInside = isMidpointInsideOrOnEdge && !midPointOnEdge;
+            
+            console.log(`   -> 中点は辺上にあるか: ${midPointOnEdge}`);
+            console.log(`   -> 中点は内部または辺上にあるか (isPointInPath): ${isMidpointInsideOrOnEdge}`);
+            console.log(`   -> 結果 (厳密に内部にあるか): ${isMidpointStrictlyInside}`);
+            
+            // 修正: 厳密に内部に *なければ* 分割不可
+            if (!isMidpointStrictlyInside) {
+                console.log("   ...分割不可 (カット線が内部を通過しない, 外部または辺上)");
+                return false;
+            }
+
+            // すべての「分割不可」条件に当てはまらなければ分割可
+            return true; 
         }
 
+
+        // --- 新しいクリア判定ロジック (ここから) ---
+
+        // 最大公約数 (GCD) を計算するヘルパー
+        function gcd(a, b) {
+            return b === 0 ? a : gcd(b, a % b);
+        }
+
+        // 2点間の格子点をたどり、単位有向辺をセットに追加するヘルパー
+        function addUnitEdgesBetween(p1, p2, edgeSet) {
+             if (!p1 || !p2) return; // null チェック
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            
+            if (dx === 0 && dy === 0) return;
+
+            // 修正: GCDを使って最短の格子点ベクトルに分解する
+            const commonDivisor = gcd(Math.abs(dx), Math.abs(dy));
+            const ux = dx / commonDivisor; // 単位ベクトルのx成分 (整数)
+            const uy = dy / commonDivisor; // 単位ベクトルのy成分 (整数)
+            const len = commonDivisor;     // 分解後の辺の数
+
+            for (let i = 0; i < len; i++) {
+                const x1 = p1.x + i * ux;
+                const y1 = p1.y + i * uy;
+                const x2 = p1.x + (i + 1) * ux;
+                const y2 = p1.y + (i + 1) * uy;
+                // 座標はすべて整数になる
+                edgeSet.add(`${x1},${y1},${x2},${y2}`);
+            }
+        }
+
+        // 多角形の頂点リストから単位有向辺セットを作成
+        function getUnitEdges(vertices) {
+             if (!vertices) return new Set(); // null チェック
+            const edgeSet = new Set();
+            const validVertices = vertices.filter(v => v !== null); // null を除去
+            const n = validVertices.length;
+            for (let i = 0; i < n; i++) {
+                const p1 = validVertices[i];
+                const p2 = validVertices[(i + 1) % n];
+                addUnitEdgesBetween(p1, p2, edgeSet);
+            }
+            return edgeSet;
+        }
+
+        // 単位有向辺セットの逆向きセットを作成
+        function getReversedEdges(edgeSet) {
+            const reversedSet = new Set();
+            for (const edge of edgeSet) {
+                const [x1, y1, x2, y2] = edge.split(',').map(Number);
+                reversedSet.add(`${x2},${y2},${x1},${y1}`);
+            }
+            return reversedSet;
+        }
+        
+        // 線分qが線分pr上にあるか (端点を含む)
+        // onSegment は isValidCut でも使用するためグローバルスコープに移動
+
+        // 線分qが線分pr上にあるか (端点を除く)
+        function onSegmentStrict(p, q, r) {
+             if (!p || !q || !r) return false; // null チェック
+            // qがpまたはrと一致する場合はfalse
+            if ((q.x === p.x && q.y === p.y) || (q.x === r.x && q.y === r.y)) {
+                return false;
+            }
+            return onSegment(p, q, r);
+        }
+
+        // レイキャスティング法による点の内部判定（厳密に内部）
+        function isPointStrictlyInside(point, polygonVertices) {
+             if (!point || !polygonVertices || polygonVertices.length < 3) return false; // null チェック
+            console.log(`  isPointStrictlyInside: 点 (${point.x}, ${point.y}) をチェック中...`);
+            const x = point.x, y = point.y;
+            let isInside = false;
+            const validVertices = polygonVertices.filter(v => v !== null); // null を除去
+            const n = validVertices.length;
+
+            for (let i = 0, j = n - 1; i < n; j = i++) {
+                const xi = validVertices[i].x, yi = validVertices[i].y;
+                const xj = validVertices[j].x, yj = validVertices[j].y;
+                
+                // 頂点上にある
+                if (xi === x && yi === y) {
+                    console.log(`    ...頂点 (${xi}, ${yi}) の上にあります。 [結果: 内部ではない]`);
+                    return false;
+                }
+                
+                // 辺上にあるかチェック (同一直線かつ範囲内)
+                if (onSegment({x:xi, y:yi}, point, {x:xj, y:yj})) {
+                     console.log(`    ...辺 (${xi}, ${yi})-(${xj}, ${yj}) の上にあります。 [結果: 内部ではない]`);
+                     return false; // 境界上
+                }
+                
+                // レイキャスティング (水平レイ: (x, y) から +X方向)
+                // 辺 (xi, yi) - (xj, yj) と交差するか？
+                // 始点を含み、終点を含まない (yi <= y < yj) または (yj <= y < yi)
+                const y_crosses = ((yi <= y && y < yj) || (yj <= y && y < yi));
+
+                if (y_crosses) {
+                    // x < x_intersect ?
+                    // 浮動小数点を避けるため、外積(getOrientation)で左右を判定
+                    const orientation = getOrientation({x:xi, y:yi}, {x:xj, y:yj}, point);
+
+                    if (yj > yi) { // 上向きの辺 (yi <= y < yj)
+                         if (orientation === 2) { // pointが左側 (レイが交差)
+                            console.log(`    ...レイが上向きの辺 (${xi}, ${yi})-(${xj}, ${yj}) と交差しました。`);
+                            isInside = !isInside;
+                         }
+                     } else { // 下向きの辺 (yj <= y < yi)
+                         if (orientation === 1) { // pointが右側 (レイが交差)
+                             console.log(`    ...レイが下向きの辺 (${xi}, ${yi})-(${xj}, ${yj}) と交差しました。`);
+                             isInside = !isInside;
+                         }
+                     }
+                }
+            }
+            console.log(`  isPointStrictlyInside: 最終結果: ${isInside}`);
+            return isInside;
+        }
+        
+
+        // 2つの線分 (p1, q1) と (p2, q2) が端点以外で交差するか
+        // (修正版: 交点計算 + 厳密な内部判定)
+        function doSegmentsIntersect(p1, q1, p2, q2) {
+             // null チェック
+             if (!p1 || !q1 || !p2 || !q2) return false; 
+            console.log(`  doSegmentsIntersect: 辺 (${p1.x},${p1.y})-(${q1.x},${q1.y}) vs 辺 (${p2.x},${p2.y})-(${q2.x},${q2.y})`);
+
+            const dx1 = q1.x - p1.x;
+            const dy1 = q1.y - p1.y;
+            const dx2 = q2.x - p2.x;
+            const dy2 = q2.y - p2.y;
+            const dx3 = p1.x - p2.x; // p1 - p2 の x 成分
+            const dy3 = p1.y - p2.y; // p1 - p2 の y 成分
+
+            const det = dx1 * dy2 - dx2 * dy1; // Integer calculation
+
+            if (det === 0) {
+                // Lines are parallel or collinear
+                // checkOverlap の役割は「食い込み」や「十字交差」の検出なので、
+                // 平行・同一直線上の場合は「交差ではない」として false を返す
+                console.log("    ...[結果: false] (平行または同一直線上)");
+                return false;
+            } else {
+                // Lines intersect at a point
+                // Corrected formula for num_t
+                const num_t = dx2 * dy3 - dx3 * dy2; // This corresponds to cross(s, q) where q = p1-p2
+                const num_u = dx1 * dy3 - dy1 * dx3; // This corresponds to cross(r, q) where q = p1-p2
+
+                console.log(`    ...Lines intersect (det=${det}, num_t=${num_t}, num_u=${num_u})`);
+
+                // Check if intersection point is strictly within both segments (0 < t < 1 and 0 < u < 1)
+                // Using integer comparison to avoid floating point issues
+                let t_in_range = false;
+                let u_in_range = false;
+
+                // Check sign consistency for t = num_t / det
+                if (det > 0) {
+                    t_in_range = num_t > 0 && num_t < det;
+                } else { // det < 0
+                    t_in_range = num_t < 0 && num_t > det; // Check if det < num_t < 0
+                }
+
+                // Check sign consistency for u = num_u / det 
+                if (det > 0) {
+                     u_in_range = num_u > 0 && num_u < det;
+                } else { // det < 0
+                     u_in_range = num_u < 0 && num_u > det; // Check if det < num_u < 0
+                }
+                
+                console.log(`    ...Range check: t_in_range=${t_in_range}, u_in_range=${u_in_range}`);
+
+                if (t_in_range && u_in_range) {
+                    console.log("    ...[結果: true] (Intersection point is strictly within both segments)");
+                    return true; // Intersection point is strictly within both segments
+                } else {
+                    console.log("    ...[結果: false] (Intersection point is outside one or both segments, or on an endpoint)");
+                    return false; // Intersection point is outside one or both segments, or on an endpoint (T-junction etc.)
+                }
+            }
+        }
+
+        // チェック1: 重なり判定
+        function checkOverlap(poly1, poly2) {
+             if (!poly1?.vertices || !poly2?.vertices || poly1.vertices.length < 3 || poly2.vertices.length < 3) return true; // Invalid polygon is considered overlapping
+            const validVertices1 = poly1.vertices.filter(v => v !== null);
+            const validVertices2 = poly2.vertices.filter(v => v !== null);
+             if (validVertices1.length < 3 || validVertices2.length < 3) return true; // Not enough valid vertices
+
+            console.log("  【チェック1】重なり判定 (checkOverlap) 開始");
+            
+            // 内部頂点判定 (P1の頂点がP2の内部にあるか)
+            console.log("  ...P1の頂点がP2の内部にあるかチェック");
+            if (isPointStrictlyInside(validVertices1[0], validVertices2)) {
+                console.log("    ...[結果: 重なっている] (P1の頂点がP2の内部)");
+                return true; // Overlaps = True
+            }
+            
+            // 内部頂点判定 (P2の頂点がP1の内部にあるか)
+            console.log("  ...P2の頂点がP1の内部にあるかチェック");
+            if (isPointStrictlyInside(validVertices2[0], validVertices1)) {
+                console.log("    ...[結果: 重なっている] (P2の頂点がP1の内部)");
+                return true; // Overlaps = True
+            }
+            
+            // 辺の交差判定
+            console.log("  ...辺同士の交差判定チェック");
+            for (let i = 0; i < validVertices1.length; i++) {
+                const p1 = validVertices1[i];
+                const q1 = validVertices1[(i + 1) % validVertices1.length];
+                for (let j = 0; j < validVertices2.length; j++) {
+                    const p2 = validVertices2[j];
+                    const q2 = validVertices2[(j + 1) % validVertices2.length];
+                    if (doSegmentsIntersect(p1, q1, p2, q2)) {
+                        console.log(`    ...[結果: 重なっている] (辺 ${i}:(${p1.x},${p1.y})-(${q1.x},${q1.y}) と 辺 ${j}:(${p2.x},${p2.y})-(${q2.x},${q2.y}) が交差)`);
+                        return true; // Overlaps = True
+                    }
+                }
+            }
+            
+            console.log("  ...[結果: 重なっていない]");
+            return false; // NonOverlapping = True
+        }
+        
+        // --- 集合演算ヘルパー ---
+        function setIntersection(setA, setB) {
+            const intersection = new Set();
+            for (const elem of setB) {
+                if (setA.has(elem)) {
+                    intersection.add(elem);
+                }
+            }
+            return intersection;
+        }
+
+        function setUnion(setA, setB) {
+            const union = new Set(setA);
+            for (const elem of setB) {
+                union.add(elem);
+            }
+            return union;
+        }
+
+        function setDifference(setA, setB) {
+            const difference = new Set(setA);
+            for (const elem of setB) {
+                difference.delete(elem);
+            }
+            return difference;
+        }
+
+        // チェック3: 結合後の頂点数カウント
+        function countCombinedVertices(unitEdges1, unitEdges2, sharedEdges) {
+            
+            // 共有辺の逆向きセット
+            const sharedEdgesReversed = getReversedEdges(sharedEdges);
+            
+            const allUnitEdges = setUnion(unitEdges1, unitEdges2);
+            // (SharedUnitEdges ∪ SharedUnitEdges_Reversed) を取り除く
+            const edgesToRemove = setUnion(sharedEdges, sharedEdgesReversed);
+            const externalUnitEdges = setDifference(allUnitEdges, edgesToRemove);
+
+            if (externalUnitEdges.size === 0) {
+                return 0; // 全て内部辺だった
+            }
+
+            // 辺の接続マップを作成 (始点キー -> 終点キー)
+            const edgeMap = new Map();
+            // 始点キー -> 辺オブジェクト
+            const edgeData = new Map();
+            
+            for (const edge of externalUnitEdges) {
+                const [x1, y1, x2, y2] = edge.split(',').map(Number);
+                const startKey = `${x1},${y1}`;
+                const endKey = `${x2},${y2}`;
+                edgeMap.set(startKey, endKey);
+                edgeData.set(startKey, {x1, y1, x2, y2});
+            }
+
+            // 任意の辺からトラバース開始
+            const startEdgeStr = externalUnitEdges.values().next().value;
+            if (!startEdgeStr) {
+                 return -1; // 外部辺がない？
+            }
+            const startKey = startEdgeStr.split(',').slice(0, 2).join(',');
+            
+            let currentKey = startKey;
+            let currentEdge = edgeData.get(currentKey);
+            if (!currentEdge) return -1; // 開始辺が見つからない
+            
+            let currentDirection = { x: currentEdge.x2 - currentEdge.x1, y: currentEdge.y2 - currentEdge.y1 };
+            
+            let vertexCount = 0;
+            let traversedEdgesCount = 0;
+            const initialDirection = currentDirection;
+
+            do {
+                traversedEdgesCount++;
+                const nextKey = edgeMap.get(currentKey);
+                
+                if (!nextKey || !edgeData.has(nextKey)) {
+                     // ループが閉じない (図形が壊れている)
+                     return -1; // エラー
+                }
+                
+                currentEdge = edgeData.get(nextKey);
+                const nextDirection = { x: currentEdge.x2 - currentEdge.x1, y: currentEdge.y2 - currentEdge.y1 };
+
+                // 向きが変わったら頂点としてカウント
+                // 単位ベクトル同士の比較なので、整数比較になる
+                if (currentDirection.x !== nextDirection.x || currentDirection.y !== nextDirection.y) {
+                    vertexCount++;
+                }
+                
+                currentKey = nextKey;
+                currentDirection = nextDirection;
+                
+                if (traversedEdgesCount > externalUnitEdges.size + 1) { // 念のため
+                    return -1; // 無限ループ
+                }
+
+            } while (currentKey !== startKey);
+            
+            // 補足: 未使用の辺が残っているかチェック
+            if (traversedEdgesCount < externalUnitEdges.size) {
+                // 図形が分離している
+                return -1; // エラー (または null)
+            }
+
+            // 最後の頂点（スタート地点）のチェック
+            if (currentDirection.x !== initialDirection.x || currentDirection.y !== initialDirection.y) {
+                 vertexCount++;
+            }
+
+            return vertexCount;
+        }
+
+        // 線分pqがポリゴン内部または境界上にあるか (isValidCut用)
+        function isSegmentInsideOrOnBoundary(p, q, polygonVertices) {
+             if (!p || !q || !polygonVertices || polygonVertices.length < 3) return false; // null チェック
+             const validVertices = polygonVertices.filter(v => v !== null);
+             if (validVertices.length < 3) return false;
+
+            const midPoint = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+            console.log(`  isSegmentInsideOrOnBoundary: 線分 (${p.x},${p.y})-(${q.x},${q.y}) の中点 (${midPoint.x}, ${midPoint.y}) をチェック`);
+
+            // まず中点がポリゴンの内部または境界上にあるかチェック (Canvas APIを利用)
+            // ポリゴンのパスを再構築
+            ctx.beginPath();
+            const startVert = validVertices[0];
+            if (!startVert) return false; // 最初の頂点がnullはエラー
+            const startPos = toCanvasCoords(startVert);
+            ctx.moveTo(startPos.x, startPos.y);
+            for (let j = 1; j < validVertices.length; j++) {
+                const ptVert = validVertices[j];
+                if (!ptVert) continue; // nullスキップ
+                const pt = toCanvasCoords(ptVert);
+                ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.closePath();
+            
+            // isPointInPath は Canvas 座標系で判定する
+            const midPointCanvas = toCanvasCoords(midPoint);
+            const isMidpointInPath = ctx.isPointInPath(midPointCanvas.x, midPointCanvas.y);
+            console.log(`    ...中点は内部または境界上か (isPointInPath): ${isMidpointInPath}`);
+            
+            // 内部ではない場合、確実に false
+            if (!isMidpointInPath) return false;
+
+            // isPointInPathがtrueでも、厳密に内部か辺上かを追加判定
+            // 中点が辺上にあるかチェック
+            let midPointOnEdge = false;
+            for (let i = 0; i < validVertices.length; i++) {
+                 const edgeP1 = validVertices[i];
+                 const edgeP2 = validVertices[(i + 1) % validVertices.length];
+                 if (!edgeP1 || !edgeP2) continue; // null チェック
+                 // 浮動小数点を含む可能性があるため、誤差を許容する onSegment を使う
+                 if (onSegment(edgeP1, midPoint, edgeP2)) {
+                      midPointOnEdge = true;
+                      console.log(`    ...中点が辺 ${i} (${edgeP1.x},${edgeP1.y})-(${edgeP2.x},${edgeP2.y}) 上にあります。`);
+                      break;
+                 }
+            }
+             console.log(`    ...中点は辺上にあるか: ${midPointOnEdge}`);
+
+            // 厳密に内部にあるのは、isPointInPathがtrueで、かつどの辺上にもない場合
+            const isStrictlyInside = isMidpointInPath && !midPointOnEdge;
+            console.log(`    ...厳密に内部にあるか: ${isStrictlyInside}`);
+            return isStrictlyInside;
+        }
+
+
         function checkWinCondition() {
-            if (gameState.polygons.length !== 2) return;
+            // --- DEBUG LOG START ---
+            console.clear();
+            console.log("--- 新クリア判定開始 ---");
+
+            if (gameState.polygons.length !== 2) {
+                console.log("判定スキップ: ポリゴンが2つではありません。");
+                return;
+            }
 
             const poly1 = gameState.polygons[0];
             const poly2 = gameState.polygons[1];
-            let isAdjacent = false;
-            
-            for (let i = 0; i < poly1.vertices.length; i++) {
-                const p1v1 = poly1.vertices[i];
-                const p1v2 = poly1.vertices[(i + 1) % poly1.vertices.length];
-                for (let j = 0; j < poly2.vertices.length; j++) {
-                    const p2v1 = poly2.vertices[j];
-                    const p2v2 = poly2.vertices[(j + 1) % poly2.vertices.length];
-                    if (Math.hypot(p1v1.x - p2v2.x, p1v1.y - p2v2.y) < 0.1 &&
-                        Math.hypot(p1v2.x - p2v1.x, p1v2.y - p2v1.y) < 0.1) {
-                        isAdjacent = true;
-                        break;
-                    }
-                }
-                if (isAdjacent) break;
+             // null/undefined チェック
+             if (!poly1?.vertices || !poly2?.vertices) {
+                 console.log("エラー: ポリゴンデータが無効です。");
+                 return;
+             }
+
+            // ステップ 1: 【チェック1】重なり合っていないこと
+            const isOverlapping = checkOverlap(poly1, poly2);
+            const nonOverlapping = !isOverlapping;
+            // checkOverlap内で詳細ログが出るので、このログはその後に出る
+            console.log(`【チェック1】重なりなし (NonOverlapping): ${nonOverlapping}`);
+
+            if (isOverlapping) {
+                console.log("--- 判定失敗: 図形が重なっています。 ---");
+                return;
+            }
+
+            // ステップ 0: 「単位有向辺セット」の作成
+            const unitEdges1 = getUnitEdges(poly1.vertices);
+            const unitEdges2 = getUnitEdges(poly2.vertices);
+            const unitEdges2_Reversed = getReversedEdges(unitEdges2);
+            // console.log("UnitEdges1:", unitEdges1);
+            // console.log("UnitEdges2_Reversed:", unitEdges2_Reversed);
+
+
+            // ステップ 2: 【チェック2】隣接していること
+            const sharedUnitEdges = setIntersection(unitEdges1, unitEdges2_Reversed);
+            const isAdjacent = sharedUnitEdges.size > 0;
+            console.log(`【チェック2】隣接している (Adjacent): ${isAdjacent} (共有単位辺: ${sharedUnitEdges.size}本)`);
+            // console.log("共有単位辺:", sharedUnitEdges);
+
+
+            if (!isAdjacent) {
+                console.log("--- 判定失敗: 図形が隣接していません。 ---");
+                return;
+            }
+
+            // ステップ 3: 【チェック3】結合後の多角形の辺の数
+            const combinedVertexCount = countCombinedVertices(unitEdges1, unitEdges2, sharedUnitEdges);
+            console.log(`【チェック3】結合後の頂点数: ${combinedVertexCount}`);
+
+            if (combinedVertexCount === -1) {
+                console.log("--- 判定失敗: 結合後の図形が不正です（分離またはループなし）。 ---");
+                return;
             }
             
-            if (isAdjacent) {
-                const allVertices = [...poly1.vertices, ...poly2.vertices];
-                const uniqueVertices = [];
-                const epsilon = 0.01;
-
-                allVertices.forEach(v => {
-                    if (!uniqueVertices.some(uv => Math.hypot(uv.x - v.x, uv.y - v.y) < epsilon)) {
-                        uniqueVertices.push(v);
-                    }
-                });
-
-                const convexHull = calculateConvexHull(uniqueVertices);
-
-                if (convexHull && convexHull.length === gameState.targetVertexCount) {
-                    const convexHullSet = new Set(convexHull.map(v => `${v.x},${v.y}`));
-                    const internalVertices = uniqueVertices.filter(v => !convexHullSet.has(`${v.x},${v.y}`));
-                    
-                    let isShapeSolid = true;
-                    
-                    for (const internalVertex of internalVertices) {
-                        const inPoly1 = poly1.vertices.some(v => Math.hypot(v.x - internalVertex.x, v.y - internalVertex.y) < epsilon);
-                        const inPoly2 = poly2.vertices.some(v => Math.hypot(v.x - internalVertex.x, v.y - internalVertex.y) < epsilon);
-
-                        if (!(inPoly1 && inPoly2)) {
-                            isShapeSolid = false;
-                            break;
-                        }
-                    }
-                    
-                    if (isShapeSolid) {
-                         showClearMessage();
-                    }
-                }
+            // 総合判定
+            if (combinedVertexCount === gameState.targetVertexCount) {
+                console.log(`--- 成功: 頂点数 (${combinedVertexCount}) が目標 (${gameState.targetVertexCount}) と一致しました！ ---`);
+                showClearMessage();
+            } else {
+                console.log(`--- 判定失敗: 頂点数 (${combinedVertexCount}) が目標 (${gameState.targetVertexCount}) と一致しません。 ---`);
             }
+            // --- DEBUG LOG END ---
         }
+        
+        // --- クリア判定ロジック (ここまで) ---
+
         
         function showClearMessage() {
             messageEl.textContent = 'クリア！';
@@ -585,6 +1242,21 @@
                  init(gameState.problemId);
             }, 3000);
         }
+        
+        // isValidCut内で使用するため、先に定義
+        function onSegment(p, q, r) {
+             // null チェック
+             if (!p || !q || !r) return false;
+            // 座標は整数なので厳密に比較
+             // Check if q lies on the line segment pr, considering potential floating point for q
+             //orientationを直接比較するのではなく、計算結果の絶対値で比較する
+             const isCollinear = Math.abs((q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y)) < 0.001; // Allow small tolerance for midPoint
+
+            return (isCollinear &&
+                    q.x <= Math.max(p.x, r.x) + 0.001 && q.x >= Math.min(p.x, r.x) - 0.001 && // Allow tolerance
+                    q.y <= Math.max(p.y, r.y) + 0.001 && q.y >= Math.min(p.y, r.y) - 0.001); // Allow tolerance
+        }
+
 
         // --- ゲーム開始 ---
         setupProblemSelect();
