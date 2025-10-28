@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>早食いクイズ</title>
+    <!-- Tailwind CSS CDN --><script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントの読み込み */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            /* 皿の基本サイズ。画像のサイズに合わせて調整してください */
+            --plate-width: 3rem; /* 48px (p-4 -> p-2) */
+            --plate-height: 0.5rem; /* 8px */
+            --plate-margin: -1px; /* 皿が重なるように調整 */
+            
+            /* 1スタックあたりの最大皿枚数（JSにより動的に設定される） */
+            --center-max-plates: 30;
+            --counter-max-plates: 30;
+        }
+
+        /* 皿の画像 */
+        .plate-img {
+            width: var(--plate-width);
+            height: var(--plate-height);
+            object-fit: cover;
+            margin-bottom: var(--plate-margin);
+            transition: opacity 0.2s ease-out, height 0.2s ease-out, margin-bottom 0.2s ease-out, content 0.2s ease-out;
+            /* アドバンスモード用に、srcの変更を高速化 */
+            content-visibility: auto;
+        }
+
+        /* 皿のスペーサー（高さを合わせるため） */
+        .plate-spacer {
+            width: var(--plate-width);
+            height: var(--plate-height);
+            margin-bottom: var(--plate-margin);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* スタックの高さ（中央） */
+        .center-stack-wrapper {
+             height: calc((var(--plate-height) + var(--plate-margin)) * var(--center-max-plates));
+             overflow: hidden;
+        }
+        
+        /* スタックの高さ（カウンター） */
+        .counter-stack-wrapper {
+             height: calc((var(--plate-height) + var(--plate-margin)) * var(--counter-max-plates));
+             overflow: hidden;
+        }
+
+
+        /* 中央の食べられる皿（アニメーション用） */
+        .plate-center-wrapper {
+            display: flex;
+            flex-direction: column-reverse; /* 下から積む（DOMの最後が一番上） */
+            justify-content: flex-start; /* 上揃え */
+        }
+        
+        .plate-center-wrapper .plate-img.eaten {
+            opacity: 0;
+            height: 0; /* 高さを0にする */
+            margin-bottom: 0; /* マージンも0にする */
+            padding: 0;
+            border: 0;
+        }
+
+
+        /* 左右の皿カウンターのラッパー */
+        .char-plate-counter-wrapper {
+            display: flex;
+            flex-direction: column-reverse; /* 下から上へ積む */
+        }
+
+
+        /* キャラクターの振動アニメーション */
+        .vibrate {
+            animation: vibrate 0.3s linear infinite; /* 0.1s -> 0.3s */
+        }
+        @keyframes vibrate {
+            0% { transform: translate(0, 0); }
+            25% { transform: translate(-1px, 1px); }
+            50% { transform: translate(1px, -1px); }
+            75% { transform: translate(-1px, -1px); }
+            100% { transform: translate(1px, 1px); }
+        }
+
+        /* 吹き出し */
+        .speech-bubble {
+            position: relative;
+            background: white;
+            border-radius: .4em;
+            padding: 0.75rem; /* padding: 1rem -> 0.75rem */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            min-height: 80px; /* 2行分の高さを確保 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center; /* 中央揃え */
+        }
+        /* 吹き出しの三角部分 */
+        .speech-bubble:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border: 15px solid transparent;
+            border-top-color: white;
+            border-bottom: 0;
+            margin-left: -15px;
+            margin-bottom: -15px;
+        }
+        .speech-bubble .question-mark {
+            color: #ef4444; /* red-500 */
+            font-size: 1.5rem; /* text-2xl */
+            line-height: 2rem;
+        }
+
+        /* 選択肢の皿スタック（高さ固定） */
+        .option-stack {
+            display: flex;
+            flex-direction: column-reverse; /* 下から積む */
+            height: calc((var(--plate-height) + var(--plate-margin)) * var(--counter-max-plates));
+            overflow: hidden;
+        }
+
+        /* アドバンスモードの選択肢ボタン */
+        .advance-option-btn {
+            font-size: 2.25rem; /* text-4xl */
+            font-weight: 700; /* font-bold */
+            width: 8rem; /* w-32 */
+            height: 6rem; /* h-24 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+    </style>
+</head>
+<body class="bg-yellow-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- モード選択モーダル -->
+    <div id="mode-select-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="bg-white p-12 rounded-lg shadow-2xl text-center">
+            <h2 class="text-3xl font-bold mb-8">モードを選択してください</h2>
+            <div class="flex gap-8">
+                <button id="select-normal-mode" class="bg-blue-500 text-white font-bold py-4 px-8 rounded-lg transition hover:bg-blue-600 text-2xl">ノーマルモード</button>
+                <button id="select-advanced-mode" class="bg-green-500 text-white font-bold py-4 px-8 rounded-lg transition hover:bg-green-600 text-2xl">アドバンスモード</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインのゲーム画面（初期状態では非表示） -->
+    <div id="game-wrapper" class="hidden">
+        <!-- 問題選択UI -->
+        <div id="quiz-select-container" class="flex justify-center gap-2 mb-4">
+            <!-- JSでボタンが生成されます -->
+        </div>
+
+        <!-- メインのゲーム画面 --><div id="game-container" class="w-full max-w-4xl mx-auto">
+            
+            <!-- 1. ゲームシーン（テーブルの上） --><div class="relative w-full">
+                <!-- テーブル --><div class="absolute bottom-0 left-0 w-full h-32 bg-yellow-800 rounded-t-lg shadow-inner"></div>
+                
+                <!-- 要素の配置コンテナ --><div class="relative flex justify-around items-end h-[250px] px-4 z-10"> <!-- h-[220px] -> h-[250px] -->
+
+                    <!-- キャラ1 (左) の皿カウンター --><div id="char1-stacks-container" class="flex gap-2">
+                        <!-- JSでスタックが生成されます --></div>
+
+                    <!-- キャラ1 (左) と吹き出し --><div class="flex flex-col items-center">
+                        <div id="char1-bubble" class="speech-bubble mb-3">
+                            <div id="char1-delay" class="text-xl font-bold text-gray-500"></div>
+                            <div id="char1-speed" class="text-xl font-bold"></div>
+                        </div>
+                        <img id="char1" src="character1.png" alt="キャラクター1" class="w-24 h-24 object-contain shadow-lg">
+                    </div>
+
+                    <!-- 中央の皿 --><div id="center-stacks-container" class="flex gap-4">
+                        <!-- JSでスタックが生成されます --></div>
+
+                    <!-- キャラ2 (右) と吹き出し --><div class="flex flex-col items-center">
+                        <div id="char2-bubble" class="speech-bubble mb-3">
+                            <div id="char2-delay" class="text-xl font-bold text-gray-500"></div>
+                            <div id="char2-speed" class="text-xl font-bold"></div>
+                        </div>
+                        <img id="char2" src="character2.png" alt="キャラクター2" class="w-24 h-24 object-contain shadow-lg">
+                    </div>
+
+                    <!-- キャラ2 (右) の皿カウンター --><div id="char2-stacks-container" class="flex gap-2">
+                        <!-- JSでスタックが生成されます --></div>
+
+                </div>
+            </div>
+
+            <!-- 2. 選択肢ボタン --><div id="options-container" class="flex justify-center gap-4 sm:gap-8 mt-8 flex-wrap">
+                <!-- 選択肢 1 --><button data-value="18" class="option-btn bg-white border-4 border-green-600 rounded-lg shadow-md p-2 flex flex-col sm:flex-row items-center gap-2 transform transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-400">
+                    <div class="normal-option-content flex flex-col sm:flex-row items-center gap-2">
+                        <img src="character2.png" alt="キャラクター2" class="w-12 h-12 object-contain">
+                        <div id="option-1-stacks-container" class="flex gap-2">
+                            <!-- JSでスタックが生成されます -->
+                        </div>
+                        <span class="option-label font-bold text-lg sm:hidden">18枚</span>
+                    </div>
+                    <div class="advanced-option-content hidden advance-option-btn">
+                        <!-- JSで数値が設定されます -->
+                    </div>
+                </button>
+                
+                <!-- 選択肢 2 --><button data-value="32" class="option-btn bg-white border-4 border-green-600 rounded-lg shadow-md p-2 flex flex-col sm:flex-row items-center gap-2 transform transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-400">
+                    <div class="normal-option-content flex flex-col sm:flex-row items-center gap-2">
+                        <img src="character2.png" alt="キャラクター2" class="w-12 h-12 object-contain">
+                        <div id="option-2-stacks-container" class="flex gap-2">
+                            <!-- JSでスタックが生成されます -->
+                        </div>
+                        <span class="option-label font-bold text-lg sm:hidden">32枚</span>
+                    </div>
+                    <div class="advanced-option-content hidden advance-option-btn">
+                        <!-- JSで数値が設定されます -->
+                    </div>
+                </button>
+
+                <!-- 選択肢 3 --><button data-value="42" class="option-btn bg-white border-4 border-green-600 rounded-lg shadow-md p-2 flex flex-col sm:flex-row items-center gap-2 transform transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-400">
+                    <div class="normal-option-content flex flex-col sm:flex-row items-center gap-2">
+                        <img src="character2.png" alt="キャラクター2" class="w-12 h-12 object-contain">
+                        <div id="option-3-stacks-container" class="flex gap-2">
+                            <!-- JSでスタックが生成されます -->
+                        </div>
+                        <span class="option-label font-bold text-lg sm:hidden">42枚</span>
+                    </div>
+                    <div class="advanced-option-content hidden advance-option-btn">
+                        <!-- JSで数値が設定されます -->
+                    </div>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 結果表示モーダル --><div id="result-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-lg shadow-2xl text-center">
+            <h2 id="result-title" class="text-4xl font-bold mb-4"></h2>
+            <p id="result-message" class="text-lg mb-6"></p>
+            <button id="reset-button" class="bg-blue-500 text-white font-bold py-2 px-6 rounded-lg transition hover:bg-blue-600">もう一度</button>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- 定数 ---
+            const ANIMATION_INTERVAL_MS = 250; // 0.25秒ごと
+
+            // --- モード別問題データ ---
+
+            // ノーマルモード: 最終的にキャラ2が何枚食べたかを当てる
+            const normalQuizData = [
+                {
+                    id: 0,
+                    title: "問題 1",
+                    centerStacks: 2, centerMaxPlates: 24,
+                    counterStacks: 2, counterMaxPlates: 24,
+                    char1: { speed: 2, delay: 0, speechDelayText: "", speechSpeedText: "🍽️ 2ずつ!" },
+                    char2: { speed: 4, delay: 0, speechDelayText: "", speechSpeedText: "🍽️ 4ずつ!" },
+                    centerPlates: 48,
+                    initialPlates: { char1: 0, char2: 0 },
+                    options: [18, 32, 42]
+                    // 正解: 32
+                },
+                {
+                    id: 1,
+                    title: "問題 2",
+                    centerStacks: 2, centerMaxPlates: 30,
+                    counterStacks: 2, counterMaxPlates: 30,
+                    char1: { speed: 3, delay: 0, speechDelayText: "", speechSpeedText: "🍽️ 3ずつ!" },
+                    char2: { speed: 3, delay: 2, speechDelayText: "⏳ 2びょう", speechSpeedText: "🍽️ 3ずつ!" },
+                    centerPlates: 60,
+                    initialPlates: { char1: 0, char2: 0 },
+                    options: [30, 33, 27]
+                    // 正解: 27
+                },
+                {
+                    id: 2,
+                    title: "問題 3",
+                    centerStacks: 2, centerMaxPlates: 21,
+                    counterStacks: 3, counterMaxPlates: 21,
+                    char1: { speed: 2, delay: 0, speechDelayText: "", speechSpeedText: "🍽️ 2ずつ!" },
+                    char2: { speed: 5, delay: 0, speechDelayText: "", speechSpeedText: "🍽️ 5ずつ!" },
+                    centerPlates: 42,
+                    initialPlates: { char1: 10, char2: 10 },
+                    options: [30, 40, 50]
+                    // 正解: 40
+                }
+            ];
+
+            // アドバンスモード: 「？」に入る数値を当てる
+            // 両キャラが目標枚数 (targetPlates) ぴったりになれば正解
+            const advancedQuizData = [
+                {
+                    id: 0,
+                    title: "問題 1",
+                    centerStacks: 2, centerMaxPlates: 24,
+                    counterStacks: 2, counterMaxPlates: 24,
+                    // char1: 12枚, char2: 36枚 が目標
+                    targetPlates: { char1: 12, char2: 36 },
+                    // char2の速度が「？」
+                    questionMark: 'char2.speed', // 'charN.speed' or 'charN.delay'
+                    char1: { speed: 2, delay: 0, speechDelayText: "", speechSpeedText: "🍽️ 2ずつ!" },
+                    char2: { speed: '?', delay: 0, speechDelayText: "", speechSpeedText: "🍽️ ？ずつ!" },
+                    centerPlates: 48,
+                    initialPlates: { char1: 0, char2: 0 },
+                    options: [4, 6, 8],
+                    correctOptionValue: 6 // (48皿 / (2+6)皿/秒) = 6秒。 char1: 2*6=12枚, char2: 6*6=36枚
+                },
+                {
+                    // 問題2の再設定（正解が5になるように）
+                    id: 1,
+                    title: "問題 2",
+                    centerStacks: 2, centerMaxPlates: 30,
+                    counterStacks: 2, counterMaxPlates: 30,
+                    targetPlates: { char1: 30, char2: 30 },
+                    questionMark: 'char1.speed',
+                    char1: { speed: '?', delay: 0, speechDelayText: "", speechSpeedText: "🍽️ ？ずつ!" },
+                    char2: { speed: 5, delay: 0, speechDelayText: "", speechSpeedText: "🍽️ 5ずつ!" },
+                    centerPlates: 60,
+                    initialPlates: { char1: 0, char2: 0 },
+                    options: [3, 4, 5],
+                    correctOptionValue: 5 // (60皿 / (5+5)皿/秒) = 6秒。 char1: 5*6=30枚, char2: 5*6=30枚
+                },
+                {
+                    // アドバンス問題3 (delay) - 最終
+                    id: 2,
+                    title: "問題 3",
+                    centerStacks: 2, centerMaxPlates: 20,
+                    counterStacks: 2, counterMaxPlates: 20,
+                    targetPlates: { char1: 10, char2: 30 }, 
+                    questionMark: 'char1.delay',
+                    char1: { speed: 2, delay: '?', speechDelayText: "⏳ ？びょう", speechSpeedText: "🍽️ 2ずつ!" },
+                    char2: { speed: 5, delay: 0, speechDelayText: "", speechSpeedText: "🍽️ 5ずつ!" },
+                    centerPlates: 40,
+                    initialPlates: { char1: 0, char2: 0 },
+                    options: [1, 2, 3],
+                    correctOptionValue: 1 // (上記計算参照)
+                }
+            ];
+            
+            let currentGameMode = 'normal'; // 'normal' or 'advanced'
+            let quizData = normalQuizData; // 現在のモードのクイズデータ
+            let currentQuizId = 0;
+
+            // --- 動的変数 ---
+            let CENTER_MAX_PLATES = 30;
+            let COUNTER_MAX_PLATES = 30;
+
+            // --- DOM要素 ---
+            const modeSelectModal = document.getElementById('mode-select-modal');
+            const gameWrapper = document.getElementById('game-wrapper');
+            const selectNormalModeBtn = document.getElementById('select-normal-mode');
+            const selectAdvancedModeBtn = document.getElementById('select-advanced-mode');
+            
+            const centerStacksContainer = document.getElementById('center-stacks-container');
+            const char1StacksContainer = document.getElementById('char1-stacks-container');
+            const char2StacksContainer = document.getElementById('char2-stacks-container');
+            const optionContainers = [
+                document.getElementById('option-1-stacks-container'),
+                document.getElementById('option-2-stacks-container'),
+                document.getElementById('option-3-stacks-container')
+            ];
+            
+            // スタックのDOM配列（動的に生成）
+            let centerStacks = [];
+            let char1Stacks = [];
+            let char2Stacks = [];
+            let optionStackElements = [[], [], []];
+
+            const char1 = document.getElementById('char1');
+            const char2 = document.getElementById('char2');
+            
+            // 吹き出しの要素
+            const char1BubbleDelay = document.getElementById('char1-delay');
+            const char1BubbleSpeed = document.getElementById('char1-speed');
+            const char2BubbleDelay = document.getElementById('char2-delay');
+            const char2BubbleSpeed = document.getElementById('char2-speed');
+            
+            const optionButtons = document.querySelectorAll('.option-btn');
+            const quizSelectContainer = document.getElementById('quiz-select-container');
+            const resultModal = document.getElementById('result-modal');
+            const resultTitle = document.getElementById('result-title');
+            const resultMessage = document.getElementById('result-message');
+            const resetButton = document.getElementById('reset-button');
+
+            // --- 状態 ---
+            let gameInProgress = false;
+            let animationStep = 0; // 0.25秒ごとのステップ数
+            let animationInterval = null;
+            let finalCounts = { char1: 0, char2: 0 }; // 最終結果格納用
+
+            // --- 関数 ---
+
+            /**
+             * 皿のDOM要素を作成する
+             * @param {string} type - 'plate', 'invisible', 'empty', 'spacer', 'quota'
+             */
+            function createPlateElement(type) {
+                if (type === 'spacer') {
+                    const spacer = document.createElement('div');
+                    spacer.className = 'plate-spacer';
+                    return spacer;
+                }
+                
+                const img = document.createElement('img');
+                img.className = 'plate-img';
+                if (type === 'plate') {
+                    img.src = 'plate.png';
+                    img.alt = '皿';
+                } else if (type === 'invisible') {
+                    img.src = 'plate_invisible.png';
+                    img.alt = '皿のシルエット';
+                } else if (type === 'empty') {
+                    img.src = 'plate_empty.png';
+                    img.alt = '使用済みの皿';
+                } else if (type === 'quota') {
+                    img.src = 'plate_quota.png';
+                    img.alt = '目標の皿';
+                }
+                return img;
+            }
+
+            /**
+             * 中央の皿の山を作成する (最大枚数までスペーサーで埋める)
+             */
+            function createCenterStack(container, count) {
+                container.innerHTML = ''; // 初期化
+                for (let i = 0; i < CENTER_MAX_PLATES; i++) {
+                    if (i < (CENTER_MAX_PLATES - count)) {
+                        container.appendChild(createPlateElement('spacer')); // 先にスペーサー
+                    } else {
+                        container.appendChild(createPlateElement('plate')); // 後で皿
+                    }
+                }
+            }
+            
+            /**
+             * 左右のカウンター皿の山を作成する (アドバンスモード対応)
+             * @param {HTMLElement} container - 皿を追加するコンテナ
+             * @param {number} emptyCount - 食べた皿の枚数 (initialPlates)
+             * @param {number} targetCount - 目標枚数 (アドバンスモード用)
+             */
+            function createCounterStack(container, emptyCount, targetCount) {
+                container.innerHTML = ''; // 初期化
+                for (let i = 0; i < COUNTER_MAX_PLATES; i++) {
+                    // 下から積む
+                    if (i < emptyCount) {
+                        container.appendChild(createPlateElement('empty'));
+                    } else if (currentGameMode === 'advanced' && i < targetCount) {
+                        // アドバンスモードかつ、初期枚数より上で目標枚数以下なら quota
+                        container.appendChild(createPlateElement('quota'));
+                    } else {
+                        container.appendChild(createPlateElement('invisible'));
+                    }
+                }
+            }
+
+            /**
+             * 選択肢の皿の山を作成する (ノーマルモード専用)
+             */
+            function createOptionStack(container, emptyCount) {
+                container.innerHTML = ''; // 初期化
+                for (let i = 0; i < COUNTER_MAX_PLATES; i++) {
+                    const type = (i < emptyCount) ? 'empty' : 'invisible';
+                    container.appendChild(createPlateElement(type));
+                }
+            }
+            
+            /**
+             * 正解を計算する (ノーマル/アドバンス共通)
+             * @param {object} quiz - quizDataの要素
+             * @param {object} [tempParams] - アドバンスモードで選択した一時的なパラメータ
+             * @returns {number} - ノーマルモード: 正解の枚数, アドバンスモード: 正解の選択肢の値
+             */
+            function calculateCorrectAnswer(quiz, tempParams = {}) {
+                
+                // アドバンスモードの場合、'?' の値を一時的に設定して計算する
+                const char1 = { ...quiz.char1 };
+                const char2 = { ...quiz.char2 };
+                
+                if (tempParams.key) {
+                    const path = tempParams.key.split('.');
+                    if (path[0] === 'char1') char1[path[1]] = tempParams.value;
+                    if (path[0] === 'char2') char2[path[1]] = tempParams.value;
+                }
+
+                let platesLeft = quiz.centerPlates;
+                let time = 0; // 経過秒数
+                let char1Eaten = 0;
+                let char2Eaten = 0;
+                const delay1 = char1.delay;
+                const delay2 = char2.delay;
+
+                // delayが'?'のまま計算しないようにする
+                if (typeof delay1 !== 'number' || typeof delay2 !== 'number') {
+                    // アドバンスモードの初期化時など
+                    finalCounts = { char1: quiz.initialPlates.char1, char2: quiz.initialPlates.char2 };
+                    return (currentGameMode === 'normal') ? finalCounts.char2 : quiz.correctOptionValue;
+                }
+
+                const minDelay = Math.min(delay1, delay2);
+                const maxDelay = Math.max(delay1, delay2);
+                
+                // 1. minDelay秒からmaxDelay秒まで (片方だけ食べる)
+                time = minDelay;
+                while (time < maxDelay && platesLeft > 0) {
+                    let speed = 0;
+                    if (delay1 === minDelay) {
+                        speed = char1.speed;
+                        if (platesLeft < speed) { char1Eaten += platesLeft; platesLeft = 0; }
+                        else { platesLeft -= speed; char1Eaten += speed; }
+                    } else {
+                        speed = char2.speed;
+                        if (platesLeft < speed) { char2Eaten += platesLeft; platesLeft = 0; }
+                        else { platesLeft -= speed; char2Eaten += speed; }
+                    }
+                    time++;
+                }
+                
+                // 2. maxDelay秒以降 (両方食べる)
+                if (platesLeft > 0) {
+                    const totalSpeed = char1.speed + char2.speed;
+                    if (totalSpeed > 0) {
+                        while (platesLeft > 0) {
+                            if (platesLeft < totalSpeed) {
+                                char1Eaten += char1.speed * (platesLeft / totalSpeed);
+                                char2Eaten += char2.speed * (platesLeft / totalSpeed);
+                                platesLeft = 0;
+                            } else {
+                                platesLeft -= totalSpeed;
+                                char1Eaten += char1.speed;
+                                char2Eaten += char2.speed;
+                            }
+                        }
+                    }
+                }
+                
+                const finalChar1 = Math.round(char1Eaten) + quiz.initialPlates.char1;
+                const finalChar2 = Math.round(char2Eaten) + quiz.initialPlates.char2;
+                
+                // グローバル変数にも保存
+                finalCounts = { char1: finalChar1, char2: finalChar2 };
+                
+                if (currentGameMode === 'normal') {
+                    return finalChar2; // ノーマル: キャラ2の最終枚数
+                } else {
+                    return quiz.correctOptionValue; // アドバンス: 正解の選択肢の値
+                }
+            }
+
+            /**
+             * ゲームの初期化 (問題選択時にも使用)
+             */
+            function initializeGame() {
+                gameInProgress = false;
+                animationStep = 0;
+                if (animationInterval) {
+                    clearInterval(animationInterval);
+                    animationInterval = null;
+                }
+
+                const quiz = quizData[currentQuizId];
+                
+                // アドバンスモード用の正解計算
+                if (currentGameMode === 'advanced') {
+                    // 正解の値を使って一度計算し、finalCountsを初期化
+                    calculateCorrectAnswer(quiz, { key: quiz.questionMark, value: quiz.correctOptionValue });
+                    quiz.correctAnswer = quiz.correctOptionValue;
+                } else {
+                    // ノーマルモード用の正解計算
+                    quiz.correctAnswer = calculateCorrectAnswer(quiz);
+                }
+                
+                // 吹き出し更新
+                updateSpeechBubble('char1', quiz.char1);
+                updateSpeechBubble('char2', quiz.char2);
+
+
+                // 中央の皿
+                let centerPlatesToDistribute = quiz.centerPlates;
+                centerStacks.forEach(stack => {
+                    const platesForThisStack = Math.min(CENTER_MAX_PLATES, centerPlatesToDistribute);
+                    createCenterStack(stack, platesForThisStack);
+                    centerPlatesToDistribute -= platesForThisStack;
+                });
+                
+                // キャラ1のカウンター
+                let char1PlatesToDistribute = quiz.initialPlates.char1;
+                const target1 = (currentGameMode === 'advanced') ? quiz.targetPlates.char1 : 0;
+                char1Stacks.forEach(stack => {
+                    const platesForThisStack = Math.min(COUNTER_MAX_PLATES, char1PlatesToDistribute);
+                    const targetForThisStack = Math.max(0, Math.min(COUNTER_MAX_PLATES, target1) - (stack.stackIndex * COUNTER_MAX_PLATES)); // 複雑...
+                    // 簡略化: targetCountをスタックに振り分ける
+                    let targetCount1 = target1;
+                    char1Stacks.forEach(stack => {
+                        const empty = Math.min(COUNTER_MAX_PLATES, quiz.initialPlates.char1 - (stack.stackIndex * COUNTER_MAX_PLATES));
+                        const target = Math.min(COUNTER_MAX_PLATES, targetCount1 - (stack.stackIndex * COUNTER_MAX_PLATES));
+                         createCounterStack(stack, empty, target);
+                    });
+                });
+                
+                // キャラ2のカウンター
+                let targetCount2 = (currentGameMode === 'advanced') ? quiz.targetPlates.char2 : 0;
+                char2Stacks.forEach((stack, index) => {
+                    const empty = Math.max(0, quiz.initialPlates.char2 - (index * COUNTER_MAX_PLATES));
+                    const target = Math.max(0, targetCount2 - (index * COUNTER_MAX_PLATES));
+                    createCounterStack(stack, empty, target);
+                });
+
+
+                // 選択肢の表示をモードによって切り替え
+                optionButtons.forEach((btn, index) => {
+                    const value = quiz.options[index];
+                    btn.dataset.value = value;
+                    
+                    const normalContent = btn.querySelector('.normal-option-content');
+                    const advancedContent = btn.querySelector('.advanced-option-content');
+
+                    if (currentGameMode === 'normal') {
+                        normalContent.classList.remove('hidden');
+                        advancedContent.classList.add('hidden');
+                        
+                        let optionPlatesToDistribute = value;
+                        optionStackElements[index].forEach((stack, stackIndex) => {
+                            const platesForThisStack = Math.max(0, optionPlatesToDistribute - (stackIndex * COUNTER_MAX_PLATES));
+                            createOptionStack(stack, Math.min(COUNTER_MAX_PLATES, platesForThisStack));
+                        });
+                        btn.querySelector('.option-label').textContent = `${value}枚`;
+                    
+                    } else { // Advanced Mode
+                        normalContent.classList.add('hidden');
+                        advancedContent.classList.remove('hidden');
+                        advancedContent.textContent = value;
+                    }
+                });
+
+                // ボタンの有効化
+                optionButtons.forEach(btn => btn.disabled = false);
+                resultModal.classList.add('hidden');
+                char1.classList.remove('vibrate');
+                char2.classList.remove('vibrate');
+            }
+
+            /**
+             * 吹き出しの内容を更新 (アドバンスモード対応)
+             */
+            function updateSpeechBubble(charId, charData) {
+                const delayEl = (charId === 'char1') ? char1BubbleDelay : char2BubbleDelay;
+                const speedEl = (charId === 'char1') ? char1BubbleSpeed : char2BubbleSpeed;
+                
+                // Delay
+                if (charData.speechDelayText) {
+                    if (charData.delay === '?') {
+                        delayEl.innerHTML = `<span class="question-mark">⏳ ？びょう</span>`;
+                    } else {
+                        delayEl.textContent = charData.speechDelayText;
+                    }
+                    delayEl.classList.remove('hidden');
+                } else {
+                    delayEl.classList.add('hidden');
+                }
+
+                // Speed
+                if (charData.speechSpeedText) {
+                     if (charData.speed === '?') {
+                        speedEl.innerHTML = `<span class="question-mark">🍽️ ？ずつ!</span>`;
+                    } else {
+                        speedEl.textContent = charData.speechSpeedText;
+                    }
+                    speedEl.classList.remove('hidden');
+                } else {
+                    speedEl.classList.add('hidden');
+                }
+            }
+            
+            /**
+             * スタックを動的に生成するヘルパー
+             */
+            function createDynamicStacks(container, count, idPrefix, cssClass) {
+                container.innerHTML = '';
+                const stacks = [];
+                for (let i = 0; i < count; i++) {
+                    const stack = document.createElement('div');
+                    stack.id = `${idPrefix}${i+1}`;
+                    stack.className = cssClass;
+                    stack.stackIndex = i; // スタックのインデックスを保存
+                    container.appendChild(stack);
+                    stacks.push(stack);
+                }
+                return stacks;
+            }
+
+            /**
+             * アニメーションの1ステップを実行
+             */
+            function runAnimationStep() {
+                if (gameInProgress === false) return;
+                
+                animationStep++; // 1, 2, 3... (ステップカウンター)
+                
+                // アニメーション用に、選択された値で上書きされた一時的なクイズデータを使う
+                const quiz = window.tempQuizData;
+                const char1 = quiz.char1;
+                const char2 = quiz.char2;
+                
+                // 遅延（砂時計）の更新 (ステップベース)
+                if (char1.delay > 0) {
+                    const remainingDelaySteps = Math.max(0, char1.delay - animationStep); // 残り待機ステップ
+                    if (animationStep <= char1.delay) { // 待機中
+                        char1BubbleDelay.textContent = `⏳ ${remainingDelaySteps}びょう`;
+                        char1BubbleDelay.classList.remove('hidden');
+                    } else { // 待機終了
+                        char1BubbleDelay.classList.add('hidden');
+                    }
+                }
+                if (char2.delay > 0) {
+                    const remainingDelaySteps = Math.max(0, char2.delay - animationStep); // 残り待機ステップ
+                    if (animationStep <= char2.delay) { // 待機中
+                        char2BubbleDelay.textContent = `⏳ ${remainingDelaySteps}びょう`;
+                        char2BubbleDelay.classList.remove('hidden');
+                    } else { // D 待機終了
+                        char2BubbleDelay.classList.add('hidden');
+                    }
+                }
+
+                // 経過「ステップ」に基づいて、各キャラが「今」食べた枚数を計算
+                let char1TotalEaten = 0;
+                if (animationStep > char1.delay) { 
+                    char1TotalEaten = char1.speed * (animationStep - char1.delay); 
+                }
+                
+                let char2TotalEaten = 0;
+                if (animationStep > char2.delay) { 
+                    char2TotalEaten = char2.speed * (animationStep - char2.delay);
+                }
+
+                const totalEaten = char1TotalEaten + char2TotalEaten;
+                const platesToEat = Math.floor(totalEaten); // 食べるべき合計枚数
+
+                // 1. 中央の皿を減らす
+                const allCenterPlates = centerStacks.flatMap(stack => Array.from(stack.children)).filter(el => !el.classList.contains('plate-spacer'));
+                for (let i = 0; i < platesToEat && i < allCenterPlates.length; i++) {
+                    allCenterPlates[allCenterPlates.length - 1 - i].classList.add('eaten');
+                }
+
+                // 2. キャラ1の皿を更新 (アドバンスモード対応)
+                const char1PlatesToShow = quiz.initialPlates.char1 + Math.floor(char1TotalEaten);
+                const allChar1Plates = char1Stacks.flatMap(stack => Array.from(stack.children));
+                updateCounterPlates(allChar1Plates, char1PlatesToShow);
+
+                // 3. キャラ2の皿を更新 (アドバンスモード対応)
+                const char2PlatesToShow = quiz.initialPlates.char2 + Math.floor(char2TotalEaten);
+                const allChar2Plates = char2Stacks.flatMap(stack => Array.from(stack.children));
+                updateCounterPlates(allChar2Plates, char2PlatesToShow);
+                
+                // 4. 停止判定
+                if (platesToEat >= quiz.centerPlates) {
+                    stopAnimation();
+                }
+            }
+
+            /**
+             * カウンターの皿の画像（empty/quota/invisible）を更新する
+             */
+            function updateCounterPlates(plateElements, platesToShow) {
+                 for (let i = 0; i < plateElements.length; i++) {
+                    const plate = plateElements[i];
+                    if (i < platesToShow) {
+                        // 食べた皿は empty.png
+                        if (!plate.src.endsWith('plate_empty.png')) {
+                            plate.src = 'plate_empty.png';
+                        }
+                    } else {
+                        // まだ食べてない皿
+                        // quota (目標) が設定されていれば quota.png
+                        if (currentGameMode === 'advanced' && plate.src.endsWith('plate_quota.png')) {
+                            // そのまま
+                        } else {
+                            // それ以外は invisible.png
+                            if (!plate.src.endsWith('plate_invisible.png')) {
+                                plate.src = 'plate_invisible.png';
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            /**
+             * アニメーションを開始
+             */
+            function startAnimation(selectedValue) {
+                gameInProgress = true;
+                animationStep = 0; // ステップカウンターをリセット
+                optionButtons.forEach(btn => btn.disabled = true);
+
+                // アニメーション用に、選択された値で上書きされた一時的なクイズデータを使う
+                const quiz = JSON.parse(JSON.stringify(quizData[currentQuizId])); // Deep copy
+                
+                if (currentGameMode === 'advanced') {
+                    const path = quiz.questionMark.split('.');
+                    quiz[path[0]][path[1]] = selectedValue;
+                    // アニメーション実行前に、この選択肢での最終結果を計算しておく
+                    calculateCorrectAnswer(quiz, { key: quiz.questionMark, value: selectedValue });
+                } else {
+                    // ノーマルモードでも finalCounts を更新
+                    calculateCorrectAnswer(quiz);
+                }
+                window.tempQuizData = quiz;
+
+
+                // 遅延があるキャラは、遅延が終わるまで振動させない
+                if (quiz.char1.delay === 0) {
+                    char1.classList.add('vibrate');
+                } else {
+                    setTimeout(() => {
+                        if (gameInProgress) char1.classList.add('vibrate');
+                    }, quiz.char1.delay * ANIMATION_INTERVAL_MS);
+                }
+                if (quiz.char2.delay === 0) {
+                    char2.classList.add('vibrate');
+                } else {
+                     setTimeout(() => {
+                        if (gameInProgress) char2.classList.add('vibrate');
+                    }, quiz.char2.delay * ANIMATION_INTERVAL_MS);
+                }
+
+                animationInterval = setInterval(runAnimationStep, ANIMATION_INTERVAL_MS);
+
+                // 停止タイマー (余裕を持って30秒)
+                setTimeout(() => {
+                    if (gameInProgress) { // まだ動いていたら強制停止
+                        stopAnimation(selectedValue);
+                    }
+                }, 30000);
+            }
+
+            /**
+             * アニメーションを停止し、結果を判定
+             */
+            function stopAnimation(selectedValue) {
+                if (animationInterval) {
+                    clearInterval(animationInterval);
+                    animationInterval = null;
+                }
+                gameInProgress = false;
+
+                // 振動停止
+                char1.classList.remove('vibrate');
+                char2.classList.remove('vibrate');
+
+                // 最終結果を強制的に反映 (finalCounts は animationStart時に計算済み)
+                updatePlatesToFinalState();
+
+                const finalSelectedValue = selectedValue || window.lastSelectedValue;
+
+                // 0.5秒待ってから結果を表示
+                setTimeout(() => {
+                    checkAnswer(finalSelectedValue);
+                }, 500);
+            }
+            
+            /**
+             * 皿の状態を最終結果に強制的に設定する
+             */
+            function updatePlatesToFinalState() {
+                // finalCounts は animationStart または calculateCorrectAnswer で計算済み
+                
+                // 1. 中央の皿 (すべて 'eaten')
+                const allCenterPlates = centerStacks.flatMap(stack => Array.from(stack.children)).filter(el => !el.classList.contains('plate-spacer'));
+                allCenterPlates.forEach(plate => plate.classList.add('eaten'));
+                
+                // 2. キャラ1 (最終枚数)
+                const allChar1Plates = char1Stacks.flatMap(stack => Array.from(stack.children));
+                updateCounterPlates(allChar1Plates, finalCounts.char1);
+
+                // 3. キャラ2 (最終枚数)
+                const allChar2Plates = char2Stacks.flatMap(stack => Array.from(stack.children));
+                updateCounterPlates(allChar2Plates, finalCounts.char2);
+            }
+
+            /**
+             * 正誤判定と結果表示
+             */
+            function checkAnswer(selectedValue) {
+                const quiz = quizData[currentQuizId];
+                const correctAnswer = quiz.correctAnswer;
+                
+                if (parseInt(selectedValue, 10) === correctAnswer) {
+                    resultTitle.textContent = '正解！';
+                    resultTitle.className = 'text-4xl font-bold mb-4 text-red-500';
+                    
+                    if (currentGameMode === 'normal') {
+                        resultMessage.textContent = `猫（キャラ2）が食べたお皿は ${correctAnswer} 枚でした！`;
+                    } else {
+                        resultMessage.textContent = `「？」に入る数値は ${correctAnswer} でした！`;
+                    }
+
+                } else {
+                    resultTitle.textContent = '残念！';
+                    resultTitle.className = 'text-4xl font-bold mb-4 text-blue-500';
+                    resultMessage.textContent = `正解は ${correctAnswer} でした。`;
+                }
+                resultModal.classList.remove('hidden');
+            }
+
+            /**
+             * 選択肢クリック時の処理
+             */
+            function handleOptionClick(event) {
+                if (gameInProgress) return;
+
+                const selectedValue = parseInt(event.currentTarget.dataset.value, 10);
+                window.lastSelectedValue = selectedValue; // 停止時に参照するため
+
+                // 選択したボタンをハイライト
+                optionButtons.forEach(btn => btn.classList.remove('ring-4', 'ring-yellow-400'));
+                event.currentTarget.classList.add('ring-4', 'ring-yellow-400');
+
+                startAnimation(selectedValue);
+            }
+            
+            /**
+             * 問題選択処理
+             */
+            function selectQuiz(quizId) {
+                currentQuizId = quizId;
+                const quiz = quizData[currentQuizId];
+                
+                // CSS変数を更新
+                CENTER_MAX_PLATES = quiz.centerMaxPlates;
+                COUNTER_MAX_PLATES = quiz.counterMaxPlates;
+                document.documentElement.style.setProperty('--center-max-plates', CENTER_MAX_PLATES);
+                document.documentElement.style.setProperty('--counter-max-plates', COUNTER_MAX_PLATES);
+
+                // スタックを動的に生成
+                centerStacks = createDynamicStacks(centerStacksContainer, quiz.centerStacks, 'center-stack-', 'plate-center-wrapper center-stack-wrapper');
+                char1Stacks = createDynamicStacks(char1StacksContainer, quiz.counterStacks, 'char1-stack-', 'char-plate-counter-wrapper counter-stack-wrapper');
+                char2Stacks = createDynamicStacks(char2StacksContainer, quiz.counterStacks, 'char2-stack-', 'char-plate-counter-wrapper counter-stack-wrapper');
+                
+                optionStackElements = [];
+                optionContainers.forEach((optContainer, index) => {
+                    optionStackElements.push(
+                        createDynamicStacks(optContainer, quiz.counterStacks, `option-${index+1}-stack-`, 'option-stack')
+                    );
+                });
+                
+                initializeGame();
+                
+                // ボタンのハイライト
+                document.querySelectorAll('.quiz-select-btn').forEach(btn => {
+                    btn.classList.remove('bg-blue-700', 'ring-2', 'ring-blue-300');
+                    btn.classList.add('bg-blue-500');
+                });
+                const selectedBtn = document.querySelector(`.quiz-select-btn[data-id="${quizId}"]`);
+                selectedBtn.classList.remove('bg-blue-500');
+                selectedBtn.classList.add('bg-blue-700', 'ring-2', 'ring-blue-300');
+            }
+            
+            /**
+             * モード選択後の初期化処理
+             */
+            function loadModeAndStart(mode) {
+                currentGameMode = mode;
+                quizData = (mode === 'normal') ? normalQuizData : advancedQuizData;
+
+                // ゲーム画面を表示
+                modeSelectModal.classList.add('hidden');
+                gameWrapper.classList.remove('hidden');
+
+                // 問題選択UIの生成
+                quizSelectContainer.innerHTML = ''; // クリア
+                quizData.forEach(quiz => {
+                    const button = document.createElement('button');
+                    button.className = 'quiz-select-btn bg-blue-500 text-white font-bold py-2 px-4 rounded transition hover:bg-blue-600 focus:outline-none';
+                    button.textContent = quiz.title;
+                    button.dataset.id = quiz.id;
+                    button.addEventListener('click', () => selectQuiz(quiz.id));
+                    quizSelectContainer.appendChild(button);
+                });
+                
+                // 最初の問題を選択
+                selectQuiz(0);
+            }
+
+
+            // --- イベントリスナー ---
+            optionButtons.forEach(button => {
+                button.addEventListener('click', handleOptionClick);
+            });
+
+            resetButton.addEventListener('click', initializeGame);
+            
+            selectNormalModeBtn.addEventListener('click', () => loadModeAndStart('normal'));
+            selectAdvancedModeBtn.addEventListener('click', () => loadModeAndStart('advanced'));
+
+            // --- 初期化実行 ---
+            // (モード選択待ち)
+        });
+    </script>
+</body>
+</html>
+
