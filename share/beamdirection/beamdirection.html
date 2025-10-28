@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ビーム誘導パズル</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="game-container">
+        <header class="header">
+            <h1>ビーム誘導パズル</h1>
+            <button id="rules-button">？</button>
+        </header>
+
+        <div class="top-controls">
+            <select id="level-select"></select>
+            <button id="reset-button">リセット</button>
+        </div>
+        
+        <div id="message-area"></div>
+
+        <main class="main-content">
+            <div id="game-board"></div>
+            <div id="panel-area" droppable="true"></div>
+        </main>
+    </div>
+    
+    <div id="rules-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <h2>ゲームのルール</h2>
+            <p><strong>目的:</strong> 盤上にある全てのライト(●)を光らせたらクリア！</p>
+            <ul>
+                <li><strong>ビーム:</strong> 矢印からビームが出ています。</li>
+                <li><strong>パネル:</strong> 下のエリアからパネルをドラッグして、盤上の空きマスに配置します。</li>
+                <li><strong>誘導:</strong> ビームがパネルの穴に当たると、他の全ての穴からビームが分岐して発射されます。穴のない面に当たるとビームは止まります。</li>
+                <li><strong>ライト:</strong> ビームが通過するとライトが点灯します。</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

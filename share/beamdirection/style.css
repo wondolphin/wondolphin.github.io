@@ -1,0 +1,254 @@
+/* CSS */
+:root {
+    --board-bg: #2c3e50;
+    --cell-bg: #34495e;
+    --panel-bg: #95a5a6;
+    --light-off-bg: #7f8c8d;
+    --light-on-bg: #f1c40f;
+    --emitter-bg: #e74c3c;
+    --beam-color: #f1c40f;
+    --text-color: #ecf0f1;
+    --border-color: #2c3e50;
+}
+
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--board-bg);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 15px;
+    margin: 0;
+    min-height: 100vh;
+    box-sizing: border-box;
+    /* スクロールを禁止するため */
+    overflow: hidden;
+}
+
+.game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 800px;
+}
+
+.header {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+}
+
+h1 {
+    margin: 0;
+    font-size: 1.8em;
+    color: var(--text-color);
+    text-align: center;
+    flex-shrink: 1;
+}
+
+#rules-button {
+    background-color: #9b59b6;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 35px;
+    height: 35px;
+    font-size: 1.3em;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.3s;
+    flex-shrink: 0;
+}
+#rules-button:hover {
+    background-color: #8e44ad;
+}
+
+.top-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+}
+
+#level-select, #reset-button {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    background-color: #3498db;
+    color: white;
+    font-size: 0.9em;
+    transition: background-color 0.3s;
+}
+
+#level-select:hover, #reset-button:hover {
+    background-color: #2980b9;
+}
+
+#message-area {
+    width: 100%;
+    text-align: center;
+    font-size: 1.6em;
+    color: #2ecc71;
+    font-weight: bold;
+    min-height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.main-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+#game-board {
+    display: grid;
+    border: 2px solid var(--border-color);
+    background-color: var(--cell-bg);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.grid-cell {
+    width: 50px;
+    height: 50px;
+    position: relative;
+    background-color: var(--cell-bg);
+    border: 1px solid var(--border-color);
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#panel-area {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    background-color: var(--cell-bg);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 450px;
+    min-height: 65px;
+}
+
+.dragging-over {
+    background-color: #4a6279;
+}
+
+.board-element {
+    width: 80%;
+    height: 80%;
+    border-radius: 50%;
+}
+
+.light { background-color: var(--light-off-bg); }
+.light.on { background-color: var(--light-on-bg); box-shadow: 0 0 12px var(--light-on-bg); }
+.emitter { background-color: var(--emitter-bg); }
+
+.beam {
+    position: absolute;
+    background: var(--beam-color);
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 5;
+}
+.beam-h { width: 100%; height: 8px; top: 50%; left: 0; transform: translateY(-50%); }
+.beam-v { width: 8px; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
+
+.panel {
+    width: 50px;
+    height: 50px;
+    background-color: var(--panel-bg);
+    cursor: grab;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 2px solid #7f8c8d;
+    touch-action: none; /* ★★★ タッチスクロールを無効化 ★★★ */
+}
+.panel.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+.panel svg {
+    width: 100%;
+    height: 100%;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+.modal-overlay.visible {
+    visibility: visible;
+    opacity: 1;
+}
+.modal-content {
+    background-color: var(--text-color);
+    color: var(--board-bg);
+    padding: 30px;
+    border-radius: 10px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    position: relative;
+}
+.modal-content h2 {
+    margin-top: 0;
+}
+.modal-close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 1.5em;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: var(--board-bg);
+}
+
+@media (max-width: 600px) {
+    body {
+        align-items: flex-start;
+    }
+    h1 {
+        font-size: 1.5em;
+    }
+    .grid-cell, .panel {
+        width: 40px;
+        height: 40px;
+    }
+    #rules-button {
+        width: 30px;
+        height: 30px;
+        font-size: 1.1em;
+    }
+}
