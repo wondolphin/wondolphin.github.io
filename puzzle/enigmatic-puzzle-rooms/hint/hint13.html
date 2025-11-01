@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>問題13 ヒント</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --danger-color: #ff5252;
+            --danger-dark: #c62828;
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --container-bg: #ffffff;
+            --border-color: #e0e0e0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: var(--container-bg);
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 30px;
+        }
+        /* 問題図用のスタイルを追加 */
+.problem-image {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 60%;
+            height: auto;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+        .hints-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+        details {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden; 
+        }
+        summary {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--text-color);
+            background-color: #f8f9fa;
+            padding: 15px 20px;
+            cursor: pointer;
+            outline: none; 
+            position: relative;
+            padding-left: 40px;
+            /* デフォルトのマーカー（▼）を非表示にする */
+            list-style: none;
+        }
+        /* Safari, Chrome用の設定 */
+        summary::-webkit-details-marker {
+            display: none;
+        }
+        summary::before {
+            content: '▶';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.2s ease;
+        }
+        details[open] > summary::before {
+            transform: translateY(-50%) rotate(90deg);
+        }
+        .hint-content {
+            padding: 20px;
+            background-color: var(--container-bg);
+            border-top: 1px solid var(--border-color);
+            line-height: 1.6;
+        }
+        .hint-image {
+            max-width: 60%;
+            height: auto;
+            display: block;
+            margin: 15px auto;
+            border-radius: 8px;
+        }
+        .answer-section {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px dashed #ccc;
+        }
+        .btn-answer {
+            display: inline-block;
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            background-color: var(--danger-color);
+            border-bottom: 4px solid var(--danger-dark);
+            padding: 12px 28px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            margin-top: 10px;
+            transition: all 0.2s ease;
+        }
+        .btn-back {
+            display: inline-block;
+            text-align: center;
+            text-decoration: none;
+            font-size: 1.1em;
+            color: var(--primary-color);
+            padding: 12px 28px;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .btn-back:hover {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>問題 13 ヒント</h1>
+
+        <!-- 問題図をここに追加 -->
+        <img src="./preview13.png" alt="問題図" class="problem-image" onerror="this.onerror=null; this.src='https://placehold.co/800x400/EEE/31343C?text=preview13.png';">
+
+        <div class="hints-wrapper">
+            <details>
+                <summary>ヒント 1</summary>
+                <div class="hint-content">
+                    <p>六角形のマスが押せます。まずは適当に押して挙動を見てみましょう。</p>
+                    <p>Q．変化する範囲は決まっているようです。どの範囲が変化しますか？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 2</summary>
+                <div class="hint-content">
+                    <p>変化するのは、押したマスの周囲６マスです。</p>
+                    <p>これは、一番外側のマスを押したときも同様です。</p>
+                    <p>盤面の外にある丸は黒く、中にある丸は光っています。ここから推察できる、クリア条件は何でしょうか？（ヒント：丸の個数とマスの個数を数えてみましょう。）</p>
+                </div>
+            </details>
+                        <details>
+                <summary>ヒント 3</summary>
+                <div class="hint-content">
+                    <p>クリア条件は、すべての丸が盤面に収まることです。</p>
+                    <p>丸は全部で１９個、マスも１９個なので、全てのマスに丸を入れるということになります。</p>
+                    <p>挙動のルールを明らかにしましょう。押したマスの周囲の６マスの丸は、どのように変化しますか。（ヒント：どこでも同じルールで移動しています。）</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 4　コツ</summary>
+                <div class="hint-content">
+                <p>外側の黒丸を内側に誘い込む際、内側にあった丸が外に出ないように気をつけるのがコツです。空白マスをうまく持っていって、そうなるのを回避しましょう。</p>
+                <p><br></p>
+                <p>解けない方は、下の解答をご覧ください。</p>
+                    <div class="answer-section">
+                        <p>解答を見たい方はこちら↓</p>
+                        <a href="answer13.html" class="btn-answer" onclick="return confirm('自分で解き明かす楽しみがなくなりますが、よろしいですか？')">解答を見る</a>
+                    </div>
+                </div>
+            </details>
+        </div>
+        
+        <div class="footer">
+            <a href="./hints-index.html" class="btn-back">目次に戻る</a>
+        </div>
+    </div>
+</body>
+</html>
+

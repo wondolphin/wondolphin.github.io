@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>問題12 ヒント</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --danger-color: #ff5252;
+            --danger-dark: #c62828;
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --container-bg: #ffffff;
+            --border-color: #e0e0e0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: var(--container-bg);
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 30px;
+        }
+        /* 問題図用のスタイルを追加 */
+.problem-image {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 60%;
+            height: auto;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+        .hints-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+        details {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden; 
+        }
+        summary {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--text-color);
+            background-color: #f8f9fa;
+            padding: 15px 20px;
+            cursor: pointer;
+            outline: none; 
+            position: relative;
+            padding-left: 40px;
+            /* デフォルトのマーカー（▼）を非表示にする */
+            list-style: none;
+        }
+        /* Safari, Chrome用の設定 */
+        summary::-webkit-details-marker {
+            display: none;
+        }
+        summary::before {
+            content: '▶';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.2s ease;
+        }
+        details[open] > summary::before {
+            transform: translateY(-50%) rotate(90deg);
+        }
+        .hint-content {
+            padding: 20px;
+            background-color: var(--container-bg);
+            border-top: 1px solid var(--border-color);
+            line-height: 1.6;
+        }
+        .hint-image {
+            max-width: 60%;
+            height: auto;
+            display: block;
+            margin: 15px auto;
+            border-radius: 8px;
+        }
+        .answer-section {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px dashed #ccc;
+        }
+        .btn-answer {
+            display: inline-block;
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            background-color: var(--danger-color);
+            border-bottom: 4px solid var(--danger-dark);
+            padding: 12px 28px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            margin-top: 10px;
+            transition: all 0.2s ease;
+        }
+        .btn-back {
+            display: inline-block;
+            text-align: center;
+            text-decoration: none;
+            font-size: 1.1em;
+            color: var(--primary-color);
+            padding: 12px 28px;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .btn-back:hover {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>問題 12 ヒント</h1>
+
+        <!-- 問題図をここに追加 -->
+        <img src="./preview12.png" alt="問題図" class="problem-image" onerror="this.onerror=null; this.src='https://placehold.co/800x400/EEE/31343C?text=preview12.png';">
+
+        <div class="hints-wrapper">
+            <details>
+                <summary>ヒント 1</summary>
+                <div class="hint-content">
+                    <p>タップできるのは９個の数字マスです。</p>
+                    <p>９だけ光っているので、全部を９にすることができればクリアとなりそうです。</p>   
+                    <p>まずはタップで変化が起こるのがどんなときかを調べましょう。</p>
+                    <p>たとえば、あるマスをタップして変化があったとき、そのマスを続けてもう一度タップしても、変化は起こりません。</p>
+                     <p>ということは、タップすると変化が起こるマスは、そのときどきによって変わってくるということです。</p>   
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 2</summary>
+                <div class="hint-content">
+                    <p>あるマスを押して変化したとき、次に押して変化するマスの場所は決まっています。</p>
+                  <p>例えば、手始めに上段中央の9を押すと、変化が起きます。その次に押して反応するマスは４つあります。どれでしょうか。そして、そこから推察できることは？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 3</summary>
+                <div class="hint-content">
+                    <p>どうやら、あるマスをタップして変化があったとき、次はそのマスと同じ列のマスが、タップして変化できるようです。</p>
+                    <p>2マス離れているマスを押したときの変化は特殊なので、ひとまず無視して結構です。上下左右に隣接しているマスを押していけば、どんどん数字は変化していく、ということが分かれば、解くには十分です。</p>
+                    <p>では次に、数字の変化の仕方を観察してみましょう。</p>
+                </div>
+            </details>
+                        <details>
+                <summary>ヒント 4</summary>
+                <div class="hint-content">
+                <p>隣接するマスをタップしていった場合は、数字が変化するマスは２つであるはずです。では…</p>
+                    <p>Q．変化するマスは、どの２つですか？</p>
+                    <p>Q．２つの数字の合計値は、どうなりますか？</p>
+                    <p>Q．押したマスの数字は、どうなりますか？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 5</summary>
+                <div class="hint-content">
+                <p>変化するのは、いま押したマスと、その直前に押したマスです。</p>
+                    <p>２つの数字の合計値は、変化しないようです。</p>
+                    <p>押したマスの数字がどうなるか、については、もう少し観察のヒントを出します。どんなにぐちゃぐちゃやっても、押したマスがなる数字は、そのマスの場所に固有の値であることに気づきます。９枚のそれぞれがなる値を突き止めてください。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 6</summary>
+                <div class="hint-content">
+                <p>上段左は、押すと1になり、上段中央は、押すと2になります。上段右は、押すと3になります。</p>
+                <p>1 2 3<br>4 5 6<br>7 8 9</p>
+                このような配置で、そのマス固有の値があり、押すとその数になるということですね。
+                <p>直前に押したマスとの合計値が一定であることから、数字の変化は、「そのマスの固有値を超える分（乗っかっている分）を直前のマスに受け渡している」ということができます。そして、押したマスには、何も「乗って」いない状態になります。</p>
+                <p>数字を押していく操作は、何も「乗って」いない状態のマスに、“浮動している数字”を移動させる操作ということです。（とあるパズルを彷彿とさせる挙動ですね。）</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 7</summary>
+                <div class="hint-content">
+                <p>固有値が分かっているので、各マスに「乗って」いる数値も、各マスに「乗せる」べき数値も、わかります。左上のマス（固有値1）を9にするためには、どこかに乗っている8を運べばよいです。そういう考え方で、1から8にそれぞれ8から1を運びましょう。右下のマス（固有値9）には、最後には何も乗らない状態になれば良いです。</p>
+                <p>上の段、もしくは左の列から９を作っていくと良いです。</p>
+                <p><br></p>
+                <p>解けない方は、下の解答をご覧ください。</p>
+                    <div class="answer-section">
+                        <p>解答を見たい方はこちら↓</p>
+                        <a href="answer12.html" class="btn-answer" onclick="return confirm('自分で解き明かす楽しみがなくなりますが、よろしいですか？')">解答を見る</a>
+                    </div>
+                </div>
+            </details>
+        </div>
+        
+        <div class="footer">
+            <a href="./hints-index.html" class="btn-back">目次に戻る</a>
+        </div>
+    </div>
+</body>
+</html>
+

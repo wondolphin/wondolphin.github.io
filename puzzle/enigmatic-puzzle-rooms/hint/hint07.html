@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>問題07 ヒント</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --danger-color: #ff5252;
+            --danger-dark: #c62828;
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --container-bg: #ffffff;
+            --border-color: #e0e0e0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: var(--container-bg);
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 30px;
+        }
+        /* 問題図用のスタイルを追加 */
+.problem-image {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 60%;
+            height: auto;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+        .hints-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+        details {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden; 
+        }
+        summary {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--text-color);
+            background-color: #f8f9fa;
+            padding: 15px 20px;
+            cursor: pointer;
+            outline: none; 
+            position: relative;
+            padding-left: 40px;
+            /* デフォルトのマーカー（▼）を非表示にする */
+            list-style: none;
+        }
+        /* Safari, Chrome用の設定 */
+        summary::-webkit-details-marker {
+            display: none;
+        }
+        summary::before {
+            content: '▶';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.2s ease;
+        }
+        details[open] > summary::before {
+            transform: translateY(-50%) rotate(90deg);
+        }
+        .hint-content {
+            padding: 20px;
+            background-color: var(--container-bg);
+            border-top: 1px solid var(--border-color);
+            line-height: 1.6;
+        }
+        .hint-image {
+            max-width: 60%;
+            height: auto;
+            display: block;
+            margin: 15px auto;
+            border-radius: 8px;
+        }
+        .answer-section {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px dashed #ccc;
+        }
+        .btn-answer {
+            display: inline-block;
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            background-color: var(--danger-color);
+            border-bottom: 4px solid var(--danger-dark);
+            padding: 12px 28px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            margin-top: 10px;
+            transition: all 0.2s ease;
+        }
+        .btn-back {
+            display: inline-block;
+            text-align: center;
+            text-decoration: none;
+            font-size: 1.1em;
+            color: var(--primary-color);
+            padding: 12px 28px;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .btn-back:hover {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>問題 07 ヒント</h1>
+
+        <!-- 問題図をここに追加 -->
+        <img src="./preview07.png" alt="問題図" class="problem-image" onerror="this.onerror=null; this.src='https://placehold.co/800x400/EEE/31343C?text=preview07.png';">
+
+        <div class="hints-wrapper">
+            <details>
+                <summary>ヒント 1</summary>
+                <div class="hint-content">
+                    <p>操作できるのは下に並んだ７つの数の増減ボタンです。</p>
+                    <p>色々にいじりながら挙動を観察してみましょう。</p>
+                    <p>Q．クリア条件は何でしょうか？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 2</summary>
+                <div class="hint-content">
+                    <p>盤上で動く円は７つあり、重なることもあります。</p>
+                    <p>盤の中央に色の違う７マスがあります。このそれぞれに７つの円が入れば良さそうです。</p>
+                    <p>Q．いじる数字によって、動く円の数が異なります。どのように異なるでしょうか？</p>
+                </div>
+            </details>
+                        <details>
+                <summary>ヒント 3</summary>
+                <div class="hint-content">
+                    <p>一番左の数字をいじると７つ全ての円が動きますが、一番右の数字をいじると、動く円は１つだけです。</p>
+                    <p>一番右の数字の操作で動く円の挙動をまずは理解しましょう。</p>
+                    <p>盤上を出る操作をした場合、どこに移動するのでしょうか？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 4</summary>
+                <div class="hint-content">
+                    <p>一番右の数字を増やすと1つの円が右上に移動します。盤を出る移動をすると、左下の方から出てきます。出てくる場所は、外周についている色が教えてくれています。</p>
+                    <p>Q．右から2番目の数字をいじると、どうなるでしょう？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 5</summary>
+                <div class="hint-content">
+                    <p>一番右の数字を増やすと1つの円が右上に移動します。盤を出る移動をすると、左下の方から出てきます。出てくる場所は、外周についている色が教えてくれています。</p>
+                    <p>Q．右から2番目の数字をいじると、どうなるでしょう？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 6</summary>
+                <div class="hint-content">
+                <p>右から2番目の数字を増やすと、2つの円が左上に移動しますね。そのうちの1つは、一番右の数字で動く円です。</p>
+                <p>ということは、それぞれの数字が動かしている円は…。</p>
+                <p>全ての数字を1にしてみても、なにかわかるかもしれません。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 7　ルールがわかってから…</summary>
+                <div class="hint-content">
+                <p>一番左から順に確定させていきましょう。</p>
+                <p>操作している数字よりも右の数字では制御できない円を、見失わないように！</p>
+                <p><br></p>
+                <p>解けない方は、下の解答をご覧ください。</p>
+                    <div class="answer-section">
+                        <p>解答を見たい方はこちら↓</p>
+                        <a href="answer07.html" class="btn-answer" onclick="return confirm('自分で解き明かす楽しみがなくなりますが、よろしいですか？')">解答を見る</a>
+                    </div>
+                </div>
+            </details>
+        </div>
+        
+        <div class="footer">
+            <a href="./hints-index.html" class="btn-back">目次に戻る</a>
+        </div>
+    </div>
+</body>
+</html>
+
