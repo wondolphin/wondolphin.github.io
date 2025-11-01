@@ -60,6 +60,7 @@
             box-sizing: border-box;
             text-align: center;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            /* スクロール削除: max-height: 85vh; overflow-y: auto; */
         }
         
         /* 特典ページのタイトル */
@@ -83,7 +84,7 @@
         }
 
 
-        /* --- パスワード入力画面 (変更なし) --- */
+        /* --- パスワード入力画面 (room-view と同階層) --- */
         #password-screen {
             width: 100%;
             height: 100%;
@@ -162,7 +163,8 @@
 
         /* (ボタンを小さく) */
         .tab {
-            padding: 8px 4px; 
+            padding: 8px 4px; /* 縦幅を削減 */
+            /* aspect-ratio: 1 / 1; 削除 */
             background-color: #1f2937;
             border: 1px solid #4b5563;
             color: #d1d5db;
@@ -237,16 +239,14 @@
         }
 
 
-        /* --- ↓ 修正点 (deluxe.html / check.html 本編のスタイルに合わせる) --- */
+        /* --- ↓ 修正点 (check.html のスタイルに完全に合わせる) --- */
+        
         #game-overlay {
-            position: fixed; /* absolute -> fixed (画面全体基準) */
-            top: 0;
-            left: 0;
-            width: 100vw; /* 100% -> 100vw */
-            height: 100vh; /* 100% -> 100vh */
-            background-color: rgba(0, 0, 0, 0.85);
+            position: fixed; /* 修正: 画面全体を覆う */
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background-color: rgba(0,0,0,0.8);
             display: flex;
-            flex-direction: column; /* #game-display-area と #close-game-button を縦に並べる */
             justify-content: center;
             align-items: center;
             opacity: 0;
@@ -258,54 +258,58 @@
             opacity: 1;
             visibility: visible;
         }
-
+        
         /* (check.html と同一のスタイル) */
         #game-display-area {
-            position: relative;
-            width: 85vmin; 
-            height: 85vmin; 
-            max-width: 90vh; 
-            max-height: 90vw; 
             display: flex;
             flex-direction: column;
+            align-items: center;
+            justify-content: center; 
+            aspect-ratio: 3 / 4; /* 縦長の比率 */
+            height: 95vh;
+            max-width: 95vw; 
+        }
+
+        /* (check.html と同一のスタイル) */
+        #game-frame-container {
+            width: 100%;
+            display: flex;
             justify-content: center;
             align-items: center;
         }
-        
-        #game-frame-container {
+        /* (check.html と同一のスタイル) */
+        #game-frame {
             width: 100%;
-            height: 100%;
+            aspect-ratio: 1 / 1;
             border: 2px solid #fff;
             border-radius: 10px;
             background-color: #000;
-            overflow: hidden;
         }
-        #game-frame {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-        
-        /* 閉じるボタン (deluxe.html準拠のスタイル) */
+        /* (check.html と同一のスタイル) */
         #close-game-button {
-            width: 50px;
-            height: 50px;
+            width: clamp(40px, 8vmin, 50px);
+            height: clamp(40px, 8vmin, 50px);
             border-radius: 50%;
-            background-color: rgba(255, 255, 255, 0.8);
+            background-color: rgba(255,255,255,0.8);
             color: #000;
             border: none;
-            font-size: 2em;
+            font-size: clamp(1.5em, 4vmin, 2em);
             cursor: pointer;
-            margin-top: 10px; /* game-display-area との隙間 */
             display: flex;
             justify-content: center;
             align-items: center;
             line-height: 1;
+            flex-shrink: 0;
+            margin-top: 15px;
         }
     </style>
 </head>
 <body>
 
+<!-- 
+    HTML構造も check.html に合わせる
+    #game-wrapper の *外* に #game-overlay を配置 
+-->
 <div id="game-wrapper">
 
     <!-- 部屋の表示エリア (特典コンテンツ) -->
@@ -327,7 +331,7 @@
             <!-- フッター (X共有) -->
             <div id="footer-share">
                 <p>宜しければ、Xにてゲームの感想を共有いただけると嬉しいです。</p>
-                <a href="https://twitter.com/intent/tweet?text=%E8%AC%E8%A7%A3%E3%81%8D%E3%82%B2%E3%83%BC%E3%83%A0%E3%80%8CEnigmatic%20Puzzle%20Rooms%E3%80%8D%E3%82%92%E3%82%AF%E3%83%AA%E3%82%A2%E3%81%97%E3%81%9F%EF%BC%81%E3%80%8D%E3%80%80%23EnigmaticPuzzleRooms%E3%80%80%23%E8%AC%E8%A7%A3%E3%81%8D%E3%80%80%23%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%23%E5%AE%87%E5%AE%99%E8%AC%EE%3%80%80%40wondolphin%0Awondolphin.github.io%2Fpuzzle%2Fenigmatic-puzzle-rooms%2Findex.html" target="_blank" class="btn-x">Xで共有する</a>
+                <a href="https://twitter.com/intent/tweet?text=%E8%AC%8E%E8%A7%A3%E3%81%8D%E3%82%B2%E3%83%BC%E3%83%A0%E3%80%8CEnigmatic%20Puzzle%20Rooms%E3%80%8D%E3%82%92%E3%82%AF%E3%83%AA%E3%82%A2%E3%81%97%E3%81%9F%EF%BC%81%E3%80%8D%E3%80%80%23EnigmaticPuzzleRooms%E3%80%80%23%E8%AC%8E%E8%A7%A3%E3%81%8D%E3%80%80%23%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%23%E5%AE%87%E5%AE%99%E8%AC%EE%3%80%80%40wondolphin%0Awondolphin.github.io%2Fpuzzle%2Fenigmatic-puzzle-rooms%2Findex.html" target="_blank" class="btn-x">Xで共有する</a>
             </div>
         </div>
     </div>
@@ -341,23 +345,23 @@
         <p id="error-message"></p>
     </div>
 
-    <!-- ゲームオーバーレイ (check.html / deluxe.html 準拠) -->
-    <!-- ↓ 修正点 (HTML構造の変更) -->
-    <div id="game-overlay">
-        <div id="game-display-area">
-            <div id="game-frame-container">
-                <iframe id="game-frame" src="about:blank"></iframe>
-            </div>
-            <!-- 閉じるボタンは #game-display-area の外、#game-overlay の直下へ -->
+</div>
+
+<!-- ゲーム表示用オーバーレイ (check.html 準拠) -->
+<div id="game-overlay">
+    <div id="game-display-area">
+        <div id="game-frame-container">
+            <iframe id="game-frame" src="about:blank"></iframe>
         </div>
         <button id="close-game-button">↓</button>
     </div>
-
 </div>
+
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM要素 ---
+    const gameWrapper = document.getElementById('game-wrapper'); // #game-wrapper
     const gameOverlay = document.getElementById('game-overlay');
     const gameFrame = document.getElementById('game-frame');
     const closeGameButton = document.getElementById('close-game-button');
@@ -381,7 +385,6 @@ document.addEventListener('DOMContentLoaded', () => {
         11: 1,  12: 0,  13: 0,  14: 0,  15: 0,
         16: 0,  17: 0,  18: 1,  19: 1,  20: 0,
         21: 0,  22: 0,  23: 0,  24: 1,  25: 0
-        // 26番は削除
     };
 
     // --- パスワード認証関数 (deluxe.htmlのロジックから) ---
@@ -393,8 +396,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return result;
     }
 
-    // パスワード検証は、本編(26番含む)をクリアした証拠として機能するため、
-    // 27ビット(0-26)すべてをチェックするロジックを維持します。
     function validateClearPassword(password) {
         if (!password) return false;
         try {
