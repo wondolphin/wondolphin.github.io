@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>解答 | 問題21</title>
+  <style>
+    :root {
+      --primary-color: #007bff;
+      --bg-color: #f4f7f6;
+      --text-color: #333;
+      --container-bg: #ffffff;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 600px;
+      width: 100%;
+      background-color: var(--container-bg);
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.2em;
+      margin-bottom: 25px;
+    }
+    p.description {
+      font-size: 1.1em;
+      line-height: 1.7;
+      margin-bottom: 35px;
+      text-align: left;
+    }
+    .answer-image {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 15px auto;
+            border-radius: 8px;
+        }
+    .responsive-video {
+      width: 100%;
+      height: auto;
+      max-width: 100%;
+      border-radius: 8px;
+      display: block;
+      margin: 15px auto;
+    }
+    .btn-back {
+      display: inline-block;
+      text-decoration: none;
+      font-size: 1.1em;
+      color: var(--primary-color);
+      padding: 12px 28px;
+      border: 2px solid var(--primary-color);
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .btn-back:hover {
+      background-color: var(--primary-color);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>問題 21 の解答</h1>
+    <p class="description">
+      上段のランプは９から０の各数字を表します。ある計算をしたときに、計算結果に使われる数字に対応するランプが、光ります。<br>
+      「計算」というのは、「二進数」と深い関係があります。<br>
+      <br>
+      下のスイッチも、９から０の各数字を担当しているとみなします。<br>
+      光ったスイッチをa,b,cとすると、2のa乗+2のb乗+2のc乗という計算を行います。<br>
+      言い換えれば、スイッチのON/OFFを1/0で表すことにして、1と0の並びを二進数とみなしたときに、それを十進数に変換します。<br>
+      たとえば、0000000111であれば、4+2+1=7です。ランプは「７」だけが光ります。<br>
+      たとえば、1110000000であれば、512+256+128=896です。ランプは「９」「８」「６」が光ります。<br>
+      <br>
+    「８」「５」「３」を光らせたいので、計算結果が３５８，３８５、５３８，５８３，８３５，８５３のいずれかになるようにします。<br>
+    ３つのスイッチ点灯で作れるのは、３８５（＝２５６＋１２８＋１）だけです。
+      よって、ONにすべきスイッチは、右から１番目、８番目、９番目のスイッチです。
+    </p>
+
+   <img src="./answer21.png" alt="答えの画像" class="answer-image">　
+
+
+    <a href="./hints-index.html" class="btn-back">目次に戻る</a>
+  </div>
+</body>
+</html>

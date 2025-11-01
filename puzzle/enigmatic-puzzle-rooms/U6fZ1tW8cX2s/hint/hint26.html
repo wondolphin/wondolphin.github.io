@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>問題26 ヒント</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --danger-color: #ff5252;
+            --danger-dark: #c62828;
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --container-bg: #ffffff;
+            --border-color: #e0e0e0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: var(--container-bg);
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 30px;
+        }
+        /* 問題図用のスタイルを追加 */
+.problem-image {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 60%;
+            height: auto;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+        .hints-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+        details {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden; 
+        }
+        summary {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--text-color);
+            background-color: #f8f9fa;
+            padding: 15px 20px;
+            cursor: pointer;
+            outline: none; 
+            position: relative;
+            padding-left: 40px;
+            /* デフォルトのマーカー（▼）を非表示にする */
+            list-style: none;
+        }
+        /* Safari, Chrome用の設定 */
+        summary::-webkit-details-marker {
+            display: none;
+        }
+        summary::before {
+            content: '▶';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.2s ease;
+        }
+        details[open] > summary::before {
+            transform: translateY(-50%) rotate(90deg);
+        }
+        .hint-content {
+            padding: 20px;
+            background-color: var(--container-bg);
+            border-top: 1px solid var(--border-color);
+            line-height: 1.6;
+        }
+        .hint-image {
+            max-width: 60%;
+            height: auto;
+            display: block;
+            margin: 15px auto;
+            border-radius: 8px;
+        }
+        .answer-section {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px dashed #ccc;
+        }
+        .btn-answer {
+            display: inline-block;
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            background-color: var(--danger-color);
+            border-bottom: 4px solid var(--danger-dark);
+            padding: 12px 28px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            margin-top: 10px;
+            transition: all 0.2s ease;
+        }
+        .btn-back {
+            display: inline-block;
+            text-align: center;
+            text-decoration: none;
+            font-size: 1.1em;
+            color: var(--primary-color);
+            padding: 12px 28px;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .btn-back:hover {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>問題 26 ヒント</h1>
+
+        <!-- 問題図をここに追加 -->
+        <img src="./preview26.png" alt="問題図" class="problem-image" onerror="this.onerror=null; this.src='https://placehold.co/800x400/EEE/31343C?text=preview26.png';">
+
+        <div class="hints-wrapper">
+        <details>
+                <summary>ヒント 0　ドアの所在</summary>
+                <div class="hint-content">
+                    <p>２６番のドアは、０番の部屋の先にあります。</p>
+                    <p>０番の部屋は最初の部屋です。ゲーム開始時、後ろにあったんですね。ただ、振り返ることはできないので、何問か解いてぐるりと回って０番の部屋に入る必要があります。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 1</summary>
+                <div class="hint-content">
+                    <p>この問題は、どこをタップしても反応がありません。</p>
+                    <p>ドラッグや特殊な入力をするわけでもありません。</p>
+                </div>
+            </details>
+            
+            <details>
+                <summary>ヒント 2</summary>
+                <div class="hint-content">
+                    <p>いったん諦めて、他の問題を解いてからまた来てみても良いでしょう。26問中の26番なので、最後に解きましょう。</p>
+                </div>
+            </details>
+                        <details>
+                <summary>ヒント 3</summary>
+                <div class="hint-content">
+                    <p>改めて来ると、黄色いマスのパターンが変わっていると思います。</p>
+                    <p>下のメーターは、上の盤面に基づいて表示されています。</p>
+                    <p>Q．メーターの数値はどのように決まるのでしょうか？</p>
+                    <p>Q．下のメーターがどうなるとクリアでしょうか？そしてそれは、盤面がどうなるべきだということを表しているでしょうか？</p>
+                </div>
+            </details>
+             <details>
+                <summary>ヒント 4</summary>
+                <div class="hint-content">
+                    <p>盤面内の黄色いマスとオレンジのマスの個数を合わせると、下のメーターの数値に一致します。</p>
+                    <p>メーターがMAXになると良さそうです。現在の数値とメーターの割合から見積もって、MAXになる数値は２６だと思われます。</p>
+                    <p>ということは、上の盤面ですべてのマスが黄色くなることが、クリアの条件であると推察されます。</p>
+                    <p>では、マスを黄色くする方法を考えます。まず、どうやったら盤面を変化させることができるのか、思い当たるものはありませんか。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 5</summary>
+                <div class="hint-content">
+                    <p>一度離れて他の問題をやってからまた来たときに、状況が変わっていたことを思い出しましょう。</p>
+                <p>時間で変化するのでしょうか？・・・いえ、いくら待っても盤面は変化しません。・・・となると、他に考えられるのは・・・。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 6</summary>
+                <div class="hint-content">
+                <p>この盤面の形…５×５に１個くっついている形、心当たりが…？</p>
+                <p>マスが全て光れば、メーターの数値は２６になります。２６…。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 7</summary>
+                <div class="hint-content">
+                <p>１マスだけオレンジです。この色になっているマスは動きません。</p>
+                <p>オレンジといえば、部屋の床の色もオレンジですね。</p>
+                <p>床の色といえば、開いているドアの先の部屋からの明かりがうっすら見えますが、その床の色はオレンジではなく、灰色だったり、黄色だったりしていました。</p>
+                <img src="hint26-1.png?text=ヒント画像1" alt="ヒントの画像" class="hint-image">
+                <p>次のヒントで盤面を変化させる方法を明かします。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 8</summary>
+                <div class="hint-content">
+                <p>盤面の形は、このゲームの０番から２５番の部屋の配置と同じです。盤面は部屋を表しているのです。</p>
+                <img src="hint26-2.png?text=ヒント画像1" alt="ヒントの画像" class="hint-image">
+                <p>実は、部屋の床の色は変化しています。今いる部屋の床はオレンジ色になりますが、いない部屋の床は灰色だったり黄色だったりします。</p>
+                <p>つまり、部屋を移動することで、部屋の床の色が変化し、この問題の盤面も変化するということです！</p>
+                <p>色が変わるルールを突き止めましょう。</p>
+                </div>
+            </details>
+             <details>
+                <summary>ヒント 9</summary>
+                <div class="hint-content">
+                <p>通ったことがある部屋が黄色くなるのでしょうか？…いいえ、灰色にもどってしまう部屋もあります。</p>
+                <p>例えば、１番の部屋から、２番、５番、１０番、６番、３番、１番、０番、と進んで盤面を見ましょう。通った部屋が黄色くなっており、他は灰色です。では、１つ引き返して、そこから２番、６番、３番、１番、０番、と進んで盤面を見ましょう。１０番と６番の光が消えています。</p>
+                <p>１番から、２，６，１１，１５，６，３，１，０と進んでみると…？</p>
+                <p>色々と試すとわかってきます。</p>
+                <p>次のヒントでルールの全容を明かします。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 10</summary>
+                <div class="hint-content">
+                <p>１番から、２，６，１１，１５，１０，６，３，１，０と進んでみると、通った部屋が光っていますが、２は光っていません。</p>
+                <p>経路をさかのぼってみてみると、一筆書きができるところまでが光っていることがわかります。</p>
+                <p>つまり、部屋間の移動経路が監視されており、移動経路を、同じ番号が現れるまでさかのぼり、そこまでの経路に含まれる番号が光っている、ということです。</p>
+                <p>たとえば、１，２，６，１１，１５，１０，６，３，１，０と進んだ場合、この経路を遡ると０→１→３→６→…となりますが、１１の次の６で、２回目の６が出てきます。ここでさかのぼりを終え、結果、０，１，３，６，１５，１１，１０が抽出されます。これらの部屋が光ります。</p>
+                <p>光が消えてしまうのは、同じ部屋に２度入ったことで一筆書きの経路が分断されてしまったとき、ということになります。</p>
+                <p>要するに、一筆書きをするように1回ずつ部屋を辿っていけば、すべての部屋が光ります！</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 11</summary>
+                <div class="hint-content">
+                <p>最後が０の部屋であることに留意し、ゴールから逆算して一筆書きを考えましょう。何通りもあるので自分が間違えにくそうなルートを考えるとよいでしょう。</p>
+                <p><br></p>
+                <p>解けない方は、下の解答をご覧ください。</p>
+                    <div class="answer-section">
+                        <p>解答を見たい方はこちら↓</p>
+                        <a href="answer26.html" class="btn-answer" onclick="return confirm('自分で解き明かす楽しみがなくなりますが、よろしいですか？')">解答を見る</a>
+                    </div>
+                </div>
+            </details>
+        </div>
+        
+        <div class="footer">
+            <a href="./hints-index.html" class="btn-back">目次に戻る</a>
+        </div>
+    </div>
+</body>
+</html>
+
