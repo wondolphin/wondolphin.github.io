@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>解答 | 問題15</title>
+  <style>
+    :root {
+      --primary-color: #007bff;
+      --bg-color: #f4f7f6;
+      --text-color: #333;
+      --container-bg: #ffffff;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 600px;
+      width: 100%;
+      background-color: var(--container-bg);
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.2em;
+      margin-bottom: 25px;
+    }
+    p.description {
+      font-size: 1.1em;
+      line-height: 1.7;
+      margin-bottom: 35px;
+      text-align: left;
+    }
+    .answer-image {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 15px auto;
+            border-radius: 8px;
+        }
+    .responsive-video {
+      width: 100%;
+      height: auto;
+      max-width: 100%;
+      border-radius: 8px;
+      display: block;
+      margin: 15px auto;
+    }
+    .btn-back {
+      display: inline-block;
+      text-decoration: none;
+      font-size: 1.1em;
+      color: var(--primary-color);
+      padding: 12px 28px;
+      border: 2px solid var(--primary-color);
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .btn-back:hover {
+      background-color: var(--primary-color);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>問題 15 の解答</h1>
+    <p class="description">
+    ＜ルール＞<br>
+      並んだ３つの数字カードは、３桁の数とみなします。上段の一番左のランプは、できた３桁の数の約数に「１」があるか、を判定し、yesなら点灯します。できた２つの３桁のどちらかが満たしていれば、点灯します。<br>
+      その右隣のランプは、約数に「２」があるかを判定します。他の１０個のランプも同様に、約数に「３」、「４」、「５」、・・・、「１２」があるかを判定します。<br>
+      よって、３桁の数を２つ作り、その２つのどちらかの約数に１〜１２が含まれているようにすれば、クリアとなります。<br>
+      <br>
+      ＜解＞<br>
+      角度で使われる３６０は、約数をたくさん持つ、優秀な数です。これをセットすると、１０個のランプが灯ります。<br>
+      残る約数は７と１１です。数字は１，２，４，５。<br>７でも１１でも割り切れるために、７７の倍数を作ることを検討しましょう。<br>
+      <br>
+      <br>
+      すると、「１５４」が見つかります。<br>
+      よって、「３６０」と「１５４」を作ればクリアです。
+    </p>
+   <img src="./answer15.png" alt="答えの画像" class="answer-image">　
+
+    <a href="./hints-index.html" class="btn-back">目次に戻る</a>
+  </div>
+</body>
+</html>

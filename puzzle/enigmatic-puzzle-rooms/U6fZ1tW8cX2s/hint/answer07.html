@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>解答 | 問題07</title>
+  <style>
+    :root {
+      --primary-color: #007bff;
+      --bg-color: #f4f7f6;
+      --text-color: #333;
+      --container-bg: #ffffff;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 600px;
+      width: 100%;
+      background-color: var(--container-bg);
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.2em;
+      margin-bottom: 25px;
+    }
+    p.description {
+      font-size: 1.1em;
+      line-height: 1.7;
+      margin-bottom: 35px;
+      text-align: left;
+    }
+    .answer-image {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 15px auto;
+            border-radius: 8px;
+        }
+    .responsive-video {
+      width: 100%;
+      height: auto;
+      max-width: 100%;
+      border-radius: 8px;
+      display: block;
+      margin: 15px auto;
+    }
+    .btn-back {
+      display: inline-block;
+      text-decoration: none;
+      font-size: 1.1em;
+      color: var(--primary-color);
+      padding: 12px 28px;
+      border: 2px solid var(--primary-color);
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .btn-back:hover {
+      background-color: var(--primary-color);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>問題 07 の解答</h1>
+    <p class="description">
+    ＜ルール＞<br>
+      ７つの円をa,b,c,d,e,f,g、数値を左からア,イ,ウ,エ,オ,カ,キとします。<br>
+      数値アを１増やす操作は、円a,b,c,d,e,f,gすべてを、右上に１つ進めます。<br>
+      数値イを１増やす操作は、円b,c,d,e,f,gを、左上に１つ進めます。<br>
+      数値ウを１増やす操作は、円c,d,e,f,gを、右上に１つ進めます。<br>
+      数値エを１増やす操作は、円d,e,f,gを、左上に１つ進めます。<br>
+      数値オを１増やす操作は、円e,f,gを、右上に１つ進めます。<br>
+      数値カを１増やす操作は、円f,gを、左上に１つ進めます。<br>
+      数値キを１増やす操作は、円gを、右上に１つ進めます。<br>
+      すべての円のスタート（全ての数値が仮に０だった場合の位置）は、赤い矢印の位置です。<br>
+      <br>
+      ＜解き方＞<br>
+      数値アを動かして円aをオレンジマスに乗せ、数値イを動かして円bをオレンジマスに乗せ、・・・という風に１個ずつ乗せていきましょう。<br>
+      クリアとなる数値の一例は、２，７，７，４，３，４，３です。
+    </p>
+
+
+   <img src="./answer07.png" alt="答えの画像" class="answer-image">　
+
+
+    <a href="./hints-index.html" class="btn-back">目次に戻る</a>
+  </div>
+</body>
+</html>

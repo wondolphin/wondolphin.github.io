@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>問題09 ヒント</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --danger-color: #ff5252;
+            --danger-dark: #c62828;
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --container-bg: #ffffff;
+            --border-color: #e0e0e0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: var(--container-bg);
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 30px;
+        }
+        /* 問題図用のスタイルを追加 */
+.problem-image {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 60%;
+            height: auto;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+        .hints-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+        details {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden; 
+        }
+        summary {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--text-color);
+            background-color: #f8f9fa;
+            padding: 15px 20px;
+            cursor: pointer;
+            outline: none; 
+            position: relative;
+            padding-left: 40px;
+            /* デフォルトのマーカー（▼）を非表示にする */
+            list-style: none;
+        }
+        /* Safari, Chrome用の設定 */
+        summary::-webkit-details-marker {
+            display: none;
+        }
+        summary::before {
+            content: '▶';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.2s ease;
+        }
+        details[open] > summary::before {
+            transform: translateY(-50%) rotate(90deg);
+        }
+        .hint-content {
+            padding: 20px;
+            background-color: var(--container-bg);
+            border-top: 1px solid var(--border-color);
+            line-height: 1.6;
+        }
+        .hint-image {
+            max-width: 60%;
+            height: auto;
+            display: block;
+            margin: 15px auto;
+            border-radius: 8px;
+        }
+        .answer-section {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px dashed #ccc;
+        }
+        .btn-answer {
+            display: inline-block;
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            background-color: var(--danger-color);
+            border-bottom: 4px solid var(--danger-dark);
+            padding: 12px 28px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            margin-top: 10px;
+            transition: all 0.2s ease;
+        }
+        .btn-back {
+            display: inline-block;
+            text-align: center;
+            text-decoration: none;
+            font-size: 1.1em;
+            color: var(--primary-color);
+            padding: 12px 28px;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .btn-back:hover {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>問題 09 ヒント</h1>
+
+        <!-- 問題図をここに追加 -->
+        <img src="./preview09.png" alt="問題図" class="problem-image" onerror="this.onerror=null; this.src='https://placehold.co/800x400/EEE/31343C?text=preview09.png';">
+
+        <div class="hints-wrapper">
+            <details>
+                <summary>ヒント 1</summary>
+                <div class="hint-content">
+                    <p>タップが反応するのはぐるりと並んだ１０個の円だけです。</p>
+                    <p>まずは上から順に、右回りに、ボタンを押してみることをおすすめします。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 2</summary>
+                <div class="hint-content">
+                    <p>デジタル数字が表示されることがわかりました。</p>
+                    <p>ある数字を表示させたときに、ぎらぎら光って、上のランプが1つ、緑になります。それは、どういうことを意味しているでしょうか？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 3</summary>
+                <div class="hint-content">
+                    <p>ずばり、このパズルには4つのステージがあり、上の4つのランプは、ステージの進行状況を表しています。（緑がクリア済み、黄色が挑戦中）</p>
+                    <p>「8」を点灯させると第1ステージがクリア扱いとなりました。第2ステージ以降も、「8」を点灯させるとクリアになりそうです。</p>
+                    <p>ところが、「8」のボタンは封じられてしまったようです。別の方法で「8」を作らなければいけません。</p>
+                    <p>第2ステージではボタンが3回押せるようです。ボタンを押すと何が起こるのでしょうか？観察しましょう。</p>
+                </div>
+            </details>
+                        <details>
+                <summary>ヒント 4　仕組みの理解1</summary>
+                <div class="hint-content">
+                    <p>第2ステージ。ボタンを1個押して表示されるのは、第1ステージと同様、デジタル数字です。ボタンと数字の関係は、変わっていません。</p>
+                    <p>2個目のボタンを押すと、おかしな表示になります。このルールをつきとめましょう。</p>
+                    <p>例えば、0のボタンを押したあと、1のボタンを押すとどうなりますか？1のボタンを押したあと、0のボタンを押すとどうなりますか？1のボタンを押したあと、3のボタンを押すとどうなりますか？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 5　仕組みの理解2</summary>
+                <div class="hint-content">
+                    <p>0のボタンを押したあと、1のボタンを押すと、光っていたパーツのうち「1」にあたる部分が消えました。</p>
+                    <p>1のボタンを押したあと、3のボタンを押すと、「3」のうち「1」を除く部分が光りました。</p>
+                    <p>押す順番は関係なく、どの組み合わせを押したかで、光のパターンが決まるようです。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 6　各ステージの攻略</summary>
+                <div class="hint-content">
+                    <p>仕組みがわかったら、あとはパズルです。とはいえ、これは手探りで見つけるしかありません。</p>
+                    <p>なお、各ステージ、解は1つです。</p>
+                    <p>6は結構使えます。あとは0,9あたりも使えます。</p>
+                <p><br></p>
+                <p>解けない方は、下の解答をご覧ください。</p>
+                    <div class="answer-section">
+                        <p>解答を見たい方はこちら↓</p>
+                        <a href="answer09.html" class="btn-answer" onclick="return confirm('自分で解き明かす楽しみがなくなりますが、よろしいですか？')">解答を見る</a>
+                    </div>
+                </div>
+            </details>
+        </div>
+        
+        <div class="footer">
+            <a href="./hints-index.html" class="btn-back">目次に戻る</a>
+        </div>
+    </div>
+</body>
+</html>
+

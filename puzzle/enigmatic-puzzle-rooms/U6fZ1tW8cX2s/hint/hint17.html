@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>問題17 ヒント</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --danger-color: #ff5252;
+            --danger-dark: #c62828;
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --container-bg: #ffffff;
+            --border-color: #e0e0e0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: var(--container-bg);
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 30px;
+        }
+        /* 問題図用のスタイルを追加 */
+.problem-image {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 60%;
+            height: auto;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+        .hints-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+        details {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden; 
+        }
+        summary {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--text-color);
+            background-color: #f8f9fa;
+            padding: 15px 20px;
+            cursor: pointer;
+            outline: none; 
+            position: relative;
+            padding-left: 40px;
+            /* デフォルトのマーカー（▼）を非表示にする */
+            list-style: none;
+        }
+        /* Safari, Chrome用の設定 */
+        summary::-webkit-details-marker {
+            display: none;
+        }
+        summary::before {
+            content: '▶';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.2s ease;
+        }
+        details[open] > summary::before {
+            transform: translateY(-50%) rotate(90deg);
+        }
+        .hint-content {
+            padding: 20px;
+            background-color: var(--container-bg);
+            border-top: 1px solid var(--border-color);
+            line-height: 1.6;
+        }
+        .hint-image {
+            max-width: 60%;
+            height: auto;
+            display: block;
+            margin: 15px auto;
+            border-radius: 8px;
+        }
+        .answer-section {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px dashed #ccc;
+        }
+        .btn-answer {
+            display: inline-block;
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            background-color: var(--danger-color);
+            border-bottom: 4px solid var(--danger-dark);
+            padding: 12px 28px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            margin-top: 10px;
+            transition: all 0.2s ease;
+        }
+        .btn-back {
+            display: inline-block;
+            text-align: center;
+            text-decoration: none;
+            font-size: 1.1em;
+            color: var(--primary-color);
+            padding: 12px 28px;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .btn-back:hover {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>問題 17 ヒント</h1>
+
+        <!-- 問題図をここに追加 -->
+        <img src="./preview17.png" alt="問題図" class="problem-image" onerror="this.onerror=null; this.src='https://placehold.co/800x400/EEE/31343C?text=preview17.png';">
+
+        <div class="hints-wrapper">
+            <details>
+                <summary>ヒント 1</summary>
+                <div class="hint-content">
+                    <p>７色の四角が、それぞれ７つの円の中にいます。タップできるのは、この７つの円です。</p>
+                    <p>四角の色が変化する操作と、変化しない操作があります。把握しておきましょう。</p>
+                    <p>Q．まずはクリア条件を考えましょう。（ヒント：円も７色です。）</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 2</summary>
+                <div class="hint-content">
+                    <p>クリア条件は、７つの円のそれぞれに、同じ色の四角が入ること、です。</p>
+                    <p>中央の円を押しても、四角の色は変わりませんが、それ以外の円を押すと、四角の色は変わります。色が変わるというよりは、７つの四角の配置が変わる、と理解したほうが良いです。</p>
+                    <p>では、配置が変わるルールを突き止めていきます。</p>
+                    <p>Q．中央以外の円を押したとき、押した円にはどの色の四角が入りますか？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 3</summary>
+                <div class="hint-content">
+                <p>中央以外の円を押したとき、押した円には、中央にあった色の四角が入ることがわかります。</p>
+                <p>他の色はどのように配置替えするのでしょうか？</p>
+                    <p>ヒントとなるのは、円どうしをつなぐ線です。四角の配置が変わるルールは、この線が関係していると見てよいでしょう。それも、操作のたびにくるくる回りますが、円をタップして四角の配置が変わるまでは動かないので、回転後の線ではなく、回転前の線と、四角の配置変化の関係を考えるとよいでしょう。</p>
+                    <p>円をタップすると、その時の線の状態（円のつながり方）に基づいた配置換えが起こり、そのあと線の状態が変わる、ということです。</p>
+                </div>
+            </details>
+                        <details>
+                <summary>ヒント 4</summary>
+                <div class="hint-content">
+                    <p>例えば、最初の状態で、下の円を押したときの変化を見てみましょう。</p>
+                <img src="hint17-1.png" alt="ヒントの画像" class="hint-image">
+                <p>四角の色を、黒から線をたどっていくと、どちらも黒→緑→紫→紺→黄→赤→青です。線がこのあと回転しますが、回転する前は、このようにつながり方が一致しているのですね。<br></p>
+                <p>ルールをまとめると…<br>
+                ・中央にある四角が、タップした円に移動する。<br>
+                ・他の四角は、線でつながりあった状態を保つ。すなわち、すべての四角は、線上を同じ数だけ進む。<br>
+                ・その後、線が回転して、つながり方が変わる。<br>
+                ということになります。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 5　ルールがわかってから…</summary>
+                <div class="hint-content">
+                <p>「この色を中央に持ってきたい」と思ったときに押すべき場所をマスターしましょう。</p>
+                <p>できるようになったら、特定の３つを順番に並べる練習をしましょう。例えば赤、黄、緑を並べたい場合、赤を中央にし、中央を何度か押して赤と黄色がつながるようにします。次に緑を中央にし、中央を何度か押して黄色の後につながるようにすれば良いですね。</p>
+                <p>そうして黒以外のつながるべき色がおおよそつながれば、クリアのチャンスはやってきます。</p>
+                <p><br></p>
+                <p>解けない方は、下の解答をご覧ください。</p>
+                    <div class="answer-section">
+                        <p>解答を見たい方はこちら↓</p>
+                        <a href="answer17.html" class="btn-answer" onclick="return confirm('自分で解き明かす楽しみがなくなりますが、よろしいですか？')">解答を見る</a>
+                    </div>
+                </div>
+            </details>
+        </div>
+        
+        <div class="footer">
+            <a href="./hints-index.html" class="btn-back">目次に戻る</a>
+        </div>
+    </div>
+</body>
+</html>
+
