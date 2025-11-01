@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ヒント目次 | 謎解きゲーム</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --container-bg: #ffffff;
+            --border-color: #e0e0e0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: var(--container-bg);
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            text-align: center;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            font-weight: 700;
+        }
+        .toc-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            text-align: left;
+        }
+        .toc-list li a {
+            display: block;
+            text-decoration: none;
+            color: var(--primary-color);
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+        .toc-list li a:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+            border-color: var(--primary-color);
+        }
+        .problem-number {
+            font-weight: 700;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ヒント目次</h1>
+        <ul id="toc-list" class="toc-list">
+            <!-- JavaScriptで目次がここに生成されます -->
+        </ul>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const tocList = document.getElementById('toc-list');
+            
+            // 各問題の名前をここで定義します。
+            const problemNames = [
+                "Reversible Lamp", "からくりパネル", "Independent Order", "星たちの饗宴", "ぬるーく",
+                "Mystery Slot", "さまよう7円", "赤青ランプ", "7 SEGMENT", "作れ! トライブレード",
+                "じゅんぐりピラミッド", "オール９", "押し合いへし合い", "9 Panels", "２スウ１２ヤク",
+                "テン×テン", "フルーツバスケット", "ニコニコガーデン", "あちこち 4 Lights", "ときどき言うことを聞く２人",
+                "10 Digits", "SWITCH", "ナゾ条件迷路", "いち、に、さん", "さしつさされつ",
+                "最後の問題"
+            ];
+
+            // 26問分のリンクを生成
+            for (let i = 0; i < 26; i++) {
+                const problemId = String(i + 1).padStart(2, '0');
+                const problemName = problemNames[i] || `問題 ${problemId}`; // 名前がない場合のフォールバック
+                
+                const listItem = document.createElement('li');
+                const link = document.createElement('a');
+                link.href = `./hint${problemId}.html`;
+                
+                const numberSpan = document.createElement('span');
+                numberSpan.className = 'problem-number';
+                numberSpan.textContent = `${problemId}:`;
+                
+                link.appendChild(numberSpan);
+                link.append(problemName); // テキストノードとして追加
+                
+                listItem.appendChild(link);
+                tocList.appendChild(listItem);
+            }
+        });
+    </script>
+</body>
+</html>

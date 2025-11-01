@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>問題04 ヒント</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --danger-color: #ff5252;
+            --danger-dark: #c62828;
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --container-bg: #ffffff;
+            --border-color: #e0e0e0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: var(--container-bg);
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 30px;
+        }
+        /* 問題図用のスタイルを追加 */
+.problem-image {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 60%;
+            height: auto;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+        }
+        .hints-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+        details {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden; 
+        }
+        summary {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--text-color);
+            background-color: #f8f9fa;
+            padding: 15px 20px;
+            cursor: pointer;
+            outline: none; 
+            position: relative;
+            padding-left: 40px;
+            /* デフォルトのマーカー（▼）を非表示にする */
+            list-style: none;
+        }
+        /* Safari, Chrome用の設定 */
+        summary::-webkit-details-marker {
+            display: none;
+        }
+        summary::before {
+            content: '▶';
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: transform 0.2s ease;
+        }
+        details[open] > summary::before {
+            transform: translateY(-50%) rotate(90deg);
+        }
+        .hint-content {
+            padding: 20px;
+            background-color: var(--container-bg);
+            border-top: 1px solid var(--border-color);
+            line-height: 1.6;
+        }
+        .hint-image {
+            max-width: 60%;
+            height: auto;
+            display: block;
+            margin: 15px auto;
+            border-radius: 8px;
+        }
+        .answer-section {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px dashed #ccc;
+        }
+        .btn-answer {
+            display: inline-block;
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            background-color: var(--danger-color);
+            border-bottom: 4px solid var(--danger-dark);
+            padding: 12px 28px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            margin-top: 10px;
+            transition: all 0.2s ease;
+        }
+        .btn-back {
+            display: inline-block;
+            text-align: center;
+            text-decoration: none;
+            font-size: 1.1em;
+            color: var(--primary-color);
+            padding: 12px 28px;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .btn-back:hover {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>問題 04 ヒント</h1>
+
+        <!-- 問題図をここに追加 -->
+        <img src="./preview04.png" alt="問題図" class="problem-image" onerror="this.onerror=null; this.src='https://placehold.co/800x400/EEE/31343C?text=preview04.png';">
+
+        <div class="hints-wrapper">
+            <details>
+                <summary>ヒント 1</summary>
+                <div class="hint-content">
+                    <p>操作は十字キーのみです。</p>
+                    <p>上下左右をたくさん押してみて、なにか糸口をつかみましょう。</p>
+                   <p>Q．オレンジの星、黄色の星、点線の星・・・推察されるクリア条件は？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 2</summary>
+                <div class="hint-content">
+                    <p>点線の星は動きません。この位置に星があるときに星は黄色くなり、そうでないときはオレンジ色です。</p>
+                    <p>星は８つ。点線の星も８つ。ということで、すべての星が点線の星の位置にくればクリアということが推察されます。</p>
+                    <p>続いて、星の位置の変化のルールを突き止めましょう。</p>
+                   <p>たとえば、左と下を連打してみましょう。</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 3</summary>
+                <div class="hint-content">
+                    <p>矢印キーのうち、一部が使えないときがあると思います。</p>
+                    <p>矢印キーは、あるものを移動させる操作です。ということは、キーが使えないのは、その方向には移動できないということですね。</p>
+                    <p>Q．たとえば、左が使えないとき、右を何回か押すと、右が使えなくなります。何回でしょうか？</p>
+                   <p>Q．キーが使えないとき、その方向に移動できないものは何でしょうか？</p>
+                </div>
+            </details>
+                        <details>
+                <summary>ヒント 4</summary>
+                <div class="hint-content">
+                    <p>左も下も使えないとき、盤面の左下隅には1つの星があります。右も上も使えないとき、盤面の右上隅には1つの星があります</p>
+                    <p>ずばり、操作しているのは、その1つの星です。その星だけに注目して、上下左右の操作をしてみてください。ちゃんとその通りに動きますね。</p>
+                    <p>では、残る問題は、他の星の動くルールです。</p>
+                    <p>例えば、左右を交互に連打してみてください。20回くらいすると、何かが観察できます。</p>
+                </div>
+            </details>
+                        <details>
+                <summary>ヒント 5</summary>
+                <div class="hint-content">
+                <p>左右を交互に連打すると、７つの星が集まってきます。</p>
+                    <p>例えば、左下でうろうろしたあと、盤面の壁際をぐるりと回ってみてください。何が観察できますか？</p>
+                </div>
+            </details>
+            <details>
+                <summary>ヒント 6</summary>
+                <div class="hint-content">
+                <p>左下でうろうろしたあと、盤面の壁際をぐるりと回ると、星が通ったところを、他の星も通っていきます。（ついてきている）</p>
+                <p>ということは、他の星の動きも予測できますね。</p>
+                <p><br></p>
+                <p>どうしても解けない方は、下の解答をご覧ください。</p>
+                    <div class="answer-section">
+                        <p>解答を見たい方はこちら↓</p>
+                        <a href="answer04.html" class="btn-answer" onclick="return confirm('自分で解き明かす楽しみがなくなりますが、よろしいですか？')">解答を見る</a>
+                    </div>
+                </div>
+            </details>
+        </div>
+        
+        <div class="footer">
+            <a href="./hints-index.html" class="btn-back">目次に戻る</a>
+        </div>
+    </div>
+</body>
+</html>
+
