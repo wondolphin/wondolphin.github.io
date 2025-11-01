@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>さしつさされつ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* カスタムスタイルで滑らかなアニメーションと見やすいデザインを定義します */
+        body {
+            font-family: 'Inter', 'Helvetica Neue', 'Arial', sans-serif;
+            touch-action: manipulation; /* ダブルタップによるズームを無効化 */
+            overflow: hidden; /* スクロールバーを隠す */
+        }
+
+        #app {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #game-wrapper {
+            width: min(98vw, 98vh);
+            height: min(98vw, 98vh);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5vmin;
+        }
+
+        h1 {
+            font-size: clamp(20px, 4.5vmin, 40px);
+        }
+
+        #lamps-container {
+            display: flex;
+            justify-content: center;
+            gap: 1vmin;
+        }
+        .lamp {
+            width: 4.5vmin;
+            height: 4.5vmin;
+            max-width: 32px;
+            max-height: 32px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            border-width: 2px;
+            border-color: #4b5563; /* gray-600 */
+        }
+        .lamp .circle {
+            width: 2.25vmin;
+            height: 2.25vmin;
+            max-width: 16px;
+            max-height: 16px;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            background-color: #4b5563; /* gray-600 */
+        }
+        .lamp.on-border-green {
+            border-color: #4ade80; /* green-400 */
+            box-shadow: 0 0 6px #22c55e; /* green-500 */
+        }
+        .lamp .circle.on-green {
+            background-color: #4ade80; /* green-400 */
+            box-shadow: 0 0 8px #22c55e; /* green-500 */
+        }
+
+        #board-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1vmin;
+            padding: 1vmin;
+        }
+
+        .cell {
+            width: 13vmin;
+            height: 13vmin;
+            max-width: 60px;
+            max-height: 60px;
+        }
+
+        .arrow {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.2s ease, color 0.3s ease-out, border-color 0.3s ease-out, outline 0.2s ease;
+            cursor: pointer;
+            border-radius: 0.5rem; /* rounded-lg */
+        }
+        .arrow:hover {
+            transform: scale(1.1);
+        }
+
+        #standby-area .arrow {
+            width: 9vmin;
+            height: 9vmin;
+            max-width: 50px;
+            max-height: 50px;
+        }
+
+        .arrow.border-glow-blue { border-color: #60a5fa; } /* blue-400 */
+        .arrow.border-glow-green { border-color: #4ade80; } /* green-400 */
+        .arrow.border-glow-orange { border-color: #fb923c; } /* orange-400 */
+
+        .selected {
+            outline: 3px solid #fde047; /* yellow-300 */
+            outline-offset: 2px;
+            transform: scale(1.1);
+        }
+
+        #standby-area-wrapper {
+            width: 90%;
+            max-width: 85vmin;
+        }
+        #standby-area {
+            min-height: 21vmin; /* 9*2 + 1*1 + 1*2 = 21 */
+            max-height: 23vmin;
+            gap: 1vmin;
+            padding: 1vmin;
+        }
+
+        @keyframes pulse-text {
+            0%, 100% { transform: scale(1); text-shadow: 0 0 20px #facc15; }
+            50% { transform: scale(1.05); text-shadow: 0 0 30px #fde047, 0 0 40px #facc15; }
+        }
+        #clear-modal h2 { animation: pulse-text 2s infinite; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white antialiased">
+
+    <div id="app" class="flex items-center justify-center">
+        <div id="game-wrapper">
+            <h1 class="font-bold text-gray-200 tracking-wider">さしつさされつ</h1>
+
+            <div id="lamps-container">
+                <!-- ランプはJSで生成されます -->
+            </div>
+
+            <div id="board-container" class="bg-gray-700/50 rounded-lg shadow-lg">
+                <!-- 盤面のセルはJSで生成されます -->
+            </div>
+
+            <div id="standby-area-wrapper" class="w-full bg-gray-800/50 p-2 rounded-lg shadow-lg">
+                <div id="standby-area" class="h-full flex flex-wrap content-start gap-2 justify-center rounded-md border-2 border-dashed border-gray-700 p-2">
+                    <!-- スタンバイの矢印はJSで生成されます -->
+                </div>
+            </div>
+        </div>
+
+        <div id="clear-modal" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center cursor-pointer z-50">
+            <h2 class="text-6xl sm:text-8xl md:text-9xl font-bold text-yellow-300">CLEAR!</h2>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const BOARD_SIZE = 4;
+            const LAMP_COUNT = 14;
+            const INITIAL_ARROWS = { up: 3, down: 3, left: 4, right: 4 };
+
+            const lampsContainer = document.getElementById('lamps-container');
+            const boardContainer = document.getElementById('board-container');
+            const standbyArea = document.getElementById('standby-area');
+            const clearModal = document.getElementById('clear-modal');
+
+            let boardState = Array(BOARD_SIZE * BOARD_SIZE).fill(null);
+            let standbyArrows = [];
+            let selected = null;
+            
+            // ご提供いただいたSVGデータ
+            const userArrowPath = `<path d="m24.23,7.31l-14.7,15.66c-1.01,1.08-.25,2.85,1.23,2.85h7.61v17.27c0,.58.47,1.05,1.05,1.05h12.09c.58,0,1.05-.47,1.05-1.05v-17.27h7.61c1.48,0,2.25-1.77,1.23-2.85l-14.7-15.66c-.67-.71-1.8-.71-2.47,0Z"/>`;
+
+            const arrowSVGs = {
+                up:    `<svg class="w-full h-full" viewBox="0 0 50.92 50.92" fill="currentColor">${userArrowPath}</svg>`,
+                down:  `<svg class="w-full h-full" viewBox="0 0 50.92 50.92" fill="currentColor"><g transform="rotate(180 25.46 25.46)">${userArrowPath}</g></svg>`,
+                left:  `<svg class="w-full h-full" viewBox="0 0 50.92 50.92" fill="currentColor"><g transform="rotate(-90 25.46 25.46)">${userArrowPath}</g></svg>`,
+                right: `<svg class="w-full h-full" viewBox="0 0 50.92 50.92" fill="currentColor"><g transform="rotate(90 25.46 25.46)">${userArrowPath}</g></svg>`,
+            };
+
+
+            function init() {
+                standbyArrows = [];
+                Object.entries(INITIAL_ARROWS).forEach(([dir, count]) => {
+                    for (let i = 0; i < count; i++) standbyArrows.push(dir);
+                });
+
+                lampsContainer.innerHTML = '';
+                for (let i = 0; i < LAMP_COUNT; i++) {
+                    const lamp = document.createElement('div');
+                    lamp.className = 'lamp bg-gray-800 rounded-md flex items-center justify-center';
+                    const circle = document.createElement('div');
+                    circle.className = 'circle rounded-full';
+                    lamp.appendChild(circle);
+                    lampsContainer.appendChild(lamp);
+                }
+
+                boardContainer.innerHTML = '';
+                for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell bg-gray-900/50 rounded-lg flex items-center justify-center';
+                    cell.dataset.index = i;
+                    cell.addEventListener('click', () => handleBoardCellClick(i));
+                    boardContainer.appendChild(cell);
+                }
+
+                renderStandby();
+                updateGame();
+
+                standbyArea.addEventListener('click', handleStandbyAreaClick);
+                clearModal.addEventListener('click', () => clearModal.classList.add('hidden'));
+            }
+
+            function renderStandby() {
+                standbyArea.innerHTML = '';
+                const sortOrder = { 'up': 1, 'right': 2, 'down': 3, 'left': 4 };
+                standbyArrows.sort((a, b) => sortOrder[a] - sortOrder[b]);
+
+                standbyArrows.forEach((direction, index) => {
+                    const arrow = createArrowElement(direction);
+                    arrow.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleStandbyArrowClick(index, direction, arrow);
+                    });
+                    standbyArea.appendChild(arrow);
+                });
+            }
+
+            function renderBoard() {
+                const cells = boardContainer.children;
+                for (let i = 0; i < cells.length; i++) {
+                    cells[i].innerHTML = '';
+                    const arrowData = boardState[i];
+                    if (arrowData) {
+                        const arrow = createArrowElement(arrowData.direction);
+                        if (arrowData.borderColor) {
+                            arrow.classList.add(`border-glow-${arrowData.borderColor}`);
+                        }
+                        if (arrowData.innerColor) {
+                            arrow.classList.remove('text-gray-400');
+                            const colorMap = {
+                                blue: 'text-blue-400',
+                                green: 'text-green-400',
+                                orange: 'text-orange-400'
+                            };
+                            arrow.classList.add(colorMap[arrowData.innerColor]);
+                        }
+                        cells[i].appendChild(arrow);
+                    }
+                }
+                if (selected && selected.type === 'board') {
+                    const selectedArrow = boardContainer.children[selected.index]?.querySelector('.arrow');
+                    if (selectedArrow) {
+                        selectedArrow.classList.add('selected');
+                        selected.element = selectedArrow;
+                    }
+                }
+            }
+            
+            function createArrowElement(direction) {
+                const parentDiv = document.createElement('div');
+                parentDiv.className = 'arrow text-gray-400 border-2 border-gray-700 flex items-center justify-center p-1';
+                parentDiv.innerHTML = arrowSVGs[direction]; 
+                return parentDiv;
+            }
+
+            function updateLamps(greenBorderCount, greenInnerCount) {
+                const lamps = lampsContainer.children;
+                for (let i = 0; i < lamps.length; i++) {
+                    const lamp = lamps[i];
+                    const circle = lamp.querySelector('.circle');
+
+                    lamp.classList.toggle('on-border-green', i < greenBorderCount);
+                    if (circle) {
+                        circle.classList.toggle('on-green', i < greenInnerCount);
+                    }
+                }
+            }
+            
+            function setSelected(newSelected) {
+                if (selected && selected.element) selected.element.classList.remove('selected');
+                selected = newSelected;
+                if (selected && selected.element) selected.element.classList.add('selected');
+            }
+
+            function handleStandbyArrowClick(index, direction, element) {
+                if (selected && selected.type === 'standby' && selected.index === index) {
+                    setSelected(null);
+                } else {
+                    setSelected({ type: 'standby', index, direction, element });
+                }
+            }
+            
+            function handleBoardCellClick(index) {
+                const clickedCellState = boardState[index];
+                const clickedCellArrowElement = boardContainer.children[index].querySelector('.arrow');
+
+                if (selected) {
+                    if (selected.type === 'standby') {
+                        const arrowToMove = standbyArrows.splice(selected.index, 1)[0];
+                        if (clickedCellState) standbyArrows.push(clickedCellState.direction);
+                        boardState[index] = { direction: arrowToMove };
+                        setSelected(null);
+                        renderStandby();
+                        updateGame();
+                    } else { // 'board' selected
+                        if (selected.index === index) {
+                            setSelected(null);
+                        } else {
+                            [boardState[index], boardState[selected.index]] = [boardState[selected.index], boardState[index]];
+                            setSelected(null);
+                            updateGame();
+                        }
+                    }
+                } else {
+                    if (clickedCellState) {
+                        setSelected({ type: 'board', index, direction: clickedCellState.direction, element: clickedCellArrowElement });
+                    }
+                }
+            }
+
+            function handleStandbyAreaClick() {
+                if (selected && selected.type === 'board') {
+                    standbyArrows.push(boardState[selected.index].direction);
+                    boardState[selected.index] = null;
+                    setSelected(null);
+                    renderStandby();
+                    updateGame();
+                }
+            }
+
+            function updateGame() {
+                let arrowsOnBoard = [];
+                boardState.forEach((arrow, index) => {
+                    if (arrow) {
+                        arrowsOnBoard.push({
+                            ...arrow,
+                            row: Math.floor(index / BOARD_SIZE), col: index % BOARD_SIZE, index: index,
+                            pointedBy: 0, pointingAt: 0,
+                        });
+                    }
+                });
+
+                for (const pointer of arrowsOnBoard) {
+                    for (const target of arrowsOnBoard) {
+                        if (pointer.index === target.index) continue;
+                        if (isPointing(pointer, target)) {
+                            pointer.pointingAt++;
+                            target.pointedBy++;
+                        }
+                    }
+                }
+
+                let greenBorderCount = 0;
+                let greenInnerCount = 0;
+
+                arrowsOnBoard.forEach(arrow => {
+                    const state = boardState[arrow.index];
+                    state.borderColor = getColor(arrow.pointedBy);
+                    state.innerColor = getColor(arrow.pointingAt);
+
+                    if (state.borderColor === 'green') {
+                        greenBorderCount++;
+                    }
+                    if (state.innerColor === 'green') {
+                        greenInnerCount++;
+                    }
+                });
+
+                renderBoard();
+                updateLamps(greenBorderCount, greenInnerCount);
+
+                if (greenBorderCount === LAMP_COUNT && greenInnerCount === LAMP_COUNT && arrowsOnBoard.length > 0) {
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game25' }, '*');
+                    setTimeout(() => clearModal.classList.remove('hidden'), 500);
+                }
+            }
+
+            function getColor(count) {
+                if (count === 1) return 'blue';
+                if (count === 2) return 'green';
+                if (count >= 3) return 'orange';
+                return null;
+            }
+            
+            function isPointing(pointer, target) {
+                switch (pointer.direction) {
+                    case 'up': return pointer.col === target.col && pointer.row > target.row;
+                    case 'down': return pointer.col === target.col && pointer.row < target.row;
+                    case 'left': return pointer.row === target.row && pointer.col > target.col;
+                    case 'right': return pointer.row === target.row && pointer.col < target.col;
+                    default: return false;
+                }
+            }
+
+            init();
+        });
+    </script></body>
+</html>
+
+

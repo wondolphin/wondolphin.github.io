@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星たちの饗宴</title>
+    <style>
+        :root {
+            /* 全体のサイズをさらに調整し、特に縦の高さを抑える */
+            --board-size: min(80vw, 50vh);
+            --cell-size: calc(var(--board-size) / 5);
+            --bg-color: #1a1a2e;
+            --cell-bg-color: #16213e;
+            --border-color: #0f3460;
+            --text-color: #e94560;
+            --star-inactive: #535353;
+            --star-active: #fca311;
+            --star-matched: #ffdd00;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent; /* スマホでのタップ時のハイライトを無効化 */
+        }
+
+        /* ゲーム全体のコンテナ */
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px; /* 隙間を少し狭くする */
+        }
+
+        h1 {
+            font-size: clamp(20px, 4vw, 32px); /* タイトルも少し小さく */
+            margin: 0;
+            color: white;
+            text-shadow: 0 0 10px var(--star-matched);
+        }
+
+        /* 5x5の盤面 */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            width: var(--board-size);
+            height: var(--board-size);
+            aspect-ratio: 1 / 1; /* 正方形を維持 */
+            background-color: var(--border-color);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            padding: 5px;
+            gap: 5px;
+        }
+
+        .cell {
+            background-color: var(--cell-bg-color);
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            aspect-ratio: 1 / 1; /* 正方形を維持 */
+        }
+        
+        /* 星のスタイル */
+        .cell svg {
+            width: 80%;
+            height: 80%;
+            transition: transform 0.2s ease-in-out, filter 0.2s;
+        }
+        
+        /* 目標位置の星 (点線) */
+        .target-star path {
+            stroke: var(--star-inactive);
+            stroke-width: 1.5;
+            fill: none;
+            stroke-dasharray: 3 2;
+            stroke-linecap: round;
+        }
+        
+        /* 動く星 (塗りつぶし) */
+        .player-star path {
+            fill: var(--star-active);
+            stroke: none;
+        }
+        
+        /* 目標と一致した星 (光る) */
+        .matched-star path {
+            fill: var(--star-matched);
+            stroke: none;
+        }
+        .matched-star {
+            filter: drop-shadow(0 0 8px var(--star-matched));
+        }
+        
+        /* クリア時のアニメーション */
+        .cleared-star {
+            animation: clear-animation 1.5s ease-in-out forwards;
+        }
+
+        @keyframes clear-animation {
+            0% { transform: scale(1) rotate(0deg); }
+            20% { transform: scale(1.2) rotate(-5deg); filter: drop-shadow(0 0 12px var(--star-matched)); }
+            40% { transform: scale(0.9) rotate(5deg); }
+            60% { transform: scale(1.1) rotate(-2deg); filter: drop-shadow(0 0 15px white); }
+            80% { transform: scale(0.95) rotate(2deg); }
+            100% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 10px var(--star-matched)); }
+        }
+
+        /* 操作ボタン */
+        .controls {
+            display: grid;
+            grid-template-areas:
+                ". up ."
+                "left down right";
+            grid-template-columns: var(--cell-size) var(--cell-size) var(--cell-size);
+            grid-template-rows: var(--cell-size) var(--cell-size);
+            gap: 10px;
+        }
+        
+        .controls button {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: var(--cell-bg-color);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            color: white;
+            font-size: calc(var(--cell-size) / 2);
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s, opacity 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .controls button:active {
+            transform: scale(0.95);
+        }
+
+        .controls button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+
+        #up-button    { grid-area: up; }
+        #left-button  { grid-area: left; }
+        #right-button { grid-area: right; }
+        #down-button  { grid-area: down; }
+
+        /* クリアメッセージ画面 */
+        #clear-message {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s, visibility 0.5s;
+        }
+
+        #clear-message.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        #clear-message span {
+            font-size: clamp(40px, 10vw, 80px);
+            color: var(--star-matched);
+            text-shadow: 0 0 15px var(--star-matched);
+        }
+
+        #share-button {
+            position: absolute;
+            bottom: 10vh;
+            left: 50%;
+            transform: translateX(-50%);
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #000;
+            color: white;
+            text-decoration: none;
+            font-size: clamp(16px, 3vw, 20px);
+            border-radius: 50px;
+            font-weight: bold;
+            transition: opacity 0.5s, visibility 0.5s, transform 0.2s ease-in-out;
+            opacity: 0;
+            visibility: hidden;
+            cursor: pointer;
+        }
+
+        #share-button.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        #share-button:hover {
+            transform: translateX(-50%) scale(1.05);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>星たちの饗宴</h1>
+        <div class="board" id="board"></div>
+        <div class="controls">
+            <button id="up-button">↑</button>
+            <button id="left-button">←</button>
+            <button id="down-button">↓</button>
+            <button id="right-button">→</button>
+        </div>
+    </div>
+    
+    <div id="clear-message">
+        <span>CLEAR!</span>
+        <a href="https://twitter.com/intent/tweet?text=%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Fstar_feast%2Findex.html" target="_blank" rel="noopener noreferrer" id="share-button">喜びをXでシェアする</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const BOARD_SIZE = 5;
+            const board = document.getElementById('board');
+            const clearMessage = document.getElementById('clear-message');
+            const shareButton = document.getElementById('share-button');
+            
+            const targetPositions = [
+                { r: 0, c: 0 }, { r: 0, c: 2 }, { r: 0, c: 4 },
+                { r: 2, c: 1 }, { r: 2, c: 3 },
+                { r: 3, c: 0 }, { r: 3, c: 4 },
+                { r: 4, c: 2 }
+            ];
+            
+            let snakePositions = [
+                { r: 2, c: 2 }, { r: 2, c: 1 }, { r: 1, c: 1 }, { r: 1, c: 0 }, 
+                { r: 0, c: 0 }, { r: 0, c: 1 }, { r: 0, c: 2 }, { r: 0, c: 3 }, 
+                { r: 1, c: 3 }, { r: 1, c: 4 }, { r: 2, c: 4 }, { r: 2, c: 3 }, 
+                { r: 3, c: 3 }, { r: 3, c: 2 }, { r: 3, c: 1 }, { r: 3, c: 0 }, 
+                { r: 4, c: 0 }, { r: 4, c: 1 }, { r: 4, c: 2 }, { r: 4, c: 3 }, 
+                { r: 4, c: 4 }, { r: 3, c: 4 }
+            ];
+
+            const starIndices = [0, 3, 6, 9, 12, 15, 18, 21];
+            
+            let cells = [];
+            let isCleared = false;
+
+            const createStarSVG = (className) => {
+                const svgNS = "http://www.w3.org/2000/svg";
+                const svg = document.createElementNS(svgNS, "svg");
+                svg.setAttribute("viewBox", "0 0 24 24");
+                svg.classList.add(className);
+                const path = document.createElementNS(svgNS, "path");
+                path.setAttribute("d", "M12 2 L15.09 8.26 L22 9.27 L17 14.14 L18.18 21.02 L12 17.77 L5.82 21.02 L7 14.14 L2 9.27 L8.91 8.26 Z");
+                svg.appendChild(path);
+                return svg;
+            };
+
+            function init() {
+                for (let r = 0; r < BOARD_SIZE; r++) {
+                    cells[r] = [];
+                    for (let c = 0; c < BOARD_SIZE; c++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        cell.dataset.r = r;
+                        cell.dataset.c = c;
+                        board.appendChild(cell);
+                        cells[r][c] = cell;
+                    }
+                }
+                
+                targetPositions.forEach(pos => {
+                    cells[pos.r][pos.c].appendChild(createStarSVG('target-star'));
+                });
+
+                setupControls();
+                render();
+                updateButtonStates();
+            }
+
+            function render() {
+                document.querySelectorAll('.player-star, .matched-star').forEach(star => star.remove());
+                document.querySelectorAll('.target-star').forEach(star => {
+                    star.style.display = '';
+                });
+
+                const currentStarPositions = starIndices.map(index => snakePositions[index]);
+                const uniquePositionKeys = new Set(currentStarPositions.map(p => `${p.r},${p.c}`));
+
+                uniquePositionKeys.forEach(key => {
+                    const [rStr, cStr] = key.split(',');
+                    const r = parseInt(rStr, 10);
+                    const c = parseInt(cStr, 10);
+
+                    const isMatched = targetPositions.some(targetPos => targetPos.r === r && targetPos.c === c);
+                    
+                    if (isMatched) {
+                        const targetStarInCell = cells[r][c].querySelector('.target-star');
+                        if (targetStarInCell) targetStarInCell.style.display = 'none';
+                        cells[r][c].appendChild(createStarSVG('matched-star'));
+                    } else {
+                        cells[r][c].appendChild(createStarSVG('player-star'));
+                    }
+                });
+            }
+
+            function move(dr, dc) {
+                if(isCleared) return; //クリア後は動かさない
+
+                const head = snakePositions[0];
+                const newHeadPos = { r: head.r + dr, c: head.c + dc };
+
+                if (newHeadPos.r < 0 || newHeadPos.r >= BOARD_SIZE || newHeadPos.c < 0 || newHeadPos.c >= BOARD_SIZE) {
+                    return;
+                }
+
+                for (let i = snakePositions.length - 1; i > 0; i--) {
+                    snakePositions[i] = { ...snakePositions[i-1] };
+                }
+                
+                snakePositions[0] = newHeadPos;
+                
+                render();
+                checkClear();
+                updateButtonStates();
+            }
+            
+            function checkClear() {
+                const currentStarPositions = starIndices.map(index => snakePositions[index]);
+                if (currentStarPositions.length !== targetPositions.length) return;
+
+                const currentPosSet = new Set(currentStarPositions.map(p => `${p.r},${p.c}`));
+                const targetPosSet = new Set(targetPositions.map(p => `${p.r},${p.c}`));
+
+                if (!isCleared && currentPosSet.size === targetPositions.length && [...currentPosSet].every(pos => targetPosSet.has(pos))) {
+                    isCleared = true;
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game04' }, '*');
+                    // 操作を無効化
+                    document.querySelectorAll('.controls button').forEach(b => b.disabled = true);
+                    document.removeEventListener('keydown', handleKeyDown);
+
+                    // クリアアニメーションを適用
+                    document.querySelectorAll('.matched-star').forEach(star => {
+                        star.classList.add('cleared-star');
+                    });
+
+                    // 1.5秒後にメッセージ表示
+                    setTimeout(() => {
+                        clearMessage.classList.add('show');
+                        /*
+                        // さらに1.5秒後にシェアボタン表示
+                        setTimeout(() => {
+                            if (shareButton) {
+                                shareButton.classList.add('show');
+                            }
+                        }, 1500);
+                        */
+                    }, 1500);
+                }
+            }
+
+            function updateButtonStates() {
+                const { r, c } = snakePositions[0];
+                document.getElementById('up-button').disabled = (r === 0);
+                document.getElementById('down-button').disabled = (r === BOARD_SIZE - 1);
+                document.getElementById('left-button').disabled = (c === 0);
+                document.getElementById('right-button').disabled = (c === BOARD_SIZE - 1);
+            }
+            
+            // キー操作の関数を名前付きで定義
+            const handleKeyDown = (e) => {
+                switch(e.key) {
+                    case 'ArrowUp': 
+                        if (!document.getElementById('up-button').disabled) { e.preventDefault(); move(-1, 0); }
+                        break;
+                    case 'ArrowDown': 
+                        if (!document.getElementById('down-button').disabled) { e.preventDefault(); move(1, 0); }
+                        break;
+                    case 'ArrowLeft': 
+                        if (!document.getElementById('left-button').disabled) { e.preventDefault(); move(0, -1); }
+                        break;
+                    case 'ArrowRight': 
+                        if (!document.getElementById('right-button').disabled) { e.preventDefault(); move(0, 1); }
+                        break;
+                }
+            };
+
+            function setupControls() {
+                document.getElementById('up-button').addEventListener('click', () => move(-1, 0));
+                document.getElementById('down-button').addEventListener('click', () => move(1, 0));
+                document.getElementById('left-button').addEventListener('click', () => move(0, -1));
+                document.getElementById('right-button').addEventListener('click', () => move(0, 1));
+                
+                document.addEventListener('keydown', handleKeyDown);
+
+                clearMessage.addEventListener('click', (e) => {
+                    // シェアボタン自体をクリックした場合は閉じない
+                    if (e.target.closest('#share-button')) {
+                        return;
+                    }
+                    clearMessage.classList.remove('show');
+                    if (shareButton) {
+                        shareButton.classList.remove('show');
+                    }
+                });
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>
+

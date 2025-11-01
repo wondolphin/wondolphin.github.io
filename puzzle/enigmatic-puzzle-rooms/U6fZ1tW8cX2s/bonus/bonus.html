@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クリア後特典 (Deluxe)</title>
+    <style>
+        /* --- deluxe.html / check.html からのコアスタイル --- */
+        :root {
+            --game-max-width: 800px;
+            --game-aspect-ratio: 800 / 600;
+        }
+
+        body {
+            font-family: 'Segoe UI', Meiryo, sans-serif;
+            background-color: #000;
+            color: #e0e0e0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 95vw;
+            max-width: var(--game-max-width);
+            max-height: 95vh;
+            aspect-ratio: var(--game-aspect-ratio);
+        }
+
+        /* --- 部屋の表示エリア (ボタン選択画面として使用) --- */
+        #room-view {
+            width: 100%;
+            height: 100%;
+            background-image: url('room.png');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            position: relative;
+            display: flex; 
+            flex-direction: column;
+            justify-content: center; /* 中央寄せ */
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            display: none; /* 初期状態では非表示 */
+        }
+        
+        /* --- 特典コンテンツ用コンテナ (deluxe.htmlのポーズ画面風) --- */
+        #bonus-container {
+            background-color: rgba(22, 33, 62, 0.9); /* deluxe.htmlのポーズ画面の色 */
+            padding: 20px 30px;
+            border-radius: 10px;
+            border: 1px solid #0f3460;
+            width: 90%;
+            max-width: 600px; /* 最大幅 */
+            box-sizing: border-box;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        
+        /* 特典ページのタイトル */
+        #bonus-container h1 {
+            color: #4dff4d;
+            text-shadow: 0 0 10px #4dff4d;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.8em;
+            border-bottom: 1px solid #0f3460;
+            padding-bottom: 10px;
+        }
+        
+        /* 特典ページの説明文 */
+        #bonus-container p.description {
+            font-size: 0.9em;
+            color: #d1d5db;
+            line-height: 1.6;
+            margin: 5px 0 15px 0;
+            text-align: left;
+        }
+
+
+        /* --- パスワード入力画面 (変更なし) --- */
+        #password-screen {
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85); /* 濃いめの背景 */
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            color: #fff;
+        }
+        #password-screen h1 {
+            color: #4dff4d;
+            text-shadow: 0 0 10px #4dff4d;
+            margin-top: 0;
+        }
+        #password-screen p {
+            font-size: 0.9em;
+        }
+        #password-input {
+            background-color: #0f1624;
+            border: 1px solid #533483;
+            color: #e0e0e0;
+            border-radius: 5px;
+            padding: 12px;
+            box-sizing: border-box;
+            font-size: 1.1em;
+            text-align: center;
+            width: 80%;
+            max-width: 400px;
+            margin-top: 10px;
+        }
+        #enter-button {
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
+            background-color: #28a745;
+            color: #fff;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: background-color 0.2s;
+            margin-top: 15px;
+        }
+        #enter-button:hover {
+            background-color: #218838;
+        }
+        #error-message {
+            margin-top: 15px;
+            color: #ffc107;
+            min-height: 1.2em;
+        }
+
+
+        /* --- タブと問題選択 (コンテナ内に配置) --- */
+        
+        /* (10列グリッド) */
+        #tabs-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr); 
+            gap: 5px; 
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            width: 100%;
+            max-width: 500px; 
+            box-sizing: border-box;
+            margin-left: auto; 
+            margin-right: auto; 
+        }
+
+        /* (ボタンを小さく) */
+        .tab {
+            padding: 8px 4px; 
+            background-color: #1f2937;
+            border: 1px solid #4b5563;
+            color: #d1d5db;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 0.75em; 
+            font-weight: bold;
+            text-align: center; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .tab:hover { background-color: #374151; }
+        .tab.active {
+            background-color: #67e8f9;
+            color: #000;
+        }
+
+        #problem-selector {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 15px;
+            background-color: rgba(0, 0, 0, 0.3); 
+            border-radius: 8px;
+            width: 100%; 
+            min-height: 40px;
+            box-sizing: border-box; 
+            border-top: 1px solid #0f3460;
+        }
+        .problem-btn {
+            padding: 10px 15px;
+            background-color: #374151;
+            border: 1px solid #6b7280;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .problem-btn:hover { background-color: #4b5563; }
+        #problem-selector p { color: #ffc107; margin: 0; }
+        
+        /* --- フッター (X共有) --- */
+        #footer-share {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #0f3460;
+        }
+        #footer-share p {
+            font-size: 0.9em;
+            color: #d1d5db;
+            margin-bottom: 15px;
+        }
+        /* Xボタンのスタイル */
+        .btn-x {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #00acee; /* X (Twitter) のブランドカラー */
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 0.9em;
+            transition: background-color 0.2s;
+        }
+        .btn-x:hover {
+            background-color: #0099d4;
+        }
+
+
+        /* --- ↓ 修正点 (deluxe.html / check.html 本編のスタイルに合わせる) --- */
+        #game-overlay {
+            position: fixed; /* absolute -> fixed (画面全体基準) */
+            top: 0;
+            left: 0;
+            width: 100vw; /* 100% -> 100vw */
+            height: 100vh; /* 100% -> 100vh */
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column; /* #game-display-area と #close-game-button を縦に並べる */
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            z-index: 100;
+        }
+        #game-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* (check.html と同一のスタイル) */
+        #game-display-area {
+            position: relative;
+            width: 85vmin; 
+            height: 85vmin; 
+            max-width: 90vh; 
+            max-height: 90vw; 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #game-frame-container {
+            width: 100%;
+            height: 100%;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            background-color: #000;
+            overflow: hidden;
+        }
+        #game-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        /* 閉じるボタン (deluxe.html準拠のスタイル) */
+        #close-game-button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.8);
+            color: #000;
+            border: none;
+            font-size: 2em;
+            cursor: pointer;
+            margin-top: 10px; /* game-display-area との隙間 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+
+    <!-- 部屋の表示エリア (特典コンテンツ) -->
+    <div id="room-view">
+        <!-- コンテンツを中央にまとめるラッパー -->
+        <div id="bonus-container">
+            <!-- タイトル -->
+            <h1>- CLEAR BONUS -</h1>
+            <!-- 説明文 -->
+            <p class="description">プレイしていただき、誠にありがとうございました。</p>
+            <p class="description">このページでは、ゲームに登場した１番〜２５番の問題と、一部のエクストラ問題を自由に遊べます。</p>
+            
+            <!-- 10列グリッド -->
+            <div id="tabs-container"></div>
+            
+            <!-- 問題選択エリア -->
+            <div id="problem-selector"></div>
+            
+            <!-- フッター (X共有) -->
+            <div id="footer-share">
+                <p>宜しければ、Xにてゲームの感想を共有いただけると嬉しいです。</p>
+                <a href="https://twitter.com/intent/tweet?text=%E8%AC%E8%A7%A3%E3%81%8D%E3%82%B2%E3%83%BC%E3%83%A0%E3%80%8CEnigmatic%20Puzzle%20Rooms%E3%80%8D%E3%82%92%E3%82%AF%E3%83%AA%E3%82%A2%E3%81%97%E3%81%9F%EF%BC%81%E3%80%8D%E3%80%80%23EnigmaticPuzzleRooms%E3%80%80%23%E8%AC%E8%A7%A3%E3%81%8D%E3%80%80%23%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%23%E5%AE%87%E5%AE%99%E8%AC%EE%3%80%80%40wondolphin%0Awondolphin.github.io%2Fpuzzle%2Fenigmatic-puzzle-rooms%2Findex.html" target="_blank" class="btn-x">Xで共有する</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- パスワード入力画面 (新規追加) -->
+    <div id="password-screen">
+        <h1>- CLEAR BONUS -</h1>
+        <p>全問クリアの証であるパスワードを入力してください。</p>
+        <input type="text" id="password-input" placeholder="Password">
+        <button id="enter-button">ENTER</button>
+        <p id="error-message"></p>
+    </div>
+
+    <!-- ゲームオーバーレイ (check.html / deluxe.html 準拠) -->
+    <!-- ↓ 修正点 (HTML構造の変更) -->
+    <div id="game-overlay">
+        <div id="game-display-area">
+            <div id="game-frame-container">
+                <iframe id="game-frame" src="about:blank"></iframe>
+            </div>
+            <!-- 閉じるボタンは #game-display-area の外、#game-overlay の直下へ -->
+        </div>
+        <button id="close-game-button">↓</button>
+    </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM要素 ---
+    const gameOverlay = document.getElementById('game-overlay');
+    const gameFrame = document.getElementById('game-frame');
+    const closeGameButton = document.getElementById('close-game-button');
+    
+    const passwordScreen = document.getElementById('password-screen');
+    const passwordInput = document.getElementById('password-input');
+    const enterButton = document.getElementById('enter-button');
+    const errorMessage = document.getElementById('error-message');
+    
+    const roomView = document.getElementById('room-view');
+    const tabsContainer = document.getElementById('tabs-container');
+    const problemSelector = document.getElementById('problem-selector');
+
+    // --- 定数とデータ ---
+    const SECRET_KEY = 'DungeonQuestSecretKey';
+    
+    // 各ゲームのエクストラ問題の数 (0はエクストラなし)
+    const extraProblems = {
+        1: 1,   2: 1,   3: 1,   4: 1,   5: 1,
+        6: 1,   7: 0,   8: 1,   9: 0,   10: 0,
+        11: 1,  12: 0,  13: 0,  14: 0,  15: 0,
+        16: 0,  17: 0,  18: 1,  19: 1,  20: 0,
+        21: 0,  22: 0,  23: 0,  24: 1,  25: 0
+        // 26番は削除
+    };
+
+    // --- パスワード認証関数 (deluxe.htmlのロジックから) ---
+    function processString(str, key) {
+        let result = '';
+        for (let i = 0; i < str.length; i++) {
+            result += String.fromCharCode(str.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+        }
+        return result;
+    }
+
+    // パスワード検証は、本編(26番含む)をクリアした証拠として機能するため、
+    // 27ビット(0-26)すべてをチェックするロジックを維持します。
+    function validateClearPassword(password) {
+        if (!password) return false;
+        try {
+            const encrypted = atob(password);
+            const compactString = processString(encrypted, SECRET_KEY);
+            const parts = compactString.split('|');
+            if (parts.length !== 4) return false; // 形式が違う
+            
+            const [clearedBase36] = parts;
+            const clearedNum = BigInt('0x' + parseInt(clearedBase36, 36).toString(16));
+            
+            // 0から26までの27ビットがすべて1である状態と比較
+            const fullClearNum = (BigInt(1) << BigInt(27)) - BigInt(1);
+            
+            return clearedNum === fullClearNum;
+        } catch (e) {
+            console.error("Password validation failed:", e);
+            return false;
+        }
+    }
+
+    // --- ゲーム読み込み関数 ---
+    function loadGame(url) {
+        gameFrame.src = url;
+        gameOverlay.classList.add('visible');
+    }
+
+    // --- 問題選択エリアの更新 ---
+    function updateProblemSelector(gameId) {
+        problemSelector.innerHTML = ''; 
+
+        const originalBtn = document.createElement('button');
+        originalBtn.className = 'problem-btn';
+        originalBtn.textContent = '本編の問題';
+        originalBtn.addEventListener('click', () => {
+            const gameFile = `game${String(gameId).padStart(2, '0')}.html`;
+            loadGame(gameFile);
+        });
+        problemSelector.appendChild(originalBtn);
+
+        const extraCount = extraProblems[gameId] || 0;
+        if (extraCount > 0) {
+            for (let i = 1; i <= extraCount; i++) {
+                const extraBtn = document.createElement('button');
+                extraBtn.className = 'problem-btn';
+                extraBtn.textContent = `エクストラ問題 ${i}`;
+                extraBtn.addEventListener('click', () => {
+                    const gameFile = `game${String(gameId).padStart(2, '0')}_ex${i}.html`;
+                    loadGame(gameFile);
+                });
+                problemSelector.appendChild(extraBtn);
+            }
+        } else {
+            const noExtraText = document.createElement('p');
+            noExtraText.textContent = 'この問題のエクストラ問題はありません。';
+            problemSelector.appendChild(noExtraText);
+        }
+    }
+
+    // --- タブ生成ヘルパー ---
+    function createTab(gameId, container) {
+        const tab = document.createElement('div');
+        tab.className = 'tab';
+        tab.textContent = String(gameId).padStart(2, '0');
+        tab.dataset.gameId = gameId;
+        
+        tab.addEventListener('click', () => {
+            // タブのアクティブ化
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            // 問題選択エリアの更新
+            updateProblemSelector(gameId);
+            gameFrame.src = 'about:blank'; // タブ切り替え時にフレームを空にする
+        });
+        container.appendChild(tab);
+    }
+
+    // --- 特典ページの初期化 (タブ生成) ---
+    function initializeBonusPage() {
+        // 1-25番をグリッドに生成
+        for (let i = 1; i <= 25; i++) {
+            createTab(i, tabsContainer);
+        }
+
+        // 最初のタブを自動的にクリック
+        const firstTab = document.querySelector('.tab');
+        if (firstTab) {
+            firstTab.click();
+        }
+    }
+
+    // --- イベントリスナー ---
+    enterButton.addEventListener('click', () => {
+        const password = passwordInput.value.trim();
+        errorMessage.textContent = '';
+
+        if (validateClearPassword(password)) {
+            // 認証成功
+            passwordScreen.style.display = 'none'; // パスワード画面を隠す
+            roomView.style.display = 'flex';     // 特典コンテンツを表示
+            initializeBonusPage(); // タブなどを生成
+        } else {
+            // 認証失敗
+            errorMessage.textContent = 'パスワードが正しくないか、クリアデータではありません。';
+            passwordInput.value = '';
+            passwordInput.focus();
+        }
+    });
+
+    passwordInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            enterButton.click();
+        }
+    });
+
+    // ゲームオーバーレイを閉じる
+    closeGameButton.addEventListener('click', () => {
+        gameFrame.src = 'about:blank'; // iframeの読み込みを停止
+        gameOverlay.classList.remove('visible');
+    });
+});
+</script>
+</body>
+</html>
+

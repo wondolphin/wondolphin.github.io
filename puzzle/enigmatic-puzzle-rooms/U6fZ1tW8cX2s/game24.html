@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>いち、に、さん</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        /* MODIFIED: Cell size further reduced for smaller screens */
+        .cell {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .cell-s { background-color: #68d391; cursor: not-allowed; }
+        .cell-g { background-color: #f6ad55; cursor: not-allowed; }
+        .cell-x { background-color: #4a5568; color: white; cursor: not-allowed; }
+        .cell-1, .cell-2, .cell-3 { background-color: #63b3ed; color: white; }
+        .cell-0 { background-color: #f7fafc; }
+        
+        .cell.selected {
+            box-shadow: 0 0 0 3px #3b82f6;
+            transform: scale(1.1);
+            z-index: 10;
+        }
+
+        #path-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        @keyframes glowing {
+            0% { text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #f6e05e, 0 0 20px #f6e05e; }
+            50% { text-shadow: 0 0 10px #fff, 0 0 20px #f6e05e, 0 0 30px #f6e05e, 0 0 40px #f6e05e; }
+            100% { text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #f6e05e, 0 0 20px #f6e05e; }
+        }
+        .glowing-text {
+            animation: glowing 1.5s infinite;
+        }
+
+        .glowing-color {
+            background: linear-gradient(45deg, #fde047, #f97316, #ec4899, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-fill-color: transparent;
+        }
+
+        #clear-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 100;
+            cursor: pointer;
+        }
+
+        #clear-modal h1 {
+            font-size: 6rem;
+            color: white;
+            text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #2563eb, 0 0 40px #2563eb;
+        }
+
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-2">
+    <!-- MODIFIED: Reduced max-width and padding -->
+    <div class="w-full max-w-md mx-auto bg-white rounded-2xl shadow-lg p-2">
+        <!-- MODIFIED: Reduced font size and margin -->
+        <div class="text-center mb-2">
+            <h1 class="text-3xl font-bold text-gray-800 tracking-widest">いち、に、さん</h1>
+        </div>
+
+        <!-- MODIFIED: Reduced gap -->
+        <div class="flex flex-col gap-2 items-center justify-center">
+            <!-- 盤面表示エリア -->
+            <div class="flex-shrink-0 relative">
+                <div id="board-container" class="grid grid-cols-8 gap-1 p-2 bg-gray-200 rounded-lg shadow-inner"></div>
+                <canvas id="path-canvas"></canvas>
+            </div>
+
+            <!-- --- MODIFICATION START --- -->
+            <!-- 結果表示エリア: 横並びに変更 -->
+            <div class="flex flex-row items-center justify-center gap-4 mt-2">
+                <!-- MODIFIED: Reduced size of result area -->
+                <div class="relative w-24 h-24">
+                    <div id="result-area" class="bg-gray-50 rounded-lg border w-full h-full flex items-center justify-center">
+                        <!-- MODIFIED: Reduced font size -->
+                        <p id="solution-count" class="text-4xl font-bold text-gray-700">?</p>
+                    </div>
+                    <div id="loader" class="hidden absolute inset-0 flex items-center justify-center bg-gray-50/90 rounded-lg">
+                        <div class="w-6 h-6 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin"></div>
+                    </div>
+                </div>
+                 <!-- MODIFIED: Reduced padding and font size -->
+                 <button id="solve-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-5 rounded-lg shadow-md text-lg transition-transform transform hover:scale-105">
+                    check
+                </button>
+            </div>
+            <!-- --- MODIFICATION END --- -->
+
+        </div>
+    </div>
+    
+    <div id="clear-modal" class="hidden flex justify-center items-center">
+        <h1>CLEAR!</h1>
+    </div>
+
+
+    <script>
+        const board = [
+            ['s', '0', '0', '0', '0', '0', '0', 'x'],
+            ['x', '0', '1', '0', '2', '0', '0', 'x'],
+            ['x', '0', '0', '0', '0', '0', '0', 'x'],
+            ['x', '0', '0', '0', '3', '0', '0', 'g']
+        ];
+        
+        const rows = board.length;
+        const cols = board[0].length;
+        const boardContainer = document.getElementById('board-container');
+        const solveButton = document.getElementById('solve-button');
+        const solutionCount = document.getElementById('solution-count');
+        const loader = document.getElementById('loader');
+        const pathCanvas = document.getElementById('path-canvas');
+        const clearModal = document.getElementById('clear-modal');
+        const ctx = pathCanvas.getContext('2d');
+
+        let startPos, goalPos;
+        let checkpoints = [];
+        let selectedCell = null;
+
+        function drawBoard() {
+            boardContainer.innerHTML = '';
+            checkpoints = [];
+            board.forEach((row, r) => {
+                row.forEach((cell, c) => {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.id = `cell-${r}-${c}`;
+                    cellDiv.className = `cell cell-${cell}`;
+                    cellDiv.textContent = /[1-9]/.test(cell) ? cell : '';
+                    cellDiv.addEventListener('click', () => onCellClick(r, c));
+                    boardContainer.appendChild(cellDiv);
+                    
+                    if (cell === 's') startPos = { r, c };
+                    if (cell === 'g') goalPos = { r, c };
+                    if (/[1-9]/.test(cell)) {
+                        checkpoints.push({ r, c, val: cell });
+                    }
+                });
+            });
+            checkpoints.sort((a, b) => a.val - b.val);
+            
+            // Recalculate canvas size on board draw
+            setTimeout(() => {
+                const boardRect = boardContainer.getBoundingClientRect();
+                 if (boardRect.width > 0 && boardRect.height > 0) {
+                    pathCanvas.width = boardRect.width;
+                    pathCanvas.height = boardRect.height;
+                }
+            }, 0);
+        }
+        
+        function onCellClick(r, c) {
+            const clickedValue = board[r][c];
+            if (clickedValue === 's' || clickedValue === 'g' || clickedValue === 'x') return;
+
+            if (selectedCell) {
+                const selectedDiv = document.getElementById(`cell-${selectedCell.r}-${selectedCell.c}`);
+                if (clickedValue === '0') {
+                    board[r][c] = selectedCell.val;
+                    board[selectedCell.r][selectedCell.c] = '0';
+                    selectedCell = null;
+                    drawBoard();
+                    return;
+                }
+                if (selectedDiv) selectedDiv.classList.remove('selected');
+                if (selectedCell.r === r && selectedCell.c === c) {
+                    selectedCell = null;
+                    return;
+                }
+                selectedCell = null;
+            }
+
+            if (/[1-9]/.test(clickedValue)) {
+                selectedCell = { r: r, c: c, val: clickedValue };
+                document.getElementById(`cell-${r}-${c}`).classList.add('selected');
+            }
+        }
+
+        const dr = [-1, 1, 0, 0];
+        const dc = [0, 0, -1, 1];
+        let solutions = [];
+
+        function findPaths() {
+            solutions = [];
+            const visited = Array.from({ length: rows }, () => Array(cols).fill(false));
+            const path = [{r: startPos.r, c: startPos.c}];
+            visited[startPos.r][startPos.c] = true;
+            dfs(startPos.r, startPos.c, visited, 0, path);
+        }
+        
+        function dfs(r, c, visited, checkpointIdx, path) {
+            if (r === goalPos.r && c === goalPos.c) {
+                if (checkpointIdx === checkpoints.length) solutions.push([...path]);
+                return;
+            }
+
+            for (let i = 0; i < 4; i++) {
+                const nr = r + dr[i], nc = c + dc[i];
+                if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || board[nr][nc] === 'x' || visited[nr][nc]) continue;
+                
+                const nextVal = board[nr][nc];
+                let nextCheckpointIdx = checkpointIdx;
+                if (/[1-9]/.test(nextVal)) {
+                    if (checkpointIdx >= checkpoints.length || nextVal !== checkpoints[checkpointIdx].val) continue;
+                    nextCheckpointIdx++;
+                }
+                
+                visited[nr][nc] = true;
+                path.push({r: nr, c: nc});
+                dfs(nr, nc, visited, nextCheckpointIdx, path);
+                path.pop();
+                visited[nr][nc] = false;
+            }
+        }
+        
+        function clearEffects() {
+            solutionCount.classList.remove('glowing-text', 'glowing-color');
+            ctx.clearRect(0, 0, pathCanvas.width, pathCanvas.height);
+        }
+
+        function drawSolutionPath(path) {
+            const cellElement = document.querySelector('.cell');
+            if (!cellElement) return; 
+            
+            const cellStyle = getComputedStyle(cellElement);
+            const cellWidth = parseFloat(cellStyle.width);
+            const cellHeight = parseFloat(cellStyle.height);
+
+            const boardStyle = getComputedStyle(boardContainer);
+            const gap = parseFloat(boardStyle.gap);
+            const paddingLeft = parseFloat(boardStyle.paddingLeft);
+            const paddingTop = parseFloat(boardStyle.paddingTop);
+            
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 4; // Slightly thinner line
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            path.forEach((pos, index) => {
+                const x = paddingLeft + (pos.c * (cellWidth + gap)) + (cellWidth / 2);
+                const y = paddingTop + (pos.r * (cellHeight + gap)) + (cellHeight / 2);
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+        }
+
+        solveButton.addEventListener('click', () => {
+            if (selectedCell) {
+                 document.getElementById(`cell-${selectedCell.r}-${selectedCell.c}`).classList.remove('selected');
+                 selectedCell = null;
+            }
+            clearEffects();
+            solutionCount.textContent = '';
+            loader.classList.remove('hidden');
+            solveButton.disabled = true;
+
+            setTimeout(() => {
+                findPaths();
+                
+                solutionCount.textContent = solutions.length;
+                loader.classList.add('hidden');
+                solveButton.disabled = false;
+                
+                if (solutions.length === 1) {
+                    window.parent.postMessage({ event: 'gameCleared', gameName: 'game24' }, '*');
+                    solutionCount.classList.add('glowing-text', 'glowing-color');
+                    drawSolutionPath(solutions[0]);
+                    setTimeout(() => {
+                        clearModal.classList.remove('hidden');
+                    }, 1000);
+                }
+            }, 50);
+        });
+        
+        clearModal.addEventListener('click', () => {
+            clearModal.classList.add('hidden');
+            clearEffects();
+        });
+        
+        window.addEventListener('resize', drawBoard);
+        drawBoard();
+    </script>
+</body>
+</html>
+

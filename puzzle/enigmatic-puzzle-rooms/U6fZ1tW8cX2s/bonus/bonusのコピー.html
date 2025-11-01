@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クリア後特典</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Meiryo, sans-serif;
+            background-color: #000;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* 上寄せに変更 */
+            min-height: 100vh;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 95%;
+            max-width: 900px;
+        }
+
+        h1 {
+            color: #4dff4d;
+            text-shadow: 0 0 10px #4dff4d;
+            border-bottom: 2px solid #4dff4d;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        p {
+            line-height: 1.6;
+            color: #ccc;
+        }
+
+        .password-section {
+            margin: 30px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #password-input {
+            width: 100%;
+            background-color: #0f1624;
+            border: 1px solid #533483;
+            color: #e0e0e0;
+            border-radius: 5px;
+            padding: 12px;
+            box-sizing: border-box;
+            font-size: 1.1em;
+            text-align: center;
+        }
+
+        #enter-button {
+            padding: 12px 20px;
+            border-radius: 5px;
+            border: none;
+            background-color: #28a745;
+            color: #fff;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: background-color 0.2s;
+        }
+
+        #enter-button:hover {
+            background-color: #218838;
+        }
+
+        #error-message {
+            margin-top: 15px;
+            color: #ffc107;
+            min-height: 1.2em;
+        }
+
+        #bonus-content {
+            display: none; /* 初期状態では非表示 */
+        }
+
+        /* --- タブUI --- */
+        #tabs-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 5px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+        }
+        .tab {
+            padding: 8px 12px;
+            background-color: #1f2937;
+            border: 1px solid #4b5563;
+            color: #d1d5db;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+            font-weight: bold;
+        }
+        .tab:hover {
+            background-color: #374151;
+        }
+        .tab.active {
+            background-color: #67e8f9;
+            color: #000;
+            border-color: #67e8f9;
+        }
+
+        /* --- 問題選択 --- */
+        #problem-selector {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #111827;
+            border-radius: 8px;
+            min-height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .problem-btn {
+            padding: 10px 15px;
+            background-color: #374151;
+            border: 1px solid #6b7280;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.2s;
+        }
+        .problem-btn:hover {
+            background-color: #4b5563;
+        }
+
+        /* --- ゲームオーバーレイ (新規追加・修正) --- */
+        #game-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background-color: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            z-index: 100;
+        }
+        #game-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        #game-content-wrapper {
+            width: 95%;
+            max-width: 900px;
+            aspect-ratio: 800 / 600;
+        }
+        #game-frame-container {
+             width: 100%;
+             height: 100%;
+        }
+        #game-frame {
+            width: 100%; height: 100%;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            background-color: #000;
+        }
+        #close-game-button {
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            background-color: rgba(255,255,255,0.8);
+            color: #000;
+            border: none;
+            font-size: 2em;
+            cursor: pointer;
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- パスワード入力画面 -->
+        <div id="password-screen">
+            <h1>- CLEAR BONUS -</h1>
+            <p>全問クリアの証であるパスワードを入力してください。</p>
+            <div class="password-section">
+                <input type="text" id="password-input" placeholder="Password">
+                <button id="enter-button">ENTER</button>
+            </div>
+            <p id="error-message"></p>
+        </div>
+
+        <!-- 特典コンテンツ表示エリア -->
+        <div id="bonus-content">
+            <h1>- CLEAR BONUS -</h1>
+            <div id="tabs-container"></div>
+            <div id="problem-selector"></div>
+            <!-- ゲーム表示用のインラインフレームはここから削除 -->
+        </div>
+    </div>
+
+    <!-- ゲーム表示用オーバーレイ (新規追加) -->
+    <div id="game-overlay">
+        <div id="game-content-wrapper">
+            <div id="game-frame-container">
+                <iframe id="game-frame" src="about:blank" title="Game Content"></iframe>
+            </div>
+        </div>
+        <button id="close-game-button">↓</button>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM要素 ---
+    const enterButton = document.getElementById('enter-button');
+    const passwordInput = document.getElementById('password-input');
+    const errorMessage = document.getElementById('error-message');
+    const passwordScreen = document.getElementById('password-screen');
+    const bonusContent = document.getElementById('bonus-content');
+    const tabsContainer = document.getElementById('tabs-container');
+    const problemSelector = document.getElementById('problem-selector');
+    
+    // オーバーレイ関連の要素を取得 (新規追加)
+    const gameOverlay = document.getElementById('game-overlay');
+    const gameFrame = document.getElementById('game-frame');
+    const closeGameButton = document.getElementById('close-game-button');
+
+    // --- 定数とデータ ---
+    const SECRET_KEY = 'DungeonQuestSecretKey';
+    const extraProblems = {
+        1: 2, 2: 0, 3: 1, 4: 0, 5: 3,
+    };
+
+    // --- 関数 ---
+    function processString(str, key) {
+        let result = '';
+        for (let i = 0; i < str.length; i++) {
+            result += String.fromCharCode(str.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+        }
+        return result;
+    }
+
+    function validateClearPassword(password) {
+        if (!password) return false;
+        try {
+            const encrypted = atob(password);
+            const compactString = processString(encrypted, SECRET_KEY);
+            const parts = compactString.split('|');
+            if (parts.length !== 4) return false;
+            const [clearedBase36] = parts;
+            const clearedNum = BigInt('0x' + parseInt(clearedBase36, 36).toString(16));
+            const fullClearNum = (BigInt(1) << BigInt(27)) - BigInt(1);
+            return clearedNum === fullClearNum;
+        } catch (e) {
+            console.error("Password validation failed:", e);
+            return false;
+        }
+    }
+
+    // ゲームをオーバーレイで表示する (修正)
+    function loadGame(url) {
+        gameFrame.src = url;
+        gameOverlay.classList.add('visible');
+    }
+
+    // 問題選択エリアを更新する (変更なし)
+    function updateProblemSelector(gameId) {
+        problemSelector.innerHTML = ''; 
+
+        const originalBtn = document.createElement('button');
+        originalBtn.className = 'problem-btn';
+        originalBtn.textContent = '本編の問題';
+        originalBtn.addEventListener('click', () => {
+            const gameFile = `game${String(gameId).padStart(2, '0')}.html`;
+            loadGame(gameFile);
+        });
+        problemSelector.appendChild(originalBtn);
+
+        const extraCount = extraProblems[gameId] || 0;
+        if (extraCount > 0) {
+            for (let i = 1; i <= extraCount; i++) {
+                const extraBtn = document.createElement('button');
+                extraBtn.className = 'problem-btn';
+                extraBtn.textContent = `エクストラ問題 ${i}`;
+                extraBtn.addEventListener('click', () => {
+                    const gameFile = `game${String(gameId).padStart(2, '0')}_ex${i}.html`;
+                    loadGame(gameFile);
+                });
+                problemSelector.appendChild(extraBtn);
+            }
+        } else {
+            const noExtraText = document.createElement('p');
+            noExtraText.textContent = 'この問題のエクストラ問題はありません。';
+            noExtraText.style.margin = '0';
+            problemSelector.appendChild(noExtraText);
+        }
+    }
+
+    // 特典ページの初期化 (変更なし)
+    function initializeBonusPage() {
+        for (let i = 1; i <= 26; i++) {
+            const tab = document.createElement('div');
+            tab.className = 'tab';
+            tab.textContent = String(i).padStart(2, '0');
+            tab.dataset.gameId = i;
+            
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                updateProblemSelector(i);
+                gameFrame.src = 'about:blank'; // タブ切り替え時にフレームを空にする
+            });
+            tabsContainer.appendChild(tab);
+        }
+
+        const firstTab = document.querySelector('.tab');
+        if (firstTab) {
+            firstTab.click();
+        }
+    }
+
+    // --- イベントリスナー ---
+    enterButton.addEventListener('click', () => {
+        const password = passwordInput.value.trim();
+        errorMessage.textContent = '';
+
+        if (validateClearPassword(password)) {
+            passwordScreen.style.display = 'none';
+            bonusContent.style.display = 'block';
+            initializeBonusPage();
+        } else {
+            errorMessage.textContent = 'パスワードが正しくないか、クリアデータではありません。';
+            passwordInput.value = '';
+            passwordInput.focus();
+        }
+    });
+
+    passwordInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            enterButton.click();
+        }
+    });
+
+    // オーバーレイを閉じるボタンのイベントリスナー (新規追加)
+    closeGameButton.addEventListener('click', () => {
+        gameOverlay.classList.remove('visible');
+        gameFrame.src = 'about:blank'; // ゲームを停止するためにフレームを空にする
+    });
+});
+</script>
+</body>
+</html>
+
