@@ -11,9 +11,7 @@
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:creator" content="@wondolphin">
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts for a nice typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
@@ -24,24 +22,23 @@
         .title-font {
             font-family: 'Orbitron', sans-serif;
         }
+        /* * .link-line の定義はTailwind CSSで代替するため削除しました。
+         */
     </style>
 </head>
 <body class="bg-slate-100 text-gray-800 antialiased leading-relaxed">
 
     <div class="container mx-auto p-5 md:p-8 max-w-3xl">
 
-        <!-- Header Title -->
         <header class="text-center mb-8">
             <h1 class="title-font text-4xl md:text-5xl font-bold text-cyan-600 tracking-wider">Enigmatic Puzzle Rooms</h1>
         </header>
 
         <main>
-            <!-- Thumbnail Image -->
             <div class="mb-10 shadow-xl rounded-lg">
                 <img src="thumbnail.png" alt="ゲームのサムネイル画像" class="w-full h-auto rounded-lg">
             </div>
 
-            <!-- Game Description -->
             <section class="mb-8 text-center bg-white/70 p-6 rounded-lg shadow">
                 <p class="text-xl font-bold">パズルを解いて部屋を開けていきましょう！全２６問！</p>
             </section>
@@ -55,50 +52,27 @@
                 </p>
             </section>
 
-            <!-- Warning Section -->
             <section class="bg-red-100 border border-red-300 rounded-lg p-6 mb-10">
-                <h2 class="text-2xl font-bold text-red-700 mb-4">⚠️ 注意 ⚠️</h2>
                 <div class="space-y-4">
-                    <p>本コンテンツは、web上で遊べるゲームです。スマホ、PCで遊べるようにしていますが、端末によって表示が見切れる可能性があります。ゲームを開始したら、下記のような表示が問題なくされるかどうか、確認をしてプレイしてください。できるだけ大きな画面でプレイすることを推奨します。</p>
-                    <!-- Example Images -->
-                    <div class="flex w-full flex-col sm:flex-row gap-4 justify-center">
-                        <div class="flex-1 min-w-0">
-                            <img src="kakunin1.png" alt="表示確認用の画像1" class="w-full h-auto rounded-md border border-gray-300">
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <img src="kakunin2.png" alt="表示確認用の画像2" class="w-full h-auto rounded-md border border-gray-300">
-                        </div>
+                    <p>本コンテンツの無料公開は終了し、現在は有料での販売となっております。</p>
+                    <p>無料期間では無かった、ヒントと答えのページ、およびクリア特典のページのご用意があります。</p>
+                    
+                    <div class="mt-6 text-center">
+                        <a href="https://note.com/wondolphin/n/n0396970f5936" 
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           class="inline-block bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-lg py-3 px-10 rounded-lg shadow-lg transition-transform transform hover:scale-105 duration-200 ease-in-out">
+                            販売ページはこちら
+                        </a>
                     </div>
                 </div>
             </section>
 
-            <!-- Save and Public Info Section -->
-            <section class="space-y-6 bg-white/70 p-6 rounded-lg shadow">
-                <div>
-                    <h3 class="font-bold text-lg text-cyan-700 mb-2">セーブ機能について</h3>
-                    <p>自動セーブ機能はありません。パスワードを使うことで最後の状態から再開できます。パスワードはこまめにおとりください。ページを更新すると初めからになります。ご注意ください。</p>
-                </div>
-                 <div>
-                    <h3 class="font-bold text-lg text-cyan-700 mb-2">公開期間について</h3>
-                    <p>10月31日まで無料公開です。以降は、ヒントページとクリア後特典ができ次第、有料化することを検討中です。</p>
-                </div>
-            </section>
 
-            <!-- Action Buttons -->
-            <div class="flex flex-col justify-center items-center gap-4 my-12">
-                <!-- Start Button -->
-                <a href="content.html" class="w-full sm:w-auto text-center bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-2xl py-4 px-16 rounded-full shadow-lg shadow-cyan-500/30 transform hover:scale-105 transition-all duration-300">
-                    スタート！
-                </a>
-                <!-- Share Button -->
-                <a href="https://twitter.com/intent/tweet?text=%E8%AC%8E%E8%A7%A3%E3%81%8D%E3%82%B2%E3%83%BC%E3%83%A0%E3%80%8CEnigmatic%20Puzzle%20Rooms%E3%80%8D%E3%81%AB%E6%8C%91%E6%88%A6%E4%B8%AD%EF%BC%81%E3%80%80%23EnigmaticPuzzleRooms%E3%80%80%23%E8%AC%8E%E8%A7%A3%E3%81%8D%E3%80%80%23%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%40wondolphin%0Awondolphin.github.io%2Fpuzzle%2Fenigmatic-puzzle-rooms%2Findex.html" target="_blank" class="w-full sm:w-auto text-center bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-8 rounded-full transform hover:scale-105 transition-all duration-200">
-                    Xで共有する
-                </a>
             </div>
 
         </main>
 
-        <!-- Footer -->
         <footer class="text-center mt-12 border-t border-gray-300 pt-6">
             <a href="https://wondolphin.github.io/profile.html" class="text-cyan-600 hover:text-cyan-800 underline transition-colors">
                 作成者：wondolphin
@@ -108,4 +82,3 @@
     </div>
 </body>
 </html>
-
