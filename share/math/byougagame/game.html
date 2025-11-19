@@ -57,7 +57,6 @@
 
         /* カスタムセレクトボックス (ドロップダウン) */
         select#problemDropdown {
-            /* @apply text-lg font-semibold py-2 px-4 border-2 border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500; */
             font-size: 1.0rem;
             line-height: 1.5rem;
             font-weight: 600;
@@ -114,13 +113,36 @@
         .reload-btn:active {
             transform: scale(0.95);
         }
+
+        /* ★ ドロップダウンのオプションの星マークの位置調整 */
+        select#problemDropdown option {
+            padding-right: 1.5rem;
+        }
     </style>
 </head>
 
 <body class="font-sans bg-gray-100 h-screen w-screen overflow-hidden">
 
+    <!-- 0. レベル選択画面 (初期表示) -->
+    <div id="levelSelectionScreen" class="flex flex-col items-center justify-center h-full">
+        <h1 class="text-4xl font-bold text-gray-800 mb-8">がくねんを えらぼう！</h1> <!-- 修正 -->
+
+        <div class="flex space-x-8">
+            <button id="selectLevel12" data-level="1-2"
+                class="w-64 h-48 bg-white shadow-xl rounded-lg border border-blue-400 flex flex-col items-center justify-center transition-all duration-200 hover:shadow-2xl hover:scale-105">
+                <span class="text-3xl font-bold text-blue-600">1-2 ねんせい</span>
+                <span class="text-gray-500 mt-2"></span> <!-- 削除 -->
+            </button>
+            <button id="selectLevel34" data-level="3-4"
+                class="w-64 h-48 bg-white shadow-xl rounded-lg border border-green-400 flex flex-col items-center justify-center transition-all duration-200 hover:shadow-2xl hover:scale-105">
+                <span class="text-3xl font-bold text-green-600">3-4 ねんせい</span>
+                <span class="text-gray-500 mt-2"></span> <!-- 削除 -->
+            </button>
+        </div>
+    </div>
+
     <!-- 問題モード画面 -->
-    <div id="problemModeScreen" class="h-screen flex flex-col overflow-hidden">
+    <div id="problemModeScreen" class="hidden h-screen flex flex-col overflow-hidden">
 
         <!-- 1. 上部エリア (高さ 75%) -->
         <div class="h-3/4 flex flex-row overflow-hidden">
@@ -128,7 +150,7 @@
             <!-- 1.1 左側: 問題選択 -->
             <div
                 class="w-72 flex-shrink-0 bg-white shadow-xl p-6 m-4 mb-0 rounded-lg border border-gray-200 flex flex-col space-y-4">
-                <h2 class="text-xl font-bold text-gray-800">問題モード</h2>
+                <h2 class="text-xl font-bold text-gray-800">もんだいせんたく</h2>
 
                 <!-- 問題選択行 (ドロップダウン + リロードボタン) -->
                 <div class="flex items-center space-x-2 w-full">
@@ -160,7 +182,7 @@
                 <!-- あなたの回答 -->
                 <div
                     class="flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-inner border border-gray-300 h-full">
-                    <h3 class="text-lg font-semibold text-gray-700 mb-2">あなたの回答</h3>
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">みほんと おなじかたちに しよう！</h3> <!-- 修正 -->
                     <div id="userCanvasContainer" class="w-full flex-1 flex items-center justify-center min-h-0">
                         <canvas id="userCanvas"></canvas>
                     </div>
@@ -168,7 +190,7 @@
                 <!-- 見本 -->
                 <div
                     class="flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-inner border border-gray-300 h-full">
-                    <h3 class="text-lg font-semibold text-gray-700 mb-2">見本</h3>
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">みほん</h3> <!-- 修正 -->
                     <div id="answerCanvasContainer" class="w-full flex-1 flex items-center justify-center min-h-0">
                         <canvas id="answerCanvas"></canvas>
                     </div>
@@ -225,8 +247,12 @@
         let userSelections = {};
         let currentUserParams = {};
 
-        // ★ クリア済み問題のIDを保持するSet (リロードで消える)
-        const clearedProblems = new Set();
+        // ★ 試行回数 (問題ロード時にリセット、OK時にインクリメント)
+        let currentProblemAttemptCount = 0;
+
+        // ★ クリア済み問題のIDを保持するSet
+        const clearedProblems = new Set(); // ★ (一発クリア)
+        const partiallyClearedProblems = new Set(); // ☆ (2回以上でクリア)
 
         // ハイライト色
         const HL_L1 = '#ef4444';
@@ -234,6 +260,8 @@
         const HL_TRI_ROT = '#a855f7';
         const HL_COPY_ROT = '#f97316';
         const HL_POINT = '#eab308';
+        // ★ フラッシュに使用する色 (黄色)
+        const HL_FLASH = '#facc15';
         const DEFAULT_STROKE_ICON = '#2563eb';
 
         // ボタンスタイル
@@ -243,356 +271,65 @@
         const paramBtnUnselected = 'bg-green-50 text-green-800 border-green-200 hover:bg-green-100 hover:border-green-300';
 
         // --- 問題データ構造 ---
-        const problemDatabase = [
-            // --- Shape1 ---
-            {
-                id: '5-1',
-                title: 'もんだい5',
-                shapeId: 'shape5',
-                answerParams: { l1: 100, l2: 150, l3: 90, l4: 90 },
-                initialParams: { l1: 50, l2: 150, l3: 90, l4: 90 },
-                options: [
-                    { paramId: 'l1', label: '屋根高さ(L1)', unit: '', values: [50, 100, 150] }
-                ]
-            },
-            {
-                id: '5-2',
-                title: 'もんだい5',
-                shapeId: 'shape5',
-                answerParams: { l1: 100, l2: 180, l3: 90, l4: 90 },
-                initialParams: { l1: 100, l2: 120, l3: 90, l4: 90 },
-                options: [
-                    { paramId: 'l1', label: '屋根高さ(L1)', unit: '', fixed: 100 },
-                    { paramId: 'l2', label: '屋根幅(L2)', unit: '', values: [120, 150, 180, 240] }
-                ]
-            },
-            {
-                id: '6-2',
-                title: 'もんだい6',
-                shapeId: 'shape6',
-                answerParams: { alpha: 180, l1: 90, l2: 50 },
-                initialParams: { alpha: 180, l1: 90, l2: 25 },
-                options: [
-                    { paramId: 'l2', label: '実の半径(L2)', unit: '', values: [25, 50, 75, 100] }
-                ]
-            },
-            {
-                id: '1-1',
-                title: 'もんだい1',
-                shapeId: 'shape1',
-                answerParams: { l1: 100, side: 60, rot: 0, copy: 90 },
-                initialParams: { l1: 50, side: 60, rot: 0, copy: 90 },
-                options: [
-                    { paramId: 'l1', label: 'L1長さ', unit: '', values: [50, 100, 150] }
-                ]
-            },
-            {
-                id: '1-2',
-                title: 'もんだい',
-                shapeId: 'shape1',
-                answerParams: { l1: 120, side: 60, rot: 0, copy: 30 },
-                initialParams: { l1: 120, side: 30, rot: 0, copy: 30 },
-                options: [
-                    { paramId: 'side', label: '1辺の長さ', unit: '', values: [30, 60, 90] }
-                ]
-            },
-            
-            {
-                id: '1-5',
-                title: 'もんだい',
-                shapeId: 'shape1',
-                answerParams: { l1: 80, side: 60, rot: 0, copy: 30 },
-                initialParams: { l1: 150, side: 60, rot: 0, copy: 30 },
-                options: [
-                    { paramId: 'l1', label: 'L1長さ', unit: '', values: [80, 120, 150] },
-                ]
-            },
+        let problemDatabase = [
+            // level: 1 (1-2年生)
+            { id: 's1-1', shapeId: 'shape1', level: 40, answerParams: { l1: 100, side: 60, rot: 0, copy: 90 }, options: [{ paramId: 'l1', label: 'L1長さ', unit: '倍', init_val: 50, values: [1.5,2.0, 3.0] }] },
+            { id: 's1-2', shapeId: 'shape1', level: 50, answerParams: { l1: 120, side: 60, rot: 0, copy: 30 }, options: [{ paramId: 'side', label: '1辺の長さ', unit: '倍', init_val: 30, values: [2.0, 3.0,4] }] },
+            { id: 's1-3', shapeId: 'shape1', level: 180, answerParams: { l1: 120, side: 60, rot: 60, copy: 30 }, options: [{ paramId: 'l1', label: 'L1長さ', unit: '倍', init_val: 150, values: [0.4, 0.6, 0.8] }, { paramId: 'rot', label: '回転角', unit: '°', init_val: 45, values: [0, 30, 60] }] },
+            { id: 's1-4', shapeId: 'shape1', level: 190, answerParams: { l1: 120, side: 100, rot: 90, copy: 30 }, options: [ { paramId: 'side', label: '1辺の長さ', unit: '倍', init_val: 50, values: [1.6, 2,2.4] }, { paramId: 'rot', label: '回転角', unit: '°', init_val: 45, values: [30, 60, 90] }] },
+            { id: 's1-5', shapeId: 'shape1', level: 60, answerParams: { l1: 75, side: 60, rot: 0, copy: 30 }, options: [{ paramId: 'l1', label: 'L1長さ', unit: '倍', init_val: 150, values: [0.5, 0.8] }] },
 
-            {
-                id: '5-3',
-                title: 'もんだい5',
-                shapeId: 'shape5',
-                answerParams: { l1: 150, l2: 40, l3: 40, l4: 80 },
-                initialParams: { l1: 100, l2: 100, l3: 40, l4: 80 },
-                options: [
-                    { paramId: 'l1', label: '屋根高さ(L1)', unit: '', values: [100, 150, 200] },
-                    { paramId: 'l2', label: '屋根幅(L2)', unit: '', values: [40, 70, 100] }
-                ]
-            },
-            {
-                id: '9-1',
-                title: 'もんだい9',
-                shapeId: 'shape9',
-                answerParams: { l1: 180, l2: 50, l3: 140, l4: 50 },
-                initialParams: { l1: 80, l2: 40, l3: 80, l4: 30 },
-                options: [
-                    { paramId: 'l1', label: '上の幅(L1)', unit: '', values: [100, 140, 180] },
-                    { paramId: 'l2', label: '上の高さ(L2)', unit: '', fixed: 50 },
-                    { paramId: 'l3', label: '下の高さ(L3)', unit: '', values: [100, 140, 180] }
-                ]
-            },
+            { id: 's2-1', shapeId: 'shape2', level: 90, answerParams: { x: 105, y: 70, alpha: 30, beta: 45 }, options: [{ paramId: 'x', label: 'L1長さ(X)', unit: '倍', init_val: 70, values: [1.5, 2, 2.5] }, { paramId: 'y', label: 'L2長さ(Y)', unit: '倍', init_val: 35, values: [1.5, 2, 2.5] }] },
+            { id: 's2-2', shapeId: 'shape2', level: 100, answerParams: { x: 35, y: 80, alpha: 30, beta: 45 }, options: [{ paramId: 'x', label: 'L1長さ(X)', unit: '倍', init_val: 70, values: [0.3, 0.5, 0.8] }, { paramId: 'y', label: 'L2長さ(Y)', unit: '倍', init_val: 40, values: [1.5, 2.0, 2.5] }] },
+            { id: 's2-3', shapeId: 'shape2', level: 170, answerParams: { x: 80, y: 50, alpha: 60, beta: 45 }, options: [{ paramId: 'x', label: 'L1長さ(X)', unit: '倍', init_val: 50, values: [1.6, 2, 2.4] }, { paramId: 'alpha', label: 'L2角度(α)', unit: '°', init_val: 20, values: [30, 45, 60, 90] }] },
 
-            {
-                id: '2-1',
-                title: 'もんだい',
-                shapeId: 'shape2',
-                answerParams: { x: 100, y: 70, alpha: 30, beta: 45 },
-                initialParams: { x: 60, y: 40, alpha: 30, beta: 45 },
-                options: [
-                    { paramId: 'x', label: 'L1長さ(X)', unit: '', values: [60, 80, 100] },
-                    { paramId: 'y', label: 'L2長さ(Y)', unit: '', values: [40, 70, 100] },
-                ]
-            },
-            {
-                id: '2-2',
-                title: 'もんだい',
-                shapeId: 'shape2',
-                answerParams: { x: 30, y: 80, alpha: 30, beta: 45 },
-                initialParams: { x: 70, y: 40, alpha: 30, beta: 45 },
-                options: [
-                    { paramId: 'x', label: 'L1長さ(X)', unit: '', values: [30, 50, 70] },
-                    { paramId: 'y', label: 'L2長さ(Y)', unit: '', values: [40, 80, 100] },
-                ]
-            },
-            {
-                id: '5-4',
-                title: 'もんだい5',
-                shapeId: 'shape5',
-                answerParams: { l1: 40, l2: 80, l3: 150, l4: 30 },
-                initialParams: { l1: 40, l2: 50, l3: 30, l4: 30 },
-                options: [
-                    { paramId: 'l2', label: '屋根幅(L2)', unit: '', values: [60, 80, 100] },
-                    { paramId: 'l3', label: '本体高さ(L3)', unit: '', values: [50, 100, 150] },
-                    { paramId: 'l4', label: '本体幅(L4)', unit: '', fixed: 30 }
-                ]
-            },
-            {
-                id: '9-2',
-                title: 'もんだい9',
-                shapeId: 'shape9',
-                answerParams: { l1: 40, l2: 40, l3: 80, l4: 120 },
-                initialParams: { l1: 100, l2: 80, l3: 80, l4: 120 },
-                options: [
-                    { paramId: 'l1', label: '上の幅(L1)', unit: '', values: [40, 60, 80, 100] },
-                    { paramId: 'l2', label: '上の高さ(L2)', unit: '', values: [20, 40, 60] },
-                    { paramId: 'l4', label: '下の幅(L4)', unit: '', fixed: 120 }
-                ]
-            },
-            {
-                id: '9-3',
-                title: 'もんだい9',
-                shapeId: 'shape9',
-                answerParams: { l1: 160, l2: 40, l3: 100, l4: 100 },
-                initialParams: { l1: 100, l2: 100, l3: 50, l4: 50 },
-                options: [
-                    { paramId: 'l1', label: '上の幅(L1)', unit: '', values: [80, 120, 160] },
-                    { paramId: 'l2', label: '上の高さ(L2)', unit: '', values: [40, 80, 120] },
-                    { paramId: 'l3', label: '下の高さ(L3)', unit: '', values: [80, 100, 120] },
-                    { paramId: 'l4', label: '下の幅(L4)', unit: '', values: [50, 100, 120] }
-                ]
-            },
-            
-                        
-            // --- Shape6 ---
-            {
-                id: '6-1',
-                title: 'もんだい6',
-                shapeId: 'shape6',
-                answerParams: { alpha: 45, l1: 160, l2: 40 },
-                initialParams: { alpha: 90, l1: 100, l2: 40 },
-                options: [
-                    { paramId: 'alpha', label: '角度(α)', unit: '°', values: [30, 45, 60, 90] },
-                    { paramId: 'l1', label: '茎の長さ(L1)', unit: '', values: [100,160,220] }
-                ]
-            },
-            
-            // --- Shape7 ---
-            
-            // --- Shape9 ---
-            
-            
-            // --- Shape10 ---
-            {
-                id: '10-1',
-                title: 'もんだい10',
-                shapeId: 'shape10',
-                answerParams: { l1: 180, l2: 90, alpha: 45 },
-                initialParams: { l1: 180, l2: 40, alpha: 20 },
-                options: [
-                    { paramId: 'l1', label: '軸の長さ(L1)', unit: '', fixed: 180 },
-                    { paramId: 'l2', label: '矢の長さ(L2)', unit: '', values: [90, 120, 150] },
-                    { paramId: 'alpha', label: '矢の角度(α)', unit: '°', values: [20, 45, 60, 90] }
-                ]
-            },
-            {
-                id: '10-2',
-                title: 'もんだい10',
-                shapeId: 'shape10',
-                answerParams: { l1: 200, l2: 120, alpha: 30 },
-                initialParams: { l1: 50, l2: 120, alpha: 90 },
-                options: [
-                    { paramId: 'l1', label: '軸の長さ(L1)', unit: '', values: [50, 100, 150, 200] },
-                    { paramId: 'l2', label: '矢の長さ(L2)', unit: '', fixed: 120 },
-                    { paramId: 'alpha', label: '矢の角度(α)', unit: '°', values: [30, 45, 60, 90] }
-                ]
-            },
+            // level: 2 (1-2年生)
 
-            {
-                id: '2-3',
-                title: 'もんだい',
-                shapeId: 'shape2',
-                answerParams: { x: 80, y: 50, alpha: 60, beta: 45 },
-                initialParams: { x: 80, y: 50, alpha: 20, beta: 45 },
-                options: [
-                    { paramId: 'alpha', label: 'L2角度(α)', unit: '°', values: [30, 45, 60, 90] }
-                ]
-            },
-            {
-                id: '1-3',
-                title: 'もんだい',
-                shapeId: 'shape1',
-                answerParams: { l1: 100, side: 60, rot: 60, copy: 30 },
-                initialParams: { l1: 150, side: 60, rot: 15, copy: 30 },
-                options: [
-                    { paramId: 'l1', label: 'L1長さ', unit: '', values: [50, 100, 130] },
-                    { paramId: 'side', label: '1辺の長さ', unit: '', fixed: 60 },
-                    { paramId: 'rot', label: '回転角', unit: '°', values: [0, 30, 60] }
+            // level: 3 (3-4年生)
+            { id: 's5-1', shapeId: 'shape5', level: 10, answerParams: { l1: 100, l2: 150, l3: 90, l4: 90 }, options: [{ paramId: 'l1', label: '屋根高さ(L1)', unit: '倍', init_val: 50, values: [1.0, 2.0, 3.0] }] },
+            { id: 's5-2', shapeId: 'shape5', level: 20, answerParams: { l1: 100, l2: 180, l3: 90, l4: 90 }, options: [{ paramId: 'l1', label: '屋根高さ(L1)', unit: '倍', fixed: 100 }, { paramId: 'l2', label: '屋根幅(L2)', unit: '倍', init_val: 120, values: [1.5, 2.0,3] }] },
+            { id: 's5-3', shapeId: 'shape5', level: 70, answerParams: { l1: 150, l2: 40, l3: 40, l4: 80 }, options: [{ paramId: 'l1', label: '屋根高さ(L1)', unit: '倍', init_val: 100, values: [1.5, 2.0] }, { paramId: 'l2', label: '屋根幅(L2)', unit: '倍', init_val: 100, values: [0.4, 0.7] }] },
+            { id: 's5-4', shapeId: 'shape5', level: 110, answerParams: { l1: 40, l2: 80, l3: 150, l4: 30 }, options: [{ paramId: 'l2', label: '屋根幅(L2)', unit: '倍', init_val: 50, values: [1.2, 1.6, 2.0] }, { paramId: 'l3', label: '本体高さ(L3)', unit: '倍', init_val: 30, values: [3, 4, 5.0] }] },
 
-                ]
-            },
-            {
-                id: '1-4',
-                title: 'もんだい',
-                shapeId: 'shape1',
-                answerParams: { l1: 120, side: 100, rot: 90, copy: 30 },
-                initialParams: { l1: 120, side: 60, rot: 15, copy: 30 },
-                options: [
-                    { paramId: 'l1', label: 'L1長さ', unit: '', fixed: 120 },
-                    { paramId: 'side', label: '1辺の長さ', unit: '', values: [50, 100, 130] },
-                    { paramId: 'rot', label: '回転角', unit: '°', values: [30, 60, 90] }
+            { id: 's6-1', shapeId: 'shape6', level: 140, answerParams: { alpha: 45, l1: 160, l2: 40 }, options: [{ paramId: 'alpha', label: '角度(α)', unit: '°', init_val: 90, values: [30, 45, 60] }, { paramId: 'l1', label: '茎の長さ(L1)', unit: '倍', init_val: 100, values: [1.6, 2] }] },
+            { id: 's6-2', shapeId: 'shape6', level: 30, answerParams: { alpha: 180, l1: 90, l2: 50 }, options: [{ paramId: 'l2', label: '実の半径(L2)', unit: '倍', init_val: 25, values: [2.0, 3.0, 4.0] }] },
 
-                ]
-            },
+            // level: 4 (3-4年生)
+            { id: 's9-1', shapeId: 'shape9', level: 80, answerParams: { l1: 180, l2: 50, l3: 140, l4: 50 }, options: [{ paramId: 'l1', label: '上の幅(L1)', unit: '倍', init_val: 90, values: [1.4, 1.7, 2.0] }, { paramId: 'l3', label: '下の高さ(L3)', unit: '倍', init_val: 70, values: [1.4, 1.7, 2.0] }] },
+            { id: 's9-2', shapeId: 'shape9', level: 120, answerParams: { l1: 42, l2: 42, l3: 80, l4: 120 }, options: [{ paramId: 'l1', label: '上の幅(L1)', unit: '倍', init_val: 140, values: [0.3, 0.5, 0.7] }, { paramId: 'l2', label: '上の高さ(L2)', unit: '倍', init_val: 60, values: [0.3, 0.5, 0.7] }] },
+            { id: 's9-3', shapeId: 'shape9', level: 130, answerParams: { l1: 160, l2: 40, l3: 100, l4: 100 }, options: [{ paramId: 'l1', label: '上の幅(L1)', unit: '倍', init_val: 100, values: [0.8, 1.2, 1.6] }, { paramId: 'l2', label: '上の高さ(L2)', unit: '倍', init_val: 100, values: [0.4, 0.8, 1.2] }, { paramId: 'l4', label: '下の幅(L4)', unit: '倍', init_val: 50, values: [1.6, 2.0, 2.4] }] },
 
-            {
-                id: 's2p2',
-                title: '図形2 - 問題2',
-                shapeId: 'shape2',
-                answerParams: { x: 90, y: 50, alpha: 60, beta: 20 },
-                initialParams: { x: 70, y: 50, alpha: 30, beta: 60 },
-                options: [
-                    { paramId: 'x', label: 'L1長さ(X)', unit: '', values: [60, 90, 120] },
-                    { paramId: 'y', label: 'L2長さ(Y)', unit: '', fixed: 50 },
-                    { paramId: 'alpha', label: 'L2角度(α)', unit: '°', values: [45, 60, 90] },
-                    { paramId: 'beta', label: 'コピー角度(β)', unit: '°', values: [15, 20, 30] }
-                ]
-            },
-            {
-                id: 's2p3',
-                title: '図形2 - 問題3',
-                shapeId: 'shape2',
-                answerParams: { x: 100, y: 70, alpha: 90, beta: 90 },
-                initialParams: { x: 70, y: 30, alpha: 90, beta: 45 },
-                options: [
-                    { paramId: 'x', label: 'L1長さ(X)', unit: '', values: [70, 100] },
-                    { paramId: 'y', label: 'L2長さ(Y)', unit: '', values: [30, 50, 70] },
-                    { paramId: 'alpha', label: 'L2角度(α)', unit: '°', fixed: 90 },
-                    { paramId: 'beta', label: 'コピー角度(β)', unit: '°', values: [45, 90] }
-                ]
-            },
-            // --- Shape3 ---
-            {
-                id: 's3p1',
-                title: '図形3 - 問題1',
-                shapeId: 'shape3',
-                answerParams: { a: 80, b: 60, c: 30, d: 30 },
-                initialParams: { a: 80, b: 50, c: 40, d: 20 },
-                options: [
-                    { paramId: 'a', label: '底辺(A)', unit: '', fixed: 80 },
-                    { paramId: 'b', label: '高さ(B)', unit: '', values: [50, 60, 70] },
-                    { paramId: 'c', label: 'ずれ(C)', unit: '', values: [20, 30, 40] },
-                    { paramId: 'd', label: '幹幅(D)', unit: '', values: [20, 30, 40] }
-                ]
-            },
-            {
-                id: 's3p2',
-                title: '図形3 - 問題2',
-                shapeId: 'shape3',
-                answerParams: { a: 100, b: 50, c: 30, d: 40 },
-                initialParams: { a: 120, b: 50, c: 40, d: 40 },
-                options: [
-                    { paramId: 'a', label: '底辺(A)', unit: '', values: [80, 100, 120] },
-                    { paramId: 'b', label: '高さ(B)', unit: '', fixed: 50 },
-                    { paramId: 'c', label: 'ずれ(C)', unit: '', values: [30, 40] },
-                    { paramId: 'd', label: '幹幅(D)', unit: '', fixed: 40 }
-                ]
-            },
-            // --- Shape4 ---
-            {
-                id: 's4p1',
-                title: '図形4 - 問題1',
-                shapeId: 'shape4',
-                answerParams: { r: 100, sa: 75, la: 125 },
-                initialParams: { r: 80, sa: 75, la: 100 },
-                options: [
-                    { paramId: 'r', label: '円半径(R)', unit: '', values: [80, 100, 120] },
-                    { paramId: 'sa', label: '楕円短半径(SA)', unit: '', fixed: 75 },
-                    { paramId: 'la', label: '楕円長半径(LA)', unit: '', values: [100, 125] }
-                ]
-            },
-            {
-                id: 's7p1',
-                title: '図形7 - 問題1',
-                shapeId: 'shape7',
-                answerParams: { l1: 100, l2: 50 },
-                initialParams: { l1: 80, l2: 50 },
-                options: [
-                    { paramId: 'l1', label: '正方形の辺(L1)', unit: '', values: [80, 100, 120] },
-                    { paramId: 'l2', label: '円の半径(L2)', unit: '', fixed: 50 }
-                ]
-            },
-            {
-                id: 's7p2',
-                title: '図形7 - 問題2 (70.7)',
-                shapeId: 'shape7',
-                answerParams: { l1: 100, l2: 70.7 },
-                initialParams: { l1: 100, l2: 50 },
-                options: [
-                    { paramId: 'l1', label: '正方形の辺(L1)', unit: '', fixed: 100 },
-                    { paramId: 'l2', label: '円の半径(L2)', unit: '', values: [50, 60, 70.7, 80] }
-                ]
-            },
-            // --- Shape8 ---
-            {
-                id: 's8p1',
-                title: '図形8 - 問題1',
-                shapeId: 'shape8',
-                answerParams: { l1: 100, l2: 100, alpha: 15 },
-                initialParams: { l1: 80, l2: 100, alpha: 10 },
-                options: [
-                    { paramId: 'l1', label: '柄の長さ(L1)', unit: '', values: [80, 100, 120] },
-                    { paramId: 'l2', label: '歯の長さ(L2)', unit: '', fixed: 100 },
-                    { paramId: 'alpha', label: '歯の角度(α)', unit: '°', values: [10, 15, 20] }
-                ]
-            },
-            {
-                id: 's8p2',
-                title: '図形8 - 問題2',
-                shapeId: 'shape8',
-                answerParams: { l1: 100, l2: 100, alpha: 15 },
-                initialParams: { l1: 100, l2: 80, alpha: 25 },
-                options: [
-                    { paramId: 'l1', label: '柄の長さ(L1)', unit: '', fixed: 100 },
-                    { paramId: 'l2', label: '歯の長さ(L2)', unit: '', values: [80, 100] },
-                    { paramId: 'alpha', label: '歯の角度(α)', unit: '°', values: [15, 25] }
-                ]
-            }
+            { id: 's10-1', shapeId: 'shape10', level: 150, answerParams: { l1: 180, l2: 90, alpha: 45 }, options: [{ paramId: 'l2', label: '矢の長さ(L2)', unit: '倍', init_val: 45, values: [2, 3.0, 3.5] }, { paramId: 'alpha', label: '矢の角度(α)', unit: '°', init_val: 40, values: [45, 70, 90] }] },
+            { id: 's10-2', shapeId: 'shape10', level: 160, answerParams: { l1: 200, l2: 120, alpha: 30 }, options: [{ paramId: 'l1', label: '軸の長さ(L1)', unit: '倍', init_val: 50, values: [2.0, 3.0, 4.0] }, { paramId: 'alpha', label: '矢の角度(α)', unit: '°', init_val: 70, values: [30, 45, 60, 90] }] },
 
-
+            // level: 6 (発展)
+            { id: 's5p2', shapeId: 'shape5', level: 999, answerParams: { l1: 50, l2: 120, l3: 60, l4: 80 }, options: [{ paramId: 'l1', label: '屋根高さ(L1)', unit: '倍', fixed: 50 }, { paramId: 'l2', label: '屋根幅(L2)', unit: '倍', init_val: 80, values: [1.0, 1.25, 1.5] }, { paramId: 'l3', label: '本体高さ(L3)', unit: '倍', fixed: 60 }, { paramId: 'l4', label: '本体幅(L4)', unit: '倍', init_val: 100, values: [0.6, 0.8, 1.0] }] },
+            { id: 's10p1', shapeId: 'shape10', level: 999, answerParams: { l1: 100, l2: 50, alpha: 45 }, options: [{ paramId: 'l1', label: '軸の長さ(L1)', unit: '倍', fixed: 100 }, { paramId: 'l2', label: '矢の長さ(L2)', unit: '倍', init_val: 40, values: [1.0, 1.25, 1.5] }, { paramId: 'alpha', label: '矢の角度(α)', unit: '°', init_val: 30, values: [30, 45, 60] }] },
+            { id: 's8p1', shapeId: 'shape8', level: 999, answerParams: { l1: 100, l2: 100, alpha: 15 }, options: [{ paramId: 'l1', label: '柄の長さ(L1)', unit: '倍', init_val: 80, values: [1.0, 1.25, 1.5] }, { paramId: 'l2', label: '歯の長さ(L2)', unit: '倍', fixed: 100 }, { paramId: 'alpha', label: '歯の角度(α)', unit: '°', init_val: 10, values: [10, 15, 20] }] },
+            { id: 's2p3', shapeId: 'shape2', level: 999, answerParams: { x: 100, y: 70, alpha: 90, beta: 90 }, options: [{ paramId: 'x', label: 'L1長さ(X)', unit: '倍', init_val: 70, values: [1.0, 1.42] }, { paramId: 'y', label: 'L2長さ(Y)', unit: '倍', init_val: 30, values: [1.0, 1.66, 2.33] }, { paramId: 'alpha', label: 'L2角度(α)', unit: '°', fixed: 90 }, { paramId: 'beta', label: 'コピー角度(β)', unit: '°', init_val: 45, values: [45, 90] }] },
+            { id: 's6p1', shapeId: 'shape6', level: 999, answerParams: { alpha: 45, l1: 100, l2: 30 }, options: [{ paramId: 'alpha', label: '角度(α)', unit: '°', init_val: 30, values: [30, 45, 60] }, { paramId: 'l1', label: '茎の長さ(L1)', unit: '倍', fixed: 100 }, { paramId: 'l2', label: '実の半径(L2)', unit: '倍', init_val: 20, values: [1.0, 1.5, 2.0] }] },
+            { id: 's8p2', shapeId: 'shape8', level: 999, answerParams: { l1: 100, l2: 100, alpha: 15 }, options: [{ paramId: 'l1', label: '柄の長さ(L1)', unit: '倍', fixed: 100 }, { paramId: 'l2', label: '歯の長さ(L2)', unit: '倍', init_val: 80, values: [1.0, 1.25] }, { paramId: 'alpha', label: '歯の角度(α)', unit: '°', init_val: 25, values: [15, 25] }] },
+            { id: 's2p2', shapeId: 'shape2', level: 999, answerParams: { x: 90, y: 50, alpha: 60, beta: 20 }, options: [{ paramId: 'x', label: 'L1長さ(X)', unit: '倍', init_val: 70, values: [0.85, 1.0, 1.28] }, { paramId: 'y', label: 'L2長さ(Y)', unit: '倍', fixed: 50 }, { paramId: 'alpha', label: 'L2角度(α)', unit: '°', init_val: 30, values: [45, 60, 90] }, { paramId: 'beta', label: 'コピー角度(β)', unit: '°', init_val: 60, values: [15, 20, 30] }] },
+            { id: 's3p2', shapeId: 'shape3', level: 999, answerParams: { a: 100, b: 50, c: 30, d: 40 }, options: [{ paramId: 'a', label: '底辺(A)', unit: '倍', init_val: 120, values: [0.66, 0.83, 1.0] }, { paramId: 'b', label: '高さ(B)', unit: '倍', fixed: 50 }, { paramId: 'c', label: 'ずれ(C)', unit: '倍', init_val: 40, values: [0.75, 1.0] }, { paramId: 'd', label: '幹幅(D)', unit: '倍', fixed: 40 }] },
+            { id: 's7p2', shapeId: 'shape7', level: 999, answerParams: { l1: 100, l2: 70.7 }, options: [{ paramId: 'l1', label: '正方形の辺(L1)', unit: '倍', fixed: 100 }, { paramId: 'l2', label: '円の半径(L2)', unit: '倍', init_val: 50, values: [1.0, 1.2, 1.41, 1.6] }] },
+            { id: 's3p1', shapeId: 'shape3', level: 999, answerParams: { a: 80, b: 60, c: 30, d: 30 }, options: [{ paramId: 'a', label: '底辺(A)', unit: '倍', fixed: 80 }, { paramId: 'b', label: '高さ(B)', unit: '倍', init_val: 50, values: [1.0, 1.2, 1.4] }, { paramId: 'c', label: 'ずれ(C)', unit: '倍', init_val: 40, values: [0.5, 0.75, 1.0] }, { paramId: 'd', label: '幹幅(D)', unit: '倍', init_val: 20, values: [1.0, 1.5, 2.0] }] },
+            { id: 's4p1', shapeId: 'shape4', level: 999, answerParams: { r: 100, sa: 75, la: 125 }, options: [{ paramId: 'r', label: '円半径(R)', unit: '倍', init_val: 80, values: [1.0, 1.25, 1.5] }, { paramId: 'sa', label: '楕円短半径(SA)', unit: '倍', fixed: 75 }, { paramId: 'la', label: '楕円長半径(LA)', unit: '倍', init_val: 100, values: [1.0, 1.25] }] },
+            { id: 's7p1', shapeId: 'shape7', level: 999, answerParams: { l1: 100, l2: 50 }, options: [{ paramId: 'l1', label: '正方形の辺(L1)', unit: '倍', init_val: 80, values: [1.0, 1.25, 1.5] }, { paramId: 'l2', label: '円の半径(L2)', unit: '倍', fixed: 50 }] },
+            { id: 's5p1', shapeId: 'shape5', level: 999, answerParams: { l1: 50, l2: 100, l3: 80, l4: 80 }, options: [{ paramId: 'l1', label: '屋根高さ(L1)', unit: '倍', init_val: 40, values: [1.0, 1.25, 1.5] }, { paramId: 'l2', label: '屋根幅(L2)', unit: '倍', fixed: 100 }, { paramId: 'l3', label: '本体高さ(L3)', unit: '倍', init_val: 70, values: [1.0, 1.14] }, { paramId: 'l4', label: '本体幅(L4)', unit: '倍', fixed: 80 }] },
+            { id: 's6p2', shapeId: 'shape6', level: 999, answerParams: { alpha: 60, l1: 100, l2: 30 }, options: [{ paramId: 'alpha', label: '角度(α)', unit: '°', fixed: 60 }, { paramId: 'l1', label: '茎の長さ(L1)', unit: '倍', init_val: 120, values: [0.66, 0.83, 1.0] }, { paramId: 'l2', label: '実の半径(L2)', unit: '倍', init_val: 25, values: [1.0, 1.2] }] },
+            { id: 's10p2', shapeId: 'shape10', level: 999, answerParams: { l1: 100, l2: 40, alpha: 40 }, options: [{ paramId: 'l1', label: '軸の長さ(L1)', unit: '倍', init_val: 120, values: [0.66, 0.83, 1.0] }, { paramId: 'l2', label: '矢の長さ(L2)', unit: '倍', fixed: 40 }, { paramId: 'alpha', label: '矢の角度(α)', unit: '°', init_val: 50, values: [40, 50] }] },
         ];
 
+        // ★ 問題データを level, 次にコード内の順番でソート
+        problemDatabase.sort((a, b) => a.level - b.level);
+
+        // 問題データ全体を保持
+        const fullProblemDatabase = [...problemDatabase];
+        let filteredProblemDatabase = []; // 選択されたレベルでフィルタリングされたリスト
 
         // --- DOM要素の取得 ---
+        const levelSelectionScreen = document.getElementById('levelSelectionScreen'); // ★
+        const problemModeScreen = document.getElementById('problemModeScreen');
         const problemDropdown = document.getElementById('problemDropdown');
         const problemTitle = document.getElementById('problemTitle');
         const paramSelectionContainer = document.getElementById('paramSelectionContainer');
@@ -619,8 +356,67 @@
             drawProblemMode();
         }
 
+        // ★ 選択肢クリック時のハイライトアニメーション
+        function animateHighlightFlash(paramId) {
+            const shapeDef = shapeDefs[currentShapeId];
+            if (!shapeDef || !shapeDef.drawFn) return;
 
-        // --- 問題モード初期化・描画 ---
+            const duration = 200; // アニメーション時間 (ms)
+            const startTime = performance.now();
+            let flashCount = 0; // 点滅回数カウンター
+            const maxFlashes = 2; // 2回点滅
+
+            // 強調対象は、選択されたパラメータのみ
+            const highlightTarget = paramId;
+
+            function step(currentTime) {
+                const elapsed = currentTime - startTime;
+                const cycleTime = elapsed % duration;
+
+                // 強調の度合い (1.0 -> 2.5)
+                let emphasis = 1.0;
+                let color = null; // nullなら通常色
+
+                // 1回目の点滅が完了したら、2回目の点滅をスタート
+                if (flashCount < maxFlashes) {
+                    const cycleProgress = cycleTime / (duration / 2); // 0 から 1.0 に戻る
+
+                    if (cycleProgress < 1.0) {
+                        emphasis = 1.0 + (1.5 * (1.0 - cycleProgress)); // 2.5倍まで太く
+                        color = HL_FLASH; // 黄色
+                    } else if (cycleTime > duration / 2 && cycleTime < duration) {
+                        emphasis = 1.0; // 通常の太さ
+                    }
+
+                }
+
+                // 一時的な描画パラメータ
+                const tempParams = { ...currentUserParams };
+
+                // 描画: 強調対象(highlightTarget)と強調レベル(emphasis)を渡す
+                // shapeDef.drawFn(userCanvas, tempParams, { [paramId]: true }, highlightTarget, emphasis, color);
+
+                // 描画サイクルが完了したかチェック
+                if (elapsed >= duration * maxFlashes) {
+                    // アニメーション終了後、通常の描画状態に戻す
+                    drawProblemMode();
+                } else {
+                    requestAnimationFrame(step);
+                }
+            }
+
+            requestAnimationFrame(step);
+        }
+
+        // ★ 倍率を整形するユーティリティ関数
+        function formatRate(rate) {
+            let displayRate = (Math.round(rate * 100) / 100);
+            if (displayRate % 1 === 0) {
+                return displayRate.toFixed(0);
+            } else {
+                return displayRate.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+            }
+        }
 
         // 問題UIを構築
         function setupProblemUI() {
@@ -629,7 +425,10 @@
                 shapeDefs[currentShapeId].stopIconAnimations();
             }
 
-            const problem = problemDatabase.find(p => p.id === currentProblemId);
+            // ★ 問題ロード時、試行回数をリセット
+            currentProblemAttemptCount = 0;
+
+            const problem = filteredProblemDatabase.find(p => p.id === currentProblemId);
             if (!problem) {
                 paramSelectionContainer.innerHTML = '<p>問題の読み込みに失敗しました。</p>';
                 submitAnswerBtn.disabled = true;
@@ -644,90 +443,190 @@
                 return;
             }
 
-            problemTitle.textContent = problem.title;
+            // 問題タイトルを自動採番されたものに設定
+            const problemIndex = filteredProblemDatabase.findIndex(p => p.id === currentProblemId);
+            problemTitle.textContent = `もんだい${problemIndex + 1}`;
+
             paramSelectionContainer.innerHTML = '';
             userSelections = {};
 
-            currentUserParams = { ...problem.initialParams };
-
+            // 1. currentUserParams の初期化: answerParams の値で初期化
+            currentUserParams = { ...problem.answerParams };
             const visibleParamIds = new Set();
 
+            // 2. options を見て初期値と選択肢を決定
             problem.options.forEach(opt => {
-                visibleParamIds.add(opt.paramId);
+                const paramId = opt.paramId;
+                visibleParamIds.add(paramId);
+                const answerVal = problem.answerParams[paramId];
 
+                let initialSelectionValue = undefined; // 選択肢のボタンが持つ値 (倍率 or 角度/実測値)
+                let initialValueForCanvas = answerVal; // ユーザーキャンバスに描画される実測値
+
+                const isLengthParam = opt.unit === '倍';
+
+                // 3. 初期値の設定と currentUserParams の更新
+                if (isLengthParam) {
+                    // 長さパラメータの場合:
+
+                    // 3-1. 初期描画値 (init_val または answerVal) の決定
+                    const initVal = opt.init_val !== undefined ? opt.init_val : answerVal;
+
+                    // fixed の場合、fixedの値を基準とする
+                    if (opt.fixed !== undefined) {
+                        initialValueForCanvas = opt.fixed;
+                        initialSelectionValue = 1.0; // fixedボタンがあれば、それは常に1.0倍として処理
+                    } else {
+                        // init_val の値を基準とする
+                        const baseValueForRate = initVal; // 倍率計算の基準となる初期の長さ
+                        initialValueForCanvas = initVal;
+
+                        const hasOne = opt.values && opt.values.some(v => Math.abs(v - 1.0) < 0.001);
+
+                        if (hasOne) {
+                            initialSelectionValue = 1.0;
+                        } else {
+                            initialSelectionValue = undefined;
+                        }
+                    }
+
+                } else {
+                    // 角度パラメータの場合: 実測値ベース
+
+                    const initialVal = opt.init_val !== undefined ? opt.init_val : answerVal;
+                    initialValueForCanvas = initialVal;
+                    initialSelectionValue = initialVal;
+
+                    if (opt.fixed !== undefined) {
+                        initialValueForCanvas = opt.fixed;
+                        initialSelectionValue = opt.fixed;
+                    }
+                }
+
+                // ユーザー選択値と描画値の設定
+                currentUserParams[paramId] = initialValueForCanvas;
+                userSelections[paramId] = initialValueForCanvas;
+
+                // --- DOM構築 ---
                 const groupDiv = document.createElement('div');
-                groupDiv.className = 'space-y-2 text-center'; // 中央寄せのために text-center 追加
+                groupDiv.className = 'space-y-2 text-center';
 
-                // ラベル (アイコン) - 中央寄せ
+                // ラベル (アイコン)
                 const label = document.createElement('label');
-                label.className = 'flex items-center justify-center space-x-2'; // justify-center 追加
+                label.className = 'flex items-center justify-center space-x-2';
                 const canvas = document.createElement('canvas');
-                canvas.id = `label_icon_prob_${currentShapeId}_${opt.paramId}`;
-
+                canvas.id = `label_icon_prob_${currentShapeId}_${paramId}`;
                 canvas.width = 80;
                 canvas.height = 60;
-
                 canvas.className = 'border border-gray-300 rounded';
                 canvas.title = opt.label;
                 label.appendChild(canvas);
                 groupDiv.appendChild(label);
 
                 const btnContainer = document.createElement('div');
-                btnContainer.className = 'flex flex-wrap gap-2 justify-center'; // justify-center 追加
+                btnContainer.className = 'flex flex-wrap gap-2 justify-center';
 
-                if (opt.fixed !== undefined) {
-                    // 固定値
-                    const btn = document.createElement('button');
-                    btn.className = `${paramBtnBase} ${paramBtnFixed}`;
-                    btn.textContent = `${opt.fixed}${opt.unit || ''}`;
-                    btnContainer.appendChild(btn);
-                    userSelections[opt.paramId] = opt.fixed;
-                    currentUserParams[opt.paramId] = opt.fixed;
+                if (isLengthParam) {
+                    // 長さパラメータの選択肢 (倍率)
 
-                } else if (opt.values) {
-                    // 選択肢
-                    const initialValue = problem.initialParams[opt.paramId];
-                    userSelections[opt.paramId] = initialValue;
+                    const initialBaseValue = opt.fixed !== undefined ? opt.fixed : (opt.init_val !== undefined ? opt.init_val : answerVal);
 
-                    opt.values.forEach(val => {
+                    if (opt.fixed !== undefined) {
+                        // 固定ボタン (実測値表示)
                         const btn = document.createElement('button');
-
-                        const isSelected = (val === initialValue);
-                        btn.className = `${paramBtnBase} ${isSelected ? paramBtnSelected : paramBtnUnselected}`;
-
-                        btn.textContent = `${val}${opt.unit || ''}`;
-                        btn.dataset.param = opt.paramId;
-                        btn.dataset.value = val;
-
-                        btn.addEventListener('click', () => {
-                            userSelections[opt.paramId] = val;
-                            btnContainer.querySelectorAll('button').forEach(b => {
-                                if (b !== btn) {
-                                    if (!b.className.includes(paramBtnFixed)) {
-                                        b.className = `${paramBtnBase} ${paramBtnUnselected}`;
-                                    }
-                                }
-                            });
-                            btn.className = `${paramBtnBase} ${paramBtnSelected}`;
-                            checkAllParamsSelected();
-                        });
+                        btn.className = `${paramBtnBase} ${paramBtnFixed}`;
+                        btn.textContent = `${opt.fixed}`;
                         btnContainer.appendChild(btn);
-                    });
+                    } else {
+                        // 選択肢ボタン (倍率表示)
+                        opt.values.forEach(rate => {
+                            const btn = document.createElement('button');
+
+                            const isSelected = (initialSelectionValue !== undefined && Math.abs(rate - initialSelectionValue) < 0.001);
+
+                            btn.className = `${paramBtnBase} ${isSelected ? paramBtnSelected : paramBtnUnselected}`;
+
+                            const displayRate = formatRate(rate);
+                            btn.textContent = `${displayRate}ばい`;
+                            btn.dataset.param = paramId;
+                            btn.dataset.value = rate; // 倍率をデータとして持つ
+
+                            btn.addEventListener('click', () => {
+                                const actualValue = initialBaseValue * rate;
+                                userSelections[paramId] = actualValue;
+
+                                animateHighlightFlash(paramId);
+
+                                btnContainer.querySelectorAll('button').forEach(b => {
+                                    b.classList.remove('bg-green-600', 'text-white', 'border-green-700', 'shadow-md', 'font-semibold');
+                                    b.classList.add('bg-green-50', 'text-green-800', 'border-green-200', 'hover:bg-green-100', 'hover:border-green-300');
+                                });
+                                btn.classList.add('bg-green-600', 'text-white', 'border-green-700', 'shadow-md', 'font-semibold');
+                                btn.classList.remove('bg-green-50', 'text-green-800', 'border-green-200', 'hover:bg-green-100', 'hover:border-green-300');
+
+                                checkAllParamsSelected();
+                            });
+                            btnContainer.appendChild(btn);
+                        });
+                    }
+
+                } else {
+                    // 角度/実測値の選択肢
+                    const isFixed = opt.fixed !== undefined;
+
+                    if (isFixed) {
+                        // 固定ボタン (角度/実測値)
+                        const btn = document.createElement('button');
+                        btn.className = `${paramBtnBase} ${paramBtnFixed}`;
+                        btn.textContent = `${opt.fixed}${opt.unit || ''}`;
+                        btnContainer.appendChild(btn);
+                    } else {
+                        // 選択肢ボタン (角度/実測値)
+                        opt.values.forEach(val => {
+                            const btn = document.createElement('button');
+
+                            const isSelected = (val === initialSelectionValue);
+                            btn.className = `${paramBtnBase} ${isSelected ? paramBtnSelected : paramBtnUnselected}`;
+
+                            btn.textContent = `${val}${opt.unit || ''}`;
+                            btn.dataset.param = paramId;
+                            btn.dataset.value = val;
+
+                            btn.addEventListener('click', () => {
+                                userSelections[paramId] = val;
+
+                                animateHighlightFlash(paramId);
+
+                                btnContainer.querySelectorAll('button').forEach(b => {
+                                    b.classList.remove('bg-green-600', 'text-white', 'border-green-700', 'shadow-md', 'font-semibold');
+                                    b.classList.add('bg-green-50', 'text-green-800', 'border-green-200', 'hover:bg-green-100', 'hover:border-green-300');
+                                });
+                                btn.classList.add('bg-green-600', 'text-white', 'border-green-700', 'shadow-md', 'font-semibold');
+                                btn.classList.remove('bg-green-50', 'text-green-800', 'border-green-200', 'hover:bg-green-100', 'hover:border-green-300');
+
+                                checkAllParamsSelected();
+                            });
+                            btnContainer.appendChild(btn);
+                        });
+                    }
                 }
+
                 groupDiv.appendChild(btnContainer);
                 paramSelectionContainer.appendChild(groupDiv);
             });
 
+            // 4. options に記述されていないパラメータの初期値を answerParams に設定 
             shapeDef.params.forEach(paramId => {
                 if (!visibleParamIds.has(paramId)) {
-                    if (problem.answerParams[paramId] !== undefined) {
-                        userSelections[paramId] = problem.answerParams[paramId];
-                    }
+                    const answerVal = problem.answerParams[paramId];
+                    userSelections[paramId] = answerVal;
+                    currentUserParams[paramId] = answerVal;
                 }
             });
 
             checkAllParamsSelected();
 
+            // 5. アイコンの描画
             problem.options.forEach(opt => {
                 const canvasId = `label_icon_prob_${currentShapeId}_${opt.paramId}`;
                 if (shapeDef.drawIconFns[opt.paramId]) {
@@ -738,13 +637,12 @@
             // 「次の問題へ」ボタンの状態更新
             updateNextButtonState();
 
-            resizeAllCanvases();
+            resizeAllCanvases(); // ★ 初期描画
         }
 
-        // 「次の問題へ」ボタンの状態更新
         function updateNextButtonState() {
-            const currentIndex = problemDatabase.findIndex(p => p.id === currentProblemId);
-            if (currentIndex === -1 || currentIndex === problemDatabase.length - 1) {
+            const currentIndex = filteredProblemDatabase.findIndex(p => p.id === currentProblemId);
+            if (currentIndex === -1 || currentIndex === filteredProblemDatabase.length - 1) {
                 nextProblemBtn.disabled = true;
                 nextProblemBtn.classList.add('opacity-50', 'cursor-not-allowed');
             } else {
@@ -755,7 +653,7 @@
 
         function drawProblemMode() {
             if (!currentProblemId || !currentShapeId) return;
-            const problem = problemDatabase.find(p => p.id === currentProblemId);
+            const problem = filteredProblemDatabase.find(p => p.id === currentProblemId);
             const shapeDef = shapeDefs[currentShapeId];
             if (!problem || !shapeDef) {
                 const ctxUser = userCanvas.getContext('2d');
@@ -770,47 +668,79 @@
                 highlights[opt.paramId] = true;
             });
 
-            shapeDef.drawFn(userCanvas, currentUserParams, highlights);
+            // ★ drawFn呼び出しの引数を修正: 選択パラメータ(null)、強調レベル(1.0)、強調色(null)
+            shapeDef.drawFn(userCanvas, currentUserParams, highlights, null, 1.0, null);
             shapeDef.drawFn(answerCanvas, problem.answerParams, {});
         }
 
         function checkAllParamsSelected() {
-            const problem = problemDatabase.find(p => p.id === currentProblemId);
+            const problem = filteredProblemDatabase.find(p => p.id === currentProblemId);
             if (!problem) {
                 submitAnswerBtn.disabled = true;
                 return;
             }
-            const allSelected = problem.options.every(opt => userSelections[opt.paramId] !== undefined);
+
+            const allSelected = problem.options.every(opt => {
+
+                if (opt.fixed !== undefined) {
+                    return true;
+                }
+
+                const isLengthParam = opt.unit === '倍';
+                const initialBaseValue = isLengthParam ? (opt.init_val !== undefined ? opt.init_val : problem.answerParams[opt.paramId]) : opt.init_val;
+
+                const hasOneRate = isLengthParam && opt.values.some(v => Math.abs(v - 1.0) < 0.001);
+
+                if (!isLengthParam && initialBaseValue !== undefined) {
+                    return Math.abs(userSelections[opt.paramId] - initialBaseValue) > 0.01;
+                }
+
+                if (isLengthParam && !hasOneRate) {
+                    return Math.abs(userSelections[opt.paramId] - initialBaseValue) > 0.01;
+                } else {
+                    return userSelections[opt.paramId] !== undefined;
+                }
+            });
+
             submitAnswerBtn.disabled = !allSelected;
         }
 
         // 回答チェック & クリア処理
         function checkAnswer() {
-            const problem = problemDatabase.find(p => p.id === currentProblemId);
+            const problem = filteredProblemDatabase.find(p => p.id === currentProblemId);
             if (!problem) return;
 
             const isCorrect = Object.keys(problem.answerParams).every(key => {
                 const answerVal = problem.answerParams[key];
                 const userVal = userSelections[key];
 
-                if (problem.shapeId === 'shape7' && key === 'l2') {
-                    return Math.abs(answerVal - userVal) < 0.1;
+                const opt = problem.options.find(o => o.paramId === key);
+                if (opt && (opt.unit === '倍' || problem.shapeId === 'shape7' && key === 'l2')) {
+                    return Math.abs(answerVal - userVal) < 0.01;
                 }
+
                 return answerVal === userVal;
             });
 
             if (isCorrect) {
-                // クリア情報を記録
-                if (!clearedProblems.has(currentProblemId)) {
+                // ★ クリアマークの更新
+                if (currentProblemAttemptCount === 1) {
+                    // 一発クリア: ★ をつける
                     clearedProblems.add(currentProblemId);
-                    setupProblemDropdown(); // ドロップダウンの★を更新
-                    problemDropdown.value = currentProblemId; // 選択状態を維持
+                    partiallyClearedProblems.delete(currentProblemId); // 念のため☆を消す
+                } else {
+                    // 2回目以降のクリア: ★が付いていなければ☆をつける
+                    if (!clearedProblems.has(currentProblemId)) {
+                        partiallyClearedProblems.add(currentProblemId);
+                    }
                 }
+
+                setupProblemDropdown(); // ドロップダウンの★/☆を更新
+                problemDropdown.value = currentProblemId; // 選択状態を維持
 
                 clearMessage.classList.remove('hidden');
                 setTimeout(() => {
                     clearMessage.classList.add('hidden');
-                    // 自動で次の問題には行かない (ユーザー操作に任せる)
                 }, 1500);
             }
         }
@@ -852,7 +782,7 @@
             const totalDuration = cumulativeTime;
             let startTime = null;
 
-            const problem = problemDatabase.find(p => p.id === currentProblemId);
+            const problem = filteredProblemDatabase.find(p => p.id === currentProblemId);
             const highlights = {};
             if (problem) {
                 problem.options.forEach(opt => {
@@ -881,14 +811,16 @@
                     }
                 });
 
-                shapeDef.drawFn(userCanvas, frameParams, highlights);
+                shapeDef.drawFn(userCanvas, frameParams, highlights, null, 1.0, null);
 
                 if (elapsed < totalDuration) {
                     requestAnimationFrame(animationLoop);
                 } else {
                     const finalParams = { ...currentUserParams, ...targetParams };
-                    shapeDef.drawFn(userCanvas, finalParams, highlights);
+                    shapeDef.drawFn(userCanvas, finalParams, highlights, null, 1.0, null);
                     currentUserParams = finalParams;
+
+                    currentProblemAttemptCount++;
 
                     checkAllParamsSelected();
                     setTimeout(checkAnswer, 500);
@@ -897,13 +829,48 @@
             requestAnimationFrame(animationLoop);
         }
 
+        // ★ レベル選択後の初期化 (メインエントリポイント)
+        function startProblemMode(level) {
+                levelSelectionScreen.classList.add('hidden');
+                problemModeScreen.classList.remove('hidden');
+
+                // ★ 許可されたレベルのリストを定義
+                let allowedLevels = [];
+                if (level === '1-2') {
+                    allowedLevels = [10, 20, 30]; // 1-2年生: レベル10, 20, 30を出題
+                } else { // '3-4'
+                    allowedLevels = [10, 20, 30, 40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200,210,220,230]; // 3-4年生: レベル10, 30, 50を出題
+                }
+
+                // ★ フィルタリングロジックを修正: allowedLevelsに含まれる問題のみを抽出
+                filteredProblemDatabase = fullProblemDatabase.filter(p => allowedLevels.includes(p.level));
+
+                // フィルタリング後、問題がない場合はエラー表示
+                if (filteredProblemDatabase.length === 0) {
+                    problemDropdown.innerHTML = '<option>問題がありません</option>';
+                    problemDropdown.disabled = true;
+                    submitAnswerBtn.disabled = true;
+                    nextProblemBtn.disabled = true;
+                    return;
+                }
+
+                currentProblemId = filteredProblemDatabase[0].id;
+                setupProblemDropdown();
+                problemDropdown.value = currentProblemId;
+                setupProblemUI();
+
+                window.addEventListener('resize', resizeAllCanvases);
+            }
+
+
         // --- 初期化 ---
         document.addEventListener('DOMContentLoaded', () => {
 
-            // ドロップダウン生成
-            setupProblemDropdown();
+            // レベル選択ボタンのイベントリスナー
+            document.getElementById('selectLevel12').addEventListener('click', () => startProblemMode('1-2'));
+            document.getElementById('selectLevel34').addEventListener('click', () => startProblemMode('3-4'));
 
-            // イベントリスナー
+            // イベントリスナー (問題モード画面に配置)
             problemDropdown.addEventListener('change', (e) => {
                 currentProblemId = e.target.value;
                 setupProblemUI();
@@ -913,40 +880,28 @@
                 animateParameters(userSelections);
             });
 
-            // 次の問題へ
             nextProblemBtn.addEventListener('click', () => {
-                const currentIndex = problemDatabase.findIndex(p => p.id === currentProblemId);
-                if (currentIndex !== -1 && currentIndex < problemDatabase.length - 1) {
-                    currentProblemId = problemDatabase[currentIndex + 1].id;
+                const currentIndex = filteredProblemDatabase.findIndex(p => p.id === currentProblemId);
+                if (currentIndex !== -1 && currentIndex < filteredProblemDatabase.length - 1) {
+                    currentProblemId = filteredProblemDatabase[currentIndex + 1].id;
                     problemDropdown.value = currentProblemId;
                     setupProblemUI();
                 }
             });
 
-            // リロード (リセット)
             reloadBtn.addEventListener('click', () => {
                 setupProblemUI(); // 現在のIDで再構築 = リセット
             });
 
-            window.addEventListener('resize', resizeAllCanvases);
-
-            // 初期表示
-            if (problemDatabase.length > 0) {
-                currentProblemId = problemDatabase[0].id;
-                problemDropdown.value = currentProblemId;
-                setupProblemUI();
-            } else {
-                paramSelectionContainer.innerHTML = '<p>問題が登録されていません。</p>';
-                submitAnswerBtn.disabled = true;
-                nextProblemBtn.disabled = true;
-            }
+            // 初期画面表示のため、問題モードを隠す
+            problemModeScreen.classList.add('hidden');
         });
 
-        // ドロップダウン生成 (★表示対応)
+        // ドロップダウン生成 (★/☆表示対応)
         function setupProblemDropdown() {
             problemDropdown.innerHTML = '';
 
-            if (problemDatabase.length === 0) {
+            if (filteredProblemDatabase.length === 0) {
                 const option = document.createElement('option');
                 option.value = '';
                 option.textContent = '問題がありません';
@@ -955,13 +910,22 @@
                 return;
             }
 
-            problemDatabase.forEach((problem) => {
+            filteredProblemDatabase.forEach((problem, index) => {
                 const option = document.createElement('option');
                 option.value = problem.id;
 
-                // クリア済みなら★を付与
-                const star = clearedProblems.has(problem.id) ? '★ ' : '';
-                option.textContent = `${star}${problem.title}`;
+                // ★マーク/☆マークを右側に追加
+                const title = `もんだい${index + 1}`;
+
+                let starMark = '';
+                if (clearedProblems.has(problem.id)) {
+                    starMark = '★'; // 一発クリア
+                } else if (partiallyClearedProblems.has(problem.id)) {
+                    starMark = '☆'; // 複数回クリア
+                }
+
+                // 問題名 + (星)
+                option.textContent = `${title} ${starMark}`;
 
                 problemDropdown.appendChild(option);
             });
