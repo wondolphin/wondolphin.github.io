@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>おかしなパーティー計算編</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: "M PLUS Rounded 1c", sans-serif;
+            touch-action: manipulation;
+        }
+        /* 領域A・Bのコンテナスタイル */
+        .number-box {
+            position: relative; /* 座標指定の基準 */
+            padding: 1rem;
+            border-radius: 1rem;
+            background-color: rgba(0, 0, 0, 0.05); /* 明るい背景に変更 */
+            min-height: 400px; /* 座標(%)が機能するように高さを確保 */
+            width: 100%;
+            overflow: hidden;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+        /* 数字オブジェクトのスタイル */
+        .number-object {
+            position: absolute; /* 座標で配置 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #333; /* 暗い色に変更 */
+            padding: 0.5rem 1rem;
+            background-color: rgba(255, 255, 255, 0.9); /* 明るい色に変更 */
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            /* 座標の中心に配置するための調整 */
+            transform: translate(-50%, -50%);
+            /* アニメーション設定 */
+            transition: left 0.5s ease-in-out, 
+                        top 0.5s ease-in-out, 
+                        opacity 0.2s ease-in-out, 
+                        transform 0.2s ease-in-out;
+        }
+        .btn {
+            transition: all 0.2s ease;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        #problem-selector {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 0.375rem;
+            padding: 0.5rem 2.5rem 0.5rem 1rem;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl mx-auto">
+        <h1 class="text-3xl md:text-4xl font-bold text-center mb-2 text-blue-600">おかしなパーティー計算編</h1>
+        <p class="text-center text-gray-600 mb-4">左右の合計は同じ？違う？</p>
+
+        <!-- 問題選択ドロップダウン -->
+        <div class="text-center mb-4">
+            <label for="problem-selector" class="mr-2 font-bold">問題を選択:</label>
+            <select id="problem-selector" class="text-lg font-bold shadow"></select>
+        </div>
+
+        <div id="game-board" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <!-- 領域A -->
+            <div id="area-a" class="number-box border-4 border-blue-400">
+                <!-- オブジェクトがここに挿入されます -->
+            </div>
+            <!-- 領域B -->
+            <div id="area-b" class="number-box border-4 border-pink-400">
+                <!-- オブジェクトがここに挿入されます -->
+            </div>
+        </div>
+
+        <!-- 結果表示 -->
+        <div id="result-container" class="text-center h-24 flex items-center justify-center">
+            <p id="result-text" class="text-5xl font-extrabold transition-transform duration-300"></p>
+        </div>
+
+        <!-- 操作ボタン -->
+        <div id="controls" class="flex justify-center gap-6">
+            <button id="correct-btn" class="btn bg-green-500 hover:bg-green-600 text-white font-bold rounded-full w-24 h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl shadow-lg">○</button>
+            <button id="incorrect-btn" class="btn bg-red-500 hover:bg-red-600 text-white font-bold rounded-full w-24 h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl shadow-lg">×</button>
+        </div>
+        
+        <!-- 次の問題へボタン (現在は1問のみ) -->
+        <div id="next-question-container" class="text-center mt-8">
+            <button id="next-btn" class="hidden btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg text-xl shadow-lg">もう一度</button>
+        </div>
+
+    </div>
+
+    <script>
+        const areaA = document.getElementById("area-a");
+        const areaB = document.getElementById("area-b");
+        const correctBtn = document.getElementById("correct-btn");
+        const incorrectBtn = document.getElementById("incorrect-btn");
+        const resultText = document.getElementById("result-text");
+        const nextBtn = document.getElementById("next-btn");
+        const problemSelector = document.getElementById("problem-selector");
+
+        let currentProblem;
+        let currentProblemIndex = 0;
+
+        // --- 問題データ定義 ---
+        const problems = [
+
+    /*　サンプル
+            // 1段階目
+            [
+            {type: "divide", target: "5050", newObjects: [
+                    { text: "1", to: "5020" },
+                    { text: "50", to: "5080" }
+                ]}
+            ],
+            // 2段階目:
+            [
+            { type: "fuse", target: "5020", newText: "100" },
+            { type: "fuse", target: "5080", newText: "100" }
+            ],
+            // 3段階目:
+            [
+            { type: "transit", from: "5020", to: "5050" },
+            { type: "transit", from: "5080", to: "5050" }
+            ],
+            // 4段階目:
+            [
+            { type: "fuse", target: "5050", newText: "200" }
+            ]
+     */
+
+
+            {
+                title: "もんだいA-1",
+                areaA: [
+                    { text: "2", coord: "2050" },
+                    { text: "3", coord: "7050" },
+                ],
+                areaB: [
+                    { text: "1", coord: "1050" },
+                    { text: "1", coord: "3050" },
+                    { text: "1", coord: "5050" },
+                    { text: "1", coord: "7050" },
+                    { text: "1", coord: "9050" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                     { type: "transit", from: "1050", to: "2050" },
+                     { type: "transit", from: "3050", to: "2050" },
+                     { type: "transit", from: "5050", to: "7050" },
+                     { type: "transit", from: "9050", to: "7050" }
+
+                    ],
+                    // 2段階目: 左右がそれぞれ"100"に融合
+                    [
+                    { type: "fuse",   target: "2050", newText: "2" },
+                    { type: "fuse",   target: "7050", newText: "3" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいA-2",
+                areaA: [
+                    { text: "4", coord: "5020" },
+                    { text: "4", coord: "5080" }
+                ],
+                areaB: [
+                    { text: "2", coord: "3020" },
+                    { text: "2", coord: "7020" },
+                    { text: "2", coord: "3080" },
+                    { text: "2", coord: "7080" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "3020", to: "5020" },
+                        { type: "transit", from: "7020", to: "5020" },
+                        { type: "transit", from: "3080", to: "5080" },
+                        { type: "transit", from: "7080", to: "5080" }
+
+                    ],
+                    // 2段階目: 左右がそれぞれ"100"に融合
+                    [
+                        { type: "fuse", target: "5020", newText: "4" },
+                        { type: "fuse", target: "5080", newText: "4" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいA-3",
+                areaA: [
+                    { text: "6", coord: "5020" },
+                    { text: "6", coord: "5080" }
+                ],
+                areaB: [
+                    { text: "2", coord: "3020" },
+                    { text: "4", coord: "7020" },
+                    { text: "5", coord: "3080" },
+                    { text: "1", coord: "7080" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "3020", to: "5020" },
+                        { type: "transit", from: "7020", to: "5020" },
+                        { type: "transit", from: "3080", to: "5080" },
+                        { type: "transit", from: "7080", to: "5080" }
+
+                    ],
+                    // 2段階目: 左右がそれぞれ"100"に融合
+                    [
+                        { type: "fuse", target: "5020", newText: "6" },
+                        { type: "fuse", target: "5080", newText: "6" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいA-4",
+                areaA: [
+                    { text: "5", coord: "5030" },
+                    { text: "5", coord: "3070" },
+                    { text: "5", coord: "7070" }
+                ],
+                areaB: [
+                    { text: "4", coord: "4030" },
+                    { text: "1", coord: "6030" },
+                    { text: "1", coord: "2070" },
+                    { text: "4", coord: "4070" },
+                    { text: "1", coord: "6070" },
+                    { text: "4", coord: "8070" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "4030", to: "5030" },
+                        { type: "transit", from: "6030", to: "5030" },
+                        { type: "transit", from: "2070", to: "3070" },
+                        { type: "transit", from: "4070", to: "3070" },
+                        { type: "transit", from: "6070", to: "7070" },
+                        { type: "transit", from: "8070", to: "7070" }
+
+                    ],
+                    // 2段階目: 左右がそれぞれ"100"に融合
+                    [
+                        { type: "fuse", target: "5030", newText: "5" },
+                        { type: "fuse", target: "3070", newText: "5" },
+                        { type: "fuse", target: "7070", newText: "5" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいA-5",
+                areaA: [
+                    { text: "3", coord: "5020" },
+                    { text: "4", coord: "5050" },
+                    { text: "3", coord: "5080" }
+                ],
+                areaB: [
+                    { text: "1", coord: "3020" },
+                    { text: "1", coord: "5020" },
+                    { text: "1", coord: "7020" },
+                    { text: "1", coord: "3050" },
+                    { text: "1", coord: "5050" },
+                    { text: "1", coord: "7050" },
+                    { text: "1", coord: "3080" },
+                    { text: "1", coord: "5080" },
+                    { text: "1", coord: "7080" }
+                ],
+                correctAnswer: false,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "3020", to: "5020" },
+                        { type: "transit", from: "7020", to: "5020" },
+                        { type: "transit", from: "3050", to: "5050" },
+                        { type: "transit", from: "7050", to: "5050" },
+                        { type: "transit", from: "3080", to: "5080" },
+                        { type: "transit", from: "7080", to: "5080" }
+
+                    ],
+                    // 2段階目: 左右がそれぞれ"100"に融合
+                    [
+                        { type: "fuse", target: "5020", newText: "3" },
+                        { type: "fuse", target: "5050", newText: "3" },
+                        { type: "fuse", target: "5080", newText: "3" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいA-6",
+                areaA: [
+                    { text: "4", coord: "3030" },
+                    { text: "4", coord: "7030" },
+                    { text: "4", coord: "3070" },
+                    { text: "4", coord: "7070" }
+                ],
+                areaB: [
+                    { text: "1", coord: "2030" },
+                    { text: "3", coord: "4030" },
+                    { text: "1", coord: "6030" },
+                    { text: "3", coord: "8030" },
+                    { text: "2", coord: "2070" },
+                    { text: "2", coord: "4070" },
+                    { text: "2", coord: "6070" },
+                    { text: "3", coord: "8070" }
+                ],
+                correctAnswer: false,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "2030", to: "3030" },
+                        { type: "transit", from: "4030", to: "3030" },
+                        { type: "transit", from: "6030", to: "7030" },
+                        { type: "transit", from: "8030", to: "7030" },
+                        { type: "transit", from: "2070", to: "3070" },
+                        { type: "transit", from: "4070", to: "3070" },
+                        { type: "transit", from: "6070", to: "7070" },
+                        { type: "transit", from: "8070", to: "7070" }
+
+                    ],
+                    // 2段階目: 左右がそれぞれ"100"に融合
+                    [
+                        { type: "fuse", target: "3030", newText: "4" },
+                        { type: "fuse", target: "7030", newText: "4" },
+                        { type: "fuse", target: "3070", newText: "4" },
+                        { type: "fuse", target: "7070", newText: "5" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいB-1",
+                areaA: [
+                    { text: "7", coord: "3050" },
+                    { text: "7", coord: "5050" },
+                    { text: "7", coord: "7050" }
+                ],
+                areaB: [
+                    { text: "3", coord: "5020" },
+                    { text: "6", coord: "3050" },
+                    { text: "6", coord: "5050" },
+                    { text: "6", coord: "7050" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        {
+                            type: "divide", target: "5020", newObjects: [
+                                { text: "1", to: "3050" },
+                                { text: "1", to: "5050" },
+                                { text: "1", to: "7050" }
+                            ]
+                        }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "fuse", target: "3050", newText: "7" },
+                        { type: "fuse", target: "5050", newText: "7" },
+                        { type: "fuse", target: "7050", newText: "7" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいB-2",
+                areaA: [
+                    { text: "30", coord: "3050" },
+                    { text: "30", coord: "5050" },
+                    { text: "30", coord: "7050" }
+                ],
+                areaB: [
+                    { text: "15", coord: "5020" },
+                    { text: "25", coord: "3050" },
+                    { text: "25", coord: "5050" },
+                    { text: "25", coord: "7050" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        {
+                            type: "divide", target: "5020", newObjects: [
+                                { text: "5", to: "3050" },
+                                { text: "5", to: "5050" },
+                                { text: "5", to: "7050" }
+                            ]
+                        }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "fuse", target: "3050", newText: "30" },
+                        { type: "fuse", target: "5050", newText: "30" },
+                        { type: "fuse", target: "7050", newText: "30" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいB-3",
+                areaA: [
+                    { text: "8", coord: "3030" },
+                    { text: "8", coord: "7030" },
+                    { text: "8", coord: "3070" },
+                    { text: "8", coord: "7070" },
+                    { text: "8", coord: "5050" }
+                ],
+                areaB: [
+                    { text: "9", coord: "3030" },
+                    { text: "10", coord: "7030" },
+                    { text: "11", coord: "3070" },
+                    { text: "12", coord: "7070" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        {
+                            type: "divide", target: "3030", newObjects: [
+                                { text: "8", to: "3030" },
+                                { text: "1", to: "4040" }
+                            ]
+                        },
+                        {
+                            type: "divide", target: "7030", newObjects: [
+                                { text: "8", to: "7030" },
+                                { text: "2", to: "6040" }
+                            ]
+                        },
+                        {
+                            type: "divide", target: "3070", newObjects: [
+                                { text: "8", to: "3070" },
+                                { text: "3", to: "4060" }
+                            ]
+                        },
+                        {
+                            type: "divide", target: "7070", newObjects: [
+                                { text: "8", to: "7070" },
+                                { text: "4", to: "6060" }
+                            ]
+                        }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "transit", from: "4040", to: "5050" },
+                        { type: "transit", from: "6040", to: "5050" },
+                        { type: "transit", from: "4060", to: "5050" },
+                        { type: "transit", from: "6060", to: "5050" }
+
+                    ],
+                    // 3段階目
+                    [
+                        { type: "fuse", target: "5050", newText: "10" }
+                    ]
+                ]
+            },
+
+            {
+                title: "もんだいC-1",
+                areaA: [
+                    { text: "7", coord: "5030" },
+                    { text: "7", coord: "5050" },
+                    { text: "7", coord: "5070" }
+                ],
+                areaB: [
+                    { text: "1", coord: "1050" },
+                    { text: "2", coord: "2650" },
+                    { text: "3", coord: "4250" },
+                    { text: "4", coord: "5850" },
+                    { text: "5", coord: "7450" },
+                    { text: "6", coord: "9050" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "1050", to: "4070" },
+                        { type: "transit", from: "2650", to: "4050" },
+                        { type: "transit", from: "4250", to: "4030" },
+                        { type: "transit", from: "5850", to: "6030" },
+                        { type: "transit", from: "7450", to: "6050" },
+                        { type: "transit", from: "9050", to: "6070" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "transit", from: "4070", to: "5070" },
+                        { type: "transit", from: "4050", to: "5050" },
+                        { type: "transit", from: "4030", to: "5030" },
+                        { type: "transit", from: "6030", to: "5030" },
+                        { type: "transit", from: "6050", to: "5050" },
+                        { type: "transit", from: "6070", to: "5070" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "fuse", target: "5030", newText: "7" },
+                        { type: "fuse", target: "5050", newText: "7" },
+                        { type: "fuse", target: "5070", newText: "7" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいC-2",
+                areaA: [
+                    { text: "9", coord: "5030" },
+                    { text: "9", coord: "5050" },
+                    { text: "9", coord: "5070" }
+                ],
+                areaB: [
+                    { text: "2", coord: "1050" },
+                    { text: "3", coord: "2650" },
+                    { text: "4", coord: "4250" },
+                    { text: "5", coord: "5850" },
+                    { text: "6", coord: "7450" },
+                    { text: "7", coord: "9050" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "1050", to: "4070" },
+                        { type: "transit", from: "2650", to: "4050" },
+                        { type: "transit", from: "4250", to: "4030" },
+                        { type: "transit", from: "5850", to: "6030" },
+                        { type: "transit", from: "7450", to: "6050" },
+                        { type: "transit", from: "9050", to: "6070" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "transit", from: "4070", to: "5070" },
+                        { type: "transit", from: "4050", to: "5050" },
+                        { type: "transit", from: "4030", to: "5030" },
+                        { type: "transit", from: "6030", to: "5030" },
+                        { type: "transit", from: "6050", to: "5050" },
+                        { type: "transit", from: "6070", to: "5070" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "fuse", target: "5030", newText: "9" },
+                        { type: "fuse", target: "5050", newText: "9" },
+                        { type: "fuse", target: "5070", newText: "9" }
+                    ]
+                ]
+            },
+
+            {
+                title: "もんだいD-1",
+                areaA: [
+                    { text: "10", coord: "3050" },
+                    { text: "10", coord: "5050" },
+                    { text: "10", coord: "7050" }
+                ],
+                areaB: [
+                    { text: "2", coord: "3030" },
+                    { text: "3", coord: "5030" },
+                    { text: "4", coord: "7030" },
+                    { text: "6", coord: "3070" },
+                    { text: "7", coord: "5070" },
+                    { text: "8", coord: "7070" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "3070", to: "7070" },
+                        { type: "transit", from: "7070", to: "3070" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "transit", from: "3030", to: "3050" },
+                        { type: "transit", from: "3070", to: "3050" },
+                        { type: "transit", from: "5030", to: "5050" },
+                        { type: "transit", from: "5070", to: "5050" },
+                        { type: "transit", from: "7030", to: "7050" },
+                        { type: "transit", from: "7070", to: "7050" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "fuse", target: "3050", newText: "10" },
+                        { type: "fuse", target: "5050", newText: "10" },
+                        { type: "fuse", target: "7050", newText: "10" }
+                    ]
+                ]
+            },
+
+
+            {
+                title: "もんだいE-1",
+                areaA: [
+                    { text: "6", coord: "5050" }
+                ],
+                areaB: [
+                    { text: "2", coord: "3030" },
+                    { text: "-2", coord: "5030" },
+                    { text: "2", coord: "7030" },
+                    { text: "2", coord: "3050" },
+                    { text: "-2", coord: "5050" },
+                    { text: "2", coord: "7050" },
+                    { text: "2", coord: "3070" },
+                    { text: "-2", coord: "5070" },
+                    { text: "2", coord: "7070" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "3030", to: "4030" },
+                        { type: "transit", from: "5030", to: "4030" },
+                        { type: "transit", from: "3050", to: "4050" },
+                        { type: "transit", from: "5050", to: "4050" },
+                        { type: "transit", from: "3070", to: "4070" },
+                        { type: "transit", from: "5070", to: "4070" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "fuse", target: "4030", newText: "0" },
+                        { type: "fuse", target: "4050", newText: "0" },
+                        { type: "fuse", target: "4070", newText: "0" }
+                    ],
+                    // 3段階目
+                    [
+                        { type: "transit", from: "7030", to: "7050" },
+                        { type: "transit", from: "7070", to: "7050" }
+                    ],
+                    // 4段階目
+                    [
+                        { type: "fuse", target: "7050", newText: "6" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいE-2",
+                areaA: [
+                    { text: "5", coord: "5050" }
+                ],
+                areaB: [
+                    { text: "5", coord: "3030" },
+                    { text: "-5", coord: "5030" },
+                    { text: "5", coord: "7030" },
+                    { text: "-5", coord: "3050" },
+                    { text: "5", coord: "5050" },
+                    { text: "-5", coord: "7050" },
+                    { text: "5", coord: "3070" },
+                    { text: "-5", coord: "5070" },
+                    { text: "5", coord: "7070" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "5030", to: "3030" },
+                        { type: "transit", from: "7050", to: "7030" },
+                        { type: "transit", from: "5070", to: "7070" },
+                        { type: "transit", from: "3050", to: "3070" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "fuse", target: "3030", newText: "0" },
+                        { type: "fuse", target: "7030", newText: "0" },
+                        { type: "fuse", target: "7070", newText: "0" },
+                        { type: "fuse", target: "3070", newText: "0" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいE-2",
+                areaA: [
+                    { text: "10", coord: "5030" },
+                    { text: "10", coord: "5070" }
+                ],
+                areaB: [
+                    { text: "13", coord: "3030" },
+                    { text: "-7", coord: "7030" },
+                    { text: "17", coord: "3070" },
+                    { text: "-3", coord: "7070" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "7030", to: "7070" },
+                        { type: "transit", from: "7070", to: "7030" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "transit", from: "3030", to: "5030" },
+                        { type: "transit", from: "7030", to: "5030" },
+                        { type: "transit", from: "3070", to: "5070" },
+                        { type: "transit", from: "7070", to: "5070" }
+                    ],
+                    // 3段階目
+                    [
+                        { type: "fuse", target: "5030", newText: "10" },
+                        { type: "fuse", target: "5070", newText: "10" }
+                    ]
+                ]
+            },
+            
+            {
+                title: "もんだいE-3",
+                areaA: [
+                    { text: "6", coord: "3050" },
+                    { text: "6", coord: "5050" },
+                    { text: "6", coord: "7050" }
+                ],
+                areaB: [
+                    { text: "7", coord: "3030" },
+                    { text: "8", coord: "5030" },
+                    { text: "9", coord: "7030" },
+                    { text: "-3", coord: "3070" },
+                    { text: "-2", coord: "5070" },
+                    { text: "-1", coord: "7070" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "3070", to: "7070" },
+                        { type: "transit", from: "7070", to: "3070" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "transit", from: "3030", to: "3050" },
+                        { type: "transit", from: "3070", to: "3050" },
+                        { type: "transit", from: "5030", to: "5050" },
+                        { type: "transit", from: "5070", to: "5050" },
+                        { type: "transit", from: "7030", to: "7050" },
+                        { type: "transit", from: "7070", to: "7050" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "fuse", target: "3050", newText: "6" },
+                        { type: "fuse", target: "5050", newText: "6" },
+                        { type: "fuse", target: "7050", newText: "6" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいE-4",
+                areaA: [
+                    { text: "4", coord: "5050" }
+                ],
+                areaB: [
+                    { text: "6", coord: "1050" },
+                    { text: "-5", coord: "2650" },
+                    { text: "4", coord: "4250" },
+                    { text: "-3", coord: "5850" },
+                    { text: "2", coord: "7450" },
+                    { text: "-1", coord: "9050" }
+                ],
+                correctAnswer: false,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "1050", to: "1850" },
+                        { type: "transit", from: "2650", to: "1850" },
+                        { type: "transit", from: "4250", to: "5050" },
+                        { type: "transit", from: "5850", to: "5050" },
+                        { type: "transit", from: "7450", to: "8250" },
+                        { type: "transit", from: "9050", to: "8250" }
+                    ],
+                    // 2段階目
+                    [
+                        { type: "fuse", target: "1850", newText: "1" },
+                        { type: "fuse", target: "5050", newText: "1" },
+                        { type: "fuse", target: "8250", newText: "1" }
+                    ],
+                    // 3段階目
+                    [
+                        { type: "transit", from: "1850", to: "5050" },
+                        { type: "transit", from: "8250", to: "5050" }
+                    ],
+                    // 4段階目
+                    [
+                        { type: "fuse", target: "5050", newText: "3" }
+                    ],
+                    // 
+                ]
+            },
+            {
+                title: "もんだいE-5",
+                areaA: [
+                    { text: "100", coord: "5050" }
+                ],
+                areaB: [
+                    { text: "100", coord: "3030" },
+                    { text: "50", coord: "7030" },
+                    { text: "-14", coord: "1470" },
+                    { text: "-6", coord: "3870" },
+                    { text: "-13", coord: "6270" },
+                    { text: "-17", coord: "8670" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "1470", to: "3870" }
+                    ],
+                    [
+                        { type: "fuse", target: "3870", newText: "-20" }
+                    ],
+                    [
+                        { type: "transit", from: "8670", to: "6270" }
+                    ],
+                    [
+                        { type: "fuse", target: "6270", newText: "-30" }
+                    ],
+                    [
+                        { type: "transit", from: "3870", to: "6270" }
+                    ],
+                    [
+                        { type: "fuse", target: "6270", newText: "-50" }
+                    ],
+                    [
+                        { type: "transit", from: "6270", to: "7030" }
+                    ],
+                    [
+                        { type: "fuse", target: "7030", newText: "0" }
+                    ],
+                    // 
+                ]
+            },
+
+
+
+            {
+                title: "もんだいF-1",
+                areaA: [
+                    { text: "6", coord: "3040" },
+                    { text: "6", coord: "5040" },
+                    { text: "6", coord: "7040" },
+                    { text: "6", coord: "3060" },
+                    { text: "6", coord: "5060" },
+                    { text: "6", coord: "7060" }
+                ],
+                areaB: [
+                    { text: "9", coord: "3040" },
+                    { text: "5", coord: "5040" },
+                    { text: "5", coord: "7040" },
+                    { text: "7", coord: "3060" },
+                    { text: "6", coord: "5060" },
+                    { text: "5", coord: "7060" }
+                ],
+                correctAnswer: false,
+                animationSteps: [
+                    // 1段階目
+                    [
+                    {
+                        type: "divide", target: "3040", newObjects: [
+                            { text: "6", to: "3040" },
+                            { text: "3", to: "2010" }
+                        ]
+                    }
+                    ],
+                    [
+                        {
+                        type: "divide", target: "2010", newObjects: [
+                            { text: "1", to: "2010" },
+                            { text: "1", to: "3010" },
+                            { text: "1", to: "4010" },
+                        ]
+                    }
+                    ],
+                    [
+                        { type: "transit", from: "2010", to: "5040" },
+                        { type: "transit", from: "3010", to: "7040" },
+                        { type: "transit", from: "4010", to: "7060" }
+                    ],
+                    [
+                        { type: "fuse", target: "5040", newText: "6" },
+                        { type: "fuse", target: "7040", newText: "6" },
+                        { type: "fuse", target: "7060", newText: "6" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいF-2",
+                areaA: [
+                    { text: "10", coord: "3040" },
+                    { text: "10", coord: "5040" },
+                    { text: "10", coord: "7040" },
+                    { text: "10", coord: "3060" },
+                    { text: "10", coord: "5060" },
+                    { text: "10", coord: "7060" }
+                ],
+                areaB: [
+                    { text: "13", coord: "3040" },
+                    { text: "14", coord: "5040" },
+                    { text: "11", coord: "7040" },
+                    { text: "5", coord: "3060" },
+                    { text: "8", coord: "5060" },
+                    { text: "8", coord: "7060" }
+                ],
+                correctAnswer: false,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        {
+                            type: "divide", target: "3040", newObjects: [
+                                { text: "10", to: "3040" },
+                                { text: "3", to: "3020" }
+                            ]
+                        },
+                        {
+                            type: "divide", target: "5040", newObjects: [
+                                { text: "10", to: "5040" },
+                                { text: "4", to: "5020" }
+                            ]
+                        },
+                        {
+                            type: "divide", target: "7040", newObjects: [
+                                { text: "10", to: "7040" },
+                                { text: "1", to: "7020" }
+                            ]
+                        }
+                    ],
+                    [
+                        { type: "transit", from: "3020", to: "5020" },
+                        { type: "transit", from: "7020", to: "5020" }
+                    ],
+                    [
+                        { type: "fuse", target: "5020", newText: "8" }
+                    ],
+                    [
+                        {
+                            type: "divide", target: "3060", newObjects: [
+                                { text: "10", to: "3060" },
+                                { text: "-5", to: "2480" }
+                            ]
+                        },
+                        {
+                            type: "divide", target: "5060", newObjects: [
+                                { text: "10", to: "5060" },
+                                { text: "-2", to: "5080" }
+                            ]
+                        },
+                        {
+                            type: "divide", target: "7060", newObjects: [
+                                { text: "10", to: "7060" },
+                                { text: "-2", to: "7680" }
+                            ]
+                        }
+                    ],
+                    [
+                        { type: "transit", from: "2480", to: "5080" },
+                        { type: "transit", from: "7680", to: "5080" }
+                    ],
+                    [
+                        { type: "fuse", target: "5080", newText: "-9" }
+                    ],
+                    [
+                        { type: "transit", from: "5080", to: "5020" }
+                    ],
+                    [
+                        { type: "fuse", target: "5020", newText: "-1" }
+                    ]
+                ]
+            },
+
+            {
+                title: "もんだいG-1",
+                areaA: [
+                    { text: "2×9", coord: "5050" }
+                ],
+                areaB: [
+                    { text: "4", coord: "3050" },
+                    { text: "4", coord: "5050" },
+                    { text: "4", coord: "7050" },
+                    { text: "2", coord: "3070" },
+                    { text: "2", coord: "5070" },
+                    { text: "2", coord: "7070" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    [
+                        {
+                            type: "divide", target: "3050", newObjects: [
+                                { text: "2", to: "3050" },
+                                { text: "2", to: "3030" }
+                            ]
+                        },
+                        {
+                            type: "divide", target: "5050", newObjects: [
+                                { text: "2", to: "5050" },
+                                { text: "2", to: "5030" }
+                            ]
+                        },
+                        {
+                            type: "divide", target: "7050", newObjects: [
+                                { text: "2", to: "7050" },
+                                { text: "2", to: "7030" }
+                            ]
+                        }
+                    ],
+                    [
+                        { type: "transit", from: "3030", to: "5050" },
+                        { type: "transit", from: "5030", to: "5050" },
+                        { type: "transit", from: "7030", to: "5050" },
+                        { type: "transit", from: "3050", to: "5050" },
+                        { type: "transit", from: "7050", to: "5050" },
+                        { type: "transit", from: "3070", to: "5050" },
+                        { type: "transit", from: "5070", to: "5050" },
+                        { type: "transit", from: "7070", to: "5050" }
+                    ],
+                    // 2段階目: 左右がそれぞれ"100"に融合
+                    [
+                        { type: "fuse", target: "5050", newText: "2×9" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいG-1",
+                areaA: [
+                    { text: "7×10", coord: "5050" }
+                ],
+                areaB: [
+                    { text: "3×10", coord: "5030" },
+                    { text: "4×10", coord: "5070" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "5030", to: "5050" },
+                        { type: "transit", from: "5070", to: "5050" }
+
+                    ],
+                    // 2段階目: 左右がそれぞれ"100"に融合
+                    [
+                        { type: "fuse", target: "5050", newText: "7×10" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいG-2",
+                areaA: [
+                    { text: "8×12", coord: "5050" }
+                ],
+                areaB: [
+                    { text: "6×12", coord: "5030" },
+                    { text: "2×12", coord: "5070" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "5030", to: "5050" },
+                        { type: "transit", from: "5070", to: "5050" }
+
+                    ],
+                    // 2段階目: 左右がそれぞれ"100"に融合
+                    [
+                        { type: "fuse", target: "5050", newText: "8×12" }
+                    ]
+                ]
+            },
+            {
+                title: "もんだいG-3",
+                areaA: [
+                    { text: "21×10", coord: "5050" }
+                ],
+                areaB: [
+                    { text: "21×8", coord: "5050" },
+                    { text: "21", coord: "5070" },
+                    { text: "21", coord: "5090" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        { type: "transit", from: "5070", to: "5050" }
+
+                    ],
+                    // 2段階目: 左右がそれぞれ"100"に融合
+                    [
+                        { type: "fuse", target: "5050", newText: "21×9" }
+                    ],
+                    [
+                        { type: "transit", from: "5090", to: "5050" }
+
+                    ],
+                    [
+                        { type: "fuse", target: "5050", newText: "21×10" }
+                    ]
+
+                ]
+            },
+            {
+                title: "もんだいG-5",
+                areaA: [
+                    { text: "15×15", coord: "5040" }
+                ],
+                areaB: [
+                    { text: "14×16", coord: "5040" },
+                    { text: "1", coord: "5080" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目
+                    [
+                        {
+                            type: "divide", target: "5040", newObjects: [
+                                { text: "14×15", to: "5040" },
+                                { text: "14", to: "5060" }
+                            ]
+                        }
+                    ],
+                    [
+                        { type: "transit", from: "5080", to: "5060" }
+
+                    ],
+                    [
+                        { type: "fuse", target: "5060", newText: "15" }
+                    ],
+                    [
+                        { type: "transit", from: "5060", to: "5040" }
+
+                    ],
+                    [
+                        { type: "fuse", target: "5040", newText: "15×15" }
+                    ],
+
+                ]
+            },
+
+
+
+            {
+                title: "問題 2 (3分裂)",
+                areaA: [
+                    { text: "30", coord: "5050" }
+                ],
+                areaB: [
+                    { text: "30", coord: "5050" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    // 1段階目: 30が"10", "10", "10"に分裂
+                    [ { type: "divide", target: "5050", newObjects: [
+                            { text: "10", to: "0020" },
+                            { text: "10", to: "5050" },
+                            { text: "10", to: "9980" }
+                        ] } ],
+                    // 2段階目: 3つが合体して"30"に戻る
+                    [ { type: "transit", from: "0020", to: "5050" },
+                      { type: "transit", from: "9980", to: "5050" } ],
+                    // 3段階目
+                    [ { type: "fuse", target: "5050", newText: "30" } ]
+                ]
+            }
+        ];
+        // --- ここまで ---
+
+        /**
+         * 座標文字列 "xxyy" から {left: "xx%", top: "yy%"} を計算する
+         * @param {string} coord - 4桁の座標文字列 (e.g., "5020")
+         */
+        function getPosition(coord) {
+            const x = coord.substring(0, 2);
+            const y = coord.substring(2, 4);
+            return { left: `${x}%`, top: `${y}%` };
+        }
+
+        /**
+         * 新しいオブジェクトをDOMに作成する
+         * @param {string} text - 表示するテキスト
+         * @param {string} coord - 4桁の座標文字列
+         * @param {HTMLElement} parentArea - 追加先の領域 (areaA or areaB)
+         */
+        function createObject(text, coord, parentArea) {
+            const obj = document.createElement("div");
+            obj.className = "number-object";
+            obj.textContent = text;
+            obj.dataset.coord = coord; // 現在の座標をdata属性に保存
+            const pos = getPosition(coord);
+            obj.style.left = pos.left;
+            obj.style.top = pos.top;
+            parentArea.appendChild(obj);
+            return obj;
+        }
+
+        /**
+         * 指定座標にあるオブジェクトをすべて検索する
+         * @param {string} coord - 4桁の座標文字列
+         * @param {HTMLElement} area - 検索対象の領域
+         */
+        function findObjectsAt(coord, area = areaB) {
+            return Array.from(area.querySelectorAll(`.number-object[data-coord="${coord}"]`));
+        }
+
+        // --- アニメーション関数 ---
+
+        /**
+         * transit: オブジェクトを移動させる
+         * @param {string} fromCoord - 移動元の座標
+         * @param {string} toCoord - 移動先の座標
+         */
+        function transit(fromCoord, toCoord) {
+            // data-coordがfromCoordで、かつisMovingフラグが立っていないものを検索
+            // areaBのオブジェクトを対象とする
+            const objs = findObjectsAt(fromCoord, areaB).filter(obj => !obj.dataset.isMoving);
+            
+            if (objs.length > 0) {
+                const obj = objs[0]; // 見つかったうちの最初の1つだけを対象にする
+                obj.dataset.isMoving = true; // 処理中フラグ
+                
+                const pos = getPosition(toCoord);
+                obj.style.left = pos.left;
+                obj.style.top = pos.top;
+                obj.dataset.coord = toCoord; // 座標データを更新
+            }
+        }
+
+        /**
+         * divide: 1つのオブジェクトを複数に分裂させて移動
+         * @param {string} targetCoord - 分裂元の座標
+         * @param {Array<object>} newObjects - {text, to} の配列
+         */
+        function divide(targetCoord, newObjects) {
+            const targetObjs = findObjectsAt(targetCoord);
+            targetObjs.forEach(obj => {
+                // 元をすぱっと非表示にして削除
+                obj.style.display = "none";
+                obj.remove(); 
+                
+                // 新しいオブジェクトを配列から生成
+                const createdObjs = newObjects.map(newObjInfo => {
+                    const obj = createObject(newObjInfo.text, targetCoord, areaB);
+                    obj.style.opacity = "0";
+                    return { el: obj, ...newObjInfo }; // DOM要素と情報を返す
+                });
+
+                // 1フレーム待ってから移動とフェードインを開始
+                setTimeout(() => {
+                    createdObjs.forEach(objInfo => {
+                        objInfo.el.style.opacity = "1";
+                        const pos = getPosition(objInfo.to);
+                        objInfo.el.style.left = pos.left;
+                        objInfo.el.style.top = pos.top;
+                        objInfo.el.dataset.coord = objInfo.to;
+                    });
+                }, 20);
+            });
+        }
+
+        /**
+         * fuse: 指定座標の複数オブジェクトを1つに融合
+         * @param {string} targetCoord - 融合が発生する座標
+         * @param {string} newText - 融合後の新テキスト
+         */
+        function fuse(targetCoord, newText) {
+            const targetObjs = findObjectsAt(targetCoord);
+            if (targetObjs.length === 0) return;
+
+            targetObjs.forEach(obj => {
+                // 元をフェードアウト
+                obj.style.opacity = "0";
+                obj.style.transform = "translate(-50%, -50%) scale(0.5)";
+            });
+
+            // 0.2秒後（フェードアウト後）に処理
+            setTimeout(() => {
+                targetObjs.forEach(obj => obj.remove());
+                // 新しいオブジェクトを融合先に作成（透明・縮小）
+                const newObj = createObject(newText, targetCoord, areaB);
+                newObj.style.opacity = "0";
+                newObj.style.transform = "translate(-50%, -50%) scale(0.5)";
+
+                // 1フレーム待ってからフェードイン
+                setTimeout(() => {
+                    newObj.style.opacity = "1";
+                    newObj.style.transform = "translate(-50%, -50%) scale(1)";
+                }, 20);
+            }, 200); // アニメーション時間(0.2s)に合わせる
+        }
+
+        /**
+         * アニメーションステップを順次実行する
+         * @param {boolean} isCorrect - ユーザーの回答が正しかったか
+         */
+        function runAnimationSequence(isCorrect) {
+            let delay = 100; // 最初の待機時間
+            const stepDuration = 500; // 各ステップの間隔 (ms) [修正]
+
+            // 段階ごとにループ (外側の配列)
+            currentProblem.animationSteps.forEach((stepGroup) => {
+                setTimeout(() => {
+                    // (1) まず、すべてのisMovingフラグをリセット
+                    const movingObjs = Array.from(areaB.querySelectorAll(`[data-is-moving]`));
+                    movingObjs.forEach(obj => delete obj.dataset.isMoving);
+
+                    // (2) 同じ段階の処理を同時に実行 (内側の配列)
+                    stepGroup.forEach((step) => {
+                        switch (step.type) {
+                            case "transit":
+                                transit(step.from, step.to); // areaBを対象とする
+                                break;
+                            case "divide":
+                                divide(step.target, step.newObjects); // 修正
+                                break;
+                            case "fuse":
+                                fuse(step.target, step.newText);
+                                break;
+                        }
+                    });
+                }, delay);
+                delay += stepDuration; // 次の段階への遅延を増やす
+            });
+
+            // すべてのアニメーションが終わった後に結果を表示
+            setTimeout(() => {
+                showResult(isCorrect);
+            }, delay + 500);
+        }
+        
+        /**
+         * 正誤判定の結果を表示
+         */
+        function showResult(isCorrect) {
+            if (isCorrect) {
+                resultText.textContent = "正解！";
+                resultText.classList.add("text-green-600"); // 色を濃く
+            } else {
+                resultText.textContent = "不正解><";
+                resultText.classList.add("text-red-600"); // 色を濃く
+            }
+            resultText.style.transform = "scale(1.2)";
+            setTimeout(() => {
+                resultText.style.transform = "scale(1)";
+            }, 300);
+            nextBtn.classList.remove("hidden");
+        }
+
+        /**
+         * 問題をロードして表示
+         */
+        function loadProblem(problemIndex) {
+            currentProblemIndex = parseInt(problemIndex);
+            currentProblem = problems[currentProblemIndex];
+
+            // リセット
+            areaA.innerHTML = "";
+            areaB.innerHTML = "";
+            resultText.textContent = "";
+            resultText.classList.remove("text-green-600", "text-red-600");
+            nextBtn.classList.add("hidden");
+            setButtonsState(true);
+
+            // 領域Aのオブジェクトを配置
+            currentProblem.areaA.forEach(obj => {
+                createObject(obj.text, obj.coord, areaA);
+            });
+            // 領域Bのオブジェクトを配置
+            currentProblem.areaB.forEach(obj => {
+                createObject(obj.text, obj.coord, areaB);
+            });
+        }
+
+        /**
+         * ボタンの有効/無効を切り替える
+         */
+        function setButtonsState(enabled) {
+            correctBtn.disabled = !enabled;
+            incorrectBtn.disabled = !enabled;
+            correctBtn.style.opacity = enabled ? "1" : "0.5";
+            incorrectBtn.style.opacity = enabled ? "1" : "0.5";
+            correctBtn.style.cursor = enabled ? "pointer" : "not-allowed";
+            incorrectBtn.style.cursor = enabled ? "pointer" : "not-allowed";
+        }
+
+        /**
+         * 回答をチェックする関数
+         */
+        function checkAnswer(userChoice) {
+            setButtonsState(false);
+            const isCorrect = (userChoice === currentProblem.correctAnswer);
+            runAnimationSequence(isCorrect);
+        }
+        
+        /**
+         * ゲームの初期化
+         */
+        function initGame() {
+            // ドロップダウンを生成
+            problems.forEach((problem, index) => {
+                const option = document.createElement("option");
+                option.value = index;
+                option.textContent = problem.title;
+                problemSelector.appendChild(option);
+            });
+
+            // ドロップダウンのイベントリスナー
+            problemSelector.addEventListener("change", (e) => {
+                loadProblem(e.target.value);
+            });
+
+            // イベントリスナーの設定
+            correctBtn.addEventListener("click", () => checkAnswer(true));
+            incorrectBtn.addEventListener("click", () => checkAnswer(false));
+            nextBtn.addEventListener("click", () => loadProblem(currentProblemIndex)); // 「もう一度」ボタン
+
+            // 最初の問題をロード
+            loadProblem(0);
+        }
+
+        // 初期化
+        window.onload = initGame;
+    </script>
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>おかしなパーティー計算編</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            touch-action: manipulation; /* ダブルタップズームを無効化 */
+        }
+        .number-box {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            padding: 1rem;
+            border-radius: 1rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            min-height: 100px;
+            align-items: center;
+        }
+        .number-box.area-b {
+            grid-template-rows: repeat(2, 1fr);
+            align-content: center;
+        }
+        .number {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: white;
+            position: relative;
+            /* transformとopacityの変化をアニメーションさせる */
+            transition: transform 0.5s ease-in-out, opacity 0.4s ease-in-out;
+        }
+        .btn {
+            transition: all 0.2s ease;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        .original-value {
+            /* フェードアウト用トランジション */
+            transition: opacity 0.4s ease-in-out;
+        }
+        .b-result {
+            position: absolute;
+            opacity: 0;
+            transform: scale(0.5);
+            /* 結果表示のアニメーション。遅延なしに変更 */
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl mx-auto">
+        <h1 class="text-3xl md:text-4xl font-bold text-center mb-2 text-yellow-300">おかしなパーティー計算編</h1>
+        <p class="text-center text-gray-300 mb-6">左右の合計は同じ？違う？</p>
+
+        <div id="game-board" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <!-- 領域A -->
+            <div id="area-a" class="number-box border-4 border-blue-400">
+                <!-- 数字がここに挿入されます -->
+            </div>
+            <!-- 領域B -->
+            <div id="area-b-container" class="border-4 border-pink-400 rounded-2xl p-4">
+                <div id="area-b" class="number-box area-b bg-transparent">
+                    <!-- 数字がここに挿入されます -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 結果表示 -->
+        <div id="result-container" class="text-center h-24 flex items-center justify-center">
+            <p id="result-text" class="text-5xl font-extrabold transition-transform duration-300"></p>
+        </div>
+
+        <!-- 操作ボタン -->
+        <div id="controls" class="flex justify-center gap-6">
+            <button id="correct-btn" class="btn bg-green-500 hover:bg-green-600 text-white font-bold rounded-full w-24 h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl shadow-lg">○</button>
+            <button id="incorrect-btn" class="btn bg-red-500 hover:bg-red-600 text-white font-bold rounded-full w-24 h-24 md:w-32 md:h-32 flex items-center justify-center text-5xl shadow-lg">×</button>
+        </div>
+        
+        <!-- 次の問題へボタン -->
+        <div id="next-question-container" class="text-center mt-8">
+            <button id="next-btn" class="hidden btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg text-xl shadow-lg">次の問題へ</button>
+        </div>
+
+    </div>
+
+    <script>
+        const areaA = document.getElementById('area-a');
+        const areaB = document.getElementById('area-b');
+        const correctBtn = document.getElementById('correct-btn');
+        const incorrectBtn = document.getElementById('incorrect-btn');
+        const resultText = document.getElementById('result-text');
+        const nextBtn = document.getElementById('next-btn');
+
+        let sumA = 0;
+        let sumB = 0;
+        let isAnswerCorrect; // 問題の答え (true: 合計が同じ, false: 違う)
+        let numA = 0; // 領域Aの基準値
+
+        // 配列をシャッフルして新しい配列を返すヘルパー関数
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        // 数字を生成して表示する関数
+        function generateProblem() {
+            // リセット
+            areaA.innerHTML = '';
+            areaB.innerHTML = '';
+            resultText.textContent = '';
+            resultText.classList.remove('text-green-400', 'text-red-400');
+            nextBtn.classList.add('hidden');
+            setButtonsState(true);
+
+            // 問題の種類をランダムに決定 (50%の確率で合計が同じになる)
+            isAnswerCorrect = Math.random() < 0.5;
+
+            // 領域Aの数字を生成
+            numA = Math.floor(Math.random() * 5) + 5; // 5から9の数字
+            sumA = numA * 3;
+            for (let i = 0; i < 3; i++) {
+                areaA.innerHTML += `<div class="number">${numA}</div>`;
+            }
+
+            // 領域Bのペアになる数字を生成
+            const bNumsTop = [];
+            const bNumsBottomCorrect = [];
+            for (let i = 0; i < 3; i++) {
+                const topVal = Math.floor(Math.random() * (numA - 1)) + 1;
+                bNumsTop.push({ id: i, val: topVal });
+                bNumsBottomCorrect.push({ id: i, val: numA - topVal });
+            }
+
+            // 下段の数字をシャッフルして表示用データを作成
+            let bNumsBottomToRender = shuffleArray(bNumsBottomCorrect);
+
+            // 合計が違う問題の場合、シャッフル後の下段の数字を1つ変更
+            if (!isAnswerCorrect) {
+                const randIndex = Math.floor(Math.random() * 3);
+                let diff = Math.random() < 0.5 ? 1 : -1;
+                if (bNumsBottomToRender[randIndex].val + diff <= 0) diff = 1; // 0以下にならないように
+                bNumsBottomToRender[randIndex].val += diff;
+            }
+            
+            // 領域Bの最終的な合計値を計算
+            const topSum = bNumsTop.reduce((acc, curr) => acc + curr.val, 0);
+            const bottomSum = bNumsBottomToRender.reduce((acc, curr) => acc + curr.val, 0);
+            sumB = topSum + bottomSum;
+
+            // HTMLに挿入
+            bNumsTop.forEach(num => {
+                areaB.innerHTML += `
+                    <div class="number b-top" data-pair-id="${num.id}">
+                        <span class="original-value">${num.val}</span>
+                        <div class="number b-result">${numA}</div>
+                    </div>`;
+            });
+            bNumsBottomToRender.forEach(num => {
+                areaB.innerHTML += `<div class="number b-bottom" data-pair-id="${num.id}">${num.val}</div>`;
+            });
+        }
+
+        // ボタンの有効/無効を切り替える
+        function setButtonsState(enabled) {
+            correctBtn.disabled = !enabled;
+            incorrectBtn.disabled = !enabled;
+            correctBtn.style.opacity = enabled ? '1' : '0.5';
+            incorrectBtn.style.opacity = enabled ? '1' : '0.5';
+            correctBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+            incorrectBtn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+        }
+
+        // 回答をチェックする関数
+        function checkAnswer(userChoice) {
+            setButtonsState(false);
+
+            const topElements = Array.from(document.querySelectorAll('.b-top'));
+            const bottomElements = Array.from(document.querySelectorAll('.b-bottom'));
+
+            // --- 演出1: 下段の数字を正しい位置へ移動 --- (アニメーション時間: 500ms)
+            bottomElements.forEach(bEl => {
+                const pairId = bEl.dataset.pairId;
+                const targetTopEl = document.querySelector(`.b-top[data-pair-id="${pairId}"]`);
+                if (!targetTopEl) return;
+
+                const currentRect = bEl.getBoundingClientRect();
+                const targetRect = targetTopEl.getBoundingClientRect();
+                const dx = targetRect.left - currentRect.left;
+                
+                bEl.style.transform = `translateX(${dx}px)`;
+            });
+
+            // --- 演出2 & 3(前半): 合体しつつ、元の数字が消える ---
+            setTimeout(() => {
+                // 上下から合体
+                topElements.forEach(tEl => {
+                    tEl.style.transform = 'translateY(75%)';
+                });
+                bottomElements.forEach(bEl => {
+                    const currentTransform = bEl.style.transform;
+                    bEl.style.transform = `${currentTransform} translateY(-75%)`;
+                });
+
+                // 元の数字をフェードアウト
+                topElements.forEach(tEl => {
+                    const originalValueSpan = tEl.querySelector('.original-value');
+                    if (originalValueSpan) {
+                        originalValueSpan.style.opacity = '0';
+                    }
+                });
+                bottomElements.forEach(bEl => {
+                    bEl.style.opacity = '0';
+                });
+            }, 500); // 水平移動のアニメーション(500ms)の直後に開始
+
+            // --- 演出3(後半): 合計値が現れる ---
+            setTimeout(() => {
+                // 結果の数字をフェードイン
+                document.querySelectorAll('.b-result').forEach(rEl => {
+                    rEl.style.opacity = '1';
+                    rEl.style.transform = 'scale(1)';
+                });
+            }, 800); // 合体・消滅アニメーションの途中で開始
+
+            // --- 正誤判定と結果表示 ---
+            setTimeout(() => {
+                const isActuallySame = (sumA === sumB);
+                if (userChoice === isActuallySame) {
+                    resultText.textContent = '正解！';
+                    resultText.classList.add('text-green-400');
+                } else {
+                    resultText.textContent = '不正解><';
+                    resultText.classList.add('text-red-400');
+                }
+                resultText.style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    resultText.style.transform = 'scale(1)';
+                }, 300);
+
+                nextBtn.classList.remove('hidden');
+            }, 1100); // 合計値の表示アニメーション(300ms)が終わった直後に開始
+        }
+
+        // イベントリスナーの設定
+        correctBtn.addEventListener('click', () => checkAnswer(true));
+        incorrectBtn.addEventListener('click', () => checkAnswer(false));
+        nextBtn.addEventListener('click', generateProblem);
+
+        // 初期化
+        window.onload = generateProblem;
+    </script>
+</body>
+</html>

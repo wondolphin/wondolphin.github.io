@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>図形問題ゲーム</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 共通スタイル */
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+
+        /* 問題モードタブボタン (パラメータ選択ボタン流用) */
+        .tab-btn {
+            padding-left: 1.5rem; padding-right: 1.5rem;
+            padding-top: 0.5rem; padding-bottom: 0.5rem;
+            font-size: 1.125rem; line-height: 1.75rem;
+            font-weight: 600;
+            color: #374151; /* text-gray-700 */
+            background-color: #ffffff; /* bg-white */
+            border-width: 2px;
+            border-color: #d1d5db; /* border-gray-300 */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+            margin: 0.5rem; /* m-2 */
+            cursor: pointer;
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+        .tab-btn:hover {
+            background-color: #f9fafb; /* hover:bg-gray-50 */
+            border-color: #60a5fa; /* hover:border-blue-400 */
+        }
+        .tab-btn.active {
+            background-color: #3b82f6;
+            color: #ffffff;
+            border-color: #2563eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* カスタムセレクトボックス (ドロップダウン) */
+        select#problemDropdown {
+            /* @apply text-lg font-semibold py-2 px-4 border-2 border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500; */
+            font-size: 1.125rem; line-height: 1.75rem;
+            font-weight: 600;
+            padding-top: 0.6rem; padding-bottom: 0.6rem;
+            padding-left: 1rem; padding-right: 2.5rem; /* 矢印の分、右側を多めに */
+            border-width: 2px;
+            border-color: #d1d5db;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+            background-position: right 0.75rem center;
+            background-repeat: no-repeat;
+            background-size: 1.25em 1.25em;
+            cursor: pointer;
+        }
+        select#problemDropdown:focus {
+            outline: 2px solid transparent;
+            outline-offset: 2px;
+            --tw-ring-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+
+    </style>
+</head>
+<body class="font-sans bg-gray-100 h-screen w-screen overflow-hidden">
+
+    <!-- 問題モード画面 -->
+    <div id="problemModeScreen" class="h-full flex flex-col overflow-hidden">
+        <!-- 3.1 問題選択 (ドロップダウンに変更) -->
+        <div class="w-full bg-gray-100 flex justify-center items-center p-3 space-x-4">
+            <h2 class="text-xl font-bold text-gray-800 self-center">問題モード</h2>
+            <select id="problemDropdown" class="">
+                <!-- JSで動的に問題が挿入されます -->
+            </select>
+        </div>
+
+        <!-- 3.2 問題モードメインエリア (設定 + キャンバス) -->
+        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            <!-- 3.2.1 パラメータ設定 (問題モード) -->
+            <div class="w-full lg:w-96 bg-white shadow-xl p-6 space-y-6 overflow-y-auto m-4 rounded-lg border border-gray-200">
+                <h2 id="problemTitle" class="text-xl font-bold text-gray-800">パラメータ設定</h2>
+                
+                <!-- パラメータ選択肢はJSで動的に生成 -->
+                <div id="paramSelectionContainer" class="space-y-4">
+                    <!-- JSで生成 -->
+                </div>
+
+                <button id="submitAnswerBtn" class="w-full px-6 py-3 bg-green-600 text-white font-bold rounded-lg shadow-md hover:bg-green-700 transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    OK
+                </button>
+            </div>
+
+            <!-- 3.2.2 キャンバスエリア (問題モード) -->
+            <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 bg-gray-200 overflow-y-auto">
+                <!-- あなたの回答 -->
+                <div class="flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-inner border border-gray-300 min-h-[300px]">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">あなたの回答</h3>
+                    <div id="userCanvasContainer" class="w-full flex-1 flex items-center justify-center min-h-0">
+                         <canvas id="userCanvas"></canvas>
+                    </div>
+                </div>
+                <!-- 見本 -->
+                <div class="flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-inner border border-gray-300 min-h-[300px]">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">見本</h3>
+                    <div id="answerCanvasContainer" class="w-full flex-1 flex items-center justify-center min-h-0">
+                         <canvas id="answerCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- クリアメッセージ (モーダル) -->
+    <div id="clearMessage" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-12 rounded-lg shadow-2xl">
+            <span class="text-5xl font-bold text-yellow-500">クリア！</span>
+        </div>
+    </div>
+
+    <!-- ★ ステップ1: 図形定義ファイルを先に読み込む (描画関数とアイコン関数を利用するため) -->
+    <script src="shape1.js"></script>
+    <script src="shape2.js"></script>
+    <script src="shape3.js"></script>
+    <script src="shape4.js"></script>
+    <!-- (新しい図形を追加する場合はここに <script src="shape5.js"></script> を追加) -->
+
+
+    <!-- ★ ステップ2: メインのロジック (共通処理) -->
+    <script>
+        // --- グローバル変数・定数 ---
+        window.shapeDefinitions = window.shapeDefinitions || {}; // 図形定義を格納するグローバルオブジェクト
+        const shapeDefs = window.shapeDefinitions; // 各JSファイルから登録された定義を参照
+
+        let currentProblemId = null; // 選択中の問題ID (e.g., 's1p1')
+        let currentShapeId = null; // 現在の問題の図形ID (e.g., 'shape1')
+        let userSelections = {}; // 問題モードでのユーザーの選択
+        let currentUserParams = {}; // 問題モードで現在表示中のパラメータ (アニメーション用)
+
+        // ハイライト色 (外部JSファイルからも参照される想定)
+        const HL_L1 = '#ef4444'; // Red
+        const HL_SIDE = '#22c55e'; // Green
+        const HL_TRI_ROT = '#a855f7'; // Purple
+        const HL_COPY_ROT = '#f97316'; // Orange
+        const HL_POINT = '#eab308'; // Yellow
+        const DEFAULT_STROKE_ICON = '#2563eb'; // Blue
+        
+        // パラメータ選択ボタンスタイル
+        const paramBtnBase = 'px-4 py-2 border-2 border-transparent rounded-lg text-sm font-medium cursor-pointer transition-all duration-150 shadow-sm';
+        const paramBtnSelected = 'bg-green-600 text-white border-green-700 shadow-md font-semibold';
+        const paramBtnFixed = 'bg-gray-200 text-gray-600 cursor-not-allowed border-gray-300';
+        const paramBtnUnselected = 'bg-green-50 text-green-800 border-green-200 hover:bg-green-100 hover:border-green-300';
+
+        // --- ★ 新しい問題データ構造 ---
+        // (元の problemSetShape1 などは使わず、ここで一元管理)
+        const problemDatabase = [
+            // --- Shape1 の問題 ---
+            {
+                id: 's1p1',
+                title: '図形1 - 問題1',
+                shapeId: 'shape1', 
+                answerParams: { l1: 100, side: 120, rot: 60, copy: 30 },
+                initialParams: { l1: 100, side: 140, rot: 90, copy: 90 },
+                options: [
+                    { paramId: 'l1', label: 'L1長さ', unit: '', fixed: 100 },
+                    { paramId: 'side', label: '1辺の長さ', unit: '', values: [90, 120, 150] },
+                    { paramId: 'rot', label: '回転角', unit: '°', values: [45, 50, 60] },
+                    { paramId: 'copy', label: 'コピー角度', unit: '°', values: [20, 30, 45, 60] }
+                ]
+            },
+            {
+                id: 's1p2',
+                title: '図形1 - 問題2',
+                shapeId: 'shape1',
+                answerParams: { l1: 100, side: 80, rot: 90, copy: 45 },
+                initialParams: { l1: 50, side: 80, rot: 0, copy: 90 },
+                options: [
+                    { paramId: 'l1', label: 'L1長さ', unit: '', values: [50, 100, 150] },
+                    { paramId: 'side', label: '1辺の長さ', unit: '', fixed: 80 },
+                    { paramId: 'rot', label: '回転角', unit: '°', values: [0, 90, 180] },
+                    { paramId: 'copy', label: 'コピー角度', unit: '°', values: [45, 60, 90] }
+                ]
+            },
+            {
+                id: 's1p3',
+                title: '図形1 - 問題3 (L1のみ)',
+                shapeId: 'shape1',
+                answerParams: { l1: 120, side: 60, rot: 0, copy: 30 },
+                initialParams: { l1: 80, side: 60, rot: 0, copy: 30 },
+                options: [ // L1以外は非表示 (固定値として initial/answer に設定)
+                    { paramId: 'l1', label: 'L1長さ', unit: '', values: [80, 120] },
+                ]
+            },
+            // --- Shape2 の問題 ---
+            {
+                id: 's2p1',
+                title: '図形2 - 問題1',
+                shapeId: 'shape2',
+                answerParams: { x: 100, y: 60, alpha: 30, beta: 45 },
+                initialParams: { x: 100, y: 40, alpha: 20, beta: 30 },
+                options: [
+                    { paramId: 'x', label: 'L1長さ(X)', unit: '', fixed: 100 },
+                    { paramId: 'y', label: 'L2長さ(Y)', unit: '', values: [40, 60, 80] },
+                    { paramId: 'alpha', label: 'L2角度(α)', unit: '°', values: [20, 30, 45] },
+                    { paramId: 'beta', label: 'コピー角度(β)', unit: '°', values: [30, 45, 60] }
+                ]
+            },
+            {
+                id: 's2p2',
+                title: '図形2 - 問題2',
+                shapeId: 'shape2',
+                answerParams: { x: 90, y: 50, alpha: 60, beta: 20 },
+                initialParams: { x: 70, y: 50, alpha: 30, beta: 60 },
+                options: [
+                    { paramId: 'x', label: 'L1長さ(X)', unit: '', values: [60, 90, 120] },
+                    { paramId: 'y', label: 'L2長さ(Y)', unit: '', fixed: 50 },
+                    { paramId: 'alpha', label: 'L2角度(α)', unit: '°', values: [45, 60, 90] },
+                    { paramId: 'beta', label: 'コピー角度(β)', unit: '°', values: [15, 20, 30] }
+                ]
+            },
+            {
+                id: 's2p3',
+                title: '図形2 - 問題3',
+                shapeId: 'shape2',
+                answerParams: { x: 100, y: 70, alpha: 90, beta: 90 },
+                initialParams: { x: 70, y: 30, alpha: 90, beta: 45 },
+                options: [
+                    { paramId: 'x', label: 'L1長さ(X)', unit: '', values: [70, 100] },
+                    { paramId: 'y', label: 'L2長さ(Y)', unit: '', values: [30, 50, 70] },
+                    { paramId: 'alpha', label: 'L2角度(α)', unit: '°', fixed: 90 },
+                    { paramId: 'beta', label: 'コピー角度(β)', unit: '°', values: [45, 90] }
+                ]
+            },
+            // --- Shape3 の問題 ---
+            {
+                id: 's3p1',
+                title: '図形3 - 問題1',
+                shapeId: 'shape3',
+                answerParams: { a: 80, b: 60, c: 30, d: 30 },
+                initialParams: { a: 80, b: 50, c: 40, d: 20 },
+                options: [
+                    { paramId: 'a', label: '底辺(A)', unit: '', fixed: 80 },
+                    { paramId: 'b', label: '高さ(B)', unit: '', values: [50, 60, 70] },
+                    { paramId: 'c', label: 'ずれ(C)', unit: '', values: [20, 30, 40] },
+                    { paramId: 'd', label: '幹幅(D)', unit: '', values: [20, 30, 40] }
+                ]
+            },
+            {
+                id: 's3p2',
+                title: '図形3 - 問題2',
+                shapeId: 'shape3',
+                answerParams: { a: 100, b: 50, c: 30, d: 40 },
+                initialParams: { a: 120, b: 50, c: 40, d: 40 },
+                options: [
+                    { paramId: 'a', label: '底辺(A)', unit: '', values: [80, 100, 120] },
+                    { paramId: 'b', label: '高さ(B)', unit: '', fixed: 50 },
+                    { paramId: 'c', label: 'ずれ(C)', unit: '', values: [30, 40] },
+                    { paramId: 'd', label: '幹幅(D)', unit: '', fixed: 40 }
+                ]
+            },
+            // --- Shape4 の問題 ---
+            {
+                id: 's4p1',
+                title: '図形4 - 問題1',
+                shapeId: 'shape4',
+                answerParams: { r: 100, sa: 75, la: 125 },
+                initialParams: { r: 80, sa: 75, la: 100 },
+                options: [
+                    { paramId: 'r', label: '円半径(R)', unit: '', values: [80, 100, 120] },
+                    { paramId: 'sa', label: '楕円短半径(SA)', unit: '', fixed: 75 },
+                    { paramId: 'la', label: '楕円長半径(LA)', unit: '', values: [100, 125] }
+                ]
+            },
+            {
+                id: 's4p2',
+                title: '図形4 - 問題2',
+                shapeId: 'shape4',
+                answerParams: { r: 100, sa: 75, la: 75 },
+                initialParams: { r: 100, sa: 100, la: 50 },
+                options: [
+                    { paramId: 'r', label: '円半径(R)', unit: '', fixed: 100 },
+                    { paramId: 'sa', label: '楕円短半径(SA)', unit: '', values: [50, 75, 100] },
+                    { paramId: 'la', label: '楕円長半径(LA)', unit: '', values: [50, 75, 100] }
+                ]
+            },
+        ];
+
+
+        // --- DOM要素の取得 ---
+        const problemDropdown = document.getElementById('problemDropdown');
+        const problemTitle = document.getElementById('problemTitle');
+        const paramSelectionContainer = document.getElementById('paramSelectionContainer');
+        let submitAnswerBtn = document.getElementById('submitAnswerBtn'); // OKボタン (let)
+        const userCanvas = document.getElementById('userCanvas');
+        const userCanvasContainer = document.getElementById('userCanvasContainer');
+        const answerCanvas = document.getElementById('answerCanvas');
+        const answerCanvasContainer = document.getElementById('answerCanvasContainer');
+        const clearMessage = document.getElementById('clearMessage');
+
+        // --- 汎用リサイズ関数 ---
+        function resizeAllCanvases() {
+            const userSize = Math.min(userCanvasContainer.clientWidth, userCanvasContainer.clientHeight) - 16;
+            userCanvas.width = userSize;
+            userCanvas.height = userSize;
+            
+            const answerSize = Math.min(answerCanvasContainer.clientWidth, answerCanvasContainer.clientHeight) - 16;
+            answerCanvas.width = answerSize;
+            answerCanvas.height = answerSize;
+            
+            drawProblemMode(); // 現在の問題を再描画
+        }
+        
+
+        // --- 問題モード初期化・描画 ---
+        
+        // 問題UIを構築
+        function setupProblemUI() {
+            // 選択されたIDから問題データを取得
+            const problem = problemDatabase.find(p => p.id === currentProblemId);
+            if (!problem) {
+                paramSelectionContainer.innerHTML = '<p>問題の読み込みに失敗しました。</p>';
+                submitAnswerBtn.disabled = true;
+                return;
+            }
+
+            // この問題が使用する図形定義を取得
+            currentShapeId = problem.shapeId;
+            const shapeDef = shapeDefs[currentShapeId];
+            if (!shapeDef) {
+                paramSelectionContainer.innerHTML = `<p>図形定義 '${currentShapeId}' が見つかりません。</p>`;
+                submitAnswerBtn.disabled = true;
+                return;
+            }
+
+            problemTitle.textContent = problem.title; // タイトルを設定
+            paramSelectionContainer.innerHTML = ''; // UIをクリア
+            userSelections = {}; // ユーザーの選択をリセット
+            
+            // ★ initialParams をベースに、表示されないパラメータの値も currentUserParams に含める
+            currentUserParams = { ...problem.initialParams }; 
+            
+            const visibleParamIds = new Set(); // 表示されるパラメータIDを記録
+
+            problem.options.forEach(opt => {
+                visibleParamIds.add(opt.paramId); // ★ 表示されるIDをセットに追加
+
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'space-y-2';
+                
+                // ラベル (アイコン)
+                const label = document.createElement('label');
+                label.className = 'flex items-center space-x-2';
+                const canvas = document.createElement('canvas');
+                canvas.id = `label_icon_prob_${currentShapeId}_${opt.paramId}`; // 固有ID
+                canvas.width = 40;
+                canvas.height = 30;
+                canvas.className = 'border border-gray-300 rounded';
+                canvas.title = opt.label;
+                label.appendChild(canvas);
+                groupDiv.appendChild(label);
+                
+                const btnContainer = document.createElement('div');
+                btnContainer.className = 'flex flex-wrap gap-2';
+                
+                if (opt.fixed !== undefined) {
+                    // 固定値
+                    const btn = document.createElement('button');
+                    btn.className = `${paramBtnBase} ${paramBtnFixed}`;
+                    btn.textContent = `${opt.fixed}${opt.unit || ''}`;
+                    btnContainer.appendChild(btn);
+                    userSelections[opt.paramId] = opt.fixed;
+                    
+                    // ★ 固定値も initialParams から currentUserParams に設定
+                    currentUserParams[opt.paramId] = opt.fixed; 
+                    
+                } else if (opt.values) {
+                    // 選択肢
+                    // ★ initialParams の値を選択状態の初期値とする
+                    const initialValue = problem.initialParams[opt.paramId];
+                    userSelections[opt.paramId] = initialValue; // ユーザー選択の初期値
+
+                    opt.values.forEach(val => {
+                        const btn = document.createElement('button');
+                        
+                        // 初期値と一致するかどうかでスタイルを決定
+                        const isSelected = (val === initialValue);
+                        btn.className = `${paramBtnBase} ${isSelected ? paramBtnSelected : paramBtnUnselected}`;
+                        
+                        btn.textContent = `${val}${opt.unit || ''}`;
+                        btn.dataset.param = opt.paramId;
+                        btn.dataset.value = val;
+                        
+                        btn.addEventListener('click', () => {
+                            userSelections[opt.paramId] = val;
+                            btnContainer.querySelectorAll('button').forEach(b => {
+                                if (b !== btn) {
+                                    if (!b.className.includes(paramBtnFixed)) {
+                                        b.className = `${paramBtnBase} ${paramBtnUnselected}`;
+                                    }
+                                }
+                            });
+                            btn.className = `${paramBtnBase} ${paramBtnSelected}`;
+                            checkAllParamsSelected();
+                        });
+                        btnContainer.appendChild(btn);
+                    });
+                }
+                groupDiv.appendChild(btnContainer);
+                paramSelectionContainer.appendChild(groupDiv);
+            });
+            
+            // ★ 非表示のパラメータを userSelections に設定する
+            shapeDef.params.forEach(paramId => {
+                if (!visibleParamIds.has(paramId)) {
+                    // このパラメータは options にないので非表示
+                    // answerParams から正しい値を取得して userSelections に設定
+                    if (problem.answerParams[paramId] !== undefined) {
+                        userSelections[paramId] = problem.answerParams[paramId];
+                    }
+                }
+            });
+
+            checkAllParamsSelected(); // OKボタンの初期状態
+            
+            // 問題モード用のアイコンを描画
+            problem.options.forEach(opt => {
+                const canvasId = `label_icon_prob_${currentShapeId}_${opt.paramId}`;
+                if (shapeDef.drawIconFns[opt.paramId]) {
+                    shapeDef.drawIconFns[opt.paramId](canvasId);
+                }
+            });
+
+            resizeAllCanvases(); // キャンバスサイズを調整して描画
+        }
+
+        // 問題モードのキャンバスを描画 (リサイズ時にも呼ばれる)
+        function drawProblemMode() {
+            if (!currentProblemId || !currentShapeId) return;
+            const problem = problemDatabase.find(p => p.id === currentProblemId);
+            const shapeDef = shapeDefs[currentShapeId];
+            if (!problem || !shapeDef) {
+                // 問題がない場合、キャンバスをクリア
+                const ctxUser = userCanvas.getContext('2d');
+                ctxUser.clearRect(0, 0, userCanvas.width, userCanvas.height);
+                const ctxAnswer = answerCanvas.getContext('2d');
+                ctxAnswer.clearRect(0, 0, answerCanvas.width, answerCanvas.height);
+                return;
+            }
+            
+            // ★ ハイライト対象を、problem.options に含まれる paramId のみ
+            const highlights = {};
+            problem.options.forEach(opt => {
+                highlights[opt.paramId] = true;
+            });
+
+            shapeDef.drawFn(userCanvas, currentUserParams, highlights); // 選択肢にあるものだけハイライト
+            shapeDef.drawFn(answerCanvas, problem.answerParams, {}); // ハイライトなし
+        }
+        
+        // 全てのパラメータが選択されたかチェック
+        function checkAllParamsSelected() {
+            const problem = problemDatabase.find(p => p.id === currentProblemId);
+            if (!problem) {
+                submitAnswerBtn.disabled = true;
+                return;
+            }
+            // options に含まれるパラメータがすべて userSelections に存在するか
+            const allSelected = problem.options.every(opt => userSelections[opt.paramId] !== undefined);
+            submitAnswerBtn.disabled = !allSelected;
+        }
+        
+        // 回答をチェック
+        function checkAnswer() {
+            const problem = problemDatabase.find(p => p.id === currentProblemId);
+            if (!problem) return;
+            
+            // ★ answerParams と userSelections を比較
+            const isCorrect = Object.keys(problem.answerParams).every(key => 
+                problem.answerParams[key] === userSelections[key]
+            );
+            
+            if (isCorrect) {
+                clearMessage.classList.remove('hidden');
+                setTimeout(() => {
+                    clearMessage.classList.add('hidden');
+                }, 1500);
+            }
+        }
+        
+        // 線形補間ヘルパー関数
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
+        }
+
+        // OKボタンのアニメーション関数
+        function animateParameters(targetParams) {
+            const shapeDef = shapeDefs[currentShapeId];
+            if (!shapeDef) return;
+            
+            const startParams = { ...currentUserParams }; 
+            // ★ アニメーション対象は、現在の図形の全パラメータ
+            const animationOrder = shapeDef.params; 
+            const paramBaseDuration = 400; 
+
+            submitAnswerBtn.disabled = true; 
+            
+            let animations = [];
+            let cumulativeTime = 0;
+            
+            animationOrder.forEach(paramId => {
+                // targetParams(userSelections) にないパラメータは、currentUserParamsの値をそのまま使う
+                const startVal = startParams[paramId];
+                const endVal = (targetParams[paramId] !== undefined) ? targetParams[paramId] : startVal;
+                
+                const duration = (startVal !== endVal) ? paramBaseDuration : 0; 
+                
+                animations.push({
+                    id: paramId,
+                    startVal: startVal,
+                    endVal: endVal,
+                    startTime: cumulativeTime, 
+                    endTime: cumulativeTime + duration 
+                });
+                
+                cumulativeTime += duration; 
+            });
+
+            const totalDuration = cumulativeTime; 
+            let startTime = null;
+            
+            const problem = problemDatabase.find(p => p.id === currentProblemId);
+            // ★ ハイライト対象を、problem.options に含まれる paramId のみ
+            const highlights = {};
+            if (problem) {
+                 problem.options.forEach(opt => {
+                    highlights[opt.paramId] = true;
+                });
+            }
+
+            function animationLoop(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const elapsed = timestamp - startTime;
+                
+                let frameParams = { ...startParams };
+
+                animations.forEach(anim => {
+                    if (elapsed < anim.startTime) {
+                        frameParams[anim.id] = anim.startVal;
+                    } else if (elapsed >= anim.endTime) {
+                        frameParams[anim.id] = anim.endVal;
+                    } else {
+                        if (anim.endTime === anim.startTime) { 
+                             frameParams[anim.id] = anim.endVal;
+                        } else {
+                            const progress = (elapsed - anim.startTime) / (anim.endTime - anim.startTime);
+                            frameParams[anim.id] = Math.round(lerp(anim.startVal, anim.endVal, progress));
+                        }
+                    }
+                });
+                
+                shapeDef.drawFn(userCanvas, frameParams, highlights);
+                
+                if (elapsed < totalDuration) {
+                    requestAnimationFrame(animationLoop);
+                } else {
+                    // 最終的なtargetParams (固定値も含む) で描画
+                    const finalParams = { ...currentUserParams, ...targetParams };
+                    shapeDef.drawFn(userCanvas, finalParams, highlights);
+                    currentUserParams = finalParams; 
+                    
+                    checkAllParamsSelected(); // OKボタンを再度有効化
+                    setTimeout(checkAnswer, 500); // 答え合わせ
+                }
+            }
+            requestAnimationFrame(animationLoop);
+        }
+
+        // --- ★ 初期化 (DOMContentLoaded) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // 1. 各図形定義に、DOM要素を紐付け (アイコン描画に必要)
+            Object.keys(shapeDefs).forEach(shapeId => {
+                const def = shapeDefs[shapeId];
+                if (!def) return;
+                // (このページではスライダーは使わないが、アイコン関数は使うため、
+                // shapeX.js 側でのエラーを防ぐため、最低限のDOM紐付け処理を残してもよいが、
+                // 今回はアイコン関数がDOMを直接 'getElementById' しているため、紐付け処理は不要)
+            });
+
+            // 2. 起動画面のドロップダウンを動的に生成
+            setupProblemDropdown();
+
+            // 3. ドロップダウンの変更イベントを設定
+            problemDropdown.addEventListener('change', (e) => {
+                currentProblemId = e.target.value;
+                setupProblemUI();
+            });
+            
+            // 4. OKボタンイベント (初回登録)
+            submitAnswerBtn.addEventListener('click', () => {
+                animateParameters(userSelections);
+            });
+
+            // 5. ウィンドウリサイズイベント
+            window.addEventListener('resize', resizeAllCanvases);
+
+            // 6. 最初の問題を設定してUI構築
+            if (problemDatabase.length > 0) {
+                currentProblemId = problemDatabase[0].id;
+                problemDropdown.value = currentProblemId;
+                setupProblemUI();
+            } else {
+                paramSelectionContainer.innerHTML = '<p>問題が登録されていません。</p>';
+                submitAnswerBtn.disabled = true;
+            }
+        });
+        
+        // ★ ドロップダウンを動的に生成する関数
+        function setupProblemDropdown() {
+            problemDropdown.innerHTML = ''; // クリア
+            
+            if (problemDatabase.length === 0) {
+                 const option = document.createElement('option');
+                 option.value = '';
+                 option.textContent = '問題がありません';
+                 problemDropdown.appendChild(option);
+                 problemDropdown.disabled = true;
+                return;
+            }
+
+            problemDatabase.forEach((problem, index) => {
+                const option = document.createElement('option');
+                option.value = problem.id;
+                option.textContent = problem.title;
+                problemDropdown.appendChild(option);
+            });
+            
+            problemDropdown.disabled = false;
+        }
+
+    </script>
+</body>
+</html>
