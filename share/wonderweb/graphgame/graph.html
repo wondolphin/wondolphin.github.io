@@ -1,0 +1,2325 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>グラフゲーム</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントを読み込みます */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            /* 全体スクロールを禁止 */
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
+        }
+
+        /* --- 盤面 --- */
+        #board-area {
+            display: grid;
+            /* CSS変数を定義 (JSが上書き) */
+            --board-rows: 4;
+            --board-cols: 6;
+
+            /* レイアウト最適化: 
+               vminを使って画面の幅か高さの小さい方に合わせてサイズを決めることで、
+               画面からはみ出さずに最大限大きく表示する。
+            */
+            --cell-size: 13vmin;
+
+            grid-template-rows: repeat(var(--board-rows), var(--cell-size));
+            grid-template-columns: repeat(var(--board-cols), var(--cell-size));
+
+            border: 2px solid #333;
+            border-radius: 8px;
+            /* overflow: hidden;  <-- 枠がはみ出る演出のため削除してもよいが、今回は維持 */
+            touch-action: none;
+            user-select: none;
+            position: relative;
+            background-color: #FDFBF5;
+            margin: auto;
+            /* 中央寄せ */
+        }
+
+        /* PCなどの大画面用調整 */
+        @media (min-width: 1024px) {
+            #board-area {
+                --cell-size: 80px;
+                /* デスクトップは固定サイズか、あるいは高さを基準にする */
+                /* 高さベースで最大化したい場合は以下のように調整可能 */
+                --cell-size: min(80px, 18vh);
+            }
+        }
+
+        .cell {
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* 文字サイズもセルサイズに合わせて可変に */
+            font-size: calc(var(--cell-size) * 0.6);
+            user-select: none;
+        }
+
+        /* 赤い枠のピース */
+        .frame-piece {
+            background-color: rgba(229, 62, 62, 0.3);
+            box-sizing: border-box;
+            z-index: 10;
+            cursor: grab;
+            transition: transform 0.1s ease-out;
+        }
+
+        .frame-piece.dragging {
+            cursor: grabbing;
+            opacity: 0.9;
+            transform: scale(1.05);
+            z-index: 20;
+        }
+
+        /* --- グラフ共通 --- */
+        /* グラフエリア全体をflexで伸ばす */
+        #chart-area-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            justify-content: center;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            /* 帯グラフの配置のため */
+        }
+
+        /* グラフ用のSVG */
+        #chart-svg-A,
+        #chart-svg-B,
+        #chart-svg-C {
+            width: 100%;
+            height: 100%;
+            max-height: 40vh;
+            /* グラフが縦に伸びすぎないように制限 */
+        }
+
+        @media (min-width: 1024px) {
+
+            #chart-svg-A,
+            #chart-svg-B,
+            #chart-svg-C {
+                max-height: 350px;
+            }
+        }
+
+        /* グラフの星 */
+        .star {
+            stroke-width: 1;
+            stroke: #F6AD55;
+        }
+
+        .star-solid-apple {
+            fill: #E53E3E;
+        }
+
+        .star-solid-grape {
+            fill: #805AD5;
+        }
+
+        .star-solid-kiwi {
+            fill: #10B981;
+        }
+
+        #chart-svg-B .star,
+        #chart-svg-B .star-dashed {
+            stroke: #F6AD55;
+        }
+
+        .star-dashed {
+            fill: none;
+            stroke-width: 2;
+            stroke-dasharray: 0.6 0.6;
+        }
+
+        .star-dashed-apple {
+            stroke: #E53E3E;
+        }
+
+        .star-dashed-grape {
+            stroke: #805AD5;
+        }
+
+        .star-dashed-kiwi {
+            stroke: #10B981;
+        }
+
+        .chart-icon {
+            font-size: 1.5rem;
+        }
+
+        /* グラフA (棒グラフ) */
+        .bar-apple {
+            fill: #FEE2E2;
+            transition: height 0.3s ease-in-out, y 0.3s ease-in-out;
+        }
+
+        .bar-grape {
+            fill: #E9D8FD;
+            transition: height 0.3s ease-in-out, y 0.3s ease-in-out;
+        }
+
+        .bar-kiwi {
+            fill: #D1FAE5;
+            transition: height 0.3s ease-in-out, y 0.3s ease-in-out;
+        }
+
+        #chart-svg-A .star,
+        #chart-svg-A .star-dashed {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        /* グラフB (散布図) */
+        .axis {
+            stroke: #333;
+            stroke-width: 2;
+        }
+
+        .guide-line {
+            stroke: #aaa;
+            stroke-width: 1;
+            stroke-dasharray: 2 2;
+            transition: x1 0.3s, y1 0.3s, x2 0.3s, y2 0.3s;
+        }
+
+        #chart-svg-B .star,
+        #chart-svg-B .star-dashed {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        /* グラフC (円グラフ) */
+        .pie-slice-apple {
+            fill: #FEE2E2;
+            stroke: #E53E3E;
+            stroke-width: 1;
+        }
+
+        .pie-slice-grape {
+            fill: #E9D8FD;
+            stroke: #805AD5;
+            stroke-width: 1;
+        }
+
+        .pie-slice-kiwi {
+            fill: #D1FAE5;
+            stroke: #10B981;
+            stroke-width: 1;
+        }
+
+        #chart-svg-C .star,
+        #chart-svg-C .star-dashed {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        /* グラフD (帯グラフ) */
+        #chart-D {
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .bar-D-container {
+            width: 100%;
+            height: 40px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .bar-D-slice {
+            height: 100%;
+            transition: width 0.3s ease-in-out;
+        }
+
+        .bar-D-slice-apple {
+            background-color: #FEE2E2;
+        }
+
+        .bar-D-slice-grape {
+            background-color: #E9D8FD;
+        }
+
+        .bar-D-slice-kiwi {
+            background-color: #D1FAE5;
+        }
+
+        .bar-D-icons {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 5px;
+            margin-top: 4px;
+        }
+
+        .bar-D-icons.three-fruits {
+            justify-content: space-around;
+        }
+
+        .bar-D-star-container {
+            position: relative;
+            /* 相対配置に変更 */
+            height: 30px;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .bar-D-star {
+            position: absolute;
+            top: 0;
+            transform: translateX(-50%);
+            transition: left 0.3s ease-in-out;
+            z-index: 10;
+        }
+
+        /* --- クリアメッセージ (全画面オーバーレイ) --- */
+        #win-message {
+            position: fixed;
+            inset: 0;
+            /* top:0, right:0, bottom:0, left:0 */
+            z-index: 9999;
+            /* 最前面 */
+            background-color: rgba(255, 255, 255, 0.4);
+            /* 半透明の白 */
+            backdrop-filter: blur(4px);
+            /* 背景をぼかす */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            /* タップできることを示す */
+
+            opacity: 0;
+            pointer-events: none;
+            /* 非表示時はクリック無効 */
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        #win-message.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #win-message-content {
+            background-color: white;
+            padding: 2rem 4rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #win-message.active #win-message-content {
+            transform: scale(1);
+        }
+
+        /* 学年選択画面 */
+        #grade-select-screen {
+            position: fixed;
+            inset: 0;
+            background-color: #f7f7f7;
+            z-index: 100;
+            transition: opacity 0.3s;
+        }
+
+        .grade-button {
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .grade-button:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .grade-button:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100">
+
+    <!-- 学年選択画面 -->
+    <div id="grade-select-screen" class="opacity-100 flex flex-col justify-center items-center">
+        <h2 class="text-3xl font-bold text-gray-800 mb-10">がくねんを えらぼう!</h2>
+        <div class="flex flex-col md:flex-row gap-8">
+            <button id="select-1-2" data-grade="1-2"
+                class="grade-button bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg w-64 text-xl">
+                1・2 ねんせい
+            </button>
+            <button id="select-3-4" data-grade="3-4"
+                class="grade-button bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg w-64 text-xl">
+                3・4 ねんせい
+            </button>
+        </div>
+    </div>
+
+    <!-- メインゲームコンテナ -->
+    <!-- h-full flex flex-col で画面いっぱいを使う -->
+    <div id="main-game-container" class="h-full w-full flex flex-col opacity-0 hidden transition-opacity duration-500">
+
+        <!-- ヘッダーエリア (タイトル & コントロール) -->
+        <div class="flex-none bg-white shadow-sm p-4 z-10">
+            <div class="container mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <h1 class="text-2xl font-bold text-gray-800">グラフゲーム</h1>
+
+                <div class="flex items-center space-x-4">
+                    <label for="stage-select" class="text-lg font-medium text-gray-700 whitespace-nowrap">もんだい:</label>
+                    <select id="stage-select"
+                        class="p-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px] text-lg">
+                        <!-- JSで生成 -->
+                    </select>
+                    <button id="next-stage-button"
+                        class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap">
+                        つぎへ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ゲームコンテンツエリア (残り高さを全て使う) -->
+        <div class="flex-grow overflow-hidden p-2 lg:p-4">
+            <div class="container mx-auto max-w-7xl h-full flex flex-col lg:flex-row gap-4 lg:gap-8">
+
+                <!-- 左側: グラフエリア -->
+                <!-- h-full を指定して高さを確保 -->
+                <div id="chart-area-wrapper"
+                    class="w-full lg:w-1/3 bg-white p-4 rounded-lg shadow-lg h-full lg:h-auto lg:flex-grow-0 overflow-y-auto">
+                    <!-- グラフA (棒グラフ) -->
+                    <div id="chart-A" class="chart-container" style="display: none;">
+                        <svg id="chart-svg-A" viewBox="0 0 200 250" preserveAspectRatio="xMidYMid meet"></svg>
+                    </div>
+
+                    <!-- グラフB (散布図) -->
+                    <div id="chart-B" class="chart-container" style="display: none;">
+                        <svg id="chart-svg-B" viewBox="0 0 250 250" preserveAspectRatio="xMidYMid meet"></svg>
+                    </div>
+
+                    <!-- グラフC (円グラフ) -->
+                    <div id="chart-C" class="chart-container" style="display: none;">
+                        <svg id="chart-svg-C" viewBox="0 0 200 250" preserveAspectRatio="xMidYMid meet"></svg>
+                    </div>
+
+                    <!-- グラフD (帯グラフ) -->
+                    <div id="chart-D" class="chart-container" style="display: none;">
+                        <div class="bar-D-star-container">
+                            <!-- 星アイコン (JSで制御) -->
+                            <svg id="star-D-target-apple" class="bar-D-star star-dashed star-dashed-apple"
+                                viewBox="0 0 24 24" width="24" height="24" style="left: 50%;">
+                                <path
+                                    d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z">
+                                </path>
+                            </svg>
+                            <svg id="star-D-current-apple" class="bar-D-star star star-solid-apple" viewBox="0 0 24 24"
+                                width="24" height="24" style="left: 50%;">
+                                <path
+                                    d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z">
+                                </path>
+                            </svg>
+                            <svg id="star-D-target-grape" class="bar-D-star star-dashed star-dashed-grape"
+                                viewBox="0 0 24 24" width="24" height="24" style="left: 50%; display: none;">
+                                <path
+                                    d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z">
+                                </path>
+                            </svg>
+                            <svg id="star-D-current-grape" class="bar-D-star star star-solid-grape" viewBox="0 0 24 24"
+                                width="24" height="24" style="left: 50%; display: none;">
+                                <path
+                                    d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z">
+                                </path>
+                            </svg>
+                        </div>
+                        <div class="bar-D-container">
+                            <div id="bar-D-apple" class="bar-D-slice bar-D-slice-apple" style="width: 33.3%;"></div>
+                            <div id="bar-D-grape" class="bar-D-slice bar-D-slice-grape" style="width: 33.3%;"></div>
+                            <div id="bar-D-kiwi" class="bar-D-slice bar-D-slice-kiwi" style="width: 33.3%;"></div>
+                        </div>
+                        <div id="bar-D-icons" class="bar-D-icons">
+                            <span class="chart-icon icon-apple">🍎</span>
+                            <span class="chart-icon icon-kiwi" style="display: none;">🥝</span>
+                            <span class="chart-icon icon-grape">🍇</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側: 盤面エリア -->
+                <!-- flex-grow で残りのスペースを埋める -->
+                <div class="w-full lg:w-2/3 flex justify-center items-center h-full">
+                    <div id="board-area">
+                        <!-- JSでマスと枠がここに追加されます -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- クリアメッセージ (全画面オーバーレイ) -->
+    <div id="win-message">
+        <div id="win-message-content">
+            <div class="text-6xl mb-4">🎉</div>
+            <h3 class="text-4xl font-bold text-green-600 mb-2">クリア！</h3>
+            <p class="text-gray-500 text-sm">がめんを タップしてね</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- 1. 定数と状態 ---
+
+            // --- ステージデータ ---
+            const ALL_STAGES = [
+                {
+                    id: 'ステージ1-1',
+                    name: 'ステージ1-1',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        ['a', 0, 0, 0, 'a', 0],
+                        [0, 'a', 0, 0, 0, 'a'],
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 'a', 0]
+                    ],
+                    frames: [
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 1, 1, 2, 2, 0],
+                        [0, 1, 1, 2, 2, 0]
+                    ],
+                    targets: { apple: 4 }
+                },
+                {
+                    id: 'ステージ1-2',
+                    name: 'ステージ1-2',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        ['a', 0, 0, 'a', 'a', 0],
+                        [0, 0, 0, 'a', 0, 'a'],
+                        ['a', 0, 'a', 0, 'a', 0],
+                        [0, 'a', 'a', 0, 0, 0]
+                    ],
+                    frames: [
+                        [0, 1, 1, 0, 0, 0],
+                        [0, 1, 1, 0, 0, 0],
+                        [0, 0, 0, 0, 2, 2],
+                        [0, 0, 0, 0, 2, 2]
+                    ],
+                    targets: { apple: 6 }
+                },
+                {
+                    id: 'ステージ1-3',
+                    name: 'ステージ1-3',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        [0, 0, 'a', 0, 'a', 0],
+                        ['a', 0, 0, 0, 0, 'a'],
+                        [0, 0, 0, 0, 'a', 0],
+                        [0, 'a', 'a', 0, 0, 0]
+                    ],
+                    frames: [
+                        [0, 0, 0, 0, 0, 0],
+                        [1, 1, 0, 0, 2, 2],
+                        [1, 1, 0, 0, 0, 0],
+                        [1, 1, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 5 }
+                },
+                {
+                    id: 'ステージ1-4',
+                    name: 'ステージ1-4',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        [0, 0, 'a', 'a', 0, 0],
+                        [0, 'a', 0, 'a', 0, 'a'],
+                        [0, 'a', 0, 0, 0, 'a'],
+                        ['a', 0, 'a', 0, 'a', 0]
+                    ],
+                    frames: [
+                        [2, 2, 0, 0, 1, 0],
+                        [2, 2, 0, 0, 1, 1],
+                        [0, 0, 0, 0, 0, 1],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 6 }
+                },
+
+
+                {
+                    id: 'ステージ2-1',
+                    name: 'ステージ2-1',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 'a', 0, 'g', 'g', 0],
+                        ['a', 'a', 'a', 0, 'g', 0],
+                        [0, 'a', 0, 0, 'g', 'g']
+                    ],
+                    frames: [
+                        [1, 0, 0, 0, 2, 0],
+                        [1, 1, 0, 0, 2, 2],
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 3, grape: 3 }
+                },
+                {
+                    id: 'ステージ2-2',
+                    name: 'ステージ2-2',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        [0, 0, 'a', 0, 0, 0],
+                        ['a', 'g', 'g', 'a', 'a', 'g'],
+                        [0, 0, 'a', 0, 0, 0],
+                        [0, 0, 'a', 'g', 'a', 'g']
+                    ],
+                    frames: [
+                        [0, 0, 0, 2, 2, 2],
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0],
+                        [1, 1, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 1, grape: 4 }
+                },
+
+
+
+                {
+                    id: 'ステージ2-3',
+                    name: 'ステージ2-3',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        ['a', 'a', 'a', 0, 0, 0],
+                        [0, 0, 'g', 'g', 'g', 0],
+                        ['a', 'a', 0, 0, 'g', 'a'],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    frames: [
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0],
+                        [1, 1, 0, 0, 2, 2],
+                        [1, 1, 0, 0, 2, 2]
+                    ],
+                    targets: { apple: 3, grape: 3 }
+                },
+                {
+                    id: 'ステージ2-4',
+                    name: 'ステージ2-4',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        ['a', 0, 'a', 0, 'g', 'a'],
+                        [0, 'g', 'a', 0, 'a', 0],
+                        ['g', 'g', 0, 'a', 0, 'g'],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    frames: [
+                        [1, 1, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 2, 2],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 2, grape: 2 }
+                },
+                {
+                    id: 'ステージ3-1',
+                    name: 'ステージ3-1',
+                    graphType: 'B',
+                    level: 1,
+                    fruits: [
+                        [0, 'a', 0, 'a', 0, 'a'],
+                        ['g', 'a', 'g', 'a', 'a', 'a'],
+                        [0, 'a', 0, 'a', 0, 'g'],
+                        ['a', 'a', 'a', 'a', 'a', 'g']
+                    ],
+                    frames: [
+                        [0, 0, 0, 0, 0, 0],
+                        [1, 1, 0, 0, 2, 0],
+                        [1, 1, 0, 2, 2, 0],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 3, grape: 3 }
+                },
+                {
+                    id: 'ステージ3-2',
+                    name: 'ステージ3-2',
+                    graphType: 'B',
+                    level: 1,
+                    fruits: [
+                        ['a', 0, 'a', 'a', 0, 'g'],
+                        ['a', 0, 'g', 'a', 0, 'a'],
+                        ['a', 0, 'g', 'a', 0, 'g'],
+                        ['g', 0, 'a', 'g', 0, 'a']
+                    ],
+                    frames: [
+                        [1, 1, 1, 0, 0, 0],
+                        [1, 1, 1, 0, 0, 0],
+                        [2, 0, 0, 0, 0, 0],
+                        [2, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 2, grape: 4 }
+                },
+                {
+                    id: 'ステージ3-3',
+                    name: 'ステージ3-3',
+                    graphType: 'B',
+                    level: 1,
+                    fruits: [
+                        ['a', 0, 0, 'g', 0, 0],
+                        [0, 'g', 'a', 0, 'a', 'g'],
+                        ['g', 0, 0, 'g', 'a', 0],
+                        ['a', 'g', 'a', 0, 0, 'g']
+                    ],
+                    frames: [
+                        [0, 1, 1, 0, 0, 0],
+                        [1, 1, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 2, 2],
+                        [0, 0, 0, 0, 2, 2]
+                    ],
+                    targets: { apple: 3, grape: 4 }
+                },
+                {
+                    id: 'ステージ3-4',
+                    name: 'ステージ3-4',
+                    graphType: 'B',
+                    level: 1,
+                    fruits: [
+                        ['g', 'a', 'a', 'a', 'a', 'a'],
+                        ['a', 'a', 'g', 'g', 'g', 'g'],
+                        ['a', 'a', 'a', 'a', 'a', 'a'],
+                        ['a', 'g', 'g', 'a', 'g', 'g']
+                    ],
+                    frames: [
+                        [1, 0, 0, 0, 2, 0],
+                        [1, 0, 0, 0, 2, 0],
+                        [1, 1, 0, 0, 2, 0],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 2, grape: 5 }
+                },
+
+
+                {
+                    id: 'ステージ4-1',
+                    name: 'ステージ4-1',
+                    graphType: 'C',
+                    level: 1,
+                    fruits: [
+                        ['g', 0, 0, 'a', 0, 0],
+                        [0, 0, 0, 0, 0, 'a'],
+                        [0, 'a', 0, 'a', 'a', 0],
+                        ['a', 0, 0, 'a', 0, 'a']
+                    ],
+                    frames: [
+                        [1, 1, 0, 2, 2, 0],
+                        [1, 1, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 3, grape: 1 }
+                },
+                {
+                    id: 'ステージ4-2',
+                    name: 'ステージ4-2',
+                    graphType: 'C',
+                    level: 1,
+                    fruits: [
+                        ['g', 'a', 'a', 0, 'g', 'a'],
+                        [0, 'a', 0, 0, 'a', 'a'],
+                        ['a', 0, 'g', 'a', 0, 0],
+                        ['a', 0, 'a', 'a', 0, 'g']
+                    ],
+                    frames: [
+                        [0, 0, 0, 0, 2, 2],
+                        [1, 1, 1, 0, 0, 0],
+                        [1, 1, 1, 0, 0, 0],
+                        [1, 1, 1, 0, 0, 0]
+                    ],
+                    targets: { apple: 3, grape: 3 }
+                },
+                {
+                    id: 'ステージ4-3',
+                    name: 'ステージ4-3',
+                    graphType: 'C',
+                    level: 1,
+                    fruits: [
+                        [0, 'a', 0, 'a', 0, 'a'],
+                        ['g', 'a', 'a', 'g', 'a', 'a'],
+                        [0, 'g', 0, 'a', 0, 'a'],
+                        ['a', 'g', 'a', 'g', 'a', 'g']
+                    ],
+                    frames: [
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 2, 2, 2],
+                        [1, 0, 0, 0, 0, 0],
+                        [1, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 1, grape: 4 }
+                },
+                {
+                    id: 'ステージ5-1',
+                    name: 'ステージ5-1',
+                    graphType: 'D',
+                    level: 1,
+                    fruits: [
+                        [0, 'a', 'a', 'a', 'a', 'g'],
+                        [0, 'a', 'a', 0, 0, 0],
+                        [0, 'a', 'a', 0, 0, 0],
+                        [0, 'g', 'a', 0, 0, 0]
+                    ],
+                    frames: [
+                        [2, 2, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0],
+                        [1, 1, 0, 0, 0, 0],
+                        [1, 1, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 3, grape: 1 }
+                },
+                {
+                    id: 'ステージ5-2',
+                    name: 'ステージ5-2',
+                    graphType: 'D',
+                    level: 1,
+                    fruits: [
+                        ['a', 0, 'g', 0, 'a', 0],
+                        [0, 'g', 0, 'a', 0, 'a'],
+                        ['g', 0, 'a', 0, 'g', 0],
+                        [0, 'a', 0, 'g', 0, 'g']
+                    ],
+                    frames: [
+                        [0, 1, 0, 0, 0, 0],
+                        [1, 1, 1, 0, 0, 0],
+                        [0, 2, 0, 0, 0, 0],
+                        [2, 2, 2, 0, 0, 0]
+                    ],
+                    targets: { apple: 4, grape: 2 }
+                },
+                {
+                    id: 'ステージ5-3',
+                    name: 'ステージ5-3',
+                    graphType: 'D',
+                    level: 1,
+                    fruits: [
+                        ['a', 'a', 'g', 'a', 'g', 'g'],
+                        ['a', 'g', 'a', 'a', 'a', 'a'],
+                        ['g', 'a', 'g', 'a', 'g', 'g'],
+                        ['a', 'a', 'a', 'a', 'a', 'g']
+                    ],
+                    frames: [
+                        [1, 1, 1, 0, 0, 2],
+                        [1, 0, 1, 0, 0, 2],
+                        [1, 0, 1, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 3, grape: 6 }
+                },
+                {
+                    id: 'ステージ6-1',
+                    name: 'ステージ6-1',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        ['k', 'a', 'g', 'g', 'k', 'k'],
+                        [0, 0, 0, 0, 0, 0],
+                        ['a', 'g', 'a', 'g', 'g', 'a'],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    frames: [
+                        [0, 0, 0, 0, 0, 0],
+                        [1, 1, 1, 2, 2, 2],
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 2, grape: 2, kiwi: 2 }
+                },
+                {
+                    id: 'ステージ6-2',
+                    name: 'ステージ6-2',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        ['a', 'k', 0, 0, 'k', 'k'],
+                        ['a', 'k', 'g', 'a', 'g', 'g'],
+                        [0, 'g', 'g', 'a', 'a', 0],
+                        [0, 0, 'a', 'a', 0, 0]
+                    ],
+                    frames: [
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0],
+                        [1, 1, 0, 0, 2, 2],
+                        [1, 1, 0, 0, 2, 2]
+                    ],
+                    targets: { apple: 2, grape: 4, kiwi: 2 }
+                },
+                {
+                    id: 'ステージ6-3',
+                    name: 'ステージ6-3',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        ['a', 'a', 'k', 'k', 'k', 'k'],
+                        ['a', 'a', 'k', 'k', 'k', 'k'],
+                        ['a', 'a', 'k', 'k', 'k', 'k'],
+                        ['g', 'g', 'g', 'g', 'g', 'g']
+                    ],
+                    frames: [
+                        [1, 1, 0, 0, 2, 2],
+                        [1, 1, 0, 0, 2, 2],
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 3, grape: 2, kiwi: 3 }
+                },
+
+
+
+
+
+                {
+                    id: 'ステージ7-1',
+                    name: 'ステージ7-1',
+                    graphType: 'C',
+                    level: 1,
+                    fruits: [
+                        [0, 0, 'k', 'k', 'a', 'a'],
+                        ['g', 'g', 'k', 'k', 'a', 'a'],
+                        ['g', 'g', 'g', 'g', 'g', 'g'],
+                        ['k', 'k', 'g', 'g', 0, 0]
+                    ],
+                    frames: [
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 2, 2],
+                        [1, 1, 0, 0, 2, 2],
+                        [1, 1, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 2, grape: 2, kiwi: 2 }
+                },
+                {
+                    id: 'ステージ7-2',
+                    name: 'ステージ7-2',
+                    graphType: 'C',
+                    level: 1,
+                    fruits: [
+                        ['k', 'g', 'a', 'k', 0, 0],
+                        [0, 0, 'k', 'g', 'k', 'a'],
+                        ['a', 'k', 'g', 'k', 0, 0],
+                        [0, 0, 'k', 'g', 'a', 'k']
+                    ],
+                    frames: [
+                        [1, 1, 0, 0, 0, 0],
+                        [1, 1, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 2, 2],
+                        [0, 0, 0, 0, 2, 2]
+                    ],
+                    targets: { apple: 2, grape: 2, kiwi: 2 }
+                },
+                {
+                    id: 'ステージ7-3',
+                    name: 'ステージ7-3',
+                    graphType: 'D',
+                    level: 1,
+                    fruits: [
+                        ['k', 'g', 0, 'k', 'g', 0],
+                        ['g', 'a', 'g', 'a', 'k', 'g'],
+                        ['a', 'k', 'g', 'a', 'g', 'a'],
+                        [0, 'a', 'k', 0, 'a', 'k']
+                    ],
+                    frames: [
+                        [1, 1, 0, 0, 2, 2],
+                        [1, 1, 0, 0, 2, 2],
+                        [0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 2, grape: 2, kiwi: 4 }
+                },
+                {
+                    id: 'stage10',
+                    name: '問題 10 (6x8 棒グラフ)',
+                    graphType: 'A',
+                    level: 1,
+                    fruits: [
+                        ['a', 'g', 'a', 'g', 'a', 'g', 'a', 'g'],
+                        ['g', 'a', 'g', 'a', 'g', 'a', 'g', 'a'],
+                        ['a', 'g', 'a', 'g', 'a', 'g', 'a', 'g'],
+                        ['g', 'a', 'g', 'a', 'g', 'a', 'g', 'a'],
+                        ['k', 'k', 'k', 'k', 'k', 'k', 'k', 'k'],
+                        ['a', 'g', 'k', 0, 0, 'k', 'g', 'a']
+                    ],
+                    frames: [
+                        [0, 1, 1, 1, 0, 0, 0, 0],
+                        [0, 1, 1, 1, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 2, 2, 0],
+                        [0, 0, 0, 0, 0, 2, 2, 0],
+                        [0, 0, 0, 0, 0, 2, 2, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0]
+                    ],
+                    targets: { apple: 3, grape: 3, kiwi: 3 }
+                }
+            ];
+
+            // --- 制御リスト (学年とレベルの対応) ---
+            const LEVEL_MAP = {
+                // 1・2年生はレベル1のみ (初級)
+                '1-2': [1],
+                // 3・4年生はレベル1（復習）とレベル2（本編）
+                '3-4': [1, 2]
+            };
+
+            // --- 状態変数 ---
+            let stages = []; // 選択された学年でフィルタリングされた問題リスト
+            let currentStage = null;
+            let currentCounts = { apple: 0, grape: 0, kiwi: 0 };
+            let frames = [];
+            let boardRows = 4;
+            let boardCols = 6;
+            let currentStageIndex = 0; // 現在の問題のインデックス
+            let clearedStages = new Set(); // クリアした問題IDを保持 (sessionStorageからロード)
+
+            // DOM要素
+            let boardElement = document.getElementById('board-area');
+            let chartContainers = {
+                A: document.getElementById('chart-A'),
+                B: document.getElementById('chart-B'),
+                C: document.getElementById('chart-C'),
+                D: document.getElementById('chart-D')
+            };
+            let winMessageElement = document.getElementById('win-message');
+            let stageSelectElement = document.getElementById('stage-select');
+            let nextButton = document.getElementById('next-stage-button');
+            let gradeSelectScreen = document.getElementById('grade-select-screen');
+            let mainGameContainer = document.getElementById('main-game-container');
+
+            // ドラッグの状態
+            let isDragging = false;
+            let activeFrame = null;
+            let dragStartPos = { x: 0, y: 0 };
+            let dragStartGrid = { r: 0, c: 0 };
+            let lastDragGrid = { r: 0, c: 0 };
+
+            // 星のSVGパス
+            const STAR_PATH_D = "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
+            const STAR_SIZE = 24;
+            const STAR_OFFSET = STAR_SIZE / 2;
+
+            // --- 2. 初期化/イベントハンドラ ---
+
+            function loadClearedStages() {
+                // sessionStorageからクリア情報をロード（ブラウザを閉じるとリセットされる）
+                const cleared = sessionStorage.getItem('clearedStages');
+                if (cleared) {
+                    try {
+                        clearedStages = new Set(JSON.parse(cleared));
+                    } catch {
+                        clearedStages = new Set();
+                    }
+                }
+            }
+
+            function saveClearedStages() {
+                // クリア情報をsessionStorageに保存
+                sessionStorage.setItem('clearedStages', JSON.stringify(Array.from(clearedStages)));
+            }
+
+            function filterStages(gradeKey) {
+                const allowedLevels = LEVEL_MAP[gradeKey] || [];
+
+                // 許可されたレベルの問題のみをフィルタリング
+                stages = ALL_STAGES.filter(stage => allowedLevels.includes(stage.level));
+
+                if (stages.length === 0) {
+                    console.error("Warning: No stages found for selected grade:", gradeKey);
+                }
+                currentStageIndex = 0;
+            }
+
+            function initApp() {
+                loadClearedStages();
+
+                // 学年選択ボタンのイベントリスナー
+                document.getElementById('select-1-2').addEventListener('click', (e) => handleGradeSelect(e.currentTarget.dataset.grade));
+                document.getElementById('select-3-4').addEventListener('click', (e) => handleGradeSelect(e.currentTarget.dataset.grade));
+
+                // クリアメッセージのクリックイベント（閉じる）
+                winMessageElement.addEventListener('click', () => {
+                    winMessageElement.classList.remove('active');
+                });
+            }
+
+            function handleGradeSelect(gradeKey) {
+                // 問題をフィルタリング
+                filterStages(gradeKey);
+
+                // アニメーションと切り替えタイミングの調整
+
+                // 1. まず学年選択画面をフェードアウト (opacity: 0, click無効)
+                gradeSelectScreen.classList.add('opacity-0', 'pointer-events-none');
+                gradeSelectScreen.classList.remove('opacity-100');
+
+                // 2. フェードアウトのtransition(300ms)を待ってからDOM操作を行う
+                setTimeout(() => {
+                    // 学年選択画面を非表示 (display: none)
+                    gradeSelectScreen.classList.add('hidden');
+
+                    // メインゲームコンテナを表示準備 (display: block等)
+                    mainGameContainer.classList.remove('hidden');
+
+                    // ブラウザの描画更新を待つために少し遅らせるか、requestAnimationFrameを使う
+                    requestAnimationFrame(() => {
+                        mainGameContainer.classList.remove('opacity-0');
+                        mainGameContainer.classList.add('opacity-100');
+                    });
+
+                    setupGameUI(); // UIをセットアップして最初の問題をロード
+                }, 300); // CSSのtransition時間に合わせる
+            }
+
+            function setupGameUI() {
+                // ドロップダウン変更時のイベントリスナー
+                stageSelectElement.addEventListener('change', (e) => {
+                    const selectedStageId = e.target.value;
+                    const index = stages.findIndex(s => s.id === selectedStageId);
+                    if (index !== -1) {
+                        currentStageIndex = index;
+                        loadStage(stages[currentStageIndex]);
+                    }
+                });
+
+                // 「つぎの もんだいへ」ボタンのイベントリスナー
+                nextButton.addEventListener('click', goToNextStage);
+
+                // 全グラフの静的要素を初期化
+                initAllCharts();
+
+                // 問題リストをUIに表示し、最初の問題をロード
+                updateStageSelectUI();
+                loadStage(stages[0]);
+            }
+
+            function updateStageSelectUI() {
+                stageSelectElement.innerHTML = ''; // 既存のオプションをクリア
+
+                stages.forEach((stage, index) => {
+                    const option = document.createElement('option');
+                    option.value = stage.id;
+
+                    // クリアマークを追加
+                    const star = clearedStages.has(stage.id) ? ' ★' : '';
+                    option.textContent = `${stage.name}${star}`;
+
+                    option.selected = (index === currentStageIndex);
+                    stageSelectElement.appendChild(option);
+                });
+
+                // 次へボタンの状態を更新
+                updateNextButtonState();
+            }
+
+            function updateNextButtonState() {
+                const isLastStage = currentStageIndex === stages.length - 1;
+                nextButton.disabled = isLastStage;
+                // クリア状態に応じて、次のボタンのアニメーションもリセット
+                if (nextButton.disabled) {
+                    nextButton.classList.remove('animate-pulse');
+                }
+            }
+
+            function goToNextStage() {
+                if (currentStageIndex < stages.length - 1) {
+                    currentStageIndex++;
+                    loadStage(stages[currentStageIndex]);
+                    // ドロップダウンも更新
+                    stageSelectElement.value = stages[currentStageIndex].id;
+                    updateNextButtonState();
+                }
+            }
+
+
+            // ステージを読み込む (初期化処理)
+            function loadStage(stageData) {
+                currentStage = stageData;
+
+                // --- 盤面のサイズをステージから取得 ---
+                boardRows = stageData.fruits.length;
+                boardCols = stageData.fruits[0].length;
+                // CSS変数を更新して、グリッドレイアウトを動的に変更
+                boardElement.style.setProperty('--board-rows', boardRows);
+                boardElement.style.setProperty('--board-cols', boardCols);
+
+                // 表示するグラフコンテナを切り替え
+                for (const type in chartContainers) {
+                    chartContainers[type].style.display = (type === currentStage.graphType) ? 'block' : 'none';
+                }
+
+                initBoard(currentStage.fruits);
+                initFrames(currentStage.frames);
+                // グラフの「目標」を更新
+                updateChartTargets(currentStage.graphType, currentStage.targets);
+
+                // クリアメッセージを隠す (クラス制御に変更)
+                winMessageElement.classList.remove('active');
+                nextButton.classList.remove('animate-pulse'); // ステージロード時にアニメーションをリセット
+
+                updateGame(false); // 初回更新 (アニメーションなし)
+            }
+
+            // 盤面(マスと果物)のDOMを生成 (変更なし)
+            function initBoard(fruitsLayout) {
+                boardElement.innerHTML = '';
+                let cells = [];
+
+                for (let r = 0; r < boardRows; r++) {
+                    for (let c = 0; c < boardCols; c++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        cell.style.gridRow = r + 1;
+                        cell.style.gridColumn = c + 1;
+
+                        const fruit = fruitsLayout[r][c];
+                        if (fruit === 'a') {
+                            cell.textContent = '🍎';
+                        } else if (fruit === 'g') {
+                            cell.textContent = '🍇';
+                        } else if (fruit === 'k') {
+                            cell.textContent = '🥝';
+                        }
+                        cells.push(cell);
+                    }
+                }
+                boardElement.append(...cells);
+            }
+
+            // 枠の内部データとDOMを生成 (変更なし)
+            function initFrames(framesLayout) {
+                frames = [];
+                const framePiecesDOM = [];
+
+                const tempFrames = new Map();
+                for (let r = 0; r < boardRows; r++) {
+                    for (let c = 0; c < boardCols; c++) {
+                        const frameId = framesLayout[r][c];
+                        if (frameId > 0) {
+                            if (!tempFrames.has(frameId)) {
+                                tempFrames.set(frameId, { pieces: [], minR: r, minC: c });
+                            }
+                            const data = tempFrames.get(frameId);
+                            data.pieces.push({ r, c });
+                            data.minR = Math.min(data.minR, r);
+                            data.minC = Math.min(data.minC, c);
+                        }
+                    }
+                }
+
+                tempFrames.forEach(data => {
+                    data.pieceSet = new Set(data.pieces.map(p => `${p.r},${p.c}`));
+                });
+
+                tempFrames.forEach((data, id) => {
+                    const anchor = { r: data.minR, c: data.minC };
+                    const frame = {
+                        id: id,
+                        anchor: anchor,
+                        pieces: [],
+                        domElements: []
+                    };
+
+                    const pieceSet = data.pieceSet;
+
+                    data.pieces.forEach(pos => {
+                        const offset = { r: pos.r - anchor.r, c: pos.c - anchor.c };
+                        frame.pieces.push(offset);
+
+                        const pieceElement = document.createElement('div');
+                        pieceElement.classList.add('frame-piece');
+                        pieceElement.dataset.frameId = id;
+
+                        pieceElement.style.gridRow = pos.r + 1;
+                        pieceElement.style.gridColumn = pos.c + 1;
+
+                        const r = pos.r;
+                        const c = pos.c;
+
+                        const hasTop = pieceSet.has(`${r - 1},${c}`);
+                        const hasBottom = pieceSet.has(`${r + 1},${c}`);
+                        const hasLeft = pieceSet.has(`${r},${c - 1}`);
+                        const hasRight = pieceSet.has(`${r},${c + 1}`);
+
+                        const shadows = [];
+                        const radius = '8px';
+
+                        if (!hasTop) shadows.push("inset 0 4px 0 0 #E53E3E");
+                        if (!hasBottom) shadows.push("inset 0 -4px 0 0 #E53E3E");
+                        if (!hasLeft) shadows.push("inset 4px 0 0 0 #E53E3E");
+                        if (!hasRight) shadows.push("inset -4px 0 0 0 #E53E3E");
+
+                        pieceElement.style.boxShadow = shadows.join(', ');
+
+                        pieceElement.style.borderRadius = '0';
+                        if (!hasTop && !hasLeft) pieceElement.style.borderTopLeftRadius = radius;
+                        if (!hasTop && !hasRight) pieceElement.style.borderTopRightRadius = radius;
+                        if (!hasBottom && !hasLeft) pieceElement.style.borderBottomLeftRadius = radius;
+                        if (!hasBottom && !hasRight) pieceElement.style.borderBottomRightRadius = radius;
+
+                        pieceElement.addEventListener('mousedown', handleDragStart);
+                        pieceElement.addEventListener('touchstart', handleDragStart, { passive: false });
+
+                        frame.domElements.push(pieceElement);
+                        framePiecesDOM.push(pieceElement);
+                    });
+
+                    frames.push(frame);
+                });
+
+                boardElement.append(...framePiecesDOM);
+            }
+
+            // --- グラフ初期化 (初回1回のみ) ---
+            function initAllCharts() {
+                initChartA();
+                initChartB();
+                initChartC();
+                initChartD();
+            }
+
+            // グラフA (棒グラフ) の静的要素を初期化 (変更なし)
+            function initChartA() {
+                const svg = document.getElementById('chart-svg-A');
+                const svgNS = "http://www.w3.org/2000/svg";
+                const chartBottomY = 230;
+                const barWidth = 40;
+
+                const axis = document.createElementNS(svgNS, 'line');
+                axis.setAttribute('x1', '20');
+                axis.setAttribute('y1', chartBottomY - 20);
+                axis.setAttribute('x2', '180');
+                axis.setAttribute('y2', chartBottomY - 20);
+                axis.setAttribute('stroke', '#333');
+                axis.setAttribute('stroke-width', '2');
+                svg.appendChild(axis);
+
+                const xApple = 60;
+                const targetStarApple = createStar(
+                    'star-dashed star-dashed-apple',
+                    xApple,
+                    chartBottomY - 20
+                );
+                targetStarApple.id = 'target-star-A-apple';
+
+                const barApple = document.createElementNS(svgNS, 'rect');
+                barApple.setAttribute('id', 'bar-apple');
+                barApple.setAttribute('class', 'bar-apple');
+                barApple.setAttribute('x', xApple - barWidth / 2);
+                barApple.setAttribute('width', barWidth);
+                barApple.setAttribute('rx', '4');
+
+                const currentStarApple = createStar(
+                    'star star-solid-apple',
+                    xApple,
+                    chartBottomY - 20
+                );
+                currentStarApple.setAttribute('id', 'star-apple');
+
+                const iconApple = document.createElementNS(svgNS, 'text');
+                iconApple.setAttribute('id', 'icon-A-apple');
+                iconApple.setAttribute('class', 'chart-icon');
+                iconApple.setAttribute('x', xApple);
+                iconApple.setAttribute('y', chartBottomY + 5);
+                iconApple.setAttribute('text-anchor', 'middle');
+                iconApple.textContent = '🍎';
+
+                const xGrape = 140;
+                const targetStarGrape = createStar(
+                    'star-dashed star-dashed-grape',
+                    xGrape,
+                    chartBottomY - 20
+                );
+                targetStarGrape.id = 'target-star-A-grape';
+
+                const barGrape = document.createElementNS(svgNS, 'rect');
+                barGrape.setAttribute('id', 'bar-grape');
+                barGrape.setAttribute('class', 'bar-grape');
+                barGrape.setAttribute('x', xGrape - barWidth / 2);
+                barGrape.setAttribute('width', barWidth);
+                barGrape.setAttribute('rx', '4');
+
+                const currentStarGrape = createStar(
+                    'star star-solid-grape',
+                    xGrape,
+                    chartBottomY - 20
+                );
+                currentStarGrape.setAttribute('id', 'star-grape');
+
+                const iconGrape = document.createElementNS(svgNS, 'text');
+                iconGrape.setAttribute('id', 'icon-A-grape');
+                iconGrape.setAttribute('class', 'chart-icon');
+                iconGrape.setAttribute('x', xGrape);
+                iconGrape.setAttribute('y', chartBottomY + 5);
+                iconGrape.setAttribute('text-anchor', 'middle');
+                iconGrape.textContent = '🍇';
+
+                const xKiwi = 100;
+                const targetStarKiwi = createStar(
+                    'star-dashed star-dashed-kiwi',
+                    xKiwi,
+                    chartBottomY - 20
+                );
+                targetStarKiwi.id = 'target-star-A-kiwi';
+
+                const barKiwi = document.createElementNS(svgNS, 'rect');
+                barKiwi.setAttribute('id', 'bar-kiwi');
+                barKiwi.setAttribute('class', 'bar-kiwi');
+                barKiwi.setAttribute('x', xKiwi - barWidth / 2);
+                barKiwi.setAttribute('width', barWidth);
+                barKiwi.setAttribute('rx', '4');
+
+                const currentStarKiwi = createStar(
+                    'star star-solid-kiwi',
+                    xKiwi,
+                    chartBottomY - 20
+                );
+                currentStarKiwi.setAttribute('id', 'star-kiwi');
+
+                const iconKiwi = document.createElementNS(svgNS, 'text');
+                iconKiwi.setAttribute('id', 'icon-A-kiwi');
+                iconKiwi.setAttribute('class', 'chart-icon');
+                iconKiwi.setAttribute('x', xKiwi);
+                iconKiwi.setAttribute('y', chartBottomY + 5);
+                iconKiwi.setAttribute('text-anchor', 'middle');
+                iconKiwi.textContent = '🥝';
+
+                svg.appendChild(barApple);
+                svg.appendChild(barGrape);
+                svg.appendChild(barKiwi);
+                svg.appendChild(targetStarApple);
+                svg.appendChild(currentStarApple);
+                svg.appendChild(targetStarGrape);
+                svg.appendChild(currentStarGrape);
+                svg.appendChild(targetStarKiwi);
+                svg.appendChild(currentStarKiwi);
+                svg.appendChild(iconApple);
+                svg.appendChild(iconGrape);
+                svg.appendChild(iconKiwi);
+            }
+
+            // グラフB (散布図) の静的要素を初期化 (変更なし)
+            function initChartB() {
+                const svg = document.getElementById('chart-svg-B');
+                const svgNS = "http://www.w3.org/2000/svg";
+                const maxCount = 7;
+                const chartWidth = 200;
+                const chartHeight = 200;
+                const origin = { x: 25, y: 225 };
+
+                const getX = (count) => origin.x + (count * (chartWidth / maxCount));
+                const getY = (count) => origin.y - (count * (chartHeight / maxCount));
+
+                const yAxis = document.createElementNS(svgNS, 'line');
+                yAxis.setAttribute('class', 'axis');
+                yAxis.setAttribute('x1', origin.x);
+                yAxis.setAttribute('y1', origin.y);
+                yAxis.setAttribute('x2', origin.x);
+                yAxis.setAttribute('y2', origin.y - chartHeight);
+                svg.appendChild(yAxis);
+
+                const yIcon = document.createElementNS(svgNS, 'text');
+                yIcon.setAttribute('class', 'chart-icon');
+                yIcon.setAttribute('x', origin.x - 10);
+                yIcon.setAttribute('y', origin.y - chartHeight);
+                yIcon.setAttribute('text-anchor', 'end');
+                yIcon.textContent = '🍎';
+                svg.appendChild(yIcon);
+
+                const xAxis = document.createElementNS(svgNS, 'line');
+                xAxis.setAttribute('class', 'axis');
+                xAxis.setAttribute('x1', origin.x);
+                xAxis.setAttribute('y1', origin.y);
+                xAxis.setAttribute('x2', origin.x + chartWidth);
+                xAxis.setAttribute('y2', origin.y);
+                svg.appendChild(xAxis);
+
+                const xIcon = document.createElementNS(svgNS, 'text');
+                xIcon.setAttribute('class', 'chart-icon');
+                xIcon.setAttribute('x', origin.x + chartWidth);
+                xIcon.setAttribute('y', origin.y + 25);
+                xIcon.setAttribute('text-anchor', 'middle');
+                xIcon.textContent = '🍇';
+                svg.appendChild(xIcon);
+
+                for (let i = 1; i <= maxCount; i++) {
+                    const gx = getX(i);
+                    const gy = getY(i);
+
+                    const tickX = document.createElementNS(svgNS, 'line');
+                    tickX.setAttribute('x1', gx);
+                    tickX.setAttribute('y1', origin.y - 5);
+                    tickX.setAttribute('x2', gx);
+                    tickX.setAttribute('y2', origin.y);
+                    tickX.setAttribute('stroke', '#ccc');
+                    svg.appendChild(tickX);
+
+                    const tickY = document.createElementNS(svgNS, 'line');
+                    tickY.setAttribute('x1', origin.x);
+                    tickY.setAttribute('y1', gy);
+                    tickY.setAttribute('x2', origin.x + 5);
+                    tickY.setAttribute('y2', gy);
+                    tickY.setAttribute('stroke', '#ccc');
+                    svg.appendChild(tickY);
+                }
+
+
+                const targetStar = createStar(
+                    'star-dashed star-dashed-b',
+                    getX(0),
+                    getY(0)
+                );
+                targetStar.id = 'target-star-B';
+
+                const lineX = document.createElementNS(svgNS, 'line');
+                lineX.setAttribute('id', 'guide-line-B-x');
+                lineX.setAttribute('class', 'guide-line');
+                svg.appendChild(lineX);
+                const lineY = document.createElementNS(svgNS, 'line');
+                lineY.setAttribute('id', 'guide-line-B-y');
+                lineY.setAttribute('class', 'guide-line');
+                svg.appendChild(lineY);
+
+                const currentStar = createStar(
+                    'star star-solid-b',
+                    getX(0),
+                    getY(0)
+                );
+                currentStar.id = 'star-B';
+
+                svg.appendChild(targetStar);
+                svg.appendChild(currentStar);
+
+                const style = document.createElementNS(svgNS, 'style');
+                style.textContent = `
+                    .star-dashed-b { stroke: #F6AD55; fill: none; stroke-width: 2; stroke-dasharray: 0.6 0.6; }
+                    .star-solid-b { fill: #F6AD55; stroke: #D69E2E; stroke-width: 1; }
+                `;
+                svg.appendChild(style);
+            }
+
+            // グラフC (円グラフ) の静的要素を初期化 (変更なし)
+            function initChartC() {
+                const svg = document.getElementById('chart-svg-C');
+                const svgNS = "http://www.w3.org/2000/svg";
+                const cx = 100;
+                const cy = 120;
+                const r = 80;
+
+                const targetStarApple = createStar(
+                    'star-dashed star-dashed-apple',
+                    cx, cy - r
+                );
+                targetStarApple.id = 'target-star-C-apple';
+
+                const targetStarGrape = createStar(
+                    'star-dashed star-dashed-grape',
+                    cx, cy - r
+                );
+                targetStarGrape.id = 'target-star-C-grape';
+                targetStarGrape.style.display = 'none';
+
+                const sliceKiwi = document.createElementNS(svgNS, 'path');
+                sliceKiwi.id = 'pie-kiwi';
+                sliceKiwi.setAttribute('class', 'pie-slice-kiwi');
+                svg.appendChild(sliceKiwi);
+
+                const sliceGrape = document.createElementNS(svgNS, 'path');
+                sliceGrape.id = 'pie-grape';
+                sliceGrape.setAttribute('class', 'pie-slice-grape');
+                svg.appendChild(sliceGrape);
+
+                const sliceApple = document.createElementNS(svgNS, 'path');
+                sliceApple.id = 'pie-apple';
+                sliceApple.setAttribute('class', 'pie-slice-apple');
+                svg.appendChild(sliceApple);
+
+                const iconApple = document.createElementNS(svgNS, 'text');
+                iconApple.id = 'icon-C-apple';
+                iconApple.setAttribute('class', 'chart-icon');
+                iconApple.setAttribute('x', cx + r);
+                iconApple.setAttribute('y', cy - r - 10);
+                iconApple.setAttribute('text-anchor', 'middle');
+                iconApple.textContent = '🍎';
+                svg.appendChild(iconApple);
+
+                const iconGrape = document.createElementNS(svgNS, 'text');
+                iconGrape.id = 'icon-C-grape';
+                iconGrape.setAttribute('class', 'chart-icon');
+                iconGrape.setAttribute('x', cx - r);
+                iconGrape.setAttribute('y', cy - r - 10);
+                iconGrape.setAttribute('text-anchor', 'middle');
+                iconGrape.textContent = '🍇';
+                svg.appendChild(iconGrape);
+
+                const iconKiwi = document.createElementNS(svgNS, 'text');
+                iconKiwi.id = 'icon-C-kiwi';
+                iconKiwi.setAttribute('class', 'chart-icon');
+                iconKiwi.setAttribute('x', cx);
+                iconKiwi.setAttribute('y', cy - r - 10);
+                iconKiwi.setAttribute('text-anchor', 'middle');
+                iconKiwi.textContent = '🥝';
+                iconKiwi.style.display = 'none';
+                svg.appendChild(iconKiwi);
+
+
+                const currentStarApple = createStar(
+                    'star star-solid-apple',
+                    cx, cy - r
+                );
+                currentStarApple.id = 'star-C-apple';
+
+                const currentStarGrape = createStar(
+                    'star star-solid-grape',
+                    cx, cy - r
+                );
+                currentStarGrape.id = 'star-C-grape';
+                currentStarGrape.style.display = 'none';
+
+                svg.appendChild(targetStarApple);
+                svg.appendChild(targetStarGrape);
+                svg.appendChild(currentStarApple);
+                svg.appendChild(currentStarGrape);
+            }
+
+            // グラフD (帯グラフ) の静的要素を初期化 (変更なし)
+            function initChartD() {
+                // JSで初期化する静的要素は特になし
+            }
+
+            // グラフの「目標」を更新
+            function updateChartTargets(graphType, targets) {
+                const svgNS = "http://www.w3.org/2000/svg";
+
+                switch (graphType) {
+                    case 'A': {
+                        const chartBottomY = 230;
+                        const chartHeight = 200;
+                        const hasGrape = targets.grape !== undefined;
+                        const hasKiwi = targets.kiwi !== undefined;
+                        const maxCount = Math.max(5, (targets.apple || 0), (targets.grape || 0), (targets.kiwi || 0)) + 1;
+
+                        const getY = (count) => chartBottomY - 20 - (count * (chartHeight / maxCount));
+
+                        const xApple = hasKiwi ? 40 : (hasGrape ? 60 : 100);
+                        const xGrape = hasKiwi ? 100 : 140;
+                        const xKiwi = 160;
+                        const barWidth = 40;
+
+                        const targetApple = document.getElementById('target-star-A-apple');
+                        const barApple = document.getElementById('bar-apple');
+                        const starApple = document.getElementById('star-apple');
+                        const iconApple = document.getElementById('icon-A-apple');
+
+                        const targetGrape = document.getElementById('target-star-A-grape');
+                        const barGrape = document.getElementById('bar-grape');
+                        const starGrape = document.getElementById('star-grape');
+                        const iconGrape = document.getElementById('icon-A-grape');
+
+                        const targetKiwi = document.getElementById('target-star-A-kiwi');
+                        const barKiwi = document.getElementById('bar-kiwi');
+                        const starKiwi = document.getElementById('star-kiwi');
+                        const iconKiwi = document.getElementById('icon-A-kiwi');
+
+                        const targetYApple = getY(targets.apple);
+                        targetApple.setAttribute('transform', `translate(${xApple - STAR_OFFSET}, ${targetYApple - STAR_OFFSET}) scale(1.2)`);
+                        barApple.setAttribute('x', xApple - barWidth / 2);
+                        iconApple.setAttribute('x', xApple);
+                        iconApple.setAttribute('y', chartBottomY + 5);
+                        starApple.setAttribute('transform', `translate(${xApple - STAR_OFFSET}, ${getY(0) - STAR_OFFSET}) scale(1.2)`);
+
+                        if (hasGrape) {
+                            const targetYGrape = getY(targets.grape);
+                            targetGrape.setAttribute('transform', `translate(${xGrape - STAR_OFFSET}, ${targetYGrape - STAR_OFFSET}) scale(1.2)`);
+                            barGrape.setAttribute('x', xGrape - barWidth / 2);
+                            iconGrape.setAttribute('x', xGrape);
+                            iconGrape.setAttribute('y', chartBottomY + 5);
+                            starGrape.setAttribute('transform', `translate(${xGrape - STAR_OFFSET}, ${getY(0) - STAR_OFFSET}) scale(1.2)`);
+
+                            targetGrape.style.display = 'block';
+                            barGrape.style.display = 'block';
+                            starGrape.style.display = 'block';
+                            iconGrape.style.display = 'block';
+                        } else {
+                            targetGrape.style.display = 'none';
+                            barGrape.style.display = 'none';
+                            starGrape.style.display = 'none';
+                            iconGrape.style.display = 'none';
+                        }
+
+                        if (hasKiwi) {
+                            const targetYKiwi = getY(targets.kiwi);
+                            targetKiwi.setAttribute('transform', `translate(${xKiwi - STAR_OFFSET}, ${targetYKiwi - STAR_OFFSET}) scale(1.2)`);
+                            barKiwi.setAttribute('x', xKiwi - barWidth / 2);
+                            iconKiwi.setAttribute('x', xKiwi);
+                            iconKiwi.setAttribute('y', chartBottomY + 5);
+                            starKiwi.setAttribute('transform', `translate(${xKiwi - STAR_OFFSET}, ${getY(0) - STAR_OFFSET}) scale(1.2)`);
+
+                            targetKiwi.style.display = 'block';
+                            barKiwi.style.display = 'block';
+                            starKiwi.style.display = 'block';
+                            iconKiwi.style.display = 'block';
+                        } else {
+                            targetKiwi.style.display = 'none';
+                            barKiwi.style.display = 'none';
+                            starKiwi.style.display = 'none';
+                            iconKiwi.style.display = 'none';
+                        }
+
+                        break;
+                    }
+                    case 'B': {
+                        const maxCount = 7;
+                        const chartWidth = 200;
+                        const chartHeight = 200;
+                        const origin = { x: 25, y: 225 };
+
+                        const getX = (count) => origin.x + (count * (chartWidth / maxCount));
+                        const getY = (count) => origin.y - (count * (chartHeight / maxCount));
+
+                        const tx = getX(targets.grape);
+                        const ty = getY(targets.apple);
+
+                        document.getElementById('target-star-B').setAttribute('transform', `translate(${tx - STAR_OFFSET}, ${ty - STAR_OFFSET}) scale(1.2)`);
+                        break;
+                    }
+                    case 'C': {
+                        const cx = 100, cy = 120, r = 80;
+                        const total = (targets.apple || 0) + (targets.grape || 0) + (targets.kiwi || 0);
+                        const hasKiwi = (targets.kiwi || 0) > 0;
+
+                        const iconApple = document.getElementById('icon-C-apple');
+                        const iconGrape = document.getElementById('icon-C-grape');
+                        const iconKiwi = document.getElementById('icon-C-kiwi');
+
+                        if (hasKiwi) {
+                            // 3種: Kiwi(左上), Apple(右上), Grape(下中央)
+                            iconKiwi.style.display = 'block';
+
+                            // Kiwi (左上)
+                            iconKiwi.setAttribute('x', cx - r);
+                            iconKiwi.setAttribute('y', cy - r - 10);
+
+                            // Apple (右上)
+                            iconApple.setAttribute('x', cx + r);
+                            iconApple.setAttribute('y', cy - r - 10);
+
+                            // Grape (下中央)
+                            iconGrape.setAttribute('x', cx);
+                            iconGrape.setAttribute('y', cy + r + 40);
+                            iconGrape.style.display = 'block';
+
+                        } else {
+                            // 2種: Grape(左上), Apple(右上)
+                            iconKiwi.style.display = 'none';
+
+                            // Apple (右上)
+                            iconApple.setAttribute('x', cx + r);
+                            iconApple.setAttribute('y', cy - r - 10);
+
+                            // Grape (左上)
+                            iconGrape.setAttribute('x', cx - r);
+                            iconGrape.setAttribute('y', cy - r - 10);
+                            iconGrape.style.display = 'block';
+                        }
+
+                        const ratioApple = (total > 0) ? ((targets.apple || 0) / total) : 0;
+                        const angleRadApple = (ratioApple * 2 * Math.PI) - (Math.PI / 2);
+                        const txApple = cx + r * Math.cos(angleRadApple);
+                        const tyApple = cy + r * Math.sin(angleRadApple);
+                        document.getElementById('target-star-C-apple').setAttribute('transform', `translate(${txApple - STAR_OFFSET}, ${tyApple - STAR_OFFSET}) scale(1.2)`);
+
+                        const starGrape = document.getElementById('target-star-C-grape');
+                        if (hasKiwi) {
+                            const ratioGrape = (total > 0) ? (((targets.apple || 0) + (targets.grape || 0)) / total) : 0;
+                            const angleRadGrape = (ratioGrape * 2 * Math.PI) - (Math.PI / 2);
+                            const txGrape = cx + r * Math.cos(angleRadGrape);
+                            const tyGrape = cy + r * Math.sin(angleRadGrape);
+                            starGrape.setAttribute('transform', `translate(${txGrape - STAR_OFFSET}, ${tyGrape - STAR_OFFSET}) scale(1.2)`);
+                            starGrape.style.display = 'block';
+                        } else {
+                            starGrape.style.display = 'none';
+                        }
+
+                        break;
+                    }
+                    case 'D': {
+                        const total = (targets.apple || 0) + (targets.grape || 0) + (targets.kiwi || 0);
+                        const hasKiwi = (targets.kiwi || 0) > 0;
+
+                        const iconContainer = document.getElementById('bar-D-icons');
+                        const iconApple = iconContainer.querySelector('.icon-apple');
+                        const iconGrape = iconContainer.querySelector('.icon-grape');
+                        const iconKiwi = iconContainer.querySelector('.icon-kiwi');
+
+                        document.getElementById('bar-D-kiwi').style.display = hasKiwi ? 'block' : 'none';
+
+                        if (hasKiwi) {
+                            // 3種: Apple, Grape, Kiwi の順に並べ替え
+                            iconContainer.classList.add('three-fruits');
+                            iconKiwi.style.display = 'inline';
+
+                            iconContainer.appendChild(iconApple);
+                            iconContainer.appendChild(iconGrape);
+                            iconContainer.appendChild(iconKiwi);
+
+                        } else {
+                            // 2種: Apple, Grape の順
+                            iconContainer.classList.remove('three-fruits');
+                            iconKiwi.style.display = 'none';
+
+                            iconContainer.appendChild(iconApple);
+                            iconContainer.appendChild(iconGrape);
+                        }
+
+                        const ratioApple = (total > 0) ? (((targets.apple || 0) / total) * 100) : 0;
+                        document.getElementById('star-D-target-apple').style.left = `${ratioApple}%`;
+
+                        const starGrapeTarget = document.getElementById('star-D-target-grape');
+                        const starGrapeCurrent = document.getElementById('star-D-current-grape');
+                        if (hasKiwi) {
+                            const ratioAppleGrape = (total > 0) ? ((((targets.apple || 0) + (targets.grape || 0)) / total) * 100) : 0;
+                            starGrapeTarget.style.left = `${ratioAppleGrape}%`;
+                            starGrapeTarget.style.display = 'block';
+                            starGrapeCurrent.style.display = 'block';
+                        } else {
+                            starGrapeTarget.style.display = 'none';
+                            starGrapeCurrent.style.display = 'none';
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            // 星のSVG要素を作成するヘルパー (変更なし)
+            function createStar(className, cx, cy) {
+                const svgNS = "http://www.w3.org/2000/svg";
+                const g = document.createElementNS(svgNS, 'g');
+                g.setAttribute('class', className);
+
+                const path = document.createElementNS(svgNS, 'path');
+                path.setAttribute('d', STAR_PATH_D);
+
+                g.appendChild(path);
+                g.setAttribute('transform', `translate(${cx - STAR_OFFSET}, ${cy - STAR_OFFSET}) scale(1.2)`);
+                return g;
+            }
+
+            // --- 3. ゲームロジック ---
+
+            function updateGame(animate = true) {
+                calculateCounts();
+                updateChart(animate);
+                checkWin();
+            }
+
+            // 枠内の果物を数える (変更なし)
+            function calculateCounts() {
+                const counts = { apple: 0, grape: 0, kiwi: 0 };
+                const occupiedCells = new Set();
+
+                frames.forEach(frame => {
+                    const anchor = frame.anchor;
+                    frame.pieces.forEach(offset => {
+                        const r = anchor.r + offset.r;
+                        const c = anchor.c + offset.c;
+
+                        if (r < 0 || r >= boardRows || c < 0 || c >= boardCols) {
+                            return;
+                        }
+
+                        const cellKey = `${r},${c}`;
+                        if (occupiedCells.has(cellKey)) {
+                            return;
+                        }
+                        occupiedCells.add(cellKey);
+
+                        const fruit = currentStage.fruits[r][c];
+                        if (fruit === 'a') {
+                            counts.apple++;
+                        } else if (fruit === 'g') {
+                            counts.grape++;
+                        } else if (fruit === 'k') {
+                            counts.kiwi++;
+                        }
+                    });
+                });
+
+                currentCounts = counts;
+            }
+
+            // グラフ(棒と星)を更新 (変更なし)
+            function updateChart(animate) {
+                if (!currentStage) return;
+
+                const graphType = currentStage.graphType;
+
+                switch (graphType) {
+                    case 'A':
+                        updateChartA(animate);
+                        break;
+                    case 'B':
+                        updateChartB(animate);
+                        break;
+                    case 'C':
+                        updateChartC(animate);
+                        break;
+                    case 'D':
+                        updateChartD(animate);
+                        break;
+                }
+            }
+
+            // グラフA (棒グラフ) の更新 (変更なし)
+            function updateChartA(animate) {
+                const transitionSetting = animate ? '' : 'transition: none;';
+
+                const targets = currentStage.targets;
+                const hasGrape = targets.grape !== undefined;
+                const hasKiwi = targets.kiwi !== undefined;
+                const maxCount = Math.max(5, (targets.apple || 0), (targets.grape || 0), (targets.kiwi || 0)) + 1;
+                const chartHeight = 200;
+                const chartBottomY = 230;
+
+                const getY = (count) => chartBottomY - 20 - (count * (chartHeight / maxCount));
+                const getH = (count) => (count * (chartHeight / maxCount));
+
+                const xApple = hasKiwi ? 40 : (hasGrape ? 60 : 100);
+                const xGrape = hasKiwi ? 100 : 140;
+                const xKiwi = 160;
+                const barWidth = 40;
+
+                const appleCount = currentCounts.apple;
+                const yApple = getY(appleCount);
+                const hApple = getH(appleCount);
+
+                const barApple = document.getElementById('bar-apple');
+                barApple.setAttribute('x', xApple - barWidth / 2);
+                barApple.setAttribute('y', yApple);
+                barApple.setAttribute('height', hApple);
+                barApple.style.cssText = transitionSetting;
+
+                const starApple = document.getElementById('star-apple');
+                starApple.setAttribute('transform', `translate(${xApple - STAR_OFFSET}, ${yApple - STAR_OFFSET}) scale(1.2)`);
+                starApple.style.cssText = transitionSetting;
+
+                if (hasGrape) {
+                    const grapeCount = currentCounts.grape;
+                    const yGrape = getY(grapeCount);
+                    const hGrape = getH(grapeCount);
+
+                    const barGrape = document.getElementById('bar-grape');
+                    barGrape.setAttribute('x', xGrape - barWidth / 2);
+                    barGrape.setAttribute('y', yGrape);
+                    barGrape.setAttribute('height', hGrape);
+                    barGrape.style.cssText = transitionSetting;
+
+                    const starGrape = document.getElementById('star-grape');
+                    starGrape.setAttribute('transform', `translate(${xGrape - STAR_OFFSET}, ${yGrape - STAR_OFFSET}) scale(1.2)`);
+                    starGrape.style.cssText = transitionSetting;
+                }
+
+                if (hasKiwi) {
+                    const kiwiCount = currentCounts.kiwi;
+                    const yKiwi = getY(kiwiCount);
+                    const hKiwi = getH(kiwiCount);
+
+                    const barKiwi = document.getElementById('bar-kiwi');
+                    barKiwi.setAttribute('x', xKiwi - barWidth / 2);
+                    barKiwi.setAttribute('y', yKiwi);
+                    barKiwi.setAttribute('height', hKiwi);
+                    barKiwi.style.cssText = transitionSetting;
+
+                    const starKiwi = document.getElementById('star-kiwi');
+                    starKiwi.setAttribute('transform', `translate(${xKiwi - STAR_OFFSET}, ${yKiwi - STAR_OFFSET}) scale(1.2)`);
+                    starKiwi.style.cssText = transitionSetting;
+                }
+            }
+
+            // グラフB (散布図) の更新 (変更なし)
+            function updateChartB(animate) {
+                const transitionSetting = animate ? '' : 'transition: none;';
+
+                const maxCount = 7;
+                const chartWidth = 200;
+                const chartHeight = 200;
+                const origin = { x: 25, y: 225 };
+
+                const getX = (count) => origin.x + (count * (chartWidth / maxCount));
+                const getY = (count) => origin.y - (count * (chartHeight / maxCount));
+
+                const cx = getX(currentCounts.grape);
+                const cy = getY(currentCounts.apple);
+
+                const star = document.getElementById('star-B');
+                star.setAttribute('transform', `translate(${cx - STAR_OFFSET}, ${cy - STAR_OFFSET}) scale(1.2)`);
+                star.style.cssText = transitionSetting;
+
+                const lineX = document.getElementById('guide-line-B-x');
+                lineX.setAttribute('x1', origin.x);
+                lineX.setAttribute('y1', cy);
+                lineX.setAttribute('x2', cx);
+                lineX.setAttribute('y2', cy);
+                lineX.style.cssText = transitionSetting;
+
+                const lineY = document.getElementById('guide-line-B-y');
+                lineY.setAttribute('x1', cx);
+                lineY.setAttribute('y1', origin.y);
+                lineY.setAttribute('x2', cx);
+                lineY.setAttribute('y2', cy);
+                lineY.style.cssText = transitionSetting;
+            }
+
+            // グラフC (円グラフ) の更新 (変更なし)
+            function updateChartC(animate) {
+                const transitionSetting = animate ? '' : 'transition: none;';
+
+                const cx = 100, cy = 120, r = 80;
+                const total = currentCounts.apple + currentCounts.grape + currentCounts.kiwi;
+                const hasKiwi = (currentStage.targets.kiwi || 0) > 0 || currentCounts.kiwi > 0;
+
+                const ratioApple = (total > 0) ? (currentCounts.apple / total) : 0;
+                const ratioGrape = (total > 0) ? (currentCounts.grape / total) : 0;
+
+                const angleRatioApple = Math.max(0, Math.min(1, ratioApple));
+                const angleRatioGrape = Math.max(0, Math.min(1, ratioApple + ratioGrape));
+
+                const angleRadApple = (angleRatioApple * 2 * Math.PI) - (Math.PI / 2);
+                const angleRadGrape = (angleRatioGrape * 2 * Math.PI) - (Math.PI / 2);
+
+                const getArcPath = (startRatio, endRatio) => {
+                    if (Math.abs(endRatio - startRatio) < 0.0001) return "";
+                    if (Math.abs(endRatio - startRatio) >= 0.9999) {
+                        const midRad = (startRatio + (endRatio - startRatio) / 2) * 2 * Math.PI - (Math.PI / 2);
+                        const mx = cx + r * Math.cos(midRad);
+                        const my = cy + r * Math.sin(midRad);
+                        const endRad = endRatio * 2 * Math.PI - (Math.PI / 2);
+                        const ex = cx + r * Math.cos(endRad);
+                        const ey = cy + r * Math.sin(endRad);
+                        const startRad = startRatio * 2 * Math.PI - (Math.PI / 2);
+                        const sx = cx + r * Math.cos(startRad);
+                        const sy = cy + r * Math.sin(startRad);
+                        return `M ${cx} ${cy} L ${sx} ${sy} A ${r} ${r} 0 0 1 ${mx} ${my} A ${r} ${r} 0 0 1 ${ex} ${ey} Z`;
+                    }
+
+                    const startRad = startRatio * 2 * Math.PI - (Math.PI / 2);
+                    const endRad = endRatio * 2 * Math.PI - (Math.PI / 2);
+                    const sx = cx + r * Math.cos(startRad);
+                    const sy = cy + r * Math.sin(startRad);
+                    const ex = cx + r * Math.cos(endRad);
+                    const ey = cy + r * Math.sin(endRad);
+                    const largeArcFlag = (endRatio - startRatio) > 0.5 ? 1 : 0;
+                    return `M ${cx} ${cy} L ${sx} ${sy} A ${r} ${r} 0 ${largeArcFlag} 1 ${ex} ${ey} Z`;
+                };
+
+                const applePath = (total > 0) ? getArcPath(0, angleRatioApple) : "";
+                const grapePath = (total > 0) ? getArcPath(angleRatioApple, angleRatioGrape) : "";
+                const kiwiPath = (total > 0 && hasKiwi) ? getArcPath(angleRatioGrape, 1) : "";
+
+                const sliceApple = document.getElementById('pie-apple');
+                const sliceGrape = document.getElementById('pie-grape');
+                const sliceKiwi = document.getElementById('pie-kiwi');
+
+                sliceApple.setAttribute('d', applePath);
+                sliceGrape.setAttribute('d', grapePath);
+                sliceKiwi.setAttribute('d', kiwiPath);
+
+                const starXApple = cx + r * Math.cos(angleRadApple);
+                const starYApple = cy + r * Math.sin(angleRadApple);
+                const starApple = document.getElementById('star-C-apple');
+                starApple.setAttribute('transform', `translate(${starXApple - 12}, ${starYApple - 12}) scale(1.2)`);
+                starApple.style.cssText = transitionSetting;
+
+                const starGrape = document.getElementById('star-C-grape');
+                if (hasKiwi) {
+                    const starXGrape = cx + r * Math.cos(angleRadGrape);
+                    const starYGrape = cy + r * Math.sin(angleRadGrape);
+                    starGrape.setAttribute('transform', `translate(${starXGrape - 12}, ${starYGrape - 12}) scale(1.2)`);
+                    starGrape.style.cssText = transitionSetting;
+                    starGrape.style.display = 'block';
+                } else {
+                    starGrape.style.display = 'none';
+                }
+            }
+
+            // グラフD (帯グラフ) の更新 (変更なし)
+            function updateChartD(animate) {
+                const total = currentCounts.apple + currentCounts.grape + currentCounts.kiwi;
+                const hasKiwi = (currentStage.targets.kiwi || 0) > 0 || currentCounts.kiwi > 0;
+
+                const ratioApple = (total > 0) ? (currentCounts.apple / total) : 0;
+                const ratioGrape = (total > 0) ? (currentCounts.grape / total) : 0;
+                const ratioKiwi = (total > 0) ? (currentCounts.kiwi / total) : 0;
+
+                const percentApple = ratioApple * 100;
+                const percentGrape = ratioGrape * 100;
+                const percentKiwi = ratioKiwi * 100;
+
+                const barApple = document.getElementById('bar-D-apple');
+                const barGrape = document.getElementById('bar-D-grape');
+                const barKiwi = document.getElementById('bar-D-kiwi');
+                const starApple = document.getElementById('star-D-current-apple');
+                const starGrape = document.getElementById('star-D-current-grape');
+
+                barApple.style.width = `${percentApple}%`;
+                barGrape.style.width = `${percentGrape}%`;
+                barKiwi.style.width = `${percentKiwi}%`;
+
+                starApple.style.left = `${percentApple}%`;
+
+                barApple.style.transition = animate ? 'width 0.3s ease-in-out' : 'none';
+                barGrape.style.transition = animate ? 'width 0.3s ease-in-out' : 'none';
+                barKiwi.style.transition = animate ? 'width 0.3s ease-in-out' : 'none';
+                starApple.style.transition = animate ? 'left 0.3s ease-in-out' : 'none';
+
+                if (hasKiwi) {
+                    const percentAppleGrape = (ratioApple + ratioGrape) * 100;
+                    starGrape.style.left = `${percentAppleGrape}%`;
+                    starGrape.style.transition = animate ? 'left 0.3s ease-in-out' : 'none';
+                    starGrape.style.display = 'block';
+                } else {
+                    starGrape.style.display = 'none';
+                }
+            }
+
+
+            // 勝利条件をチェック
+            function checkWin() {
+                if (!currentStage) return;
+
+                const targets = currentStage.targets;
+                const graphType = currentStage.graphType;
+                let isWin = false;
+
+                if (graphType === 'A') {
+                    const hasGrapeTarget = targets.grape !== undefined;
+                    const hasKiwiTarget = targets.kiwi !== undefined;
+
+                    if (hasKiwiTarget) {
+                        isWin = (currentCounts.apple === targets.apple &&
+                            currentCounts.grape === targets.grape &&
+                            currentCounts.kiwi === targets.kiwi);
+                    } else if (hasGrapeTarget) {
+                        isWin = (currentCounts.apple === targets.apple &&
+                            currentCounts.grape === targets.grape);
+                    } else {
+                        isWin = (currentCounts.apple === targets.apple);
+                    }
+                } else if (graphType === 'B') {
+                    isWin = (currentCounts.apple === targets.apple &&
+                        currentCounts.grape === targets.grape);
+                } else {
+                    const targetTotal = (targets.apple || 0) + (targets.grape || 0) + (targets.kiwi || 0);
+                    const hasKiwiTarget = (targets.kiwi || 0) > 0;
+
+                    const targetRatioApple = (targetTotal > 0) ? ((targets.apple || 0) / targetTotal) : 0;
+                    const targetRatioGrape = (targetTotal > 0) ? ((targets.grape || 0) / targetTotal) : 0;
+
+                    const currentTotal = currentCounts.apple + currentCounts.grape + currentCounts.kiwi;
+                    const currentRatioApple = (currentTotal > 0) ? (currentCounts.apple / currentTotal) : 0;
+                    const currentRatioGrape = (currentTotal > 0) ? (currentCounts.grape / currentTotal) : 0;
+
+                    if (currentTotal === 0 && targetTotal > 0) {
+                        isWin = false;
+                    }
+                    else if (targetTotal === 0 && currentTotal === 0) {
+                        isWin = true;
+                    }
+                    else {
+                        const appleMatch = Math.abs(currentRatioApple - targetRatioApple) < 0.001;
+                        const grapeMatch = Math.abs(currentRatioGrape - targetRatioGrape) < 0.001;
+
+                        if (hasKiwiTarget) {
+                            isWin = appleMatch && grapeMatch;
+                        } else {
+                            isWin = appleMatch;
+                        }
+                    }
+                }
+
+                if (isWin) {
+                    winMessageElement.classList.add('active'); // 表示
+
+                    if (currentStage && !clearedStages.has(currentStage.id)) {
+                        clearedStages.add(currentStage.id);
+                        saveClearedStages();
+                        updateStageSelectUI();
+                    }
+                    if (currentStageIndex < stages.length - 1) {
+                        nextButton.classList.add('animate-pulse');
+                    }
+
+                } else {
+                    winMessageElement.classList.remove('active'); // 非表示
+                    nextButton.classList.remove('animate-pulse');
+                }
+            }
+
+            // 枠のDOM位置を更新 (変更なし)
+            function updateFramePosition(frame, newAnchor) {
+                frame.anchor = newAnchor;
+                frame.domElements.forEach((el, index) => {
+                    const offset = frame.pieces[index];
+                    const newRow = newAnchor.r + offset.r + 1;
+                    const newCol = newAnchor.c + offset.c + 1;
+                    el.style.gridRow = newRow;
+                    el.style.gridColumn = newCol;
+                });
+            }
+
+            // --- 4. ドラッグイベント --- (変更なし)
+
+            function handleDragStart(e) {
+                if (isDragging) return;
+
+                const frameId = parseInt(e.currentTarget.dataset.frameId, 10);
+                activeFrame = frames.find(f => f.id === frameId);
+                if (!activeFrame) return;
+
+                isDragging = true;
+                dragStartGrid = { ...activeFrame.anchor };
+                lastDragGrid = { ...activeFrame.anchor };
+
+                const pos = getEventPosition(e);
+                dragStartPos = pos;
+
+                activeFrame.domElements.forEach(el => el.classList.add('dragging'));
+
+                window.addEventListener('mousemove', handleDragMove);
+                window.addEventListener('mouseup', handleDragEnd);
+                window.addEventListener('touchmove', handleDragMove, { passive: false });
+                window.addEventListener('touchend', handleDragEnd);
+
+                if (e.type === 'touchstart') {
+                    e.preventDefault();
+                }
+            }
+
+            function handleDragMove(e) {
+                if (!isDragging || !activeFrame) return;
+
+                e.preventDefault();
+
+                const pos = getEventPosition(e);
+
+                const cellRect = boardElement.children[0].getBoundingClientRect();
+                const cellWidth = cellRect.width;
+                const cellHeight = cellRect.height;
+
+                const deltaX = pos.x - dragStartPos.x;
+                const deltaY = pos.y - dragStartPos.y;
+
+                const gridDeltaC = Math.round(deltaX / cellWidth);
+                const gridDeltaR = Math.round(deltaY / cellHeight);
+
+                let newR = dragStartGrid.r + gridDeltaR;
+                let newC = dragStartGrid.c + gridDeltaC;
+
+                if (newR !== lastDragGrid.r || newC !== lastDragGrid.c) {
+
+                    if (Math.abs(newR - lastDragGrid.r) > 1) {
+                        newR = lastDragGrid.r + Math.sign(newR - lastDragGrid.r);
+                    }
+                    if (Math.abs(newC - lastDragGrid.c) > 1) {
+                        newC = lastDragGrid.c + Math.sign(newC - lastDragGrid.c);
+                    }
+
+                    if (isValidPosition(activeFrame, newR, newC)) {
+                        updateFramePosition(activeFrame, { r: newR, c: newC });
+
+                        lastDragGrid = { r: newR, c: newC };
+
+                        updateGame(true);
+                    } else {
+                        newR = lastDragGrid.r;
+                        newC = lastDragGrid.c;
+                    }
+                }
+            }
+
+            function handleDragEnd(e) {
+                if (!isDragging || !activeFrame) return;
+
+                isDragging = false;
+
+                activeFrame.domElements.forEach(el => {
+                    el.classList.remove('dragging');
+                    el.style.transform = '';
+                });
+
+                activeFrame.anchor = { ...lastDragGrid };
+                updateFramePosition(activeFrame, activeFrame.anchor);
+
+                activeFrame = null;
+
+                window.removeEventListener('mousemove', handleDragMove);
+                window.removeEventListener('mouseup', handleDragEnd);
+                window.removeEventListener('touchmove', handleDragMove);
+                window.removeEventListener('touchend', handleDragEnd);
+
+                updateGame(true);
+            }
+
+            function isValidPosition(frame, newR, newC) {
+                for (const offset of frame.pieces) {
+                    const r = newR + offset.r;
+                    const c = newC + offset.c;
+
+                    if (r < 0 || r >= boardRows || c < 0 || c >= boardCols) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            function getEventPosition(e) {
+                if (e.touches && e.touches.length > 0) {
+                    return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                } else {
+                    return { x: e.clientX, y: e.clientY };
+                }
+            }
+
+            // --- 5. ゲーム開始 ---
+            initApp();
+
+        });
+    </script>
+
+</body>
+
+</html>

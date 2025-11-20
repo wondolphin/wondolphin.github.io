@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>おかしなパーティー計算編</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            touch-action: manipulation;
+        }
+
+        /* 領域A・Bのコンテナスタイル */
+        .number-box {
+            position: relative;
+            /* 座標指定の基準 */
+            padding: 1rem;
+            border-radius: 1rem;
+            background-color: rgba(255, 255, 235, 0.9);
+            /* 明るい背景に変更 */
+            min-height: 300px;
+            /* 高さを少し縮小 */
+            height: 45vh;
+            /* 画面高の45%を使用 */
+            width: 100%;
+            overflow: hidden;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+
+        /* 数字オブジェクトのスタイル */
+        .number-object {
+            position: absolute;
+            /* 座標で配置 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #333;
+            /* 暗い色に変更 */
+            padding: 0.5rem 1rem;
+            background-color: rgba(185, 245, 255, 0.4);
+            /* 明るい色に変更 */
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            /* 座標の中心に配置するための調整 */
+            transform: translate(-50%, -50%);
+            /* アニメーション設定 */
+            transition: left 0.5s ease-in-out,
+                top 0.5s ease-in-out,
+                opacity 0.2s ease-in-out,
+                transform 0.2s ease-in-out;
+        }
+
+        .btn {
+            transition: all 0.2s ease;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        /* 非アクティブなボタンのスタイル */
+        .btn-inactive {
+            opacity: 0.3 !important;
+            transform: scale(0.9);
+            cursor: not-allowed !important;
+        }
+
+        #problem-selector {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 0.375rem;
+            padding: 0.5rem 2.5rem 0.5rem 1rem;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            max-width: 200px;
+            /* 幅を制限 */
+        }
+
+        /* スタート画面とゲーム画面の切り替え用 */
+        .hidden-screen {
+            display: none !important;
+        }
+
+        /* 正誤判定表示の新しいスタイル */
+        #result-text {
+            position: absolute;
+            bottom: 0;
+            /* 問題領域に寄せるため */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            text-align: center;
+            font-size: 3rem;
+            font-weight: 900;
+            z-index: 20;
+            /* ゲームボードの上に表示 */
+            /* 初期状態は非表示 */
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-5xl mx-auto">
+
+        <!-- ==================== スタート画面 ==================== -->
+        <div id="start-screen" class="bg-white p-8 rounded-2xl shadow-lg text-center max-w-xl mx-auto mt-8">
+            <!-- タイトルをここに移動 -->
+            <h1 class="text-3xl md:text-4xl font-bold text-center mb-4 text-blue-600">かずくらべゲーム</h1>
+            <p class="text-xl font-bold mb-6 text-gray-600">ステージとモードをえらんでね</p>
+
+            <!-- ステージ選択 -->
+            <div class="mb-8">
+                <p class="text-lg font-bold mb-3 text-indigo-500">ステージ</p>
+                <div class="flex justify-center gap-6">
+                    <label
+                        class="flex items-center gap-2 cursor-pointer bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 transition">
+                        <input type="radio" name="stage" value="1" checked class="w-5 h-5 text-indigo-600">
+                        <span class="font-bold text-lg">ステージ 1</span>
+                    </label>
+                    <label
+                        class="flex items-center gap-2 cursor-pointer bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 transition">
+                        <input type="radio" name="stage" value="2" class="w-5 h-5 text-indigo-600">
+                        <span class="font-bold text-lg">ステージ 2</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- モード選択ボタン -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button id="start-score-attack-btn"
+                    class="btn bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-4 rounded-xl text-xl shadow-lg flex flex-col items-center justify-center gap-1">
+                    <span>スコアアタック</span>
+                    <span class="text-sm font-normal opacity-90">3ぷんで たくさん とこう!</span>
+                </button>
+                <button id="start-free-mode-btn"
+                    class="btn bg-sky-500 hover:bg-sky-600 text-white font-bold py-4 px-4 rounded-xl text-xl shadow-lg flex flex-col items-center justify-center gap-1">
+                    <span>フリーモード</span>
+                    <span class="text-sm font-normal opacity-90">じゆうに もんだいを えらべるよ</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ==================== ゲーム画面 ==================== -->
+        <div id="game-screen" class="hidden-screen w-full">
+            <p class="text-center text-gray-600 mb-4">ひだりのごうけいと みぎのごうけいは おなじ？</p>
+
+            <!-- コントロールパネル (フリーモード用) -->
+            <div id="free-mode-panel"
+                class="flex flex-wrap items-center justify-between gap-4 mb-2 bg-white p-3 rounded-xl shadow-sm hidden-screen">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex items-center">
+                        <label for="problem-selector"
+                            class="mr-2 font-bold text-sm md:text-base whitespace-nowrap">もんだい:</label>
+                        <select id="problem-selector"
+                            class="text-base font-bold shadow border-gray-300 rounded-lg"></select>
+                    </div>
+
+                    <button id="next-problem-btn"
+                        class="btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg text-sm md:text-base shadow flex items-center gap-1">
+                        つぎの もんだいへ
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button id="back-to-title-btn-free"
+                        class="btn bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg text-sm shadow">
+                        タイトルへ
+                    </button>
+                    <button id="reload-btn"
+                        class="btn bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold p-2 rounded-full shadow"
+                        title="もう一度遊ぶ">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- コントロールパネル (スコアアタック用) -->
+            <div id="score-attack-panel"
+                class="flex items-center justify-between mb-2 bg-white p-4 rounded-xl shadow-sm border-2 border-orange-200 hidden-screen">
+                <!-- タイム表示 -->
+                <div class="flex flex-col items-start">
+                    <span class="text-xs text-gray-500 font-bold">タイム</span>
+                    <div id="timer-display" class="text-3xl font-black text-orange-600 font-mono">3'00</div>
+                </div>
+
+                <!-- スコア表示 -->
+                <div class="flex flex-col items-center absolute left-1/2 transform -translate-x-1/2">
+                    <span class="text-xs text-gray-500 font-bold">スコア</span>
+                    <div id="score-display" class="text-4xl font-black text-indigo-600">0</div>
+                </div>
+
+                <!-- タイトルへ戻るボタン -->
+                <button id="back-to-title-btn-score"
+                    class="btn bg-gray-400 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded text-xs shadow">
+                    もどる
+                </button>
+            </div>
+
+            <!-- 問題領域と正誤判定領域 -->
+            <div id="game-board-container" class="relative">
+                <div id="game-board" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- 領域A -->
+                    <div id="area-a" class="number-box border-4 border-blue-400">
+                        <!-- オブジェクトがここに挿入されます -->
+                    </div>
+                    <!-- 領域B -->
+                    <div id="area-b" class="number-box border-4 border-pink-400">
+                        <!-- オブジェクトがここに挿入されます -->
+                    </div>
+                </div>
+                <!-- 正誤判定表示（ゲームボードに重ねる） -->
+                <p id="result-text" class="transition-transform duration-300"></p>
+            </div>
+
+
+            <!-- 操作ボタン -->
+            <div id="controls" class="flex justify-center gap-6 mt-4">
+                <button id="correct-btn"
+                    class="btn bg-green-500 hover:bg-green-600 text-white font-bold rounded-full w-20 h-20 md:w-28 md:h-28 flex items-center justify-center text-4xl shadow-lg transition-all duration-300">○</button>
+                <button id="incorrect-btn"
+                    class="btn bg-red-500 hover:bg-red-600 text-white font-bold rounded-full w-20 h-20 md:w-28 md:h-28 flex items-center justify-center text-4xl shadow-lg transition-all duration-300">×</button>
+            </div>
+
+            <!-- フリーモード用「もう一度」ボタン（不要なため削除。リロードボタンを使用） -->
+            <!-- <div id="next-question-container" class="text-center mt-8">
+                <button id="next-btn" class="hidden btn bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg text-xl shadow-lg">もう一度</button>
+            </div> -->
+
+        </div>
+
+        <!-- ==================== ゲーム終了画面 (モーダル) ==================== -->
+        <div id="game-over-modal"
+            class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden-screen z-50">
+            <div class="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-md w-full animate-bounce-in">
+                <h2 class="text-4xl font-black text-orange-500 mb-4">ゲームしゅうりょう！</h2>
+                <p class="text-gray-600 mb-2">あなたのスコアは...</p>
+                <p id="final-score" class="text-6xl font-black text-indigo-600 mb-8">0</p>
+                <button id="back-to-title-btn-result"
+                    class="btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-xl text-xl shadow-lg w-full">
+                    タイトルへもどる
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DOM要素 ---
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const gameOverModal = document.getElementById('game-over-modal');
+
+        const freeModePanel = document.getElementById('free-mode-panel');
+        const scoreAttackPanel = document.getElementById('score-attack-panel');
+
+        const areaA = document.getElementById('area-a');
+        const areaB = document.getElementById('area-b');
+        const correctBtn = document.getElementById('correct-btn');
+        const incorrectBtn = document.getElementById('incorrect-btn');
+        const resultText = document.getElementById('result-text');
+
+        const problemSelector = document.getElementById('problem-selector');
+        const nextProblemBtn = document.getElementById('next-problem-btn');
+        const reloadBtn = document.getElementById('reload-btn');
+        // const nextBtn = document.getElementById('next-btn'); // 削除
+
+        const timerDisplay = document.getElementById('timer-display');
+        const scoreDisplay = document.getElementById('score-display');
+        const finalScoreDisplay = document.getElementById('final-score');
+
+        // ボタン群
+        const startScoreAttackBtn = document.getElementById('start-score-attack-btn');
+        const startFreeModeBtn = document.getElementById('start-free-mode-btn');
+        const backToTitleBtns = [
+            document.getElementById('back-to-title-btn-free'),
+            document.getElementById('back-to-title-btn-score'),
+            document.getElementById('back-to-title-btn-result')
+        ];
+        const stageRadios = document.getElementsByName('stage');
+
+        // --- ゲーム状態 ---
+        let currentMode = ''; // 'free' or 'score'
+        let currentStage = 1;
+        let currentProblemList = []; // 現在のモード・ステージで使う問題リスト
+        let currentProblemIndex = 0; // currentProblemList内でのインデックス
+        let currentProblemData = null; // 現在表示中の問題データ
+        let score = 0;
+        let timeLeft = 180; // 3分 = 180秒
+        let timerInterval = null;
+
+        // クリア状況 (Master Indexをキーにする)
+        // 配列のインデックス = problems配列のインデックス
+        let clearedStatus = [];
+
+        // --- ステージ設定 ---
+        const STAGE_CONFIG = {
+            1: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31],
+            2: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51]
+        };
+
+        // --- 問題データ ---
+        // levelプロパティを追加
+        const problems = [
+            // Level 1: 基本的な足し算・移動
+            {
+                level: 1,
+                title: "もんだいA-1",
+                areaA: [{ text: "2", coord: "2050" }, { text: "3", coord: "7050" }],
+                areaB: [{ text: "1", coord: "1050" }, { text: "1", coord: "3050" }, { text: "1", coord: "5050" }, { text: "1", coord: "7050" }, { text: "1", coord: "9050" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "1050", to: "2050" }, { type: "transit", from: "3050", to: "2050" }, { type: "transit", from: "5050", to: "7050" }, { type: "transit", from: "9050", to: "7050" }],
+                    [{ type: "fuse", target: "2050", newText: "2" }, { type: "fuse", target: "7050", newText: "3" }]
+                ]
+            },
+            {
+                level: 3,
+                title: "もんだいA-2",
+                areaA: [{ text: "4", coord: "5020" }, { text: "4", coord: "5080" }],
+                areaB: [{ text: "2", coord: "3020" }, { text: "2", coord: "7020" }, { text: "2", coord: "3080" }, { text: "2", coord: "7080" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "3020", to: "5020" }, { type: "transit", from: "7020", to: "5020" }, { type: "transit", from: "3080", to: "5080" }, { type: "transit", from: "7080", to: "5080" }],
+                    [{ type: "fuse", target: "5020", newText: "4" }, { type: "fuse", target: "5080", newText: "4" }]
+                ]
+            },
+            {
+                level: 5,
+                title: "もんだいA-3",
+                areaA: [{ text: "6", coord: "5020" }, { text: "6", coord: "5080" }],
+                areaB: [{ text: "2", coord: "3020" }, { text: "4", coord: "7020" }, { text: "5", coord: "3080" }, { text: "1", coord: "7080" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "3020", to: "5020" }, { type: "transit", from: "7020", to: "5020" }, { type: "transit", from: "3080", to: "5080" }, { type: "transit", from: "7080", to: "5080" }],
+                    [{ type: "fuse", target: "5020", newText: "6" }, { type: "fuse", target: "5080", newText: "6" }]
+                ]
+            },
+            {
+                level: 7,
+                title: "もんだいA-4",
+                areaA: [{ text: "5", coord: "5030" }, { text: "5", coord: "3070" }, { text: "5", coord: "7070" }],
+                areaB: [{ text: "4", coord: "4030" }, { text: "1", coord: "6030" }, { text: "1", coord: "2070" }, { text: "4", coord: "4070" }, { text: "1", coord: "6070" }, { text: "4", coord: "8070" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "4030", to: "5030" }, { type: "transit", from: "6030", to: "5030" }, { type: "transit", from: "2070", to: "3070" }, { type: "transit", from: "4070", to: "3070" }, { type: "transit", from: "6070", to: "7070" }, { type: "transit", from: "8070", to: "7070" }],
+                    [{ type: "fuse", target: "5030", newText: "5" }, { type: "fuse", target: "3070", newText: "5" }, { type: "fuse", target: "7070", newText: "5" }]
+                ]
+            },
+            {
+                level: 9,
+                title: "もんだいA-5",
+                areaA: [{ text: "3", coord: "5020" }, { text: "4", coord: "5050" }, { text: "3", coord: "5080" }],
+                areaB: [{ text: "1", coord: "3020" }, { text: "1", coord: "5020" }, { text: "1", coord: "7020" }, { text: "1", coord: "3050" }, { text: "1", coord: "5050" }, { text: "1", coord: "7050" }, { text: "1", coord: "3080" }, { text: "1", coord: "5080" }, { text: "1", coord: "7080" }],
+                correctAnswer: false,
+                animationSteps: [
+                    [{ type: "transit", from: "3020", to: "5020" }, { type: "transit", from: "7020", to: "5020" }, { type: "transit", from: "3050", to: "5050" }, { type: "transit", from: "7050", to: "5050" }, { type: "transit", from: "3080", to: "5080" }, { type: "transit", from: "7080", to: "5080" }],
+                    [{ type: "fuse", target: "5020", newText: "3" }, { type: "fuse", target: "5050", newText: "3" }, { type: "fuse", target: "5080", newText: "3" }]
+                ]
+            },
+            {
+                level: 11,
+                title: "もんだいA-6",
+                areaA: [{ text: "4", coord: "3030" }, { text: "4", coord: "7030" }, { text: "4", coord: "3070" }, { text: "4", coord: "7070" }],
+                areaB: [{ text: "1", coord: "2030" }, { text: "3", coord: "4030" }, { text: "1", coord: "6030" }, { text: "3", coord: "8030" }, { text: "2", coord: "2070" }, { text: "2", coord: "4070" }, { text: "2", coord: "6070" }, { text: "3", coord: "8070" }],
+                correctAnswer: false,
+                animationSteps: [
+                    [{ type: "transit", from: "2030", to: "3030" }, { type: "transit", from: "4030", to: "3030" }, { type: "transit", from: "6030", to: "7030" }, { type: "transit", from: "8030", to: "7030" }, { type: "transit", from: "2070", to: "3070" }, { type: "transit", from: "4070", to: "3070" }, { type: "transit", from: "6070", to: "7070" }, { type: "transit", from: "8070", to: "7070" }],
+                    [{ type: "fuse", target: "3030", newText: "4" }, { type: "fuse", target: "7030", newText: "4" }, { type: "fuse", target: "3070", newText: "4" }, { type: "fuse", target: "7070", newText: "5" }]
+                ]
+            },
+            // Level 2: 分裂と融合、少し複雑な移動
+            {
+                level: 13,
+                title: "もんだいB-1",
+                areaA: [{ text: "7", coord: "3050" }, { text: "7", coord: "5050" }, { text: "7", coord: "7050" }],
+                areaB: [{ text: "3", coord: "5020" }, { text: "6", coord: "3050" }, { text: "6", coord: "5050" }, { text: "6", coord: "7050" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "divide", target: "5020", newObjects: [{ text: "1", to: "3050" }, { text: "1", to: "5050" }, { text: "1", to: "7050" }] }],
+                    [{ type: "fuse", target: "3050", newText: "7" }, { type: "fuse", target: "5050", newText: "7" }, { type: "fuse", target: "7050", newText: "7" }]
+                ]
+            },
+            {
+                level: 15,
+                title: "もんだいB-2",
+                areaA: [{ text: "30", coord: "3050" }, { text: "30", coord: "5050" }, { text: "30", coord: "7050" }],
+                areaB: [{ text: "15", coord: "5020" }, { text: "25", coord: "3050" }, { text: "25", coord: "5050" }, { text: "25", coord: "7050" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "divide", target: "5020", newObjects: [{ text: "5", to: "3050" }, { text: "5", to: "5050" }, { text: "5", to: "7050" }] }],
+                    [{ type: "fuse", target: "3050", newText: "30" }, { type: "fuse", target: "5050", newText: "30" }, { type: "fuse", target: "7050", newText: "30" }]
+                ]
+            },
+            {
+                level: 17,
+                title: "もんだいB-3",
+                areaA: [{ text: "8", coord: "3030" }, { text: "8", coord: "7030" }, { text: "8", coord: "3070" }, { text: "8", coord: "7070" }, { text: "8", coord: "5050" }],
+                areaB: [{ text: "9", coord: "3030" }, { text: "10", coord: "7030" }, { text: "11", coord: "3070" }, { text: "12", coord: "7070" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "divide", target: "3030", newObjects: [{ text: "8", to: "3030" }, { text: "1", to: "4040" }] }, { type: "divide", target: "7030", newObjects: [{ text: "8", to: "7030" }, { text: "2", to: "6040" }] }, { type: "divide", target: "3070", newObjects: [{ text: "8", to: "3070" }, { text: "3", to: "4060" }] }, { type: "divide", target: "7070", newObjects: [{ text: "8", to: "7070" }, { text: "4", to: "6060" }] }],
+                    [{ type: "transit", from: "4040", to: "5050" }, { type: "transit", from: "6040", to: "5050" }, { type: "transit", from: "4060", to: "5050" }, { type: "transit", from: "6060", to: "5050" }],
+                    [{ type: "fuse", target: "5050", newText: "10" }]
+                ]
+            },
+            {
+                level: 19,
+                title: "もんだいC-1",
+                areaA: [{ text: "7", coord: "5030" }, { text: "7", coord: "5050" }, { text: "7", coord: "5070" }],
+                areaB: [{ text: "1", coord: "1050" }, { text: "2", coord: "2650" }, { text: "3", coord: "4250" }, { text: "4", coord: "5850" }, { text: "5", coord: "7450" }, { text: "6", coord: "9050" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "1050", to: "4070" }, { type: "transit", from: "2650", to: "4050" }, { type: "transit", from: "4250", to: "4030" }, { type: "transit", from: "5850", to: "6030" }, { type: "transit", from: "7450", to: "6050" }, { type: "transit", from: "9050", to: "6070" }],
+                    [{ type: "transit", from: "4070", to: "5070" }, { type: "transit", from: "4050", to: "5050" }, { type: "transit", from: "4030", to: "5030" }, { type: "transit", from: "6030", to: "5030" }, { type: "transit", from: "6050", to: "5050" }, { type: "transit", from: "6070", to: "5070" }],
+                    [{ type: "fuse", target: "5030", newText: "7" }, { type: "fuse", target: "5050", newText: "7" }, { type: "fuse", target: "5070", newText: "7" }]
+                ]
+            },
+            {
+                level: 21,
+                title: "もんだいC-2",
+                areaA: [{ text: "9", coord: "5030" }, { text: "9", coord: "5050" }, { text: "9", coord: "5070" }],
+                areaB: [{ text: "2", coord: "1050" }, { text: "3", coord: "2650" }, { text: "4", coord: "4250" }, { text: "5", coord: "5850" }, { text: "6", coord: "7450" }, { text: "7", coord: "9050" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "1050", to: "4070" }, { type: "transit", from: "2650", to: "4050" }, { type: "transit", from: "4250", to: "4030" }, { type: "transit", from: "5850", to: "6030" }, { type: "transit", from: "7450", to: "6050" }, { type: "transit", from: "9050", to: "6070" }],
+                    [{ type: "transit", from: "4070", to: "5070" }, { type: "transit", from: "4050", to: "5050" }, { type: "transit", from: "4030", to: "5030" }, { type: "transit", from: "6030", to: "5030" }, { type: "transit", from: "6050", to: "5050" }, { type: "transit", from: "6070", to: "5070" }],
+                    [{ type: "fuse", target: "5030", newText: "9" }, { type: "fuse", target: "5050", newText: "9" }, { type: "fuse", target: "5070", newText: "9" }]
+                ]
+            },
+            {
+                level: 23,
+                title: "もんだいD-1",
+                areaA: [{ text: "10", coord: "3050" }, { text: "10", coord: "5050" }, { text: "10", coord: "7050" }],
+                areaB: [{ text: "2", coord: "3030" }, { text: "3", coord: "5030" }, { text: "4", coord: "7030" }, { text: "6", coord: "3070" }, { text: "7", coord: "5070" }, { text: "8", coord: "7070" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "3070", to: "7070" }, { type: "transit", from: "7070", to: "3070" }],
+                    [{ type: "transit", from: "3030", to: "3050" }, { type: "transit", from: "3070", to: "3050" }, { type: "transit", from: "5030", to: "5050" }, { type: "transit", from: "5070", to: "5050" }, { type: "transit", from: "7030", to: "7050" }, { type: "transit", from: "7070", to: "7050" }],
+                    [{ type: "fuse", target: "3050", newText: "10" }, { type: "fuse", target: "5050", newText: "10" }, { type: "fuse", target: "7050", newText: "10" }]
+                ]
+            },
+            {
+                level: 25,
+                title: "もんだいD-2",
+                areaA: [{ text: "5", coord: "3030" }, { text: "5", coord: "7030" }, { text: "5", coord: "3070" }, { text: "5", coord: "7070" }],
+                areaB: [
+                    { text: "3", coord: "9020" },
+                    { text: "1", coord: "3040" },
+                    { text: "2", coord: "5040" },
+                    { text: "1", coord: "7040" },
+                    { text: "2", coord: "9040" },
+                    { text: "1", coord: "1060" },
+                    { text: "3", coord: "3060" },
+                    { text: "1", coord: "5060" },
+                    { text: "1", coord: "7060" },
+                    { text: "1", coord: "3080" },
+                    { text: "1", coord: "7080" },
+                    { text: "3", coord: "9080" }
+                ],
+                correctAnswer: true,
+                animationSteps: [
+                    [
+                        { type: "transit", from: "3040", to: "5040" },
+                        { type: "transit", from: "7040", to: "5040" },
+                        { type: "transit", from: "5060", to: "5040" }
+                    ],
+                    [
+                        { type: "fuse", target: "5040", newText: "5" }
+                    ],
+                    [
+                        { type: "transit", from: "9040", to: "9020" }
+                    ],
+                    [
+                        { type: "fuse", target: "9020", newText: "5" }
+                    ],
+                    [
+                        { type: "transit", from: "1060", to: "3060" },
+                        { type: "transit", from: "3080", to: "3060" },
+                    ],
+                    [
+                        { type: "fuse", target: "3060", newText: "5" }
+                    ],
+                    [
+                        { type: "transit", from: "7060", to: "7080" },
+                        { type: "transit", from: "9080", to: "7080" },
+                    ],
+                    [
+                        { type: "fuse", target: "7080", newText: "5" }
+                    ]
+                ]
+            },
+            {
+                level: 27,
+                title: "もんだいE-1",
+                areaA: [{ text: "6", coord: "5050" }],
+                areaB: [{ text: "2", coord: "3030" }, { text: "-2", coord: "5030" }, { text: "2", coord: "7030" }, { text: "2", coord: "3050" }, { text: "-2", coord: "5050" }, { text: "2", coord: "7050" }, { text: "2", coord: "3070" }, { text: "-2", coord: "5070" }, { text: "2", coord: "7070" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "3030", to: "4030" }, { type: "transit", from: "5030", to: "4030" }, { type: "transit", from: "3050", to: "4050" }, { type: "transit", from: "5050", to: "4050" }, { type: "transit", from: "3070", to: "4070" }, { type: "transit", from: "5070", to: "4070" }],
+                    [{ type: "fuse", target: "4030", newText: "0" }, { type: "fuse", target: "4050", newText: "0" }, { type: "fuse", target: "4070", newText: "0" }],
+                    [{ type: "transit", from: "7030", to: "7050" }, { type: "transit", from: "7070", to: "7050" }],
+                    [{ type: "fuse", target: "7050", newText: "6" }]
+                ]
+            },
+            {
+                level: 29,
+                title: "もんだいE-2",
+                areaA: [{ text: "5", coord: "5050" }],
+                areaB: [{ text: "5", coord: "3030" }, { text: "-5", coord: "5030" }, { text: "5", coord: "7030" }, { text: "-5", coord: "3050" }, { text: "5", coord: "5050" }, { text: "-5", coord: "7050" }, { text: "5", coord: "3070" }, { text: "-5", coord: "5070" }, { text: "5", coord: "7070" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "5030", to: "3030" }, { type: "transit", from: "7050", to: "7030" }, { type: "transit", from: "5070", to: "7070" }, { type: "transit", from: "3050", to: "3070" }],
+                    [{ type: "fuse", target: "3030", newText: "0" }, { type: "fuse", target: "7030", newText: "0" }, { type: "fuse", target: "7070", newText: "0" }, { type: "fuse", target: "3070", newText: "0" }]
+                ]
+            },
+            {
+                level: 31,
+                title: "もんだいE-2b",
+                areaA: [{ text: "10", coord: "5030" }, { text: "10", coord: "5070" }],
+                areaB: [{ text: "13", coord: "3030" }, { text: "-7", coord: "7030" }, { text: "17", coord: "3070" }, { text: "-3", coord: "7070" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "7030", to: "7070" }, { type: "transit", from: "7070", to: "7030" }],
+                    [{ type: "transit", from: "3030", to: "5030" }, { type: "transit", from: "7030", to: "5030" }, { type: "transit", from: "3070", to: "5070" }, { type: "transit", from: "7070", to: "5070" }],
+                    [{ type: "fuse", target: "5030", newText: "10" }, { type: "fuse", target: "5070", newText: "10" }]
+                ]
+            },
+            {
+                level: 33,
+                title: "もんだいE-3",
+                areaA: [{ text: "6", coord: "3050" }, { text: "6", coord: "5050" }, { text: "6", coord: "7050" }],
+                areaB: [{ text: "7", coord: "3030" }, { text: "8", coord: "5030" }, { text: "9", coord: "7030" }, { text: "-3", coord: "3070" }, { text: "-2", coord: "5070" }, { text: "-1", coord: "7070" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "3070", to: "7070" }, { type: "transit", from: "7070", to: "3070" }],
+                    [{ type: "transit", from: "3030", to: "3050" }, { type: "transit", from: "3070", to: "3050" }, { type: "transit", from: "5030", to: "5050" }, { type: "transit", from: "5070", to: "5050" }, { type: "transit", from: "7030", to: "7050" }, { type: "transit", from: "7070", to: "7050" }],
+                    [{ type: "fuse", target: "3050", newText: "6" }, { type: "fuse", target: "5050", newText: "6" }, { type: "fuse", target: "7050", newText: "6" }]
+                ]
+            },
+            {
+                level: 35,
+                title: "もんだいE-4",
+                areaA: [{ text: "4", coord: "5050" }],
+                areaB: [{ text: "6", coord: "1050" }, { text: "-5", coord: "2650" }, { text: "4", coord: "4250" }, { text: "-3", coord: "5850" }, { text: "2", coord: "7450" }, { text: "-1", coord: "9050" }],
+                correctAnswer: false,
+                animationSteps: [
+                    [{ type: "transit", from: "1050", to: "1850" }, { type: "transit", from: "2650", to: "1850" }, { type: "transit", from: "4250", to: "5050" }, { type: "transit", from: "5850", to: "5050" }, { type: "transit", from: "7450", to: "8250" }, { type: "transit", from: "9050", to: "8250" }],
+                    [{ type: "fuse", target: "1850", newText: "1" }, { type: "fuse", target: "5050", newText: "1" }, { type: "fuse", target: "8250", newText: "1" }],
+                    [{ type: "transit", from: "1850", to: "5050" }, { type: "transit", from: "8250", to: "5050" }],
+                    [{ type: "fuse", target: "5050", newText: "3" }]
+                ]
+            },
+            {
+                level: 37,
+                title: "もんだいE-5",
+                areaA: [{ text: "100", coord: "5050" }],
+                areaB: [{ text: "100", coord: "3030" }, { text: "50", coord: "7030" }, { text: "-14", coord: "1470" }, { text: "-6", coord: "3870" }, { text: "-13", coord: "6270" }, { text: "-17", coord: "8670" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "1470", to: "3870" }],
+                    [{ type: "fuse", target: "3870", newText: "-20" }],
+                    [{ type: "transit", from: "8670", to: "6270" }],
+                    [{ type: "fuse", target: "6270", newText: "-30" }],
+                    [{ type: "transit", from: "3870", to: "6270" }],
+                    [{ type: "fuse", target: "6270", newText: "-50" }],
+                    [{ type: "transit", from: "6270", to: "7030" }],
+                    [{ type: "fuse", target: "7030", newText: "0" }]
+                ]
+            },
+            // Level 3: 複雑な分裂、掛け算 (ステージ2)
+            {
+                level: 39,
+                title: "もんだいF-1",
+                areaA: [{ text: "6", coord: "3040" }, { text: "6", coord: "5040" }, { text: "6", coord: "7040" }, { text: "6", coord: "3060" }, { text: "6", coord: "5060" }, { text: "6", coord: "7060" }],
+                areaB: [{ text: "9", coord: "3040" }, { text: "5", coord: "5040" }, { text: "5", coord: "7040" }, { text: "7", coord: "3060" }, { text: "6", coord: "5060" }, { text: "5", coord: "7060" }],
+                correctAnswer: false,
+                animationSteps: [
+                    [{ type: "divide", target: "3040", newObjects: [{ text: "6", to: "3040" }, { text: "3", to: "2010" }] }],
+                    [{ type: "divide", target: "2010", newObjects: [{ text: "1", to: "2010" }, { text: "1", to: "3010" }, { text: "1", to: "4010" }] }],
+                    [{ type: "transit", from: "2010", to: "5040" }, { type: "transit", from: "3010", to: "7040" }, { type: "transit", from: "4010", to: "7060" }],
+                    [{ type: "fuse", target: "5040", newText: "6" }, { type: "fuse", target: "7040", newText: "6" }, { type: "fuse", target: "7060", newText: "6" }]
+                ]
+            },
+            {
+                level: 41,
+                title: "もんだいF-2",
+                areaA: [{ text: "10", coord: "3040" }, { text: "10", coord: "5040" }, { text: "10", coord: "7040" }, { text: "10", coord: "3060" }, { text: "10", coord: "5060" }, { text: "10", coord: "7060" }],
+                areaB: [{ text: "13", coord: "3040" }, { text: "14", coord: "5040" }, { text: "11", coord: "7040" }, { text: "5", coord: "3060" }, { text: "8", coord: "5060" }, { text: "8", coord: "7060" }],
+                correctAnswer: false,
+                animationSteps: [
+                    [{ type: "divide", target: "3040", newObjects: [{ text: "10", to: "3040" }, { text: "3", to: "3020" }] }, { type: "divide", target: "5040", newObjects: [{ text: "10", to: "5040" }, { text: "4", to: "5020" }] }, { type: "divide", target: "7040", newObjects: [{ text: "10", to: "7040" }, { text: "1", to: "7020" }] }],
+                    [{ type: "transit", from: "3020", to: "5020" }, { type: "transit", from: "7020", to: "5020" }],
+                    [{ type: "fuse", target: "5020", newText: "8" }],
+                    [{ type: "divide", target: "3060", newObjects: [{ text: "10", to: "3060" }, { text: "-5", to: "2480" }] }, { type: "divide", target: "5060", newObjects: [{ text: "10", to: "5060" }, { text: "-2", to: "5080" }] }, { type: "divide", target: "7060", newObjects: [{ text: "10", to: "7060" }, { text: "-2", to: "7680" }] }],
+                    [{ type: "transit", from: "2480", to: "5080" }, { type: "transit", from: "7680", to: "5080" }],
+                    [{ type: "fuse", target: "5080", newText: "-9" }],
+                    [{ type: "transit", from: "5080", to: "5020" }],
+                    [{ type: "fuse", target: "5020", newText: "-1" }]
+                ]
+            },
+            {
+                level: 43,
+                title: "もんだいG-1",
+                areaA: [{ text: "2×9", coord: "5050" }],
+                areaB: [{ text: "4", coord: "3050" }, { text: "4", coord: "5050" }, { text: "4", coord: "7050" }, { text: "2", coord: "3070" }, { text: "2", coord: "5070" }, { text: "2", coord: "7070" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "divide", target: "3050", newObjects: [{ text: "2", to: "3050" }, { text: "2", to: "3030" }] }, { type: "divide", target: "5050", newObjects: [{ text: "2", to: "5050" }, { text: "2", to: "5030" }] }, { type: "divide", target: "7050", newObjects: [{ text: "2", to: "7050" }, { text: "2", to: "7030" }] }],
+                    [{ type: "transit", from: "3030", to: "5050" }, { type: "transit", from: "5030", to: "5050" }, { type: "transit", from: "7030", to: "5050" }, { type: "transit", from: "3050", to: "5050" }, { type: "transit", from: "7050", to: "5050" }, { type: "transit", from: "3070", to: "5050" }, { type: "transit", from: "5070", to: "5050" }, { type: "transit", from: "7070", to: "5050" }],
+                    [{ type: "fuse", target: "5050", newText: "2×9" }]
+                ]
+            },
+            {
+                level: 45,
+                title: "もんだいG-1b",
+                areaA: [{ text: "7×10", coord: "5050" }],
+                areaB: [{ text: "3×10", coord: "5030" }, { text: "4×10", coord: "5070" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "5030", to: "5050" }, { type: "transit", from: "5070", to: "5050" }],
+                    [{ type: "fuse", target: "5050", newText: "7×10" }]
+                ]
+            },
+            {
+                level: 47,
+                title: "もんだいG-2",
+                areaA: [{ text: "8×12", coord: "5050" }],
+                areaB: [{ text: "6×12", coord: "5030" }, { text: "2×12", coord: "5070" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "5030", to: "5050" }, { type: "transit", from: "5070", to: "5050" }],
+                    [{ type: "fuse", target: "5050", newText: "8×12" }]
+                ]
+            },
+            {
+                level: 49,
+                title: "もんだいG-3",
+                areaA: [{ text: "21×10", coord: "5050" }],
+                areaB: [{ text: "21×8", coord: "5050" }, { text: "21", coord: "5070" }, { text: "21", coord: "5090" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "transit", from: "5070", to: "5050" }],
+                    [{ type: "fuse", target: "5050", newText: "21×9" }],
+                    [{ type: "transit", from: "5090", to: "5050" }],
+                    [{ type: "fuse", target: "5050", newText: "21×10" }]
+                ]
+            },
+            {
+                level: 51,
+                title: "もんだいG-5",
+                areaA: [{ text: "15×15", coord: "5040" }],
+                areaB: [{ text: "14×16", coord: "5040" }, { text: "1", coord: "5080" }],
+                correctAnswer: true,
+                animationSteps: [
+                    [{ type: "divide", target: "5040", newObjects: [{ text: "14×15", to: "5040" }, { text: "14", to: "5060" }] }],
+                    [{ type: "transit", from: "5080", to: "5060" }],
+                    [{ type: "fuse", target: "5060", newText: "15" }],
+                    [{ type: "transit", from: "5060", to: "5040" }],
+                    [{ type: "fuse", target: "5040", newText: "15×15" }]
+                ]
+            }
+        ];
+
+        // クリア状況初期化 (problems配列のインデックスに対応)
+        clearedStatus = new Array(problems.length).fill(false);
+
+        // --- ユーティリティ ---
+        function getPosition(coord) {
+            const x = coord.substring(0, 2);
+            const y = coord.substring(2, 4);
+            return { left: `${x}%`, top: `${y}%` };
+        }
+
+        function createObject(text, coord, parentArea) {
+            const obj = document.createElement('div');
+            obj.className = 'number-object';
+            obj.textContent = text;
+            obj.dataset.coord = coord;
+            const pos = getPosition(coord);
+            obj.style.left = pos.left;
+            obj.style.top = pos.top;
+            parentArea.appendChild(obj);
+            return obj;
+        }
+
+        function findObjectsAt(coord, area = areaB) {
+            return Array.from(area.querySelectorAll(`.number-object[data-coord="${coord}"]`));
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // --- アニメーション関数 (修正なし) ---
+        function transit(fromCoord, toCoord) {
+            const objs = findObjectsAt(fromCoord, areaB).filter(obj => !obj.dataset.isMoving);
+            if (objs.length > 0) {
+                const obj = objs[0];
+                obj.dataset.isMoving = true;
+                const pos = getPosition(toCoord);
+                obj.style.left = pos.left;
+                obj.style.top = pos.top;
+                obj.dataset.coord = toCoord;
+            }
+        }
+
+        function divide(targetCoord, newObjects) {
+            const targetObjs = findObjectsAt(targetCoord);
+            targetObjs.forEach(obj => {
+                obj.style.display = 'none';
+                obj.remove();
+                const createdObjs = newObjects.map(newObjInfo => {
+                    const obj = createObject(newObjInfo.text, targetCoord, areaB);
+                    obj.style.opacity = '0';
+                    return { el: obj, ...newObjInfo };
+                });
+                setTimeout(() => {
+                    createdObjs.forEach(objInfo => {
+                        objInfo.el.style.opacity = '1';
+                        const pos = getPosition(objInfo.to);
+                        objInfo.el.style.left = pos.left;
+                        objInfo.el.style.top = pos.top;
+                        objInfo.el.dataset.coord = objInfo.to;
+                    });
+                }, 20);
+            });
+        }
+
+        function fuse(targetCoord, newText) {
+            const targetObjs = findObjectsAt(targetCoord);
+            if (targetObjs.length === 0) return;
+            targetObjs.forEach(obj => {
+                obj.style.opacity = '0';
+                obj.style.transform = 'translate(-50%, -50%) scale(0.5)';
+            });
+            setTimeout(() => {
+                targetObjs.forEach(obj => obj.remove());
+                const newObj = createObject(newText, targetCoord, areaB);
+                newObj.style.opacity = '0';
+                newObj.style.transform = 'translate(-50%, -50%) scale(0.5)';
+                setTimeout(() => {
+                    newObj.style.opacity = '1';
+                    newObj.style.transform = 'translate(-50%, -50%) scale(1)';
+                }, 20);
+            }, 200);
+        }
+
+        // --- ゲームロジック ---
+
+        // 問題のフィルタリングとリスト作成
+        function prepareProblemList() {
+            let selectedStage = 1;
+            for (const radio of stageRadios) {
+                if (radio.checked) {
+                    selectedStage = parseInt(radio.value);
+                    break;
+                }
+            }
+            currentStage = selectedStage;
+
+            const allowedLevels = STAGE_CONFIG[currentStage] || [1];
+
+            const filteredList = problems
+                .map((p, index) => ({ ...p, originalIndex: index }))
+                .filter(p => allowedLevels.includes(p.level));
+
+            currentProblemList = filteredList;
+            currentProblemIndex = 0;
+        }
+
+        // ゲーム開始
+        function startGame(mode) {
+            currentMode = mode;
+            prepareProblemList();
+
+            if (currentProblemList.length === 0) {
+                alert("このステージにはまだもんだいがないようです。");
+                return;
+            }
+
+            // UI切り替え
+            startScreen.classList.add('hidden-screen');
+            gameScreen.classList.remove('hidden-screen');
+            gameOverModal.classList.add('hidden-screen');
+
+            if (mode === 'free') {
+                freeModePanel.classList.remove('hidden-screen');
+                scoreAttackPanel.classList.add('hidden-screen');
+                updateProblemSelector();
+                loadProblem(0);
+            } else {
+                // スコアアタック
+                freeModePanel.classList.add('hidden-screen');
+                scoreAttackPanel.classList.remove('hidden-screen');
+                score = 0;
+                timeLeft = 180; // 3分
+                updateScoreDisplay();
+                updateTimerDisplay();
+                loadProblem(0);
+                startTimer();
+            }
+        }
+
+        // タイトルへ戻る
+        function backToTitle() {
+            stopTimer();
+            gameScreen.classList.add('hidden-screen');
+            gameOverModal.classList.add('hidden-screen');
+            startScreen.classList.remove('hidden-screen');
+        }
+
+        // タイマー処理
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                if (timeLeft <= 0) {
+                    finishScoreAttack();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function updateTimerDisplay() {
+            const m = Math.floor(timeLeft / 60);
+            const s = timeLeft % 60;
+            timerDisplay.textContent = `${m}'${s.toString().padStart(2, '0')}`;
+        }
+
+        function updateScoreDisplay() {
+            scoreDisplay.textContent = score;
+        }
+
+        // スコアアタック終了
+        function finishScoreAttack() {
+            stopTimer();
+            finalScoreDisplay.textContent = score;
+            gameOverModal.classList.remove('hidden-screen');
+        }
+
+        // 問題ロード (listIndex: currentProblemList内でのインデックス)
+        function loadProblem(listIndex) {
+            currentProblemIndex = listIndex;
+
+            if (currentProblemIndex >= currentProblemList.length) {
+                if (currentMode === 'score') {
+                    currentProblemIndex = 0;
+                } else {
+                    return;
+                }
+            }
+
+            currentProblemData = currentProblemList[currentProblemIndex];
+
+            if (currentMode === 'free') {
+                problemSelector.value = listIndex; // フリーモードでは問題選択を維持
+
+                // 次へボタン制御
+                if (currentProblemIndex >= currentProblemList.length - 1) {
+                    nextProblemBtn.style.opacity = "0.5";
+                    nextProblemBtn.style.cursor = "not-allowed";
+                } else {
+                    nextProblemBtn.style.opacity = "1";
+                    nextProblemBtn.style.cursor = "pointer";
+                }
+            }
+
+            // 画面リセット
+            areaA.innerHTML = "";
+            areaB.innerHTML = "";
+            resultText.textContent = "";
+            resultText.classList.remove("text-green-600", "text-gray-600");
+            resultText.style.opacity = '0'; // 正誤判定を非表示に
+
+            // ボタン状態リセット
+            setButtonsState(true);
+
+            // オブジェクト配置
+            currentProblemData.areaA.forEach(obj => createObject(obj.text, obj.coord, areaA));
+            currentProblemData.areaB.forEach(obj => createObject(obj.text, obj.coord, areaB));
+        }
+
+        // ドロップダウン更新 (フリーモード用)
+        function updateProblemSelector() {
+            const savedValue = problemSelector.value; // 現在選択中の値を保持
+
+            problemSelector.innerHTML = '';
+            currentProblemList.forEach((problem, index) => {
+                const option = document.createElement("option");
+                option.value = index;
+                const isCleared = clearedStatus[problem.originalIndex];
+                option.textContent = problem.title + (isCleared ? " ★" : "");
+                problemSelector.appendChild(option);
+            });
+
+            // 保持した値を再設定
+            if (currentMode === 'free' && savedValue !== null) {
+                problemSelector.value = savedValue;
+            } else {
+                problemSelector.value = 0; // 初期選択
+            }
+        }
+
+        function setButtonsState(enabled) {
+            correctBtn.disabled = !enabled;
+            incorrectBtn.disabled = !enabled;
+
+            if (enabled) {
+                correctBtn.classList.remove("btn-inactive");
+                incorrectBtn.classList.remove("btn-inactive");
+                correctBtn.style.opacity = "1";
+                incorrectBtn.style.opacity = "1";
+                correctBtn.style.cursor = "pointer";
+                incorrectBtn.style.cursor = "pointer";
+            } else {
+                correctBtn.style.cursor = "not-allowed";
+                incorrectBtn.style.cursor = "not-allowed";
+            }
+        }
+
+        // 回答チェック
+        function checkAnswer(userChoice) {
+            setButtonsState(false); // ボタン連打防止
+
+            // 選択したボタン以外を薄くする
+            if (userChoice === true) {
+                incorrectBtn.classList.add("btn-inactive");
+            } else {
+                correctBtn.classList.add("btn-inactive");
+            }
+
+            const isCorrect = (userChoice === currentProblemData.correctAnswer);
+            runAnimationSequence(isCorrect);
+        }
+
+        // アニメーション実行
+        function runAnimationSequence(isCorrect) {
+            let delay = 100;
+            const stepDuration = 500;
+
+            currentProblemData.animationSteps.forEach((stepGroup) => {
+                setTimeout(() => {
+                    const movingObjs = Array.from(areaB.querySelectorAll(`[data-is-moving]`));
+                    movingObjs.forEach(obj => delete obj.dataset.isMoving);
+
+                    stepGroup.forEach((step) => {
+                        switch (step.type) {
+                            case "transit": transit(step.from, step.to); break;
+                            case "divide": divide(step.target, step.newObjects); break;
+                            case "fuse": fuse(step.target, step.newText); break;
+                        }
+                    });
+                }, delay);
+                delay += stepDuration;
+            });
+
+            setTimeout(() => {
+                showResult(isCorrect);
+            }, delay + 500);
+        }
+
+        // 結果表示・スコア処理
+        function showResult(isCorrect) {
+            if (isCorrect) {
+                resultText.textContent = "せいかい！";
+                resultText.classList.add("text-green-600");
+
+                const masterIndex = currentProblemData.originalIndex;
+                if (!clearedStatus[masterIndex]) {
+                    clearedStatus[masterIndex] = true;
+                }
+
+                if (currentMode === 'score') {
+                    score += 6;
+                    updateScoreDisplay();
+                }
+            } else {
+                resultText.textContent = "ふせいかい! ><";
+                resultText.classList.add("text-red-600"); // 不正解は赤色で強調
+                resultText.classList.remove("text-gray-600"); // 念のため削除
+
+                if (currentMode === 'score') {
+                    score -= 3;
+                    updateScoreDisplay();
+                }
+            }
+
+            // 正誤判定を表示
+            resultText.style.opacity = '1';
+            resultText.style.transform = "translateX(-50%) scale(1.2)";
+            setTimeout(() => {
+                resultText.style.transform = "translateX(-50%) scale(1)";
+            }, 300);
+
+            // モードごとの事後処理
+            if (currentMode === 'score') {
+                // 2秒後に次の問題へ
+                setTimeout(() => {
+                    if (timeLeft > 0) {
+                        loadProblem(currentProblemIndex + 1);
+                    }
+                }, 2000);
+            } else {
+                // フリーモード: ★更新 (問題選択は維持されている)
+                updateProblemSelector();
+            }
+        }
+
+        // --- イベントリスナー ---
+
+        // スタート画面
+        startScoreAttackBtn.addEventListener('click', () => startGame('score'));
+        startFreeModeBtn.addEventListener('click', () => startGame('free'));
+
+        // ゲーム内操作
+        correctBtn.addEventListener('click', () => checkAnswer(true));
+        incorrectBtn.addEventListener('click', () => checkAnswer(false));
+
+        // フリーモードUI
+        problemSelector.addEventListener('change', (e) => loadProblem(parseInt(e.target.value)));
+        nextProblemBtn.addEventListener('click', () => {
+            if (currentProblemIndex < currentProblemList.length - 1) {
+                loadProblem(currentProblemIndex + 1);
+            }
+        });
+        reloadBtn.addEventListener('click', () => loadProblem(currentProblemIndex));
+
+        // 戻るボタン
+        backToTitleBtns.forEach(btn => {
+            btn.addEventListener('click', backToTitle);
+        });
+
+    </script>
+</body>
+
+</html>

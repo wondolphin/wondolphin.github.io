@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>わんだーweb</title>
+  <link rel="icon" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="manifest" href="manifest.json">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Noto Sans JP', sans-serif;
+      background: linear-gradient(135deg, #e8f5f8, #fffde7);
+      color: #222;
+      text-align: center;
+    }
+
+    header {
+      padding: 60px 20px 40px;
+      background: linear-gradient(135deg, #0288d1, #26a69a);
+      color: #fff;
+      font-size: 2.8em;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-shadow: 1px 2px 6px rgba(0,0,0,0.25);
+      border-bottom: 4px solid rgba(255,255,255,0.7);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 32px;
+      padding: 50px 40px 60px;
+      max-width: 1100px;
+      margin: auto;
+    }
+
+    .game-card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+
+    .game-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+      border-color: #c5e1a5;
+    }
+
+    .thumbnail {
+      aspect-ratio: 4 / 3;
+      width: 100%;
+      object-fit: cover;
+      background: #f0f0f0;
+    }
+
+    .title {
+      padding: 12px;
+      font-size: 1.1em;
+      background: #fafafa;
+      font-weight: 600;
+      color: #004d40;
+      border-top: 2px solid #c8e6c9;
+    }
+
+    footer {
+      margin-top: 40px;
+      padding: 20px;
+      font-size: 0.9em;
+      color: #777;
+      border-top: 1px solid #ddd;
+    }
+  </style>
+</head>
+<body>
+  <header>わんだーweb</header>
+
+  <main>
+    <!-- ゲーム一覧 -->
+    <div class="game-card" onclick="openGame('byougagame/game.html')">
+      <img src="byougagame/thumbnail.png" class="thumbnail" alt="ゲーム1">
+      <div class="title">びよよんマスター</div>
+    </div>
+    <div class="game-card" onclick="openGame('graphgame/graph.html')">
+      <img src="graphgame/thumbnail.png" class="thumbnail" alt="ゲーム2">
+      <div class="title">グラフゲーム</div>
+    </div>
+    <div class="game-card" onclick="openGame('arrangewatermelon2/content.html')">
+      <img src="arrangewatermelon2/thumbnail.png" class="thumbnail" alt="ゲーム3">
+      <div class="title">おかしなパーティーEX</div>
+    </div>
+    <div class="game-card" onclick="openGame('MakeX/index.html')">
+      <img src="MakeX/thumbnail.png" class="thumbnail" alt="ゲーム1">
+      <div class="title">メイクX</div>
+    </div>
+    <div class="game-card" onclick="openGame('tachiawase/tachiawase.html')">
+      <img src="tachiawase/thumbnail.png" class="thumbnail" alt="ゲーム2">
+      <div class="title">たちあわせゲーム</div>
+    </div>
+    <div class="game-card" onclick="openGame('direction/direction.html')">
+      <img src="direction/thumbnail.png" class="thumbnail" alt="ゲーム3">
+      <div class="title">ほうこうてんかん</div>
+    </div>
+  </main>
+
+  <footer>© 2025 Wonderfy</footer>
+
+  <script>
+    function openGame(url) {
+      window.open(url, '_blank');
+    }
+  </script>
+</body>
+</html>

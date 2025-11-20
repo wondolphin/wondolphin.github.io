@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>方向転換パズルゲーム</title>
+    <style>
+        /* 全体のスタイル */
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            margin: 0;
+            padding: 10px; 
+            background-color: #f0f2f5;
+            color: #333;
+            height: 100vh; /* ★変更: 高さをビューポートに固定 */
+            box-sizing: border-box; 
+            overflow: hidden; /* ★追加: スクロールバーを非表示 */
+            touch-action: none;
+        }
+
+        /* ゲームコンテナ */
+        .main-container {
+            display: flex;
+            flex-wrap: nowrap; /* ★変更: 折り返さない */
+            gap: 20px;
+            align-items: flex-start;
+            height: 100%; /* ★追加: 親（body）の高さに合わせる */
+            max-height: calc(100vh - 20px); /* ★変更: bodyのパディングを考慮 */
+        }
+
+        /* 盤面 */
+        #game-board {
+            /* ★変更: 高さを基準にサイズを決定 (さらに小さく) */
+            height: calc(100vh - 120px); /* ビューポートの高さから余白を引く */
+            width: calc(100vh - 120px);  /* 高さと合わせて正方形を維持 */
+            
+            /* ★変更: max-height/widthは500pxの論理サイズに合わせる */
+            max-height: 500px;
+            max-width: 500px;
+
+            border: 2px solid #333;
+            position: relative;
+            background-color: #fff;
+            background-image:
+                linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+            /* ★変更: background-sizeも動的に変更（JS側で） */
+            /* background-size: 40px 40px; */ 
+            overflow: hidden; /* プレイヤーがはみ出さないように */
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        /* サイドパネル */
+        .side-panel {
+            width: 260px; /* ★変更: 固定サイズに戻す */
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+
+            /* ★変更: 盤面と高さを合わせる (さらに小さく) */
+            height: calc(100vh - 120px); /* 盤面と同じ */
+            max-height: 500px; /* 盤面と同じ */
+            box-sizing: border-box; /* ★追加: パディングを高さに含める */
+            
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .side-panel h3 {
+            margin: 0;
+            padding-bottom: 5px; /* ★変更: パディングを減らす */
+            border-bottom: 1px solid #eee;
+            text-align: center;
+            font-size: 1.0em; /* ★変更: デフォルトのフォントサイズ */
+        }
+        
+        #level-selection h3 {
+            font-size: 0.8em; /* ★変更: フォントを小さく */
+            padding-bottom: 2px;
+            margin-bottom: 5px;
+            gap: 5px; /* ★変更: ギャップを小さく */
+        }
+        
+        /* スタンバイエリア */
+        #standby-area {
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 10px; 
+            padding: 10px; 
+            min-height: 100px;
+            background-color: #f9f9f9;
+            border: 1px dashed #ccc;
+            border-radius: 6px;
+            align-items: start;
+            justify-items: center;
+        }
+
+        /* ゲームオブジェクトの共通スタイル */
+        .game-object {
+            position: absolute;
+            /* width/heightはJSで動的に設定 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 14px;
+            box-sizing: border-box;
+            background-size: contain; 
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        /* プレイヤー */
+        #player {
+            background-image: url('player.png'); 
+            z-index: 10;
+            transform: rotate(calc(var(--angle, 0) * 1deg)); 
+            transition: transform 0.05s linear; 
+            border-radius: 50%;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotate(calc(var(--angle, 0) * 1deg)) translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: rotate(calc(var(--angle, 0) * 1deg)) translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: rotate(calc(var(--angle, 0) * 1deg)) translateX(5px); }
+        }
+        #player.hit-wall {
+            animation: shake 0.5s ease-in-out;
+        }
+
+
+        /* ゴール */
+        .goal {
+            background-image: url('goal.png'); 
+            border-radius: 50%; 
+        }
+
+        /* 壁 */
+        .wall {
+            background-color: #777;
+            z-index: 5;
+            border-radius: 4px;
+        }
+        
+        /* 方向転換ブロック */
+        .direction-block {
+            cursor: grab;
+            position: relative; 
+            z-index: 8;
+            user-select: none; 
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: opacity 0.3s ease; 
+            /* width/heightはJSで動的に設定 */
+        }
+        .direction-block.placed {
+             position: absolute; 
+        }
+        .direction-block:active {
+            cursor: grabbing;
+            z-index: 20; 
+        }
+        .direction-block.hit { 
+            opacity: 0.4; 
+            cursor: default;
+        }
+        
+        /* ボタン */
+        .button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background-color 0.2s, transform 0.1s;
+            user-select: none; 
+        }
+        .button:active {
+            transform: translateY(1px);
+        }
+
+        #go-button {
+            background-color: #50e3c2;
+            color: white;
+        }
+        #go-button:hover {
+            background-color: #45c4a8;
+        }
+        #go-button:disabled, #reset-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+
+        #reset-button {
+            background-color: #f0f2f5;
+            color: #555;
+            border: 1px solid #ddd;
+        }
+         #reset-button:hover:not(:disabled) { 
+            background-color: #e6e8eb;
+        }
+
+
+        /* メッセージ表示エリア */
+        #message-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.0); 
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            border-radius: 8px;
+        }
+        #message-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .message-box {
+            background-color: rgba(255, 255, 255, 0.9); 
+            color: #333;
+            padding: 30px 50px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .message-box .button { 
+            background-color: #50e3c2;
+            color: white;
+        }
+        .message-box .button:hover {
+            background-color: #45c4a8;
+        }
+
+        /* レベル選択UI (ドロップダウン) */
+        #level-selection {
+            display: flex;
+            flex-direction: column;
+            gap: 5px; 
+        }
+        #level-dropdown {
+            width: 100%;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+            background-color: white;
+        }
+
+        /* プレイヤーの軌跡 */
+        .trail {
+            position: absolute;
+            /* width/heightはJSで動的に設定 */
+            background-color: rgba(0, 0, 200, 0.3);
+            border-radius: 50%;
+            z-index: 1;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div id="game-board">
+             <div id="message-overlay"></div>
+        </div>
+        <div class="side-panel">
+            <div id="level-selection">
+                <!-- ドロップダウンはJSでここに追加されます -->
+            </div>
+            <h3>ブロック</h3>
+            <div id="standby-area">
+                <!-- ブロックはJSでここに追加されます -->
+            </div>
+            <button id="go-button" class="button">Go!</button>
+            <button id="reset-button" class="button">リセット</button>
+        </div>
+    </div>
+
+    <script>
+        // --- ゲーム設定 ---
+        const LOGICAL_BOARD_SIZE = 500; // ★変更: 論理的な盤面サイズ
+        const PLAYER_SPEED = 8;
+        const PLAYER_SLOW_SPEED = 3; 
+        const OBJECT_SIZE = 40; // 論理的なオブジェクトサイズ
+        const STANDBY_BLOCK_SIZE = 55; // 論理的なスタンバイブロックサイズ
+
+        // --- レベルデータ (500x500の論理座標) ---
+             const levels = [
+             {
+    player: { x: 378, y: 412, angle: 0 },
+    goals: [
+        { x: 110, y: 142 },
+    ],
+    walls: [
+        { x: 102, y: 254, w: 179, h: 196 },
+    ],
+    blocks: [
+        { angle: 90 },
+    ]
+},
+                {
+                    player: { x: 74, y: 402, angle: 0 },
+                    goals: [
+                        { x: 367, y: 58 },
+                    ],
+                    walls: [
+                        { x: 222, y: 2, w: 30, h: 160 },
+                        { x: 223, y: 307, w: 30, h: 184 },
+                    ],
+                    blocks: [
+                        { angle: 90 },
+                        { angle: -90 },
+                    ]
+                },
+                
+                                {
+                    player: { x: 234, y: 229, angle: 180 },
+                    goals: [
+                        { x: 230, y: 29 },
+                    ],
+                    walls: [
+                        { x: 145, y: 134, w: 211, h: 39 },
+                    ],
+                    blocks: [
+                        { angle: -90 },
+                        { angle: -90 },
+                        { angle: -90 },
+                    ]
+                },
+                                {
+                    player: { x: 35, y: 33, angle: 90 },
+                    goals: [
+                        { x: 235, y: 387 },
+                    ],
+                    walls: [
+                        { x: 198, y: 187, w: 100, h: 40 },
+                    ],
+                    blocks: [
+                        { angle: -45 },
+                        { angle: -90 },
+                    ]
+                },
+                
+{
+    player: { x: 55, y: 407, angle: 45 },
+    goals: [
+        { x: 55, y: 55 },
+        { x: 305, y: 305 },
+        { x: 155, y: 155 },
+        { x: 405, y: 405 },
+    ],
+    walls: [
+    ],
+    blocks: [
+        { angle: 135 },
+        { angle: 135 },
+    ]
+},
+                                               
+                {
+    player: { x: 80, y: 382, angle: 0 },
+    goals: [
+        { x: 231, y: 231 },
+        { x: 83, y: 231 },
+        { x: 386, y: 228 },
+    ],
+    walls: [
+        { x: 139, y: 225, w: 20.5, h: 134 },
+        { x: 339, y: 99, w: 26.5, h: 118 },
+    ],
+    blocks: [
+        { angle: 135 },
+        { angle: -135 },
+    ]
+},
+
+/*
+ {
+                    player: { x: 35, y: 427, angle: 45 },
+                    goals: [
+                        { x: 425, y: 275 },
+                        { x: 176, y: 179 },
+                        { x: 34, y: 286 },
+                    ],
+                    walls: [
+                    ],
+                    blocks: [
+                        { angle: -135 },
+                        { angle: -135 },
+                        { angle: 135 },
+                    ]
+                },
+                */
+
+                
+{
+                    player: { x: 61, y: 435, angle: 0 },
+                    goals: [
+                        { x: 394, y: 44 },
+                    ],
+                    walls: [
+                        { x: 135, y: 10, w: 98.5, h: 114 },
+                        { x: 215, y: 125, w: 98.5, h: 109 },
+                        { x: 373, y: 381, w: 97.5, h: 106 },
+                    ],
+                    blocks: [
+                        { angle: -135 },
+                        { angle: 90 },
+                        { angle: 45 },
+                    ]
+                },
+{
+    player: { x: 405, y: 355, angle: 0 },
+    goals: [
+        { x: 55, y: 55 },
+        { x: 405, y: 55 },
+    ],
+    walls: [
+        { x: 242, y: 0, w: 20, h: 397 },
+    ],
+    blocks: [
+        { angle: -180 },
+        { angle: -90 },
+        { angle: -90 },
+    ]
+},
+
+                {
+    player: { x: 230, y: 427, angle: 0 },
+    goals: [
+        { x: 236, y: 130 },
+        { x: 135, y: 328 },
+    ],
+    walls: [
+        { x: 147, y: 240, w: 153.5, h: 20 },
+        { x: 143, y: 44, w: 214.5, h: 20 },
+        { x: 124, y: 47, w: 49, h: 194 },
+    ],
+    blocks: [
+        { angle: 180 },
+        { angle: 90 },
+        { angle: 135 },
+    ]
+},
+{
+    player: { x: 34, y: 434, angle: 90 },
+    goals: [
+        { x: 27, y: 29 },
+        { x: 258, y: 227 },
+        { x: 428, y: 226 },
+    ],
+    walls: [
+        { x: 0, y: 101, w: 230, h: 280 },
+        { x: 328, y: 99, w: 63, h: 286 },
+    ],
+    blocks: [
+        { angle: 90 },
+        { angle: -90 },
+        { angle: 180 },
+        { angle: 90 },
+    ]
+},
+{
+    player: { x: 381, y: 82, angle: 270 },
+    goals: [
+        { x: 227, y: 84 },
+        { x: 236, y: 227 },
+        { x: 234, y: 371 },
+        { x: 87, y: 232 },
+    ],
+    walls: [
+    ],
+    blocks: [
+        { angle: -135 },
+        { angle: 135 },
+        { angle: -90 },
+    ]
+},
+ {
+                    player: { x: 330, y: 377, angle: 0 },
+                    goals: [
+                        { x: 229, y: 434 },  { x: 329, y: 434 },
+                    ],
+                    walls: [
+                        { x: 171, y: 268, w: 138, h: 52 },
+                    ],
+                    blocks: [
+                        { angle: 45 },
+                        { angle: 90 },
+                        { angle: 135 },
+                    ]
+                },
+{
+    player: { x: 30, y: 285, angle: 90 },
+    goals: [
+        { x: 81, y: 179 },
+        { x: 234, y: 327 },
+        { x: 336, y: 177 },
+    ],
+    walls: [
+        { x: 250, y: 93, w: 49, h: 154 },
+    ],
+    blocks: [
+        { angle: 180 },
+        { angle: 135 },
+        { angle: 135 },
+    ]
+},
+{
+    player: { x: 229, y: 438, angle: 0 },
+    goals: [
+        { x: 129, y: 235 },
+        { x: 133, y: 128 },
+        { x: 329, y: 236 },
+        { x: 331, y: 131 },
+    ],
+    walls: [
+        { x: 236, y: 149, w: 30.5, h: 102 },
+        { x: 204, y: 190, w: 98.5, h: 23 },
+    ],
+    blocks: [
+        { angle: 45 },
+        { angle: -90 },
+        { angle: -90 },
+        { angle: -90 },
+    ]
+},
+               
+{
+    player: { x: 406, y: 460, angle: 0 },
+    goals: [
+        { x: 393, y: 231 },
+        { x: 73, y: 229 },
+        { x: 231, y: 382 },
+        { x: 233, y: 77 },
+    ],
+    walls: [
+    ],
+    blocks: [
+        { angle: 135 },
+        { angle: -135 },
+        { angle: 135 },
+    ]
+},
+                                {
+                    player: { x: 423, y: 424, angle: 0 },
+                    goals: [
+                        { x: 27, y: 428 },
+                    ],
+                    walls: [
+                        { x: 116, y: 209, w: 254, h: 51 },
+                        { x: 302, y: 396, w: 72, h: 104 },
+                        { x: 116, y: 272, w: 66, h: 111 },
+                        { x: 376, y: 152, w: 33, h: 108 },
+                        { x: 0, y: 0, w: 248, h: 110 },
+                    ],
+                    blocks: [
+                        { angle: 135 },
+                        { angle: -45 },
+                        { angle: 90 },
+                    ]
+                },
+                
+                /*
+                {
+                    player: { x: 234, y: 286, angle: 0 },
+                    goals: [
+                        { x: 128, y: 129 },
+                    ],
+                    walls: [
+                        { x: 73, y: 203, w: 120, h: 112 },
+                        { x: 191, y: 87, w: 118.5, h: 109 },
+                    ],
+                    blocks: [
+                        { angle: -90 },
+                        { angle: -135 },
+                        { angle: -135 },
+                        { angle: -135 },
+                    ]
+                },
+                */
+                
+                
+                {
+    player: { x: 109, y: 435, angle: 0 },
+    goals: [
+        { x: 330, y: 118 },
+        { x: 411, y: 431 },
+    ],
+    walls: [
+        { x: 212, y: 385, w: 79, h: 100 },
+        { x: 66, y: 12, w: 108, h: 79.5 },
+    ],
+    blocks: [
+        { angle: -60 },
+        { angle: -120 },
+    ]
+},
+                {
+                    player: { x: 307, y: 446, angle: 90 },
+                    goals: [
+                        { x: 28, y: 283 },
+                    ],
+                    walls: [
+                        { x: 215, y: 128, w: 68, h: 372 },
+                        { x: 0, y: 129, w: 97, h: 47 },
+                        { x: 357, y: 231, w: 74, h: 153 },
+                        { x: 424, y: 0, w: 76, h: 124 },
+                    ],
+                    blocks: [
+                        { angle: 90 },
+                        { angle: 90 },
+                        { angle: 60 },
+                    ]
+                },
+                
+                 {
+    player: { x: 336, y: 34, angle: -90 },
+    goals: [
+        { x: 414, y: 420 },
+    ],
+    walls: [
+        { x: 229, y: 338, w: 46, h: 162 },
+        { x: 192, y: 108, w: 247, h: 54 },
+    ],
+    blocks: [
+        { angle: 90 },
+        { angle: -90 },
+        { angle: 120 },
+    ]
+},
+ {
+                    player: { x: 35, y: 33, angle: 90 },
+                    goals: [
+                        { x: 228, y: 334 },
+                        { x: 128, y: 179 },
+                    ],
+                    walls: [
+                    ],
+                    blocks: [
+                        { angle: -90 },
+                        { angle: -45 },
+                        { angle: -135 },
+                    ]
+                },
+                
+                                {
+                    player: { x: 226, y: 245, angle: 0 },
+                    goals: [
+                        { x: 33, y: 449 },
+                    ],
+                    walls: [
+                        { x: 109, y: 260, w: 98.5, h: 114 },
+                    ],
+                    blocks: [
+                        { angle: -60 },
+                        { angle: 150 },
+                        { angle: 90 },
+                    ]
+                },
+{
+    player: { x: 226, y: 137, angle: 180 },
+    goals: [
+        { x: 382, y: 30 },
+        { x: 78, y: 30 },
+    ],
+    walls: [
+        { x: 195, y: 0, w: 106, h: 97 },
+    ],
+    blocks: [
+        { angle: -135 },
+        { angle: 150 },
+        { angle: 120 },
+    ]
+},
+                {
+                    player: { x: 54, y: 67, angle: 180 },
+                    goals: [
+                        { x: 411, y: 135 },
+                        { x: 414, y: 421 },
+                        { x: 208, y: 42 },
+                    ],
+                    walls: [
+                    ],
+                    blocks: [
+                        { angle: 120 },
+                        { angle: -120 },
+                        { angle: -150 },
+                    ]
+                },
+
+                {
+                    player: { x: 430, y: 280, angle: 0 },
+                    goals: [
+                        { x: 430, y: 330 },
+                    ],
+                    walls: [
+                        { x: 153, y: 151, w: 206.5, h: 185 },
+                    ],
+                    blocks: [
+                        { angle: 60 },
+                        { angle: 60 },
+                        { angle: 60 },
+                        { angle: 60 },
+                        { angle: 60 },
+                    ]
+                },
+                {
+                    player: { x: 69, y: 367, angle: 30 },
+                    goals: [
+                        { x: 104, y: 455 },
+                    ],
+                    walls: [
+                    ],
+                    blocks: [
+                        { angle: -135 },
+                        { angle: -135 },
+                        { angle: -135 },
+                        { angle: -135 },
+                    ]
+                },
+                {
+                    player: { x: 85, y: 340, angle: 30 },
+                    goals: [
+                        { x: 230, y: 228 },
+                        { x: 78, y: 231 },
+                        { x: 383, y: 229 },
+                    ],
+                    walls: [
+                    ],
+                    blocks: [
+                        { angle: -150 },
+                        { angle: 150 },
+                        { angle: 120 },
+                    ]
+                },
+               
+                
+
+
+               
+                {
+                    player: { x: 232, y: 230, angle: 315 },
+                    goals: [
+                        { x: 130, y: 134 },
+                        { x: 33, y: 225 },
+                        { x: 133, y: 333 },
+                        { x: 336, y: 336 },
+                        { x: 431, y: 232 },
+                    ],
+                    walls: [
+                    ],
+                    blocks: [
+                        { angle: 135 },
+                        { angle: 135 },
+                        { angle: -135 },
+                        { angle: -135 },
+                    ]
+                },
+                
+                {
+                    player: { x: 232, y: 234, angle: 0 },
+                    goals: [
+                        { x: 232, y: 135 },
+                        { x: 130, y: 135 },
+                        { x: 340, y: 135 },
+                    ],
+                    walls: [
+                    ],
+                    blocks: [
+                        { angle: -180 },
+                        { angle: 90 },
+                        { angle: 135 },
+                        { angle: -135 },
+                        { angle: -135 },
+                    ]
+                },
+                {
+    player: { x: 36, y: 129, angle: 180 },
+    goals: [
+        { x: 28, y: 29 },
+    ],
+    walls: [
+        { x: 112, y: 94, w: 124, h: 108 },
+        { x: 258, y: 277, w: 140, h: 123 },
+    ],
+    blocks: [
+        { angle: 45 },
+        { angle: 60 },
+        { angle: 150 },
+        { angle: -45 },
+        { angle: 60 },
+    ]
+},
+
+
+
+
+
+
+
+{
+    player: { x: 230, y: 230, angle: 45 },
+    goals: [
+        { x: 405, y: 405 },
+        { x: 55, y: 55 },
+        { x: 405, y: 55 },
+    ],
+    walls: [
+    ],
+    blocks: [
+        { angle: -180 },
+        { angle: -180 },
+        { angle: -135 },
+        { angle: 90 },
+    ]
+},
+{
+    player: { x: 230, y: 230, angle: 0 },
+    goals: [
+        { x: 30, y: 427 },
+        { x: 27, y: 28 },
+        { x: 391, y: 37 },
+        { x: 391, y: 428 },
+    ],
+    walls: [
+        { x: 288, y: 223, w: 46, h: 162 },
+        { x: 110, y: 160, w: 66, h: 230 },
+        { x: 287, y: 0, w: 46, h: 102 },
+    ],
+    blocks: [
+        { angle: -90 },
+        { angle: -60 },
+        { angle: 90 },
+        { angle: -150 },
+        { angle: 120 },
+    ]
+}
+
+
+                
+                
+                
+                
+                
+                
+            ];
+
+
+        // --- DOM要素の取得 ---
+        const gameBoard = document.getElementById('game-board');
+        let BOARD_SIZE = gameBoard.clientWidth; // ★変更: 盤面の*実際*のピクセルサイズ
+        let scaleFactor = 1.0; // ★追加: 論理サイズと実際サイズの比率
+
+        const standbyArea = document.getElementById('standby-area');
+        const goButton = document.getElementById('go-button');
+        const resetButton = document.getElementById('reset-button');
+        const messageOverlay = document.getElementById('message-overlay');
+        const levelSelectionDiv = document.getElementById('level-selection');
+
+        // --- ゲームの状態管理 ---
+        let player, goals = [], walls = [], placedBlocks = [];
+        let gameState = 'standby'; // 'standby' or 'playing'
+        let animationFrameId;
+        let currentLevelIndex = 0; // 現在のレベル
+        let levelClearStatus = {}; // レベルクリア状態 (★マーク用)
+        let playerTrail = []; // プレイヤーの軌跡
+
+        // --- ドラッグ＆ドロップ関連の変数 ---
+        let draggedElement = null;
+        let offsetX, offsetY;
+
+        // --- 初期化処理 ---
+        function init(levelIndex = 0) {
+            // ★追加: 盤面サイズと縮尺を動的に更新
+            BOARD_SIZE = gameBoard.clientWidth; 
+            scaleFactor = BOARD_SIZE / LOGICAL_BOARD_SIZE;
+            
+            // ★追加: 盤面のマス目サイズも縮尺に合わせる
+            gameBoard.style.backgroundSize = `${40 * scaleFactor}px ${40 * scaleFactor}px`;
+
+            cancelAnimationFrame(animationFrameId); 
+            clearTrail(); 
+            
+            currentLevelIndex = levelIndex;
+            const currentLevel = levels[currentLevelIndex];
+
+            gameBoard.innerHTML = ''; 
+            gameBoard.appendChild(messageOverlay); 
+            standbyArea.innerHTML = '';
+            placedBlocks = [];
+            goals = [];
+            walls = []; 
+
+            // プレイヤーの作成 (★createGameObjectがスケーリング)
+            const playerConfig = currentLevel.player;
+            player = createGameObject('player', playerConfig.x, playerConfig.y, OBJECT_SIZE, OBJECT_SIZE);
+            player.angle = playerConfig.angle;
+            player.overlappingBlock = null;
+            player.lastDistanceToBlock = Infinity;
+            updatePlayerTransform(); 
+
+            // ゴールの作成 (複数)
+            currentLevel.goals.forEach((goalConfig, index) => {
+                const goal = createGameObject(`goal-${index} goal game-object`, goalConfig.x, goalConfig.y, OBJECT_SIZE, OBJECT_SIZE);
+                goal.hit = false; 
+                goals.push(goal);
+            });
+
+            // 壁の作成
+            walls = currentLevel.walls.map((w, index) => 
+                createGameObject(`wall-${index} wall game-object`, w.x, w.y, w.w, w.h, false)
+            );
+
+            // スタンバイエリアに方向転換ブロックを作成
+            currentLevel.blocks.forEach((blockInfo, index) => {
+                const block = document.createElement('div');
+                block.id = `standby-block-${index}`; 
+                block.className = 'direction-block game-object';
+                
+                const angle = blockInfo.angle;
+                const sign = angle > 0 ? 'plus' : 'minus';
+                const angleValue = Math.abs(angle);
+                const filename = `math_direction_${sign}_${angleValue}.png`;
+                block.style.backgroundImage = `url('${filename}')`;
+                
+                block.dataset.angle = blockInfo.angle;
+                // ★変更: スタンバイ時のサイズもスケーリング（ただし基準は固定値）
+                const scaledStandbySize = STANDBY_BLOCK_SIZE; // (サイドパネルは縮小しない前提)
+                block.style.width = `${scaledStandbySize}px`;
+                block.style.height = `${scaledStandbySize}px`;
+                block.dataset.radius = scaledStandbySize / 2; 
+                block.style.position = 'relative'; 
+                block.style.left = 'auto';
+                block.style.top = 'auto';
+                block.addEventListener('mousedown', onDragStart, false);
+                block.addEventListener('touchstart', onDragStart, false);
+                standbyArea.appendChild(block);
+            });
+            
+            renderLevelDropdown();
+            resetToStandby();
+        }
+
+        // --- ★変更: ゲームオブジェクト生成関数 (スケーリング対応) ---
+        function createGameObject(idOrClass, x, y, w, h, isCircle = true) {
+            const el = document.createElement('div');
+            if (idOrClass.includes(' ')) {
+                el.className = idOrClass;
+            } else {
+                el.id = idOrClass;
+                el.className = `${idOrClass} game-object`;
+            }
+
+            // ★追加: 論理座標/サイズをスケーリング
+            const scaledX = x * scaleFactor;
+            const scaledY = y * scaleFactor;
+            const scaledW = w * scaleFactor;
+            const scaledH = h * scaleFactor;
+
+            el.style.width = `${scaledW}px`;
+            el.style.height = `${scaledH}px`;
+            el.style.left = `${scaledX}px`;
+            el.style.top = `${scaledY}px`;
+            
+            if (isCircle) {
+                // ★変更: 半径もスケーリング
+                el.dataset.radius = (w / 2) * scaleFactor;
+            }
+            // ★追加: 論理座標をデータ属性として保持（ドラッグ用）
+            el.dataset.logicalX = x;
+            el.dataset.logicalY = y;
+            
+            gameBoard.appendChild(el);
+            return el;
+        }
+
+        // --- ドラッグ＆ドロップ処理 (スケーリング対応) ---
+        function onDragStart(e) {
+            if (gameState !== 'standby' || draggedElement) return;
+
+            const touch = e.touches ? e.touches[0] : null;
+            const clientX = touch ? touch.clientX : e.clientX;
+            const clientY = touch ? touch.clientY : e.clientY;
+
+            draggedElement = e.target;
+
+            if (draggedElement.parentElement === standbyArea) {
+                e.preventDefault(); 
+                draggedElement.classList.add('placed'); 
+                draggedElement.style.position = 'absolute'; 
+                draggedElement.style.opacity = '0.7'; 
+                
+                // ★変更: 盤面上のオブジェクトサイズにスケーリング
+                const scaledObjectSize = OBJECT_SIZE * scaleFactor;
+                draggedElement.style.width = `${scaledObjectSize}px`;
+                draggedElement.style.height = `${scaledObjectSize}px`;
+                draggedElement.dataset.radius = scaledObjectSize / 2;
+                
+                const boardRect = gameBoard.getBoundingClientRect();
+                // ★変更: オフセットもスケーリング
+                offsetX = scaledObjectSize / 2;
+                offsetY = scaledObjectSize / 2;
+                
+                let scaledX = clientX - boardRect.left - offsetX;
+                let scaledY = clientY - boardRect.top - offsetY;
+
+                // 盤面内に収める
+                scaledX = Math.max(0, Math.min(scaledX, BOARD_SIZE - scaledObjectSize));
+                scaledY = Math.max(0, Math.min(scaledY, BOARD_SIZE - scaledObjectSize));
+                
+                draggedElement.style.left = `${scaledX}px`;
+                draggedElement.style.top = `${scaledY}px`;
+                // ★変更: 論理座標を保存
+                draggedElement.dataset.logicalX = scaledX / scaleFactor;
+                draggedElement.dataset.logicalY = scaledY / scaleFactor;
+
+                gameBoard.appendChild(draggedElement); 
+                placedBlocks.push(draggedElement); 
+
+            } else if (draggedElement.classList.contains('placed')) {
+                e.preventDefault(); 
+                draggedElement.style.opacity = '0.7';
+                const rect = draggedElement.getBoundingClientRect();
+                offsetX = clientX - rect.left;
+                offsetY = clientY - rect.top;
+            } else {
+                draggedElement = null;
+                return;
+            }
+
+            draggedElement.style.zIndex = 1000;
+            document.addEventListener('mousemove', onDragMove, false);
+            document.addEventListener('touchmove', onDragMove, false);
+            document.addEventListener('mouseup', onDragEnd, false);
+            document.addEventListener('touchend', onDragEnd, false);
+        }
+
+        function onDragMove(e) {
+            if (!draggedElement) return;
+            e.preventDefault(); 
+
+            const touch = e.touches ? e.touches[0] : null;
+            const clientX = touch ? touch.clientX : e.clientX;
+            const clientY = touch ? touch.clientY : e.clientY;
+
+            const boardRect = gameBoard.getBoundingClientRect();
+            let scaledX = clientX - boardRect.left - offsetX;
+            let scaledY = clientY - boardRect.top - offsetY;
+
+            // ★変更: 実際の幅/高さを取得
+            const scaledW = parseFloat(draggedElement.style.width);
+            const scaledH = parseFloat(draggedElement.style.height);
+
+            scaledX = Math.max(0, Math.min(scaledX, BOARD_SIZE - scaledW));
+            scaledY = Math.max(0, Math.min(scaledY, BOARD_SIZE - scaledH));
+
+            draggedElement.style.left = `${scaledX}px`;
+            draggedElement.style.top = `${scaledY}px`;
+            
+            // ★変更: 論理座標を更新
+            draggedElement.dataset.logicalX = scaledX / scaleFactor;
+            draggedElement.dataset.logicalY = scaledY / scaleFactor;
+        }
+
+        function onDragEnd(e) {
+            if (!draggedElement) return;
+            
+            draggedElement.style.zIndex = 8;
+            draggedElement.style.opacity = '1'; 
+            
+            document.removeEventListener('mousemove', onDragMove, false);
+            document.removeEventListener('touchmove', onDragMove, false);
+            document.removeEventListener('mouseup', onDragEnd, false);
+            document.removeEventListener('touchend', onDragEnd, false);
+            
+            draggedElement = null;
+        }
+
+
+        // --- ゲームロジック ---
+        function startGame() {
+            if (gameState !== 'standby') return;
+            gameState = 'playing';
+            clearTrail(); 
+
+            // ★変更: プレイヤーの初期位置もスケーリング
+            const playerConfig = levels[currentLevelIndex].player;
+            player.style.left = `${playerConfig.x * scaleFactor}px`;
+            player.style.top = `${playerConfig.y * scaleFactor}px`;
+            player.angle = playerConfig.angle;
+            player.overlappingBlock = null;
+            player.lastDistanceToBlock = Infinity;
+            updatePlayerTransform();
+
+            goButton.disabled = true;
+            resetButton.disabled = true; 
+
+            placedBlocks.forEach(block => {
+                block.hit = false;
+                block.classList.remove('hit'); 
+            });
+
+            goals.forEach(goal => {
+                goal.hit = false;
+                goal.style.display = 'flex'; 
+            });
+            
+            hideMessage(); 
+            gameLoop();
+        }
+
+        function gameLoop() {
+            // ★変更: 速度もスケーリング
+            const currentLogicalSpeed = player.overlappingBlock ? PLAYER_SLOW_SPEED : PLAYER_SPEED;
+            const currentSpeed = currentLogicalSpeed * scaleFactor;
+
+            const rad = (player.angle - 90) * (Math.PI / 180); 
+            
+            const currentX = parseFloat(player.style.left);
+            const currentY = parseFloat(player.style.top);
+
+            const newX = currentX + currentSpeed * Math.cos(rad);
+            const newY = currentY + currentSpeed * Math.sin(rad);
+
+            player.style.left = `${newX}px`;
+            player.style.top = `${newY}px`;
+            
+            updateTrail(newX, newY); // 軌跡を更新
+
+            if (checkCollisions()) {
+                return;
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+        
+        function updatePlayerTransform() {
+             player.style.setProperty('--angle', player.angle);
+        }
+
+        // --- 衝突判定 (スケーリングされた値で実行) ---
+        function checkCollisions() {
+            const pRect = player.getBoundingClientRect();
+            const boardRect = gameBoard.getBoundingClientRect();
+            
+            // 盤面の壁との衝突
+            if (pRect.left < boardRect.left - 1 || pRect.right > boardRect.right + 1 ||
+                pRect.top < boardRect.top - 1 || pRect.bottom > boardRect.bottom + 1) {
+                handleFailure(); 
+                return true;
+            }
+
+            // 壁ブロックとの衝突 (円 vs 四角形)
+            for (const wall of walls) {
+                if (isCircleRectOverlap(player, wall)) {
+                    handleFailure(); 
+                    return true;
+                }
+            }
+            
+            // ゴールとの衝突 (複数対応)
+            let allGoalsHit = true;
+            for (const goal of goals) {
+                if (!goal.hit) {
+                    if (isCircleOverlap(player, goal)) {
+                        goal.hit = true;
+                        goal.style.display = 'none'; // ゴールを消す
+                    } else {
+                        allGoalsHit = false; // まだヒットしていないゴールがある
+                    }
+                }
+            }
+            
+            if (allGoalsHit) {
+                handleClear();
+                return true;
+            }
+
+            // 方向転換ブロックとの衝突ロジック
+            if (player.overlappingBlock) {
+                const currentDistance = getDistance(player, player.overlappingBlock);
+                
+                // ★変更: 判定距離もスケーリング
+                const triggerDistance = ((PLAYER_SLOW_SPEED / 2) + 1) * scaleFactor;
+
+                if (isCircleOverlap(player, player.overlappingBlock, true)) { 
+                    if (currentDistance < triggerDistance || currentDistance > player.lastDistanceToBlock) {
+                        player.angle -= parseInt(player.overlappingBlock.dataset.angle); 
+                        updatePlayerTransform();
+                        player.overlappingBlock.hit = true;
+                        player.overlappingBlock.classList.add('hit'); 
+                        player.overlappingBlock.style.opacity = '0.4';
+                        
+                        player.overlappingBlock = null; 
+                        player.lastDistanceToBlock = Infinity;
+                    } else {
+                        player.lastDistanceToBlock = currentDistance;
+                    }
+                } else {
+                    player.overlappingBlock = null; 
+                    player.lastDistanceToBlock = Infinity;
+                }
+            } else {
+                for (const block of placedBlocks) {
+                    if (!block.hit && isCircleOverlap(player, block, true)) { 
+                        player.overlappingBlock = block; 
+                        player.lastDistanceToBlock = getDistance(player, block);
+                        break; 
+                    }
+                }
+            }
+            return false;
+        }
+        
+        // ★変更: 円と四角形の衝突判定 (スケーリングされたstyle値を使用)
+        function isCircleRectOverlap(circle, rect) {
+            const circleRadius = parseFloat(circle.dataset.radius); // Scaled
+            const circleX = parseFloat(circle.style.left) + circleRadius; // Scaled
+            const circleY = parseFloat(circle.style.top) + circleRadius; // Scaled
+
+            const rectX = parseFloat(rect.style.left); // Scaled
+            const rectY = parseFloat(rect.style.top); // Scaled
+            const rectW = parseFloat(rect.style.width); // Scaled
+            const rectH = parseFloat(rect.style.height); // Scaled
+
+            const testX = Math.max(rectX, Math.min(circleX, rectX + rectW));
+            const testY = Math.max(rectY, Math.min(circleY, rectY + rectH));
+
+            const distX = circleX - testX;
+            const distY = circleY - testY;
+            const distance = Math.sqrt((distX * distX) + (distY * distY));
+
+            return distance < circleRadius;
+        }
+
+        
+        // ★変更: 円形同士の衝突判定 (スケーリングされたstyle値を使用)
+        function isCircleOverlap(objA, objB, expandRadius = false) {
+            const distance = getDistance(objA, objB);
+            const radiusA = parseFloat(objA.dataset.radius); // Scaled
+            const radiusB = parseFloat(objB.dataset.radius); // Scaled
+            
+            let combinedRadius = radiusA + radiusB;
+            if (expandRadius) {
+                combinedRadius *= 1.5; // 判定係数はそのまま
+            }
+
+            return distance < combinedRadius;
+        }
+        
+        // ★変更: 2つのオブジェクトの中心間の距離 (スケーリングされたstyle値を使用)
+        function getDistance(objA, objB) {
+            const radiusA = parseFloat(objA.dataset.radius); // Scaled
+            const radiusB = parseFloat(objB.dataset.radius); // Scaled
+            
+            // ★変更: 両方ともstyleから座標を取得
+            const centerAx = parseFloat(objA.style.left) + radiusA; // Scaled
+            const centerAy = parseFloat(objA.style.top) + radiusA; // Scaled
+            
+            const centerBx = parseFloat(objB.style.left) + radiusB; // Scaled
+            const centerBy = parseFloat(objB.style.top) + radiusB; // Scaled
+
+            const dx = centerAx - centerBx;
+            const dy = centerAy - centerBy;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        // --- ゲーム状態のハンドラ ---
+        function handleClear() {
+            cancelAnimationFrame(animationFrameId);
+            
+            levelClearStatus[currentLevelIndex] = true; 
+            renderLevelDropdown(); 
+            
+            showMessage("クリア！");
+            goButton.disabled = true;
+            resetButton.disabled = false; 
+        }
+
+        function handleFailure() { 
+            cancelAnimationFrame(animationFrameId);
+            player.classList.add('hit-wall'); 
+            setTimeout(resetToStandby, 1000); 
+        }
+
+function resetToStandby() {
+    gameState = 'standby';
+    cancelAnimationFrame(animationFrameId);
+
+    const playerConfig = levels[currentLevelIndex].player;
+    player.style.left = `${playerConfig.x * scaleFactor}px`;
+    player.style.top = `${playerConfig.y * scaleFactor}px`;
+    player.angle = playerConfig.angle;
+    player.overlappingBlock = null;
+    player.lastDistanceToBlock = Infinity;
+    updatePlayerTransform();
+    player.classList.remove('hit-wall'); 
+
+    goals.forEach(goal => {
+        goal.hit = false;
+        goal.style.display = 'flex'; 
+    });
+
+    // 🔽 ここを追加！
+placedBlocks.forEach(block => {
+    block.hit = false;
+    block.classList.remove('hit');
+    block.style.opacity = '1'; // ← これを追加
+});
+
+    goButton.disabled = false;
+    resetButton.disabled = false;
+    hideMessage();
+}
+
+        function fullReset() {
+             cancelAnimationFrame(animationFrameId);
+             clearTrail(); 
+             init(currentLevelIndex); // 現在のレベルで初期化
+        }
+
+        function showMessage(text) {
+            messageOverlay.innerHTML = ''; 
+            
+            if (text === "クリア！") {
+                messageOverlay.classList.add('show'); 
+                const messageBox = document.createElement('div');
+                messageBox.className = 'message-box';
+                
+                const messageText = document.createElement('div');
+                messageText.textContent = text;
+                messageText.style.fontSize = '48px'; 
+                messageText.style.fontWeight = 'bold';
+                messageBox.appendChild(messageText);
+
+                if (currentLevelIndex < levels.length - 1) {
+                    const nextButton = document.createElement('button');
+                    nextButton.className = 'button';
+                    nextButton.textContent = 'つぎへ';
+                    nextButton.onclick = nextLevel; 
+                    messageBox.appendChild(nextButton);
+                }
+                
+                messageOverlay.appendChild(messageBox);
+            }
+        }
+
+        function hideMessage() {
+            messageOverlay.classList.remove('show');
+            messageOverlay.innerHTML = ''; 
+        }
+        
+        function nextLevel() {
+            hideMessage();
+            if (currentLevelIndex < levels.length - 1) {
+                init(currentLevelIndex + 1); 
+            }
+        }
+
+        // --- レベル選択UIの描画 (ドロップダウン) ---
+        function renderLevelDropdown() {
+            const oldDropdown = document.getElementById('level-dropdown');
+            if (oldDropdown) {
+                oldDropdown.remove();
+            }
+            
+            const dropdown = document.createElement('select');
+            dropdown.id = 'level-dropdown';
+
+            levels.forEach((_, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                
+                const clearedMark = levelClearStatus[index] ? ' ★' : '';
+                option.textContent = `もんだい ${index + 1}${clearedMark}`;
+                
+                if (index === currentLevelIndex) {
+                    option.selected = true;
+                }
+                dropdown.appendChild(option);
+            });
+            
+            dropdown.addEventListener('change', (e) => {
+                init(parseInt(e.target.value)); 
+            });
+            
+            levelSelectionDiv.appendChild(dropdown);
+        }
+        
+        // --- 軌跡クリア ---
+        function clearTrail() {
+            playerTrail.forEach(dot => dot.remove());
+            playerTrail = [];
+        }
+
+        // --- 軌跡描画 (スケーリング対応) ---
+        function updateTrail(x, y) {
+            // ★変更: 軌跡のサイズと位置もスケーリング
+            const scaledObjectSize = OBJECT_SIZE * scaleFactor;
+            const scaledTrailRadius = 1.5 * scaleFactor; // 1.5は論理半径
+
+            const trailDot = document.createElement('div');
+            trailDot.className = 'trail';
+            trailDot.style.width = `${scaledTrailRadius * 2}px`;
+            trailDot.style.height = `${scaledTrailRadius * 2}px`;
+            trailDot.style.left = `${x + (scaledObjectSize / 2) - scaledTrailRadius}px`; 
+            trailDot.style.top = `${y + (scaledObjectSize / 2) - scaledTrailRadius}px`;
+            
+            gameBoard.appendChild(trailDot);
+            playerTrail.push(trailDot);
+        }
+
+
+        // --- イベントリスナーの設定 ---
+        goButton.addEventListener('click', startGame);
+        resetButton.addEventListener('click', fullReset);
+        
+        // ★追加: リサイズ時に盤面を再初期化
+        window.addEventListener('resize', () => {
+            init(currentLevelIndex); 
+        });
+
+        // --- ゲーム開始 ---
+        init(0); // 最初のレベルで開始
+    </script>
+</body>
+</html>
+

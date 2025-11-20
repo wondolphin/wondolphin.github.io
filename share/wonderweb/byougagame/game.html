@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>図形問題ゲーム</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 共通スタイル */
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+
+        /* 問題モードタブボタン (パラメータ選択ボタン流用) */
+        .tab-btn {
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+            font-size: 1.125rem;
+            line-height: 1.75rem;
+            font-weight: 600;
+            color: #374151;
+            /* text-gray-700 */
+            background-color: #ffffff;
+            /* bg-white */
+            border-width: 2px;
+            border-color: #d1d5db;
+            /* border-gray-300 */
+            border-radius: 0.5rem;
+            /* rounded-lg */
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            /* shadow-sm */
+            margin: 0.5rem;
+            /* m-2 */
+            cursor: pointer;
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+
+        .tab-btn:hover {
+            background-color: #f9fafb;
+            /* hover:bg-gray-50 */
+            border-color: #60a5fa;
+            /* hover:border-blue-400 */
+        }
+
+        .tab-btn.active {
+            background-color: #3b82f6;
+            color: #ffffff;
+            border-color: #2563eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+
+        /* カスタムセレクトボックス (ドロップダウン) */
+        select#problemDropdown {
+            font-size: 1.0rem;
+            line-height: 1.5rem;
+            font-weight: 600;
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+            padding-left: 0.75rem;
+            padding-right: 2.0rem;
+            /* 矢印の分 */
+            border-width: 2px;
+            border-color: #d1d5db;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.25em 1.25em;
+            cursor: pointer;
+            width: 100%;
+            color: #374151;
+        }
+
+        select#problemDropdown:focus {
+            outline: 2px solid transparent;
+            outline-offset: 2px;
+            --tw-ring-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+        /* リロードボタン */
+        .reload-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 0.5rem;
+            border: 2px solid #d1d5db;
+            background-color: white;
+            color: #4b5563;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .reload-btn:hover {
+            background-color: #f3f4f6;
+            border-color: #9ca3af;
+            color: #1f2937;
+        }
+
+        .reload-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* ★ ドロップダウンのオプションの星マークの位置調整 */
+        select#problemDropdown option {
+            padding-right: 1.5rem;
+        }
+
+        /* レイアウト最適化のためのカスタムクラス */
+        #problemModeScreen {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            /* 画面高さいっぱい */
+        }
+
+        /* 1. 上部エリア (キャンバスと問題選択) */
+        .main-area {
+            /* 画面高 - 上下パディング(2rem) - 下部エリア高(200px) - 下部エリアマージン(1rem*2) */
+            height: calc(100vh - 2rem - 160px - 2rem);
+            min-height: 250px;
+            /* 最小高さを確保 */
+            flex-grow: 1;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            margin-bottom: 0;
+        }
+
+        /* 2. 下部エリア (パラメータ設定) */
+        .param-area {
+            flex-shrink: 0;
+            height: 160px;
+            /* 縦幅を200pxに変更 */
+            margin-top: 1rem;
+            margin-left: 1rem;
+            margin-right: 1rem;
+        }
+
+        /* キャンバスコンテナの余白を少し減らす */
+        .canvas-grid-area {
+            padding: 0.5rem;
+            padding-bottom: 0.5rem;
+            overflow-y: auto;
+        }
+
+        /* OKボタンのサイズ調整 */
+        .submit-btn-custom {
+            width: 6rem;
+            /* w-24 */
+            height: 5rem;
+            /* h-20 */
+            font-size: 1.125rem;
+            /* text-lg */
+            font-weight: 700;
+            /* font-bold */
+        }
+
+        /* ★ 選択肢ボタンのサイズを大きく */
+        .paramSelectionContainer button {
+            padding: 0.1rem 0.1rem;
+            font-size: 2rem;
+            /* text-base */
+        }
+    </style>
+</head>
+
+<body class="font-sans bg-gray-100 h-screen w-screen overflow-hidden">
+
+    <!-- 0. レベル選択画面 (初期表示) -->
+    <div id="levelSelectionScreen" class="flex flex-col items-center justify-center h-full">
+        <h1 class="text-4xl font-bold text-gray-800 mb-8">がくねんを えらぼう！</h1>
+
+        <div class="flex space-x-8">
+            <button id="selectLevel12" data-level="1-2"
+                class="w-64 h-48 bg-white shadow-xl rounded-lg border border-blue-400 flex flex-col items-center justify-center transition-all duration-200 hover:shadow-2xl hover:scale-105">
+                <span class="text-3xl font-bold text-blue-600">1-2 ねんせい</span>
+                <span class="text-gray-500 mt-2"></span>
+            </button>
+            <button id="selectLevel34" data-level="3-4"
+                class="w-64 h-48 bg-white shadow-xl rounded-lg border border-green-400 flex flex-col items-center justify-center transition-all duration-200 hover:shadow-2xl hover:scale-105">
+                <span class="text-3xl font-bold text-green-600">3-4 ねんせい</span>
+                <span class="text-gray-500 mt-2"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 問題モード画面 -->
+    <!-- h-screen を保持し、内部を flex-col で構成 -->
+    <div id="problemModeScreen" class="hidden h-screen flex flex-col overflow-hidden p-4">
+
+        <!-- 1. 上部エリア (問題選択 + キャンバス) -->
+        <div class="main-area">
+
+            <!-- 1.1 左側: 問題選択 (固定幅 w-72) -->
+            <div
+                class="w-72 flex-shrink-0 bg-white shadow-xl p-6 mr-4 mb-4 rounded-lg border border-gray-200 flex flex-col space-y-4 h-full">
+                <h2 class="text-xl font-bold text-gray-800">もんだいせんたく</h2>
+
+                <!-- 問題選択行 (ドロップダウン + リロードボタン) -->
+                <div class="flex items-center space-x-2 w-full">
+                    <div class="flex-grow relative">
+                        <select id="problemDropdown" class="">
+                            <!-- JSで動的に問題が挿入されます -->
+                        </select>
+                    </div>
+                    <button id="reloadBtn" class="reload-btn" title="この問題をリロード">
+                        <!-- SVG Refresh Icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                            stroke="currentColor" class="w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- 次の問題へボタン -->
+                <button id="nextProblemBtn"
+                    class="w-full px-4 py-2 bg-blue-100 text-blue-700 font-semibold rounded-lg border border-blue-200 hover:bg-blue-200 hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-100">
+                    つぎの もんだいへ →
+                </button>
+
+                <!-- 空きスペースを埋めるための要素 -->
+                <div class="flex-grow"></div>
+
+            </div>
+
+            <!-- 1.2 右側: キャンバスエリア (flex-1 で残り幅を占有) -->
+            <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 canvas-grid-area bg-gray-200">
+                <!-- あなたの回答 -->
+                <div
+                    class="flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-inner border border-gray-300 h-full">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-2">みほんと おなじかたちに しよう！</h3>
+                    <div id="userCanvasContainer" class="w-full flex-1 flex items-center justify-center min-h-0">
+                        <canvas id="userCanvas"></canvas>
+                    </div>
+                </div>
+                <!-- 見本 -->
+                <div
+                    class="flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-inner border border-gray-300 h-full">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-2">みほん</h3>
+                    <div id="answerCanvasContainer" class="w-full flex-1 flex items-center justify-center min-h-0">
+                        <canvas id="answerCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 下部エリア: パラメータ設定 (固定高さ param-area) -->
+        <div
+            class="param-area bg-white shadow-xl p-1 my-0 rounded-lg border border-gray-200 flex items-center justify-center gap-1 overflow-y-hidden">
+
+            <h2 id="problemTitle" class="text-xl font-bold text-gray-800 hidden">パラメータ設定</h2>
+
+            <!-- 中央寄せ (justify-center) に変更 -->
+            <div id="paramSelectionContainer"
+                class="flex-1 flex flex-row flex-wrap justify-center gap-x-8 gap-y-4 h-full overflow-y-auto pr-4">
+                <!-- JSで生成 -->
+            </div>
+
+            <button id="submitAnswerBtn"
+                class="submit-btn-custom flex-shrink-0 px-6 py-3 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                OK
+            </button>
+        </div>
+
+    </div>
+
+    <!-- クリアメッセージ (モーダル) -->
+    <div id="clearMessage" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-12 rounded-lg shadow-2xl transform transition-all scale-100">
+            <span class="text-5xl font-bold text-yellow-500 drop-shadow-md">クリア！</span>
+        </div>
+    </div>
+
+    <!-- 図形定義ファイル -->
+    <script src="shape1.js"></script>
+    <script src="shape2.js"></script>
+    <script src="shape3.js"></script>
+    <script src="shape4.js"></script>
+    <script src="shape5.js"></script>
+    <script src="shape6.js"></script>
+    <script src="shape7.js"></script>
+    <script src="shape8.js"></script>
+    <script src="shape9.js"></script>
+    <script src="shape10.js"></script>
+
+    <!-- メインロジック -->
+    <script>
+        // --- グローバル変数・定数 ---
+        window.shapeDefinitions = window.shapeDefinitions || {};
+        const shapeDefs = window.shapeDefinitions;
+
+        let currentProblemId = null;
+        let currentShapeId = null;
+        let userSelections = {};
+        let currentUserParams = {};
+
+        // ★ 試行回数 (問題ロード時にリセット、OK時にインクリメント)
+        let currentProblemAttemptCount = 0;
+
+        // ★ クリア済み問題のIDを保持するSet (sessionStorageからロード)
+        let clearedProblems = new Set();
+        let partiallyClearedProblems = new Set();
+
+        // ハイライト色
+        const HL_L1 = '#ef4444';
+        const HL_SIDE = '#22c55e';
+        const HL_TRI_ROT = '#a855f7';
+        const HL_COPY_ROT = '#f97316';
+        const HL_POINT = '#eab308';
+        // ★ フラッシュに使用する色 (黄色)
+        const HL_FLASH = '#facc15';
+        const DEFAULT_STROKE_ICON = '#2563eb';
+
+        // ボタンスタイル
+        // ★ ボタンのベーススタイルを修正
+        const paramBtnBase = 'px-4 py-3 border-2 rounded-lg text-lg font-medium cursor-pointer transition-all duration-150 shadow-sm';
+        const paramBtnSelected = 'bg-green-600 text-white border-green-700 shadow-md font-semibold';
+        const paramBtnFixed = 'bg-gray-200 text-gray-600 cursor-not-allowed border-gray-300';
+        const paramBtnUnselected = 'bg-green-50 text-green-800 border-green-200 hover:bg-green-100 hover:border-green-300';
+
+        // --- 問題データ構造 ---
+        let problemDatabase = [
+            // level: 1 (1-2年生)
+            { id: 's1-1', shapeId: 'shape1', level: 10, answerParams: { l1: 100, side: 60, rot: 0, copy: 90 }, options: [{ paramId: 'l1', label: 'L1長さ', unit: '倍', init_val: 50, values: [1.5, 2.0, 3.0] }] },
+            { id: 's1-2', shapeId: 'shape1', level: 10, answerParams: { l1: 120, side: 60, rot: 0, copy: 30 }, options: [{ paramId: 'side', label: '1辺の長さ', unit: '倍', init_val: 30, values: [2.0, 3.0, 4] }] },
+            { id: 's2-1', shapeId: 'shape2', level: 10, answerParams: { x: 105, y: 70, alpha: 30, beta: 45 }, options: [{ paramId: 'x', label: 'L1長さ(X)', unit: '倍', init_val: 70, values: [1.5, 2, 2.5] }, { paramId: 'y', label: 'L2長さ(Y)', unit: '倍', init_val: 35, values: [1.5, 2, 2.5] }] },
+            { id: 's3p1', shapeId: 'shape3', level: 20, answerParams: { a: 80, b: 60, c: 30, d: 30 }, options: [{ paramId: 'a', label: '底辺(A)', unit: '倍', fixed: 80 }, { paramId: 'b', label: '高さ(B)', unit: '倍', init_val: 50, values: [1.0, 1.2, 1.4] }, { paramId: 'c', label: 'ずれ(C)', unit: '倍', init_val: 40, values: [0.5, 0.75, 1.0] }, { paramId: 'd', label: '幹幅(D)', unit: '倍', init_val: 20, values: [1.0, 1.5, 2.0] }] },
+            { id: 's4p1', shapeId: 'shape4', level: 20, answerParams: { r: 100, sa: 75, la: 125 }, options: [{ paramId: 'r', label: '円半径(R)', unit: '倍', init_val: 80, values: [1.0, 1.25, 1.5] }, { paramId: 'sa', label: '楕円短半径(SA)', unit: '倍', fixed: 75 }, { paramId: 'la', label: '楕円長半径(LA)', unit: '倍', init_val: 100, values: [1.0, 1.25] }] },
+            { id: 's7p1', shapeId: 'shape7', level: 20, answerParams: { l1: 100, l2: 50 }, options: [{ paramId: 'l1', label: '正方形の辺(L1)', unit: '倍', init_val: 80, values: [1.0, 1.25, 1.5] }, { paramId: 'l2', label: '円の半径(L2)', unit: '倍', fixed: 50 }] },
+            { id: 's1-3', shapeId: 'shape1', level: 30, answerParams: { l1: 120, side: 60, rot: 60, copy: 30 }, options: [{ paramId: 'l1', label: 'L1長さ', unit: '倍', init_val: 150, values: [0.4, 0.6, 0.8] }, { paramId: 'rot', label: '回転角', unit: '°', init_val: 45, values: [0, 30, 60] }] },
+            { id: 's2-2', shapeId: 'shape2', level: 30, answerParams: { x: 35, y: 80, alpha: 30, beta: 45 }, options: [{ paramId: 'x', label: 'L1長さ(X)', unit: '倍', init_val: 70, values: [0.3, 0.5, 0.8] }, { paramId: 'y', label: 'L2長さ(Y)', unit: '倍', init_val: 40, values: [1.5, 2.0, 2.5] }, { paramId: 'alpha', label: 'L2角度(α)', unit: '°', fixed: 30 }, { paramId: 'beta', label: 'コピー角度(β)', unit: '°', fixed: 45 }] },
+
+            // level: 3 (3-4年生)
+            { id: 's5-1', shapeId: 'shape5', level: 30, answerParams: { l1: 100, l2: 150, l3: 90, l4: 90 }, options: [{ paramId: 'l1', label: '屋根高さ(L1)', unit: '倍', init_val: 50, values: [1.0, 2.0, 3.0] }] }, // レベル30として残す
+            { id: 's6-2', shapeId: 'shape6', level: 30, answerParams: { alpha: 180, l1: 90, l2: 50 }, options: [{ paramId: 'l2', label: '実の半径(L2)', unit: '倍', init_val: 25, values: [2.0, 3.0, 4.0] }] }, // レベル30として残す
+
+            // level: 4 (3-4年生)
+            { id: 's1-4', shapeId: 'shape1', level: 40, answerParams: { l1: 120, side: 100, rot: 90, copy: 30 }, options: [{ paramId: 'side', label: '1辺の長さ', unit: '倍', init_val: 50, values: [1.6, 2, 2.4] }, { paramId: 'rot', label: '回転角', unit: '°', init_val: 45, values: [30, 60, 90] }] },
+            { id: 's2-3', shapeId: 'shape2', level: 50, answerParams: { x: 80, y: 50, alpha: 60, beta: 45 }, options: [{ paramId: 'x', label: 'L1長さ(X)', unit: '倍', init_val: 50, values: [1.6, 2, 2.4] }, { paramId: 'alpha', label: 'L2角度(α)', unit: '°', init_val: 20, values: [30, 45, 60, 90] }] },
+            { id: 's1-5', shapeId: 'shape1', level: 50, answerParams: { l1: 75, side: 60, rot: 0, copy: 30 }, options: [{ paramId: 'l1', label: 'L1長さ', unit: '倍', init_val: 150, values: [0.5, 0.8] }] },
+            { id: 's5-2', shapeId: 'shape5', level: 50, answerParams: { l1: 100, l2: 180, l3: 90, l4: 90 }, options: [{ paramId: 'l1', label: '屋根高さ(L1)', unit: '倍', fixed: 100 }, { paramId: 'l2', label: '屋根幅(L2)', unit: '倍', init_val: 120, values: [1.5, 2.0, 3] }] },
+            { id: 's5-3', shapeId: 'shape5', level: 50, answerParams: { l1: 150, l2: 40, l3: 40, l4: 80 }, options: [{ paramId: 'l1', label: '屋根高さ(L1)', unit: '倍', init_val: 100, values: [1.5, 2.0] }, { paramId: 'l2', label: '屋根幅(L2)', unit: '倍', init_val: 100, values: [0.4, 0.7] }] },
+            { id: 's5-4', shapeId: 'shape5', level: 50, answerParams: { l1: 40, l2: 80, l3: 150, l4: 30 }, options: [{ paramId: 'l2', label: '屋根幅(L2)', unit: '倍', init_val: 50, values: [1.2, 1.6, 2.0] }, { paramId: 'l3', label: '本体高さ(L3)', unit: '倍', init_val: 30, values: [3, 4, 5.0] }] },
+            { id: 's6-1', shapeId: 'shape6', level: 50, answerParams: { alpha: 45, l1: 160, l2: 40 }, options: [{ paramId: 'alpha', label: '角度(α)', unit: '°', init_val: 90, values: [30, 45, 60] }, { paramId: 'l1', label: '茎の長さ(L1)', unit: '倍', init_val: 100, values: [1.6, 2] }] },
+            { id: 's9-1', shapeId: 'shape9', level: 50, answerParams: { l1: 180, l2: 50, l3: 140, l4: 50 }, options: [{ paramId: 'l1', label: '上の幅(L1)', unit: '倍', init_val: 90, values: [1.4, 1.7, 2.0] }, { paramId: 'l3', label: '下の高さ(L3)', unit: '倍', init_val: 70, values: [1.4, 1.7, 2.0] }] },
+            { id: 's10-1', shapeId: 'shape10', level: 50, answerParams: { l1: 180, l2: 90, alpha: 45 }, options: [{ paramId: 'l2', label: '矢の長さ(L2)', unit: '倍', init_val: 45, values: [2, 3.0, 3.5] }, { paramId: 'alpha', label: '矢の角度(α)', unit: '°', init_val: 40, values: [45, 70, 90] }] },
+            { id: 's10-2', shapeId: 'shape10', level: 50, answerParams: { l1: 200, l2: 120, alpha: 30 }, options: [{ paramId: 'l1', label: '軸の長さ(L1)', unit: '倍', init_val: 50, values: [2.0, 3.0, 4.0] }, { paramId: 'alpha', label: '矢の角度(α)', unit: '°', init_val: 70, values: [30, 45, 60, 90] }] },
+        ];
+
+        // ★ 問題データを level, 次にコード内の順番でソート
+        problemDatabase.sort((a, b) => a.level - b.level);
+
+        // 問題データ全体を保持
+        const fullProblemDatabase = [...problemDatabase];
+        let filteredProblemDatabase = []; // 選択されたレベルでフィルタリングされたリスト
+
+        // --- DOM要素の取得 ---
+        const levelSelectionScreen = document.getElementById('levelSelectionScreen');
+        const problemModeScreen = document.getElementById('problemModeScreen');
+        const problemDropdown = document.getElementById('problemDropdown');
+        const problemTitle = document.getElementById('problemTitle');
+        const paramSelectionContainer = document.getElementById('paramSelectionContainer');
+        let submitAnswerBtn = document.getElementById('submitAnswerBtn');
+        const userCanvas = document.getElementById('userCanvas');
+        const userCanvasContainer = document.getElementById('userCanvasContainer');
+        const answerCanvas = document.getElementById('answerCanvas');
+        const answerCanvasContainer = document.getElementById('answerCanvasContainer');
+        const clearMessage = document.getElementById('clearMessage');
+
+        const nextProblemBtn = document.getElementById('nextProblemBtn');
+        const reloadBtn = document.getElementById('reloadBtn');
+
+        // --- ★ sessionStorage ロード/セーブ関数 ---
+
+        // セッションストレージからクリア情報をロード
+        function loadClearStatus() {
+            try {
+                const cleared = sessionStorage.getItem('clearedProblems');
+                if (cleared) clearedProblems = new Set(JSON.parse(cleared));
+
+                const partiallyCleared = sessionStorage.getItem('partiallyClearedProblems');
+                if (partiallyCleared) partiallyClearedProblems = new Set(JSON.parse(partiallyCleared));
+            } catch (e) {
+                console.error("Error loading clear status from sessionStorage:", e);
+            }
+        }
+
+        // セッションストレージにクリア情報をセーブ
+        function saveClearStatus() {
+            try {
+                sessionStorage.setItem('clearedProblems', JSON.stringify(Array.from(clearedProblems)));
+                sessionStorage.setItem('partiallyClearedProblems', JSON.stringify(Array.from(partiallyClearedProblems)));
+            } catch (e) {
+                console.error("Error saving clear status to sessionStorage:", e);
+            }
+        }
+        // --- 終了 ---
+
+
+        // --- 汎用リサイズ関数 ---
+        function resizeAllCanvases() {
+            // キャンバスコンテナのサイズを基準にキャンバスサイズを設定
+            const userSize = Math.min(userCanvasContainer.clientWidth, userCanvasContainer.clientHeight) - 16;
+            userCanvas.width = userSize;
+            userCanvas.height = userSize;
+
+            const answerSize = Math.min(answerCanvasContainer.clientWidth, answerCanvasContainer.clientHeight) - 16;
+            answerCanvas.width = answerSize;
+            answerCanvas.height = answerSize;
+
+            drawProblemMode();
+        }
+
+        // ★ 選択肢クリック時のハイライトアニメーション
+        function animateHighlightFlash(paramId) {
+            const shapeDef = shapeDefs[currentShapeId];
+            if (!shapeDef || !shapeDef.drawFn) return;
+
+            const duration = 200; // アニメーション時間 (ms)
+            const startTime = performance.now();
+            const maxFlashes = 2; // 2回点滅
+
+            const highlightTarget = paramId;
+            const flashColor = HL_FLASH;
+
+            const problem = filteredProblemDatabase.find(p => p.id === currentProblemId);
+            const highlights = {};
+            if (problem) {
+                problem.options.forEach(opt => {
+                    highlights[opt.paramId] = true;
+                });
+            }
+
+            function step(currentTime) {
+                const elapsed = currentTime - startTime;
+                const totalCycleTime = duration * maxFlashes;
+
+                let emphasis = 1.0;
+                let currentColor = null;
+
+                const cycleDuration = duration / 2; // 1回の太くなるフェーズ
+
+                if (elapsed < totalCycleTime) {
+                    const timeInCycle = elapsed % duration;
+
+                    if (timeInCycle < cycleDuration) {
+                        // 太くなるフェーズ (0 -> 100ms)
+                        const progress = timeInCycle / cycleDuration;
+                        emphasis = 1.0 + (1.5 * progress); // 1.0倍 -> 2.5倍
+                        currentColor = flashColor;
+                    } else {
+                        // 戻るフェーズ (100ms -> 200ms)
+                        const progress = (timeInCycle - cycleDuration) / cycleDuration;
+                        emphasis = 2.5 - (1.5 * progress); // 2.5倍 -> 1.0倍
+                        currentColor = flashColor;
+                    }
+                }
+
+                const tempParams = { ...currentUserParams };
+
+                // ★ 描画関数呼び出し: 強調対象、強調レベル、強調色を渡す (drawFnが6引数を期待するように修正)
+                shapeDef.drawFn(userCanvas, tempParams, highlights, highlightTarget, emphasis, currentColor);
+
+                if (elapsed < totalCycleTime) {
+                    requestAnimationFrame(step);
+                } else {
+                    // アニメーション終了後、通常の描画状態に戻す
+                    drawProblemMode();
+                }
+            }
+
+            requestAnimationFrame(step);
+        }
+
+        // ★ 倍率を整形するユーティリティ関数
+        function formatRate(rate) {
+            let displayRate = (Math.round(rate * 100) / 100);
+            if (displayRate % 1 === 0) {
+                return displayRate.toFixed(0);
+            } else {
+                return displayRate.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+            }
+        }
+
+        // 問題UIを構築
+        function setupProblemUI() {
+            // (もしあれば)前回の図形のアニメーションループを停止
+            if (currentShapeId && shapeDefs[currentShapeId] && shapeDefs[currentShapeId].stopIconAnimations) {
+                shapeDefs[currentShapeId].stopIconAnimations();
+            }
+
+            // ★ 問題ロード時、試行回数をリセット
+            currentProblemAttemptCount = 0;
+
+            const problem = filteredProblemDatabase.find(p => p.id === currentProblemId);
+            if (!problem) {
+                paramSelectionContainer.innerHTML = '<p>問題の読み込みに失敗しました。</p>';
+                submitAnswerBtn.disabled = true;
+                return;
+            }
+
+            currentShapeId = problem.shapeId;
+            const shapeDef = shapeDefs[currentShapeId];
+            if (!shapeDef) {
+                paramSelectionContainer.innerHTML = `<p>図形定義 '${currentShapeId}' が見つかりません。</p>`;
+                submitAnswerBtn.disabled = true;
+                return;
+            }
+
+            // 問題タイトルを自動採番されたものに設定
+            const problemIndex = filteredProblemDatabase.findIndex(p => p.id === currentProblemId);
+            problemTitle.textContent = `もんだい${problemIndex + 1}`;
+
+            paramSelectionContainer.innerHTML = '';
+            userSelections = {};
+
+            // 1. currentUserParams の初期化: answerParams の値で初期化
+            currentUserParams = { ...problem.answerParams };
+            const visibleParamIds = new Set();
+
+            // 2. options を見て初期値と選択肢を決定
+            problem.options.forEach(opt => {
+                const paramId = opt.paramId;
+                visibleParamIds.add(paramId);
+                const answerVal = problem.answerParams[paramId];
+
+                let initialSelectionValue = undefined;
+                let initialValueForCanvas = answerVal;
+
+                const isLengthParam = opt.unit === '倍';
+
+                // 3. 初期値の設定と currentUserParams の更新
+                if (isLengthParam) {
+                    const initVal = opt.init_val !== undefined ? opt.init_val : answerVal;
+
+                    if (opt.fixed !== undefined) {
+                        initialValueForCanvas = opt.fixed;
+                        initialSelectionValue = 1.0;
+                    } else {
+                        const baseValueForRate = initVal;
+                        initialValueForCanvas = initVal;
+
+                        const hasOne = opt.values && opt.values.some(v => Math.abs(v - 1.0) < 0.001);
+
+                        if (hasOne) {
+                            initialSelectionValue = 1.0;
+                        } else {
+                            initialSelectionValue = undefined;
+                        }
+                    }
+
+                } else {
+                    const initialVal = opt.init_val !== undefined ? opt.init_val : answerVal;
+                    initialValueForCanvas = initialVal;
+                    initialSelectionValue = initialVal;
+
+                    if (opt.fixed !== undefined) {
+                        initialValueForCanvas = opt.fixed;
+                        initialSelectionValue = opt.fixed;
+                    }
+                }
+
+                // ユーザー選択値と描画値の設定
+                currentUserParams[paramId] = initialValueForCanvas;
+                userSelections[paramId] = initialValueForCanvas;
+
+                // --- DOM構築 ---
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'space-y-2 text-center';
+
+                // ラベル (アイコン)
+                const label = document.createElement('label');
+                label.className = 'flex items-center justify-center space-x-2';
+                const canvas = document.createElement('canvas');
+
+                // ★ アイコンサイズを修正
+                canvas.width = 100;
+                canvas.height = 75;
+
+                canvas.id = `label_icon_prob_${currentShapeId}_${paramId}`;
+                canvas.className = 'border border-gray-300 rounded';
+                canvas.title = opt.label;
+                label.appendChild(canvas);
+                groupDiv.appendChild(label);
+
+                const btnContainer = document.createElement('div');
+                btnContainer.className = 'flex flex-wrap gap-2 justify-center';
+
+                if (isLengthParam) {
+                    const initialBaseValue = opt.fixed !== undefined ? opt.fixed : (opt.init_val !== undefined ? opt.init_val : answerVal);
+
+                    if (opt.fixed !== undefined) {
+                        const btn = document.createElement('button');
+                        // ★ ボタンのベースクラス修正により、ここで border-2 border-transparent が含まれる
+                        btn.className = `${paramBtnBase} ${paramBtnFixed}`;
+                        btn.textContent = `${opt.fixed}`;
+                        btnContainer.appendChild(btn);
+                    } else {
+                        opt.values.forEach(rate => {
+                            const btn = document.createElement('button');
+
+                            const isSelected = (initialSelectionValue !== undefined && Math.abs(rate - initialSelectionValue) < 0.001);
+
+                            // ★ ボタンのベースクラス修正を適用
+                            btn.className = `${paramBtnBase} ${isSelected ? paramBtnSelected : paramBtnUnselected}`;
+
+                            const displayRate = formatRate(rate);
+                            btn.textContent = `${displayRate}ばい`;
+                            btn.dataset.param = paramId;
+                            btn.dataset.value = rate;
+
+                            btn.addEventListener('click', () => {
+                                const actualValue = initialBaseValue * rate;
+                                userSelections[paramId] = actualValue;
+
+                                animateHighlightFlash(paramId);
+
+                                btnContainer.querySelectorAll('button').forEach(b => {
+                                    b.classList.remove('bg-green-600', 'text-white', 'border-green-700', 'shadow-md', 'font-semibold');
+                                    b.classList.add('bg-green-50', 'text-green-800', 'border-green-200', 'hover:bg-green-100', 'hover:border-green-300');
+                                });
+                                btn.classList.add('bg-green-600', 'text-white', 'border-green-700', 'shadow-md', 'font-semibold');
+                                btn.classList.remove('bg-green-50', 'text-green-800', 'border-green-200', 'hover:bg-green-100', 'hover:border-green-300');
+
+                                checkAllParamsSelected();
+                            });
+                            btnContainer.appendChild(btn);
+                        });
+                    }
+
+                } else {
+                    const isFixed = opt.fixed !== undefined;
+
+                    if (isFixed) {
+                        const btn = document.createElement('button');
+                        // ★ ボタンのベースクラス修正を適用
+                        btn.className = `${paramBtnBase} ${paramBtnFixed}`;
+                        btn.textContent = `${opt.fixed}${opt.unit || ''}`;
+                        btnContainer.appendChild(btn);
+                    } else {
+                        opt.values.forEach(val => {
+                            const btn = document.createElement('button');
+
+                            const isSelected = (val === initialSelectionValue);
+                            // ★ ボタンのベースクラス修正を適用
+                            btn.className = `${paramBtnBase} ${isSelected ? paramBtnSelected : paramBtnUnselected}`;
+
+                            btn.textContent = `${val}${opt.unit || ''}`;
+                            btn.dataset.param = paramId;
+                            btn.dataset.value = val;
+
+                            btn.addEventListener('click', () => {
+                                userSelections[paramId] = val;
+
+                                animateHighlightFlash(paramId);
+
+                                btnContainer.querySelectorAll('button').forEach(b => {
+                                    b.classList.remove('bg-green-600', 'text-white', 'border-green-700', 'shadow-md', 'font-semibold');
+                                    b.classList.add('bg-green-50', 'text-green-800', 'border-green-200', 'hover:bg-green-100', 'hover:border-green-300');
+                                });
+                                btn.classList.add('bg-green-600', 'text-white', 'border-green-700', 'shadow-md', 'font-semibold');
+                                btn.classList.remove('bg-green-50', 'text-green-800', 'border-green-200', 'hover:bg-green-100', 'hover:border-green-300');
+
+                                checkAllParamsSelected();
+                            });
+                            btnContainer.appendChild(btn);
+                        });
+                    }
+                }
+
+                groupDiv.appendChild(btnContainer);
+                paramSelectionContainer.appendChild(groupDiv);
+            });
+
+            // 4. options に記述されていないパラメータの初期値を answerParams に設定 
+            shapeDef.params.forEach(paramId => {
+                if (!visibleParamIds.has(paramId)) {
+                    const answerVal = problem.answerParams[paramId];
+                    userSelections[paramId] = answerVal;
+                    currentUserParams[paramId] = answerVal;
+                }
+            });
+
+            checkAllParamsSelected();
+
+            // 5. アイコンの描画
+            problem.options.forEach(opt => {
+                const canvasId = `label_icon_prob_${currentShapeId}_${opt.paramId}`;
+                if (shapeDef.drawIconFns[opt.paramId]) {
+                    // ★ 描画時には新しいサイズを考慮して引数調整が必要かもしれないが、ここではキャンバスIDのみ渡し、drawIconFns側でサイズ取得を期待
+                    shapeDef.drawIconFns[opt.paramId](canvasId);
+                }
+            });
+
+            // 「次の問題へ」ボタンの状態更新
+            updateNextButtonState();
+
+            resizeAllCanvases(); // ★ 初期描画
+        }
+
+        function updateNextButtonState() {
+            const currentIndex = filteredProblemDatabase.findIndex(p => p.id === currentProblemId);
+            if (currentIndex === -1 || currentIndex === filteredProblemDatabase.length - 1) {
+                nextProblemBtn.disabled = true;
+                nextProblemBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                nextProblemBtn.disabled = false;
+                nextProblemBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function drawProblemMode() {
+            if (!currentProblemId || !currentShapeId) return;
+            const problem = filteredProblemDatabase.find(p => p.id === currentProblemId);
+            const shapeDef = shapeDefs[currentShapeId];
+            if (!problem || !shapeDef) {
+                const ctxUser = userCanvas.getContext('2d');
+                ctxUser.clearRect(0, 0, userCanvas.width, userCanvas.height);
+                const ctxAnswer = answerCanvas.getContext('2d');
+                ctxAnswer.clearRect(0, 0, answerCanvas.width, answerCanvas.height);
+                return;
+            }
+
+            const highlights = {};
+            problem.options.forEach(opt => {
+                highlights[opt.paramId] = true;
+            });
+
+            // ★ drawFn呼び出しの引数を修正: 6引数全てを渡す
+            shapeDef.drawFn(userCanvas, currentUserParams, highlights, null, 1.0, null);
+            shapeDef.drawFn(answerCanvas, problem.answerParams, {});
+        }
+
+        function checkAllParamsSelected() {
+            const problem = filteredProblemDatabase.find(p => p.id === currentProblemId);
+            if (!problem) {
+                submitAnswerBtn.disabled = true;
+                return;
+            }
+
+            const allSelected = problem.options.every(opt => {
+
+                if (opt.fixed !== undefined) {
+                    return true;
+                }
+
+                const isLengthParam = opt.unit === '倍';
+                const initialBaseValue = isLengthParam ? (opt.init_val !== undefined ? opt.init_val : problem.answerParams[opt.paramId]) : opt.init_val;
+
+                const hasOneRate = isLengthParam && opt.values.some(v => Math.abs(v - 1.0) < 0.001);
+
+                if (!isLengthParam && initialBaseValue !== undefined) {
+                    return Math.abs(userSelections[opt.paramId] - initialBaseValue) > 0.01;
+                }
+
+                if (isLengthParam && !hasOneRate) {
+                    return Math.abs(userSelections[opt.paramId] - initialBaseValue) > 0.01;
+                } else {
+                    return userSelections[opt.paramId] !== undefined;
+                }
+            });
+
+            submitAnswerBtn.disabled = !allSelected;
+        }
+
+        // 回答チェック & クリア処理
+        function checkAnswer() {
+            const problem = filteredProblemDatabase.find(p => p.id === currentProblemId);
+            if (!problem) return;
+
+            const isCorrect = Object.keys(problem.answerParams).every(key => {
+                const answerVal = problem.answerParams[key];
+                const userVal = userSelections[key];
+
+                const opt = problem.options.find(o => o.paramId === key);
+                if (opt && (opt.unit === '倍' || problem.shapeId === 'shape7' && key === 'l2')) {
+                    return Math.abs(answerVal - userVal) < 0.01;
+                }
+
+                return answerVal === userVal;
+            });
+
+            if (isCorrect) {
+                // ★ クリアマークの更新
+                if (currentProblemAttemptCount === 1) {
+                    // 一発クリア: ★ をつける
+                    clearedProblems.add(currentProblemId);
+                    partiallyClearedProblems.delete(currentProblemId); // 念のため☆を消す
+                } else {
+                    // 2回目以降のクリア: ★が付いていなければ☆をつける
+                    if (!clearedProblems.has(currentProblemId)) {
+                        partiallyClearedProblems.add(currentProblemId);
+                    }
+                }
+
+                // ★ sessionStorageに保存
+                saveClearStatus();
+
+                setupProblemDropdown(); // ドロップダウンの★/☆を更新
+                problemDropdown.value = currentProblemId; // 選択状態を維持
+
+                clearMessage.classList.remove('hidden');
+                setTimeout(() => {
+                    clearMessage.classList.add('hidden');
+                }, 1500);
+            }
+        }
+
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
+        }
+
+        function animateParameters(targetParams) {
+            const shapeDef = shapeDefs[currentShapeId];
+            if (!shapeDef) return;
+
+            const startParams = { ...currentUserParams };
+            const animationOrder = shapeDef.params;
+            const paramBaseDuration = 400;
+
+            submitAnswerBtn.disabled = true;
+
+            let animations = [];
+            let cumulativeTime = 0;
+
+            animationOrder.forEach(paramId => {
+                const startVal = startParams[paramId];
+                const endVal = (targetParams[paramId] !== undefined) ? targetParams[paramId] : startVal;
+
+                const duration = (startVal !== endVal) ? paramBaseDuration : 0;
+
+                animations.push({
+                    id: paramId,
+                    startVal: startVal,
+                    endVal: endVal,
+                    startTime: cumulativeTime,
+                    endTime: cumulativeTime + duration
+                });
+
+                cumulativeTime += duration;
+            });
+
+            const totalDuration = cumulativeTime;
+            let startTime = null;
+
+            const problem = filteredProblemDatabase.find(p => p.id === currentProblemId);
+            const highlights = {};
+            if (problem) {
+                problem.options.forEach(opt => {
+                    highlights[opt.paramId] = true;
+                });
+            }
+
+            function animationLoop(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const elapsed = timestamp - startTime;
+
+                let frameParams = { ...startParams };
+
+                animations.forEach(anim => {
+                    if (elapsed < anim.startTime) {
+                        frameParams[anim.id] = anim.startVal;
+                    } else if (elapsed >= anim.endTime) {
+                        frameParams[anim.id] = anim.endVal;
+                    } else {
+                        if (anim.endTime === anim.startTime) {
+                            frameParams[anim.id] = anim.endVal;
+                        } else {
+                            const progress = (elapsed - anim.startTime) / (anim.endTime - anim.startTime);
+                            frameParams[anim.id] = lerp(anim.startVal, anim.endVal, progress);
+                        }
+                    }
+                });
+
+                // ★ drawFn呼び出しの引数を修正: 6引数全てを渡す
+                shapeDef.drawFn(userCanvas, frameParams, highlights, null, 1.0, null);
+
+                if (elapsed < totalDuration) {
+                    requestAnimationFrame(animationLoop);
+                } else {
+                    const finalParams = { ...currentUserParams, ...targetParams };
+                    shapeDef.drawFn(userCanvas, finalParams, highlights, null, 1.0, null);
+                    currentUserParams = finalParams;
+
+                    currentProblemAttemptCount++;
+
+                    checkAllParamsSelected();
+                    setTimeout(checkAnswer, 500);
+                }
+            }
+            requestAnimationFrame(animationLoop);
+        }
+
+        // ★ レベル選択後の初期化 (メインエントリポイント)
+        function startProblemMode(level) {
+            levelSelectionScreen.classList.add('hidden');
+            problemModeScreen.classList.remove('hidden');
+
+            // ★ 許可されたレベルのリストを定義
+            let allowedLevels = [];
+            if (level === '1-2') {
+                allowedLevels = [10, 20, 30]; // 1-2年生: レベル10, 20, 30を出題
+            } else { // '3-4'
+                allowedLevels = [10, 30, 50]; // 3-4年生: レベル10, 30, 50を出題
+            }
+
+            // ★ フィルタリングロジックを修正: allowedLevelsに含まれる問題のみを抽出
+            filteredProblemDatabase = fullProblemDatabase.filter(p => allowedLevels.includes(p.level));
+
+            // フィルタリング後、問題がない場合はエラー表示
+            if (filteredProblemDatabase.length === 0) {
+                problemDropdown.innerHTML = '<option>問題がありません</option>';
+                problemDropdown.disabled = true;
+                submitAnswerBtn.disabled = true;
+                nextProblemBtn.disabled = true;
+                return;
+            }
+
+            currentProblemId = filteredProblemDatabase[0].id;
+            setupProblemDropdown();
+            problemDropdown.value = currentProblemId;
+            setupProblemUI();
+
+            window.addEventListener('resize', resizeAllCanvases);
+        }
+
+
+        // --- 初期化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // ★ クリア情報をロード
+            loadClearStatus();
+
+            // レベル選択ボタンのイベントリスナー
+            document.getElementById('selectLevel12').addEventListener('click', () => startProblemMode('1-2'));
+            document.getElementById('selectLevel34').addEventListener('click', () => startProblemMode('3-4'));
+
+            // イベントリスナー (問題モード画面に配置)
+            problemDropdown.addEventListener('change', (e) => {
+                currentProblemId = e.target.value;
+                setupProblemUI();
+            });
+
+            submitAnswerBtn.addEventListener('click', () => {
+                animateParameters(userSelections);
+            });
+
+            nextProblemBtn.addEventListener('click', () => {
+                const currentIndex = filteredProblemDatabase.findIndex(p => p.id === currentProblemId);
+                if (currentIndex !== -1 && currentIndex < filteredProblemDatabase.length - 1) {
+                    currentProblemId = filteredProblemDatabase[currentIndex + 1].id;
+                    problemDropdown.value = currentProblemId;
+                    setupProblemUI();
+                }
+            });
+
+            reloadBtn.addEventListener('click', () => {
+                setupProblemUI(); // 現在のIDで再構築 = リセット
+            });
+
+            // 初期画面表示のため、問題モードを隠す
+            problemModeScreen.classList.add('hidden');
+        });
+
+        // ドロップダウン生成 (★/☆表示対応)
+        function setupProblemDropdown() {
+            problemDropdown.innerHTML = '';
+
+            if (filteredProblemDatabase.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = '問題がありません';
+                problemDropdown.appendChild(option);
+                problemDropdown.disabled = true;
+                return;
+            }
+
+            filteredProblemDatabase.forEach((problem, index) => {
+                const option = document.createElement('option');
+                option.value = problem.id;
+
+                // ★マーク/☆マークを右側に追加
+                const title = `もんだい${index + 1}`;
+
+                let starMark = '';
+                if (clearedProblems.has(problem.id)) {
+                    starMark = '★'; // 一発クリア
+                } else if (partiallyClearedProblems.has(problem.id)) {
+                    starMark = '☆'; // 複数回クリア
+                }
+
+                // 問題名 + (星)
+                option.textContent = `${title} ${starMark}`;
+
+                problemDropdown.appendChild(option);
+            });
+
+            problemDropdown.disabled = false;
+        }
+
+        // --- 全シェイプファイルの drawFn を統一するラッパー関数を定義 ---
+        // このラッパーは、animateHighlightFlashが期待する6引数を元の3引数の関数に変換して呼び出します。
+        // これにより、Flashアニメーションの動作が安定します。
+        Object.keys(shapeDefs).forEach(shapeId => {
+            const originalDrawFn = shapeDefs[shapeId].drawFn;
+
+            // 既存の drawFn が既にラッパー化されていないかチェック
+            if (!originalDrawFn.__isWrapped) {
+
+                shapeDefs[shapeId].drawFn = function (canvas, params, highlights, highlightTarget = null, emphasis = 1.0, color = null) {
+
+                    // 1. 通常の描画を一旦実行 (highlightsは問題で指定された全ハイライト)
+                    // この描画は、キャンバスをクリアし、現在のparamsに基づいて図形を描画します。
+                    originalDrawFn(canvas, params, highlights);
+
+                    // 2. フラッシュ強調が必要な場合、強調部分のみを上書き描画する
+                    if (highlightTarget && color) {
+                        // 強調描画のための特殊なhighlightsを作成: 選択されたパラメータのみをハイライトONにする
+                        const flashHighlights = { [highlightTarget]: true };
+
+                        // 強調描画を元の関数に依頼する（ここでは、強調用のdrawFnが別途定義されていることを前提とする）
+                        // 6引数を持つdrawFnがシェイプファイル側で適切に実装されていることを期待します。
+                        // ここでは、シグネチャを維持し、元の関数に処理を委譲します。
+                        return originalDrawFn(canvas, params, highlights, highlightTarget, emphasis, color);
+                    }
+
+                    // 3. 強調がない場合は、通常の3引数呼び出し（または6引数呼び出し）の結果を返す
+                    return originalDrawFn(canvas, params, highlights);
+                };
+                shapeDefs[shapeId].drawFn.__isWrapped = true;
+            }
+        });
+
+    </script>
+</body>
+
+</html>

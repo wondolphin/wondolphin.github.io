@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MakeX ゲーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=M+PLUS+Rounded+1c:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            min-height: calc(var(--vh, 1vh) * 100);
+        }
+        .number-card.dragging {
+            opacity: 0.5;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            z-index: 1000;
+            position: absolute;
+        }
+        .drop-zone.drag-over {
+            background-color: rgba(255, 255, 255, 0.7);
+        }
+        
+        #number-cards-container {
+            /* ★ 修正点: 6.5rem -> 6rem (5.5rem + padding) */
+            min-height: 6rem;
+        }
+        .fraction {
+            display: inline-block;
+            vertical-align: middle; 
+            text-align: center;
+            line-height: 1.2;
+        }
+        .numerator {
+            display: block;
+            border-bottom: 2px solid #475569;
+            padding: 0 0.25em;
+        }
+        .denominator {
+            display: block;
+            padding: 0 0.25em;
+        }
+        
+        html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+#game-wrapper {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+        /* --- 標準レイアウト --- */
+        #game-wrapper.default-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #level-selector-container {
+            margin-bottom: 0.5rem;
+        }
+        #level-selector-container label {
+            font-size: 1.125rem;
+        }
+        #game-container {
+            padding: 1rem;
+            width: 100%;
+        }
+        .objective-area {
+            margin-bottom: 0.5rem;
+            padding: 1rem;
+        }
+        .objective-area h2 {
+            font-size: 1.125rem;
+        }
+        @media (min-width: 768px) {
+            .objective-area h2 {
+                font-size: 1.25rem;
+            }
+        }
+
+        .number-card, #target-card {
+            /* ★ 修正点: w-16 h-24 -> w-20 h-22 */
+            width: 5rem; /* w-20 */
+            height: 5.5rem; /* h-22 */
+            font-size: 1.5rem;
+            line-height: 2rem;
+        }
+        @media (min-width: 768px) {
+            .number-card, #target-card {
+                font-size: 1.875rem;
+                line-height: 2.25rem;
+            }
+        }
+
+        .drop-zone {
+            /* ★ 修正点: w-16 h-24 -> w-20 h-22 */
+            width: 5rem; /* w-20 */
+            height: 5.5rem; /* h-22 */
+        }
+        .operation-area {
+            padding: 0.75rem;
+        }
+        .operation-area .flex p {
+            font-size: 1.5rem;
+        }
+        @media (min-width: 768px) {
+            .operation-area .flex p {
+                font-size: 1.875rem;
+            }
+        }
+        
+        #operation-areas-top, #operation-areas-bottom {
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        #hand-area {
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        #hand-area h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        /* --- 横長レイアウト (縦幅680px以下) --- */
+        @media (max-height: 680px) {
+            body {
+                padding: 0;
+            }
+            #game-wrapper {
+                display: flex;
+                flex-direction: row;
+                width: 100%;
+            }
+            #left-panel {
+                width: 12rem; /* 左パネルの幅 */
+                flex-shrink: 0;
+                padding: 1rem;
+                display: flex;
+                flex-direction: column;
+                gap: 1.5rem;
+                align-items: center;
+                justify-content: center;
+            }
+            #level-selector-container {
+                flex-direction: column;
+                gap: 0.5rem;
+                margin-bottom: 0;
+            }
+            #level-selector-container label {
+                font-size: 1rem;
+                margin-right: 0;
+            }
+            #game-container-wrapper {
+                flex-grow: 1;
+                padding: 0.5rem;
+            }
+            #game-container {
+                padding: 0.5rem;
+                margin: 0;
+            }
+            .objective-area {
+                margin-bottom: 0.25rem;
+                padding: 0.5rem;
+            }
+            .objective-area h2 {
+                font-size: 1rem;
+            }
+            
+            .number-card, #target-card {
+                /* ★ 修正点: w-12 h-20 -> w-14 h-18 */
+                width: 3.5rem; /* w-14 */
+                height: 4.5rem; /* h-18 */
+                font-size: 1.125rem; /* text-lg */
+                line-height: 1.75rem;
+            }
+            .drop-zone {
+                /* ★ 修正点: w-12 h-20 -> w-14 h-18 */
+                width: 3.5rem; /* w-14 */
+                height: 4.5rem; /* h-18 */
+            }
+            
+            #operation-areas-top, #operation-areas-bottom, #hand-area {
+                gap: 0.25rem;
+                margin-bottom: 0.25rem;
+            }
+            .operation-area {
+                padding: 0.25rem;
+            }
+            .operation-area .flex p {
+                font-size: 1.125rem;
+            }
+            
+            #hand-area {
+                padding: 0.25rem;
+            }
+            #hand-area h3 {
+                font-size: 1rem;
+                margin-bottom: 0.125rem;
+            }
+            #number-cards-container {
+                /* ★ 修正点: 5.5rem -> 5rem (h-18 = 4.5rem + padding) */
+                min-height: 5rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex flex-col items-center justify-center">
+
+
+    <!-- ★ 修正点: レイアウトラッパー追加 -->
+    <div id="game-wrapper" class="w-full max-w-7xl mx-auto default-layout">
+
+        <!-- ★ 修正点: 左パネル追加 -->
+        <div id="left-panel">
+            <div id="level-selector-container" class="w-full flex justify-center items-center gap-4">
+                <a href="index.html" title="トップにもどる" class="text-slate-500 hover:text-indigo-600 transition-colors p-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                </a>
+                <label for="level-select" class="font-bold text-slate-700 mr-2">もんだいせんたく:</label>
+                <select id="level-select" class="p-2 rounded-lg shadow-md border border-slate-300 bg-white">
+                    <!-- オプションはJSで生成 -->
+                </select>
+            </div>
+        </div>
+
+        <!-- ★ 修正点: ゲームコンテナラッパー追加 -->
+        <div id="game-container-wrapper">
+            <div id="game-container" class="relative w-full max-w-xl mx-auto bg-white rounded-2xl shadow-xl">
+
+                <div class="objective-area bg-indigo-600 rounded-xl text-white shadow-lg flex justify-center items-center gap-2 md:gap-4">
+                    <h2 class="font-bold shrink-0">てふだを ぜんぶ つかって</h2>
+                    <div id="target-card" class="number-card bg-lime-300 rounded-lg shadow-lg flex justify-center items-center font-bold text-slate-700 shrink-0 pointer-events-none">
+                        <span id="target-number">18</span>
+                    </div>
+                    <h2 class="font-bold shrink-0">を つくろう！</h2>
+                </div>
+
+                <div id="operation-areas-top" class="grid grid-cols-1 md:grid-cols-2">
+                    <!-- JSで + と - をここに追加 -->
+                </div>
+
+                <div id="hand-area" class="bg-slate-200 rounded-xl relative max-w-sm mx-auto">
+                    <h3 class="font-bold text-slate-600 text-center">てふだ</h3>
+                    <div id="number-cards-container" class="flex flex-wrap justify-center items-center gap-3">
+                        <!-- JSで生成 -->
+                    </div>
+                    <button id="reset-hand-button" title="リセット" class="absolute top-2 right-2 text-slate-500 hover:text-indigo-600 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    </button>
+                </div>
+                
+                <div id="operation-areas-bottom" class="grid grid-cols-1 md:grid-cols-2">
+                     <!-- JSで * と / をここに追加 -->
+                </div>
+
+            </div>
+        </div> <!-- game-container-wrapper ここまで -->
+    </div> <!-- game-wrapper ここまで -->
+
+
+    <!-- 結果モーダル (変更なし) -->
+    <div id="result-modal" class="fixed inset-0 bg-black/0 flex items-center justify-center hidden transition-opacity duration-300">
+        <div class="bg-[rgba(255,254,233,0.9)] rounded-xl p-8 text-center shadow-2xl transform scale-95 transition-transform duration-300">
+            <p id="result-message" class="text-4xl font-bold mb-6">クリア！</p>
+            <button id="restart-button" class="bg-[rgba(50,200,200,0.8)] text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
+                つぎへ
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- URLパラメータの取得 (変更なし) ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const showDivision = urlParams.get('division') !== 'false';
+        const showFraction = urlParams.get('fraction') !== 'false';
+
+        // --- ゲーム設定 (レベルデータ変更なし) ---
+        const ALL_GAME_LEVELS = [
+            { target: 10,  cards: [{n: 4, d: 1},{n: 4, d: 1},{n: 2, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 10,  cards: [{n: 1, d: 1},{n: 5, d: 1},{n: 6, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 10,  cards: [{n: 1, d: 1},{n: 1, d: 1},{n: 5, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 10,  cards: [{n: 1, d: 1},{n: 3, d: 1},{n: 3, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 10,  cards: [{n: 3, d: 1},{n: 5, d: 1},{n: 5, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 10,  cards: [{n: 11, d: 1},{n: 3, d: 1},{n: 3, d: 1}], usesDivision: true, usesFraction: false },
+            { target: 10,  cards: [{n: 4, d: 1},{n: 5, d: 1},{n: 2, d: 1}], usesDivision: true, usesFraction: false },
+            { target: 10,  cards: [{n: 16, d: 1},{n: 2, d: 1},{n: 2, d: 1}], usesDivision: true, usesFraction: false },
+            { target: 10,  cards: [{n: 2, d: 1},{n: 2, d: 1},{n: 5, d: 2}], usesDivision: false, usesFraction: true },
+            { target: 10,  cards: [{n: 1, d: 1},{n: 8, d: 1},{n: 1, d: 2}], usesDivision: true, usesFraction: true },
+            { target: 100,  cards: [{n: 2, d: 1},{n: 5, d: 1},{n: 10, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 99,  cards: [{n: 9, d: 1},{n: 9, d: 1},{n: 2, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 111,  cards: [{n: 10, d: 1},{n: 11, d: 1},{n: 11, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 35,  cards: [{n: 3, d: 1},{n: 5, d: 1},{n: 100, d: 1}], usesDivision: true, usesFraction: false },
+            { target: 1,  cards: [{n: 5, d: 1},{n: 5, d: 1},{n: 10, d: 1}], usesDivision: true, usesFraction: false },
+            { target: 2,  cards: [{n: 1, d: 2},{n: 1, d: 2},{n: 1, d: 2}], usesDivision: true, usesFraction: true },
+            { target: 1,  cards: [{n: 1, d: 2},{n: 1, d: 3},{n: 5, d: 1}], usesDivision: true, usesFraction: true },
+            { target: 6,  cards: [{n: 1, d: 1},{n: 1, d: 1},{n: 1, d: 1},{n: 1, d: 1},{n: 1, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 55,  cards: [{n: 5, d: 1},{n: 5, d: 1},{n: 5, d: 1},{n: 5, d: 1},{n: 5, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 24,  cards: [{n: 2, d: 1},{n: 4, d: 1},{n: 2, d: 1},{n: 4, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 100,  cards: [{n: 6, d: 1},{n: 6, d: 1},{n: 8, d: 1},{n: 8, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 91,  cards: [{n: 9, d: 1},{n: 1, d: 1},{n: 9, d: 1},{n: 1, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 78,  cards: [{n: 3, d: 1},{n: 4, d: 1},{n: 5, d: 1},{n: 6, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 100,  cards: [{n: 2, d: 1},{n: 7, d: 1},{n: 7, d: 1},{n: 7, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 100,  cards: [{n: 2, d: 1},{n: 3, d: 1},{n: 4, d: 1},{n: 5, d: 1}], usesDivision: false, usesFraction: false },
+            { target: 100,  cards: [{n: 2, d: 1},{n: 8, d: 1},{n: 8, d: 1},{n: 9, d: 1}], usesDivision: true, usesFraction: true },
+            { target: 1,  cards: [{n: 100, d: 1},{n: 33, d: 1},{n: 3, d: 1},{n: 3, d: 1}], usesDivision: true, usesFraction: true }
+        ];
+        
+        // --- フィルタリング、変数定義 (変更なし) ---
+        const availableLevelData = ALL_GAME_LEVELS
+            .map((level, index) => ({ ...level, originalIndex: index }))
+            .filter(level => 
+                (showDivision || !level.usesDivision) &&
+                (showFraction || !level.usesFraction)
+            );
+        let currentLevelIndex = 0;
+        let clearedLevels = JSON.parse(sessionStorage.getItem('makeXClearedLevels')) || [];
+        function gcd(a, b) {
+            if (b === 0) { return a; }
+            return gcd(b, a % b);
+        }
+        const ALL_OPERATIONS = [
+            { id: 'add', symbol: '＋', color: 'bg-blue-500', func: (c1, c2) => ({ n: c1.n * c2.d + c2.n * c1.d, d: c1.d * c2.d }) },
+            { id: 'subtract', symbol: '−', color: 'bg-green-500', func: (c1, c2) => ({ n: c1.n * c2.d - c2.n * c1.d, d: c1.d * c2.d }) },
+            { id: 'multiply', symbol: '×', color: 'bg-red-500', func: (c1, c2) => ({ n: c1.n * c2.n, d: c1.d * c2.d }) },
+            { id: 'divide', symbol: '÷', color: 'bg-yellow-500', func: (c1, c2) => (c2.n === 0) ? null : ({ n: c1.n * c2.d, d: c1.d * c2.n }) }
+        ];
+        const enabledOperations = ALL_OPERATIONS.filter(op => showDivision || op.id !== 'divide');
+        const targetNumberEl = document.getElementById('target-number');
+        const operationAreasTop = document.getElementById('operation-areas-top');
+        const operationAreasBottom = document.getElementById('operation-areas-bottom');
+        const numberCardsContainer = document.getElementById('number-cards-container');
+        const resultModal = document.getElementById('result-modal');
+        const resultMessage = document.getElementById('result-message');
+        const restartButton = document.getElementById('restart-button');
+        const resetHandButton = document.getElementById('reset-hand-button');
+        const levelSelectEl = document.getElementById('level-select');
+        let draggedCardId = null;
+        let draggedElement = null; 
+        let isDragging = false;    
+        let offsetX = 0, offsetY = 0; 
+        let startX = 0, startY = 0; 
+        let currentDropZone = null; 
+
+        // --- initGame (★ 修正点) ---
+        function initGame() {
+            operationAreasTop.innerHTML = '';
+            operationAreasBottom.innerHTML = '';
+            numberCardsContainer.innerHTML = '';
+            updateLevelSelector();
+            
+            // レイアウト切り替え
+            checkLayout();
+
+            if (availableLevelData.length === 0) {
+                targetNumberEl.textContent = "??";
+                operationAreasTop.innerHTML = `<p class="text-center text-red-500 col-span-2">あそべるもんだいがありません。<br>トップページでせっていをかえてみてください。</p>`;
+                return;
+            }
+
+            const level = availableLevelData[currentLevelIndex];
+            const targetSpan = document.getElementById('target-number');
+            if (level.target % 1 !== 0) {
+                const num = Math.round(level.target * 10);
+                const den = 10;
+                const common = gcd(num, den);
+                targetSpan.innerHTML = `<div class="fraction pointer-events-none"><span class="numerator">${num/common}</span><span class="denominator">${den/common}</span></div>`;
+            } else {
+                 targetSpan.textContent = level.target;
+            }
+
+            enabledOperations.forEach(op => {
+                const area = document.createElement('div');
+                area.id = op.id;
+                area.className = `operation-area rounded-xl shadow-md transition-colors duration-200 ${op.color}`;
+                area.innerHTML = `
+                    <div class="flex justify-center items-center gap-2">
+                        <div class="drop-zone bg-white/50 rounded-lg border-2 border-dashed border-white/80 flex justify-center items-center"></div>
+                        <p class="font-bold text-white mx-1 md:mx-2 pointer-events-none">${op.symbol}</p>
+                        <div class="drop-zone bg-white/50 rounded-lg border-2 border-dashed border-white/80 flex justify-center items-center"></div>
+                    </div>
+                `;
+                
+                if (op.id === 'add' || op.id === 'subtract') {
+                    operationAreasTop.appendChild(area);
+                } else {
+                    operationAreasBottom.appendChild(area);
+                }
+            });
+
+            const isLastCard = (level.cards.length === 1);
+            level.cards.forEach((card, index) => {
+                createNumberCard(card.n, card.d, `card-${index}`, true, isLastCard);
+            });
+
+            addEventListeners();
+        }
+
+        // --- ★ 修正点: レイアウト切り替え関数 ---
+        function checkLayout() {
+            const wrapper = document.getElementById('game-wrapper');
+            if (window.innerHeight <= 680) {
+                wrapper.classList.remove('default-layout');
+            } else {
+                wrapper.classList.add('default-layout');
+            }
+        }
+
+        // --- updateLevelSelector (変更なし) ---
+        function updateLevelSelector() {
+            const currentSelection = levelSelectEl.value;
+            levelSelectEl.innerHTML = '';
+            if (availableLevelData.length === 0) {
+                 const option = document.createElement('option');
+                 option.textContent = `もんだいがありません`;
+                 option.value = -1;
+                 levelSelectEl.appendChild(option);
+                 levelSelectEl.disabled = true;
+                 return;
+            }
+            levelSelectEl.disabled = false;
+            availableLevelData.forEach((levelData, index) => {
+                const option = document.createElement('option');
+                const isCleared = clearedLevels.includes(levelData.originalIndex) ? ' ★' : '';
+                option.textContent = `もんだい ${index + 1}${isCleared}`;
+                option.value = levelData.originalIndex;
+                levelSelectEl.appendChild(option);
+            });
+            levelSelectEl.value = availableLevelData[currentLevelIndex].originalIndex; 
+        }
+
+        // --- createNumberCard (変更なし) ---
+        function createNumberCard(numerator, denominator, id, appendToHand = true, isLastCard = false) {
+            const card = document.createElement('div');
+            card.id = id;
+            if (isLastCard) {
+                card.className = 'number-card bg-lime-300 rounded-lg shadow-lg flex justify-center items-center font-bold text-slate-700 transition-transform duration-200';
+            } else {
+                card.className = 'number-card bg-white rounded-lg shadow-lg flex justify-center items-center font-bold text-slate-700 transition-transform duration-200';
+            }
+            if (denominator < 0) {
+                numerator *= -1;
+                denominator *= -1;
+            }
+            card.dataset.numerator = numerator;
+            card.dataset.denominator = denominator;
+            if (denominator === 1) {
+                card.textContent = numerator;
+            } else {
+                card.innerHTML = `<div class="fraction pointer-events-none"><span class="numerator">${numerator}</span><span class="denominator">${denominator}</span></div>`;
+            }
+            if (appendToHand) {
+                numberCardsContainer.appendChild(card);
+            }
+            return card;
+        }
+
+        // --- addEventListeners (変更なし) ---
+        function addEventListeners() {
+            document.querySelectorAll('.number-card').forEach(card => {
+                if (card.id === 'target-card') return;
+                card.removeEventListener('mousedown', dragStart);
+                card.removeEventListener('touchstart', dragStart);
+                card.addEventListener('mousedown', dragStart);
+                card.addEventListener('touchstart', dragStart);
+            });
+        }
+        
+        // --- returnCardToHand (変更なし) ---
+        function returnCardToHand(card) {
+            if (!card) return;
+            const handContainer = document.getElementById('number-cards-container');
+            card.style.position = '';
+            card.style.top = '';
+            card.style.left = '';
+            card.style.zIndex = '';
+            card.style.transform = '';
+            card.style.opacity = '1';
+            card.classList.remove('dragging'); 
+            handContainer.appendChild(card);
+        }
+
+        // --- ドラッグ＆ドロップ (変更なし) ---
+        function getEventPosition(e) {
+            if (e.touches) {
+                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+            return { x: e.clientX, y: e.clientY };
+        }
+        function dragStart(e) {
+            if (e.currentTarget.id === 'target-card') return;
+            draggedElement = e.currentTarget;
+            draggedCardId = draggedElement.id;
+            isDragging = true;
+            const pos = getEventPosition(e);
+            startX = pos.x; 
+            startY = pos.y;
+            const rect = draggedElement.getBoundingClientRect();
+            offsetX = pos.x - rect.left;
+            offsetY = pos.y - rect.top;
+            draggedElement.style.position = 'absolute';
+            draggedElement.style.zIndex = '1000';
+            draggedElement.classList.add('dragging'); 
+            document.body.appendChild(draggedElement);
+            let initialX = pos.x - offsetX;
+            let initialY = pos.y - offsetY;
+            draggedElement.style.left = `${initialX + window.scrollX}px`;
+            draggedElement.style.top = `${initialY + window.scrollY}px`;
+            draggedElement.style.transform = ''; 
+        }
+        function dragMove(e) {
+            if (!isDragging || !draggedElement) return;
+            e.preventDefault(); 
+            const pos = getEventPosition(e);
+            let newX = pos.x - offsetX;
+            let newY = pos.y - offsetY;
+            draggedElement.style.left = `${newX + window.scrollX}px`;
+            draggedElement.style.top = `${newY + window.scrollY}px`;
+            draggedElement.style.transform = ''; 
+            draggedElement.style.visibility = 'hidden'; 
+            const elementBelow = document.elementFromPoint(pos.x, pos.y); 
+            draggedElement.style.visibility = 'visible';
+            const dropZone = elementBelow ? elementBelow.closest('.drop-zone') : null;
+            if (currentDropZone && currentDropZone !== dropZone) {
+                currentDropZone.classList.remove('drag-over');
+                currentDropZone = null;
+            }
+            if (dropZone && !dropZone.hasChildNodes()) {
+                dropZone.classList.add('drag-over');
+                currentDropZone = dropZone;
+            }
+        }
+        function dragEnd(e) {
+            if (!isDragging || !draggedElement) return;
+            isDragging = false;
+            if (currentDropZone) {
+                currentDropZone.classList.remove('drag-over');
+                currentDropZone = null;
+            }
+            let clientX, clientY;
+            if (e.type === 'touchend') {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            const moveThreshold = 10; 
+            const movedDistance = Math.hypot(clientX - startX, clientY - startY);
+            const originalParent = document.getElementById(draggedCardId)?.parentElement;
+            if (originalParent && originalParent.classList.contains('drop-zone') && movedDistance < moveThreshold) {
+                returnCardToHand(draggedElement);
+            } 
+            else {
+                draggedElement.style.visibility = 'hidden';
+                const elementBelow = document.elementFromPoint(clientX, clientY);
+                draggedElement.style.visibility = 'visible';
+                let dropTarget = null;
+                const dropZone = elementBelow ? elementBelow.closest('.drop-zone') : null;
+                if (dropZone && !dropZone.hasChildNodes()) {
+                    dropTarget = dropZone;
+                } 
+                else {
+                    const operationArea = elementBelow ? elementBelow.closest('.operation-area') : null;
+                    if (operationArea) {
+                        const firstEmptyZone = operationArea.querySelector('.drop-zone:empty');
+                        if (firstEmptyZone) {
+                            dropTarget = firstEmptyZone;
+                        }
+                    }
+                }
+                if (dropTarget) {
+                    draggedElement.style.position = ''; 
+                    draggedElement.style.zIndex = '';
+                    draggedElement.style.transform = '';
+                    draggedElement.style.left = ''; 
+                    draggedElement.style.top = ''; 
+                    draggedElement.classList.remove('dragging'); 
+                    dropTarget.appendChild(draggedElement);
+                    checkCalculation(dropTarget.closest('.operation-area'));
+                } else {
+                    returnCardToHand(draggedElement);
+                }
+            }
+            draggedElement = null;
+            draggedCardId = null;
+        }
+        document.addEventListener('mousemove', dragMove);
+        document.addEventListener('touchmove', dragMove, { passive: false }); 
+        document.addEventListener('mouseup', dragEnd);
+        document.addEventListener('touchend', dragEnd);
+
+        // --- checkCalculation (変更なし) ---
+        function checkCalculation(operationArea) {
+            const dropZones = operationArea.querySelectorAll('.drop-zone');
+            const card1El = dropZones[0].querySelector('.number-card');
+            const card2El = dropZones[1].querySelector('.number-card');
+            if (card1El && card2El) {
+                document.body.style.pointerEvents = 'none';
+                const card1 = { n: parseInt(card1El.dataset.numerator), d: parseInt(card1El.dataset.denominator) };
+                const card2 = { n: parseInt(card2El.dataset.numerator), d: parseInt(card2El.dataset.denominator) };
+                const operation = enabledOperations.find(op => op.id === operationArea.id);
+                const result = operation.func(card1, card2);
+                if (result === null) {
+                    showResult(false, 'けいさんできないよ！');
+                    setTimeout(initGame, 2000);
+                    document.body.style.pointerEvents = 'auto';
+                    return;
+                }
+                const flexContainer = operationArea.querySelector('.flex');
+                flexContainer.style.position = 'relative';
+                [card1El, card2El].forEach(card => {
+                    const rect = card.getBoundingClientRect();
+                    const parentRect = flexContainer.getBoundingClientRect();
+                    card.style.position = 'absolute';
+                    card.style.top = `${rect.top - parentRect.top}px`;
+                    card.style.left = `${rect.left - parentRect.left}px`;
+                    card.style.transition = 'transform 0.33s ease-in, opacity 0.33s ease-in';
+                });
+                requestAnimationFrame(() => {
+                    const centerOffset1 = (flexContainer.offsetWidth / 2) - (card1El.offsetLeft + card1El.offsetWidth / 2);
+                    const centerOffset2 = (flexContainer.offsetWidth / 2) - (card2El.offsetLeft + card2El.offsetWidth / 2);
+                    card1El.style.transform = `translateX(${centerOffset1}px) scale(0.5)`;
+                    card1El.style.opacity = '0';
+                    card2El.style.transform = `translateX(${centerOffset2}px) scale(0.5)`;
+                    card2El.style.opacity = '0';
+                });
+                const commonDivisor = gcd(Math.abs(result.n), Math.abs(result.d));
+                const simplifiedN = result.n / commonDivisor;
+                const simplifiedD = result.d / commonDivisor;
+                setTimeout(() => {
+                    card1El.remove();
+                    card2El.remove();
+                    const existingCards = document.querySelectorAll('.number-card:not(#target-card)').length;
+                    const isLastCard = (existingCards === 0);
+                    const newCardId = `card-${Date.now()}`;
+                    const newCard = createNumberCard(simplifiedN, simplifiedD, newCardId, false, isLastCard);
+                    const gameContainer = document.getElementById('game-container');
+                    const startRect = operationArea.getBoundingClientRect();
+                    const handRect = numberCardsContainer.getBoundingClientRect();
+                    const gameRect = gameContainer.getBoundingClientRect();
+                    newCard.style.position = 'absolute';
+                    newCard.style.top = `${startRect.top - gameRect.top + startRect.height / 2 - newCard.offsetHeight / 2}px`;
+                    newCard.style.left = `${startRect.left - gameRect.left + startRect.width / 2 - newCard.offsetWidth / 2}px`;
+                    newCard.style.transition = 'top 0.25s ease-in-out, left 0.25s ease-in-out, transform 0.25s ease-in-out';
+                    newCard.style.transform = 'scale(0.8)';
+                    gameContainer.appendChild(newCard);
+                    requestAnimationFrame(() => {
+                        const randomXOffset = (Math.random() - 0.5) * (handRect.width * 0.5);
+                        const randomYOffset = (Math.random() - 0.5) * (handRect.height * 0.2);
+                        newCard.style.top = `${handRect.top - gameRect.top + (handRect.height / 2 - newCard.offsetHeight / 2) + randomYOffset}px`;
+                        newCard.style.left = `${handRect.left - gameRect.left + (handRect.width / 2 - newCard.offsetWidth / 2) + randomXOffset}px`;
+                        newCard.style.transform = 'scale(1)';
+                    });
+                    newCard.addEventListener('transitionend', () => {
+                        newCard.remove();
+                        const existingCardsAfterAnim = document.querySelectorAll('.number-card:not(#target-card)').length;
+                        const isLastCardAfterAnim = (existingCardsAfterAnim === 0);
+                        createNumberCard(simplifiedN, simplifiedD, newCardId, true, isLastCardAfterAnim);
+                        addEventListeners();
+                        setTimeout(() => {
+                            checkGameEnd();
+                            document.body.style.pointerEvents = 'auto';
+                        }, 200);
+                    }, { once: true });
+                }, 333);
+            }
+        }
+
+        // --- checkGameEnd (変更なし) ---
+        function checkGameEnd() {
+            const allCards = document.querySelectorAll('.number-card:not(#target-card)');
+            if (allCards.length === 1) {
+                const card = allCards[0];
+                const finalN = parseInt(card.dataset.numerator);
+                const finalD = parseInt(card.dataset.denominator);
+                const targetValue = availableLevelData[currentLevelIndex].target;
+                if (finalD !== 0 && finalN / finalD === targetValue) {
+                    const currentOriginalIndex = availableLevelData[currentLevelIndex].originalIndex;
+                    if (!clearedLevels.includes(currentOriginalIndex)) {
+                        clearedLevels.push(currentOriginalIndex);
+                        sessionStorage.setItem('makeXClearedLevels', JSON.stringify(clearedLevels));
+                    }
+                    showResult(true, 'クリア！🎉');
+                    currentLevelIndex = (currentLevelIndex + 1) % availableLevelData.length;
+                } else {
+                    showResult(false, 'おしい！');
+                }
+            }
+        }
+
+        // --- showResult (変更なし) ---
+        function showResult(isSuccess, message) {
+            resultMessage.textContent = message;
+            if (isSuccess) {
+                resultMessage.classList.remove('text-red-500');
+                resultMessage.classList.add('text-green-500');
+                restartButton.textContent = 'つぎへ';
+            } else {
+                resultMessage.classList.remove('text-green-500');
+                resultMessage.classList.add('text-red-500');
+                restartButton.textContent = 'もういちど';
+            }
+            resultModal.classList.remove('hidden');
+            setTimeout(() => {
+                resultModal.firstElementChild.classList.add('scale-100');
+            }, 10);
+            if (!isSuccess) {
+                setTimeout(() => {
+                    hideResult();
+                    initGame();
+                }, 1500);
+            }
+        }
+        function hideResult() {
+            resultModal.firstElementChild.classList.remove('scale-100');
+            setTimeout(() => {
+                resultModal.classList.add('hidden');
+            }, 300);
+        }
+
+        // --- イベントリスナー (★ 修正点) ---
+        restartButton.addEventListener('click', () => {
+            hideResult();
+            initGame();
+        });
+        resetHandButton.addEventListener('click', initGame);
+        levelSelectEl.addEventListener('change', (e) => {
+            const selectedOriginalIndex = parseInt(e.target.value);
+            currentLevelIndex = availableLevelData.findIndex(level => level.originalIndex === selectedOriginalIndex);
+            initGame();
+        });
+        
+        // ★ 修正点: リサイズイベントでレイアウトをチェック
+        window.addEventListener('resize', checkLayout);
+
+        // --- 初期起動 (変更なし) ---
+        initGame();
+        
+        function setRealHeight() {
+    document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+}
+window.addEventListener('resize', setRealHeight);
+setRealHeight();
+        
+    </script>
+</body>
+</html>
+
