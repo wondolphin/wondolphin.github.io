@@ -1,0 +1,239 @@
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 10px;
+    background-color: #f4f4f4;
+    color: #333;
+    font-size: 14px;
+}
+
+h1 {
+    color: #2c3e50;
+    font-size: 1.8em;
+    margin-bottom: 10px;
+}
+
+.controls {
+    margin-bottom: 10px; /* タイマーとの間隔調整 */
+    padding: 8px;
+    background-color: #fff;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.controls label {
+    margin-right: 4px;
+}
+
+.controls select, .controls button {
+    padding: 6px 10px;
+    border-radius: 3px;
+    border: 1px solid #ddd;
+    margin-left: 4px;
+    font-size: 0.9em;
+}
+
+.controls button#start-button { /* スタートボタンの色指定 */
+    background-color: #3498db;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.controls button#start-button:hover {
+    background-color: #2980b9;
+}
+
+#timer-area {
+    margin-bottom: 10px;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #333;
+}
+
+#game-area {
+    padding: 15px;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    width: 95%;
+    max-width: 550px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+#game-area h2 {
+    font-size: 1.2em;
+    margin-top: 10px;
+    margin-bottom: 8px;
+}
+
+#problem-area {
+    font-size: 1.5em;
+    margin-bottom: 15px;
+    padding: 10px;
+    border: 1px dashed #ddd;
+    min-height: 30px;
+    line-height: 1.5;
+    letter-spacing: 2px;
+    text-align: center;
+    word-break: break-all;
+}
+
+/* #problem-area span はJSでスタイルを設定するため削除またはコメントアウト */
+
+.answer-section {
+    display: flex;
+    margin-bottom: 10px; /* ギブアップボタンとの間隔調整 */
+}
+
+#answer-input {
+    flex-grow: 1;
+    padding: 8px;
+    border-radius: 3px;
+    border: 1px solid #ddd;
+    margin-right: 8px;
+    font-size: 0.95em;
+}
+
+button#submit-button { /* 解答ボタンの色指定 */
+    padding: 8px 15px;
+    background-color: #2ecc71;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    font-size: 0.9em;
+}
+
+button#submit-button:hover {
+    background-color: #27ae60;
+}
+
+button#submit-button:disabled, button#give-up-button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
+button#give-up-button {
+    padding: 7px 12px; /* 少し小さく */
+    background-color: #f39c12; /* オレンジ系 */
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    font-size: 0.85em; /* 少し小さく */
+    margin-bottom: 15px; /* 正解リストとの間隔 */
+    display: block; /* 中央寄せや幅調整のため */
+    margin-left: auto;
+    margin-right: auto;
+}
+
+button#give-up-button:hover {
+    background-color: #e67e22;
+}
+
+#correct-answers-area div {
+    margin-bottom: 6px;
+    padding: 4px 6px;
+    font-weight: bold;
+    background-color: #e8f8f0;
+    border-left: 2px solid #27ae60;
+    font-size: 0.9em;
+}
+#correct-answers-area div.given-up { /* ギブアップ時のスタイル */
+    color: #c0392b; /* 赤系 */
+    background-color: #fdecea;
+    border-left-color: #c0392b;
+}
+
+
+#clear-message-area {
+    margin-top: 15px;
+    padding: 8px;
+    font-size: 1.1em;
+    color: #3498db;
+    font-weight: bold;
+    text-align: center;
+    background-color: #eaf5fb;
+    border-radius: 3px;
+}
+
+#clear-message-area.speed-clear {
+    color: #e67e22; /* オレンジ系 for speed clear */
+    background-color: #fdf3e6;
+}
+#clear-message-area.give-up-clear {
+    color: #7f8c8d; /* グレー系 for give up clear */
+    background-color: #f0f1f1;
+}
+
+
+.seed-controls {
+    margin-bottom: 5px; /* リストセレクタとの間隔調整 */
+}
+
+.list-selector-container {
+    margin-bottom: 10px;
+    padding: 10px;
+    background-color: #fff;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.list-selector-container h3 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 1em;
+    color: #333;
+}
+
+#word-list-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px; /* チェックボックス間の隙間 */
+}
+
+#word-list-checkboxes label {
+    display: flex;
+    align-items: center;
+    font-size: 0.9em;
+    padding: 5px 8px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#word-list-checkboxes label:hover {
+    background-color: #e9ecef;
+}
+
+#word-list-checkboxes input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+
+#share-link-area {
+    margin-bottom: 10px;
+    font-size: 0.85em;
+    color: #555;
+    word-break: break-all;
+    padding: 8px; /* 少しパディングを増やす */
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    border-radius: 3px;
+    min-height: 1.5em;
+    line-height: 1.4; /* 行間調整 */
+}
+#share-link-area a {
+    color: #007bff;
+    text-decoration: none;
+}
+#share-link-area a:hover {
+    text-decoration: underline;
+}

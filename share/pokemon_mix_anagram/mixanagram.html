@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポケモンごちゃまぜアナグラム</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>ポケモンごちゃまぜアナグラム</h1>
+
+    <div class="list-selector-container">
+        <h3>範囲を選択 (複数可):</h3>
+        <div id="word-list-checkboxes">
+            </div>
+    </div>
+
+
+    <div class="controls">
+        <label for="mix-count">混ぜる数：</label>
+        <select id="mix-count">
+            </select>
+        <button id="start-button">スタート</button>
+    </div>
+
+    <div class="seed-controls">
+        <input type="text" id="seed-input" placeholder="シード値を入力 (任意)">
+        <button id="generate-seed-button">ランダムシード生成</button>
+    </div>
+
+    <div id="share-link-area">
+        </div>
+
+    <div id="timer-area">Time: <span id="time-elapsed">0</span>s</div>
+
+    <div id="game-area">
+        <h2>問題</h2>
+        <div id="problem-area">
+            </div>
+
+        <h2>解答</h2>
+        <div class="answer-section">
+            <input type="text" id="answer-input" placeholder="単語を入力 (ひらがな/カタカナ)">
+            <button id="submit-button">解答する</button>
+        </div>
+        <button id="give-up-button">ギブアップ（１つ）</button>
+
+        <h2>正解した単語</h2>
+        <div id="correct-answers-area">
+            </div>
+
+        <div id="clear-message-area">
+            </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
