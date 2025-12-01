@@ -14,19 +14,53 @@
             color: white;
             margin: 0;
             padding: 20px;
-            user-select: none; /* テキスト選択無効化 */
+            user-select: none;
         }
         h1 { margin-bottom: 10px; font-size: 1.2rem;}
         
+        /* コントロールパネル */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        select, button {
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        select {
+            background: #444;
+            color: white;
+        }
+
+        button.action-btn {
+            background-color: #f58231;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 4px #9A6324;
+            transition: all 0.1s ease;
+        }
+        button.action-btn:active {
+            box-shadow: 0 1px #9A6324;
+            transform: translateY(3px);
+        }
+
         /* ゲームコンテナ */
         #game-container {
             position: relative;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
             cursor: pointer;
+            margin-bottom: 15px;
         }
 
         canvas {
-            background-color: #ddd; /* ニュートラルな床の色 */
+            background-color: #ddd;
             display: block;
             border-radius: 4px;
         }
@@ -34,12 +68,10 @@
         /* スコアボード */
         #scoreboard {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             width: 100%;
-            /* キャンバス幅に合わせる */
             max-width: 540px; 
-            margin-top: 15px;
             background: #333;
             padding: 10px;
             border-radius: 8px;
@@ -49,6 +81,9 @@
             display: flex;
             align-items: center;
             font-size: 0.9rem;
+            background: rgba(255,255,255,0.05);
+            padding: 5px;
+            border-radius: 4px;
         }
 
         .color-dot {
@@ -58,150 +93,262 @@
             margin-right: 8px;
             border: 1px solid #fff;
         }
+        
+        .score-id {
+            margin-right: 8px;
+            font-weight: bold;
+            color: #ccc;
+            width: 15px;
+        }
 
         .score-val {
             font-weight: bold;
+            font-size: 1.1rem;
         }
         
-        /* 説明文 */
         .instruction {
-            margin-top: 10px;
+            margin-top: 5px;
             color: #aaa;
             font-size: 0.8rem;
-        }
-
-        /* ボタンのスタイル */
-        #undoButton {
-            background-color: #f58231; /* オレンジ (テーマカラーから) */
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            font-size: 1rem;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            margin: 15px 0; /* 上下のマージンを調整 */
-            box-shadow: 0 4px #9A6324; /* 茶色 (テーマカラーから) */
-            transition: all 0.1s ease;
-        }
-        
-        #undoButton:hover {
-            background-color: #f79a59;
-        }
-        
-        #undoButton:active {
-            box-shadow: 0 1px #9A6324;
-            transform: translateY(3px);
         }
     </style>
 </head>
 <body>
 
-    <h1>スリングショット陣取り</h1>
+    <h1>陣取りスリングショット</h1>
+
+    <div class="controls">
+        <select id="stageSelect">
+            <option value="1">Stage 1: ノーマル (9x7)</option>
+            <option value="2">Stage 2: 障害物 (黒マス・2倍)</option>
+            <option value="3">Stage 3: 塗不可 (無効マス・2倍)</option>
+            <option value="4">Stage 4: ループ (壁なし)</option>
+        </select>
+        <button id="changeStageBtn" class="action-btn" style="background-color:#4363d8; box-shadow:0 4px #2a4094;">ステージ移動</button>
+    </div>
 
     <div id="game-container">
-        <!-- キャンバスサイズを 9x7 (540x420) に変更 -->
         <canvas id="gameCanvas" width="540" height="420"></canvas>
     </div>
 
-    <div class="instruction">メダルをドラッグ＆ドロップして弾いてください</div>
-
-    <!-- ★ ボタン追加 -->
-    <button id="undoButton">1手戻る</button>
+    <div class="controls">
+        <button id="undoButton" class="action-btn">1手戻る</button>
+    </div>
 
     <div id="scoreboard">
         <!-- JSで生成 -->
     </div>
+    
+    <div class="instruction">ドラッグ＆ドロップで発射。自分の色の面積を増やそう！</div>
 
 <script>
-    // --- 設定 (9x7 に変更) ---
+    // --- 設定 ---
     const COLS = 9;
     const ROWS = 7;
-    const TILE_W = 60; // (540 / 9)
-    const TILE_H = 60; // (420 / 7)
-    const CANVAS_W = COLS * TILE_W; // 540
-    const CANVAS_H = ROWS * TILE_H; // 420
+    const TILE_W = 60;
+    const TILE_H = 60;
+    const CANVAS_W = COLS * TILE_W;
+    const CANVAS_H = ROWS * TILE_H;
     
     // 物理定数
-    const FRICTION = 0.985; // 摩擦（1未満で徐々に減速）
-    const WALL_BOUNCE = 0.8; // 壁の跳ね返り係数
-    const MEDAL_RADIUS = 30; // ★ 1.5倍に変更 (20 -> 30)
-    const SHOOT_POWER = 0.15; // 引っ張る強さの係数
-    const MAX_SPEED = 25; // 最高速度制限
+    const FRICTION = 0.985;
+    const WALL_BOUNCE = 0.8;
+    const MEDAL_RADIUS = 30; 
+    const SHOOT_POWER = 0.15;
+    const MAX_SPEED = 25;
 
-    // 色定義 (8色) - 区別しやすい配色に変更
+    // 色定義 (6色)
     const COLORS = [
-        { name: 'Red', hex: '#E6194B' },    // 赤
-        { name: 'Blue', hex: '#4363d8' },   // 青
-        { name: 'Green', hex: '#3cb44b' },  // 緑
-        { name: 'Yellow', hex: '#ffe119' }, // 黄
-        { name: 'Orange', hex: '#f58231' }, // オレンジ
-        { name: 'Purple', hex: '#911eb4' }, // 紫
-        { name: 'Cyan', hex: '#42d4f4' },   // 水色
-        { name: 'Brown', hex: '#9A6324' }   // 茶色
+        { id: 'A', name: 'Red',    hex: '#E6194B' },
+        { id: 'B', name: 'Blue',   hex: '#4363d8' },
+        { id: 'C', name: 'Green',  hex: '#3cb44b' },
+        { id: 'D', name: 'Yellow', hex: '#ffe119' },
+        { id: 'E', name: 'Purple', hex: '#911eb4' },
+        { id: 'F', name: 'Orange', hex: '#f58231' }
     ];
     const NEUTRAL_COLOR = '#e0e0e0';
+    const BLOCK_COLOR = '#222'; // 黒マスの色
+    const UNPAINTABLE_COLOR = '#f9f9f9'; // ★塗られないマスの色 (白っぽく変更)
+
+    // --- ステージマップ定義 ---
+    
+    // Stage 2: 黒マス(b), 2倍(d)
+    const STAGE_2_MAP = [
+        ['d', 'd', 0, 'b', 'b', 'b', 0, 'd', 'd'],
+        ['d','d',0, 0, 0, 0, 0,'d', 'd'],
+        ['b', 0, 0, 0, 0, 0, 0, 0, 'b'],
+        ['b',0, 0, 0, 0, 0, 0, 0,'b'],
+        ['b', 0, 0, 0, 0, 0, 0, 0, 'b'],
+        ['d', 'd',0, 0, 0, 0, 0,'d', 'd'],
+        ['d', 'd', 0, 'b', 'b', 'b', 0, 'd', 'd']
+    ];
+
+    // Stage 3: 塗られない(n), 2倍(d)
+    const STAGE_3_MAP = [
+        ['n','n', 0 ,'d', 0 ,'d', 0 ,'n','n'],
+        ['n','n','d', 0 ,'d', 0 ,'d','n','n'],
+        [ 0 ,'d', 0 ,'n','n','n', 0 ,'d', 0 ],
+        ['d', 0 ,'d','n','n','n','d', 0 ,'d'],
+        [ 0 ,'d', 0 ,'n','n','n', 0 ,'d', 0 ],
+        ['n','n','d', 0 ,'d', 0 ,'d','n','n'],
+        ['n','n', 0 ,'d', 0 ,'d', 0 ,'n','n']
+    ];
 
     // --- クラス定義 ---
 
     class Tile {
-        constructor(c, r) {
+        constructor(c, r, type = 'normal') {
             this.c = c;
             this.r = r;
             this.x = c * TILE_W;
             this.y = r * TILE_H;
-            this.ownerIndex = -1; // -1はニュートラル
+            this.type = type; // 'normal', 'block', 'double', 'unpaintable'
+            this.ownerIndex = -1; 
         }
 
         draw(ctx) {
-            ctx.fillStyle = this.ownerIndex === -1 ? NEUTRAL_COLOR : COLORS[this.ownerIndex].hex;
+            // 背景描画
+            if (this.type === 'block') {
+                ctx.fillStyle = BLOCK_COLOR;
+            } else if (this.type === 'unpaintable') {
+                ctx.fillStyle = UNPAINTABLE_COLOR;
+            } else {
+                ctx.fillStyle = this.ownerIndex === -1 ? NEUTRAL_COLOR : COLORS[this.ownerIndex].hex;
+            }
             ctx.fillRect(this.x, this.y, TILE_W, TILE_H);
             
-            // グリッド線
+            // 枠線
             ctx.strokeStyle = 'rgba(0,0,0,0.05)';
             ctx.strokeRect(this.x, this.y, TILE_W, TILE_H);
+
+            // 2倍マスの表示
+            if (this.type === 'double') {
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.font = 'bold 20px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('x2', this.x + TILE_W/2, this.y + TILE_H/2);
+                
+                // 枠を強調
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(255,215,0,0.5)'; // Gold
+                ctx.strokeRect(this.x+2, this.y+2, TILE_W-4, TILE_H-4);
+            }
+        }
+        
+        getScore() {
+            if (this.type === 'block' || this.type === 'unpaintable') return 0;
+            if (this.ownerIndex === -1) return 0;
+            return (this.type === 'double') ? 2 : 1;
         }
     }
 
     class Medal {
         constructor(index, x, y) {
-            this.index = index; // 色のインデックス
+            this.index = index; 
             this.x = x;
             this.y = y;
             this.vx = 0;
             this.vy = 0;
             this.radius = MEDAL_RADIUS;
-            this.mass = 1; // 質量はすべて同じとする
         }
 
-        update() {
+        update(stageType, tiles) {
             // 位置更新
             this.x += this.vx;
             this.y += this.vy;
 
-            // 摩擦（減速）
+            // 摩擦
             this.vx *= FRICTION;
             this.vy *= FRICTION;
 
-            // 止まりかけたら完全に止める
             if (Math.abs(this.vx) < 0.05) this.vx = 0;
             if (Math.abs(this.vy) < 0.05) this.vy = 0;
 
-            // 壁判定
-            if (this.x - this.radius < 0) {
-                this.x = this.radius;
-                this.vx *= -1 * WALL_BOUNCE;
-            } else if (this.x + this.radius > CANVAS_W) {
-                this.x = CANVAS_W - this.radius;
-                this.vx *= -1 * WALL_BOUNCE;
+            // --- 壁判定 ---
+            if (stageType === 4) { 
+                // ループ
+                if (this.x < 0) this.x += CANVAS_W;
+                if (this.x > CANVAS_W) this.x -= CANVAS_W;
+                if (this.y < 0) this.y += CANVAS_H;
+                if (this.y > CANVAS_H) this.y -= CANVAS_H;
+            } else {
+                // 通常の壁判定 (Stage 1, 2, 3)
+                if (this.x - this.radius < 0) {
+                    this.x = this.radius;
+                    this.vx *= -1 * WALL_BOUNCE;
+                } else if (this.x + this.radius > CANVAS_W) {
+                    this.x = CANVAS_W - this.radius;
+                    this.vx *= -1 * WALL_BOUNCE;
+                }
+
+                if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.vy *= -1 * WALL_BOUNCE;
+                } else if (this.y + this.radius > CANVAS_H) {
+                    this.y = CANVAS_H - this.radius;
+                    this.vy *= -1 * WALL_BOUNCE;
+                }
             }
 
-            if (this.y - this.radius < 0) {
-                this.y = this.radius;
-                this.vy *= -1 * WALL_BOUNCE;
-            } else if (this.y + this.radius > CANVAS_H) {
-                this.y = CANVAS_H - this.radius;
-                this.vy *= -1 * WALL_BOUNCE;
+            // --- 黒マス(障害物)との衝突判定 (Stage 2のみ) ---
+            if (stageType === 2) {
+                this.checkBlockCollision(tiles);
+            }
+        }
+        
+        checkBlockCollision(tiles) {
+            const centerC = Math.floor(this.x / TILE_W);
+            const centerR = Math.floor(this.y / TILE_H);
+            
+            for(let r = centerR - 1; r <= centerR + 1; r++) {
+                for(let c = centerC - 1; c <= centerC + 1; c++) {
+                    if(r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+                        const tile = tiles[r][c];
+                        if(tile.type === 'block') {
+                            this.resolveRectCollision(tile.x, tile.y, TILE_W, TILE_H);
+                        }
+                    }
+                }
+            }
+        }
+
+        resolveRectCollision(rx, ry, rw, rh) {
+            let testX = this.x;
+            let testY = this.y;
+            
+            if (this.x < rx) testX = rx;
+            else if (this.x > rx + rw) testX = rx + rw;
+            
+            if (this.y < ry) testY = ry;
+            else if (this.y > ry + rh) testY = ry + rh;
+
+            let distX = this.x - testX;
+            let distY = this.y - testY;
+            let distance = Math.sqrt(distX*distX + distY*distY);
+
+            if (distance <= this.radius) {
+                if (distance === 0) {
+                    let nx = (this.x - (rx + rw/2));
+                    let ny = (this.y - (ry + rh/2));
+                    distance = Math.sqrt(nx*nx + ny*ny);
+                }
+                
+                let nx = (this.x - testX) / distance;
+                let ny = (this.y - testY) / distance;
+                
+                // 距離が0の場合の安全策
+                if (isNaN(nx)) nx = 1;
+                if (isNaN(ny)) ny = 0;
+
+                let overlap = this.radius - distance;
+                this.x += nx * overlap;
+                this.y += ny * overlap;
+
+                let dot = this.vx * nx + this.vy * ny;
+                
+                this.vx = (this.vx - 2 * dot * nx) * WALL_BOUNCE;
+                this.vy = (this.vy - 2 * dot * ny) * WALL_BOUNCE;
             }
         }
 
@@ -211,10 +358,17 @@
             ctx.fillStyle = COLORS[this.index].hex;
             ctx.fill();
             
-            // 立体感を出すための枠線と光沢
             ctx.lineWidth = 3;
             ctx.strokeStyle = 'white';
             ctx.stroke();
+            
+            // 色ID
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(COLORS[this.index].id, this.x, this.y);
+            
             ctx.closePath();
         }
     }
@@ -225,131 +379,161 @@
     
     let tiles = [];
     let medals = [];
+    let currentStage = 1;
+
     let dragTarget = null;
     let dragStartPos = { x: 0, y: 0 };
     let currentMousePos = { x: 0, y: 0 };
     let isDragging = false;
 
-    // ★ 履歴管理用
     let historyStack = [];
-    const MAX_HISTORY = 10; // 10手前まで記憶
-    let previousAllStopped = true; // メダルが停止していたかどうかの前フレームの状態
-
-    // ★ 状態保存
-    function saveState() {
-        // 現在の状態をディープコピー
-        const medalsState = medals.map(m => ({ x: m.x, y: m.y, vx: 0, vy: 0 })); // 速度は0で保存
-        const tilesState = tiles.map(row => row.map(tile => ({ ownerIndex: tile.ownerIndex })));
-
-        historyStack.push({ medals: medalsState, tiles: tilesState });
-
-        // 履歴の上限管理
-        if (historyStack.length > MAX_HISTORY) {
-            historyStack.shift(); // 古いものから削除
-        }
-        console.log("状態を保存しました。履歴:", historyStack.length);
-    }
-
-    // ★ 状態復元
-    function restoreState() {
-        if (historyStack.length <= 1) { // 最初の状態（または履歴なし）の場合は戻れない
-            console.log("これ以上戻れません");
-            return;
-        }
-
-        // 現在の状態（スタックの末尾）を破棄し、1つ前の状態を読み込む
-        historyStack.pop(); 
-        const lastState = historyStack[historyStack.length - 1];
-
-        if (!lastState) return;
-
-        // 状態を復元
-        medals.forEach((m, i) => {
-            m.x = lastState.medals[i].x;
-            m.y = lastState.medals[i].y;
-            m.vx = 0; // 戻った時は必ず停止状態
-            m.vy = 0;
-        });
-
-        tiles.forEach((row, r) => {
-            row.forEach((tile, c) => {
-                tile.ownerIndex = lastState.tiles[r][c].ownerIndex;
-            });
-        });
-
-        // スコアボードも更新
-        updateScoreboard();
-        
-        // ドラッグ状態を強制解除
-        isDragging = false;
-        dragTarget = null;
-        previousAllStopped = true; // 状態を戻したので「停止」状態
-        
-        console.log("状態を1手戻しました。残り履歴:", historyStack.length);
-    }
-
+    const MAX_HISTORY = 10;
+    let previousAllStopped = true;
 
     // --- 初期化 ---
-    function init() {
-        // キャンバスサイズをJS側でも設定
-        canvas.width = CANVAS_W;
-        canvas.height = CANVAS_H;
+    function init(stageId) {
+        currentStage = parseInt(stageId);
         
+        tiles = [];
+        medals = [];
+        historyStack = [];
+        isDragging = false;
+        dragTarget = null;
+        previousAllStopped = true;
+
         // タイル生成
         for (let r = 0; r < ROWS; r++) {
             let rowTiles = [];
             for (let c = 0; c < COLS; c++) {
-                rowTiles.push(new Tile(c, r));
+                let type = 'normal';
+                
+                if (currentStage === 2) {
+                    const mapVal = STAGE_2_MAP[r][c];
+                    if (mapVal === 'b') type = 'block';
+                    if (mapVal === 'd') type = 'double';
+                } else if (currentStage === 3) { 
+                    const mapVal = STAGE_3_MAP[r][c];
+                    if (mapVal === 'n') type = 'unpaintable';
+                    if (mapVal === 'd') type = 'double';
+                }
+                
+                rowTiles.push(new Tile(c, r, type));
             }
             tiles.push(rowTiles);
         }
 
-        // メダル生成（ランダム配置だが重ならないように簡易チェック）
-        for (let i = 0; i < 8; i++) {
+        // メダル生成
+        for (let i = 0; i < 6; i++) {
             let placed = false;
             while (!placed) {
-                // メダルが大きくなったので、配置マージンを調整
                 let tx = Math.random() * (CANVAS_W - MEDAL_RADIUS * 2) + MEDAL_RADIUS;
                 let ty = Math.random() * (CANVAS_H - MEDAL_RADIUS * 2) + MEDAL_RADIUS;
                 
-                // 既存のメダルと近すぎないかチェック
-                let tooClose = false;
+                let validPos = true;
+                
+                // 他のメダルとの距離
                 for (let m of medals) {
                     let dx = tx - m.x;
                     let dy = ty - m.y;
-                    if (Math.sqrt(dx*dx + dy*dy) < MEDAL_RADIUS * 2.5) { // 判定も半径基準
-                        tooClose = true;
+                    if (Math.sqrt(dx*dx + dy*dy) < MEDAL_RADIUS * 2.5) {
+                        validPos = false;
                         break;
                     }
                 }
                 
-                if (!tooClose) {
+                // 障害物・塗不可マスの上の初期配置チェック
+                if (validPos && (currentStage === 2 || currentStage === 3)) {
+                    let c = Math.floor(tx / TILE_W);
+                    let r = Math.floor(ty / TILE_H);
+                    
+                    if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+                         // ブロックまたは塗不可マスの上には置かない
+                         if (tiles[r][c].type === 'block' || tiles[r][c].type === 'unpaintable') {
+                             validPos = false;
+                         }
+                    }
+                }
+
+                if (validPos) {
                     medals.push(new Medal(i, tx, ty));
                     placed = true;
                 }
             }
         }
 
-        // スコアボード初期化
+        initScoreboard();
+        saveState();
+        updateScoreboard();
+    }
+
+    function initScoreboard() {
         const scoreBoard = document.getElementById('scoreboard');
+        scoreBoard.innerHTML = '';
         COLORS.forEach((col, idx) => {
             const div = document.createElement('div');
             div.className = 'score-item';
             div.innerHTML = `
+                <span class="score-id">${col.id}</span>
                 <div class="color-dot" style="background-color:${col.hex}"></div>
                 <span id="score-${idx}" class="score-val">0</span>
             `;
             scoreBoard.appendChild(div);
         });
-
-        // ★ 初期状態を履歴に保存
-        previousAllStopped = true;
-        saveState();
-        
-        loop();
     }
 
-    // --- 衝突判定と解決 (メダル同士) ---
+    // --- 履歴管理 ---
+    function saveState() {
+        const medalsState = medals.map(m => ({ x: m.x, y: m.y }));
+        const tilesState = tiles.map(row => row.map(tile => ({ ownerIndex: tile.ownerIndex })));
+        historyStack.push({ medals: medalsState, tiles: tilesState });
+        if (historyStack.length > MAX_HISTORY) historyStack.shift();
+    }
+
+    // ★ Undo処理の改修
+    function restoreState() {
+        if (historyStack.length === 0) return;
+
+        let targetState;
+
+        // メダルが動いている最中かどうかで挙動を分岐
+        if (!previousAllStopped) {
+            // 動いている最中（発射直後など）の場合、
+            // 「履歴の最新（発射前の状態）」を取り出す。削除はしない。
+            targetState = historyStack[historyStack.length - 1];
+        } else {
+            // 完全に静止している場合（確定した手）、
+            // 最新の履歴を削除して、一つ前の状態に戻す。
+            if (historyStack.length <= 1) return; // これ以上戻れない
+            historyStack.pop(); 
+            targetState = historyStack[historyStack.length - 1];
+        }
+
+        if (!targetState) return;
+
+        // 状態復元
+        medals.forEach((m, i) => {
+            m.x = targetState.medals[i].x;
+            m.y = targetState.medals[i].y;
+            m.vx = 0;
+            m.vy = 0;
+        });
+
+        tiles.forEach((row, r) => {
+            row.forEach((tile, c) => {
+                tile.ownerIndex = targetState.tiles[r][c].ownerIndex;
+            });
+        });
+
+        updateScoreboard();
+        
+        // フラグ類をリセット（復元した瞬間は「静止状態」）
+        isDragging = false;
+        dragTarget = null;
+        previousAllStopped = true;
+    }
+
+    // --- ゲームロジック ---
+
     function resolveCollisions() {
         for (let i = 0; i < medals.length; i++) {
             for (let j = i + 1; j < medals.length; j++) {
@@ -361,37 +545,26 @@
                 let distance = Math.sqrt(dx * dx + dy * dy);
 
                 if (distance < m1.radius + m2.radius) {
-                    // 衝突検知
-
-                    // 1. 重なり解消（めり込み防止）
-                    // 距離が0の場合のゼロ除算を防止
-                    if (distance === 0) {
-                        dx = 1; 
-                        distance = 1;
-                    }
+                    if (distance === 0) { dx = 1; distance = 1; }
                     
                     let overlap = (m1.radius + m2.radius - distance) / 2;
-                    let nx = dx / distance; // 法線ベクトルX
-                    let ny = dy / distance; // 法線ベクトルY
+                    let nx = dx / distance;
+                    let ny = dy / distance;
                     
                     m1.x -= nx * overlap;
                     m1.y -= ny * overlap;
                     m2.x += nx * overlap;
                     m2.y += ny * overlap;
 
-                    // 2. 運動量の交換（弾性衝突）
-                    // 法線方向と接線方向の速度成分に分解
                     let v1n = m1.vx * nx + m1.vy * ny;
                     let v1t = -m1.vx * ny + m1.vy * nx;
                     let v2n = m2.vx * nx + m2.vy * ny;
                     let v2t = -m2.vx * ny + m2.vy * nx;
 
-                    // 質量が同じなので、法線方向の速度を入れ替えるだけでOK
                     let temp = v1n;
                     v1n = v2n;
                     v2n = temp;
 
-                    // 速度ベクトルを元に戻す
                     m1.vx = v1n * nx - v1t * ny;
                     m1.vy = v1n * ny + v1t * nx;
                     m2.vx = v2n * nx - v2t * ny;
@@ -401,80 +574,73 @@
         }
     }
 
-    // --- 塗り判定 ---
     function updateTiles() {
         medals.forEach(m => {
-            // メダルが動いている時だけ塗る（オプション）
-            // if(m.vx === 0 && m.vy === 0) return; 
-
-            // メダルの中心座標から行・列を計算
             let c = Math.floor(m.x / TILE_W);
             let r = Math.floor(m.y / TILE_H);
+            
+            // ループステージ (Stage 4) の場合の座標正規化
+            if (currentStage === 4) {
+                if (c < 0) c = COLS - 1;
+                if (c >= COLS) c = 0;
+                if (r < 0) r = ROWS - 1;
+                if (r >= ROWS) r = 0;
+            }
 
-            // 範囲内なら色を塗る
             if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
-                tiles[r][c].ownerIndex = m.index;
+                // 黒マス(block)と塗不可マス(unpaintable)は塗れない
+                if (tiles[r][c].type !== 'block' && tiles[r][c].type !== 'unpaintable') {
+                    tiles[r][c].ownerIndex = m.index;
+                }
             }
         });
     }
 
-    // --- スコア計算 ---
     function updateScoreboard() {
-        let counts = new Array(8).fill(0);
+        let scores = new Array(6).fill(0);
         
         for (let r = 0; r < ROWS; r++) {
             for (let c = 0; c < COLS; c++) {
-                let idx = tiles[r][c].ownerIndex;
-                if (idx !== -1) {
-                    counts[idx]++;
+                let tile = tiles[r][c];
+                if (tile.ownerIndex !== -1) {
+                    scores[tile.ownerIndex] += tile.getScore();
                 }
             }
         }
 
-        counts.forEach((count, idx) => {
-            document.getElementById(`score-${idx}`).textContent = count;
+        scores.forEach((score, idx) => {
+            document.getElementById(`score-${idx}`).textContent = score;
         });
     }
 
     // --- メインループ ---
     function loop() {
-        // ★ 1. 状態保存判定 (メダルがすべて停止した瞬間に保存)
         let allStopped = medals.every(m => m.vx === 0 && m.vy === 0);
         if (allStopped && !previousAllStopped) {
-            // 動いていた状態から停止した瞬間に履歴を保存
             saveState();
         }
         previousAllStopped = allStopped;
 
-
-        // 2. 物理更新 (ドラッグ中は更新しない)
         if (!isDragging) {
-            medals.forEach(m => m.update());
+            medals.forEach(m => m.update(currentStage, tiles));
             resolveCollisions();
         }
         
-        // 3. タイル判定
         updateTiles();
-        
-        // 4. スコア更新 (毎フレームは重いかもしれないが、今回はOK)
         updateScoreboard();
 
-        // 5. 描画
         ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
-        // 床描画
         for (let r = 0; r < ROWS; r++) {
             for (let c = 0; c < COLS; c++) {
                 tiles[r][c].draw(ctx);
             }
         }
 
-        // 照準線（ドラッグ中のみ）
         if (isDragging && dragTarget) {
             ctx.beginPath();
             ctx.moveTo(dragTarget.x, dragTarget.y);
             
-            // ★ ガイド線ロジック変更
             let pullX = dragStartPos.x - currentMousePos.x;
             let pullY = dragStartPos.y - currentMousePos.y;
             
@@ -485,15 +651,12 @@
             let displayX, displayY;
 
             if (isMaxPower) {
-                // 最大パワー時
-                ctx.strokeStyle = '#FFC107'; // 黄色とオレンジの間
-                ctx.lineWidth = 4; // 少し太く
-                // 線の長さを固定
+                ctx.strokeStyle = '#FFC107'; 
+                ctx.lineWidth = 4;
                 let displayPull = MAX_SPEED / SHOOT_POWER;
                 displayX = dragTarget.x + Math.cos(angle) * displayPull;
                 displayY = dragTarget.y + Math.sin(angle) * displayPull;
             } else {
-                // 通常時
                 ctx.strokeStyle = 'white';
                 ctx.lineWidth = 3;
                 displayX = dragTarget.x + pullX;
@@ -501,20 +664,18 @@
             }
             
             ctx.lineTo(displayX, displayY);
-            ctx.setLineDash([5, 5]); // 点線
+            ctx.setLineDash([5, 5]);
             ctx.stroke();
             ctx.setLineDash([]);
-            ctx.lineWidth = 3; // メダル描画のために線幅を戻す
+            ctx.lineWidth = 3;
         }
 
-        // メダル描画
         medals.forEach(m => m.draw(ctx));
 
         requestAnimationFrame(loop);
     }
 
-    // --- 入力イベント処理 ---
-    
+    // --- 入力イベント ---
     function getMousePos(canvas, evt) {
         const rect = canvas.getBoundingClientRect();
         const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
@@ -526,25 +687,19 @@
     }
 
     function onDown(e) {
-        // すべてのメダルが停止していないと操作できない
         if (!previousAllStopped) return;
-
-        if(e.type === 'touchstart') e.preventDefault(); // スクロール防止
+        if(e.type === 'touchstart') e.preventDefault();
         const pos = getMousePos(canvas, e);
         
-        // メダルをクリックしたか判定
         for (let m of medals) {
             let dx = pos.x - m.x;
             let dy = pos.y - m.y;
-            // メダルが大きくなったので判定も半径基準
-            if (Math.sqrt(dx*dx + dy*dy) < m.radius * 1.2) { // 判定を少し厳密に
+            if (Math.sqrt(dx*dx + dy*dy) < m.radius * 1.2) {
                 dragTarget = m;
                 isDragging = true;
-                dragStartPos = pos; // ドラッグ開始位置（ここを基準に引っ張る）
+                dragStartPos = pos;
                 currentMousePos = pos;
-                // ドラッグ中は速度を殺す（掴むイメージ）
-                m.vx = 0;
-                m.vy = 0;
+                m.vx = 0; m.vy = 0;
                 break;
             }
         }
@@ -562,45 +717,40 @@
             return;
         }
         
-        // 発射処理
-        // ベクトル: スタート位置 - リリース位置 (引っ張った逆方向)
         let pullX = dragStartPos.x - currentMousePos.x;
         let pullY = dragStartPos.y - currentMousePos.y;
         
-        // 速度制限
         let speed = Math.sqrt(pullX * pullX + pullY * pullY) * SHOOT_POWER;
         let angle = Math.atan2(pullY, pullX);
 
         if (speed > MAX_SPEED) speed = MAX_SPEED;
 
-        // わずかなドラッグでは発射しない（誤操作防止）
         if (speed > 1) {
             dragTarget.vx = Math.cos(angle) * speed;
             dragTarget.vy = Math.sin(angle) * speed;
-            previousAllStopped = false; // 発射したので「動作中」フラグ
-        } else {
-            // 速度が小さすぎる場合はキャンセル扱い
+            previousAllStopped = false;
         }
 
         isDragging = false;
         dragTarget = null;
     }
 
-    // イベントリスナー登録
     canvas.addEventListener('mousedown', onDown);
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-
     canvas.addEventListener('touchstart', onDown, {passive: false});
     window.addEventListener('touchmove', onMove, {passive: false});
     window.addEventListener('touchend', onUp);
 
-    // ★ ボタンイベントリスナー追加
     document.getElementById('undoButton').addEventListener('click', restoreState);
+    
+    document.getElementById('changeStageBtn').addEventListener('click', () => {
+        const sel = document.getElementById('stageSelect');
+        init(sel.value);
+    });
 
-
-    // ゲーム開始
-    init();
+    init(1);
+    loop();
 
 </script>
 </body>
