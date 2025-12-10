@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Light and Shadow Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #eee;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden; /* スクロール防止 */
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-size: 1.5rem;
+            color: #aaa;
+        }
+
+        .controls {
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: #888;
+            background: #222;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        kbd {
+            background-color: #333;
+            border: 1px solid #555;
+            border-radius: 3px;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+            color: #eee;
+            display: inline-block;
+            font-size: 0.85em;
+            font-weight: 700;
+            line-height: 1;
+            padding: 2px 4px;
+            white-space: nowrap;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
+            border: 2px solid #444;
+            background-color: #000;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Light and Shadow Game</h1>
+    
+    <div class="controls">
+        <span><span style="color: #4facfe;">●</span> Player 1: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>
+        <span style="margin: 0 15px;">|</span>
+        <span><span style="color: #ff6b6b;">●</span> Player 2: <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span>
+    </div>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script>
+        // --- 設定定数 ---
+        const TILE_SIZE = 80; // 見やすいように少し大きくしました
+        const WALL_THICKNESS = 4;
+        const PLAYER_RADIUS = 10;
+        const PLAYER_SPEED = 3.5;
+
+        // --- マップデータ ---
+        const rawMapData = [
+            ".,_,.,_,.,.",
+            "|,.,.,|,.,a",
+            "a,.,.,|,.,.",
+            ".,.,_,.,_,.",
+            ".,_,_,.,.,.",
+            ".,.,.,|,.,."
+        ];
+
+        // --- 入力管理 ---
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            // 矢印キーで画面がスクロールしないようにする
+            if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+                e.preventDefault();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // --- クラス定義 ---
+
+        class Point {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+        }
+
+        class Segment {
+            constructor(a, b) {
+                this.a = a;
+                this.b = b;
+            }
+        }
+
+        class Player {
+            constructor(x, y, color, controls) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.controls = controls; // {up, down, left, right}
+                this.radius = PLAYER_RADIUS;
+            }
+
+            update(segments, width, height) {
+                let dx = 0;
+                let dy = 0;
+
+                if (keys[this.controls.up]) dy -= 1;
+                if (keys[this.controls.down]) dy += 1;
+                if (keys[this.controls.left]) dx -= 1;
+                if (keys[this.controls.right]) dx += 1;
+
+                // 正規化（斜め移動も同じ速度にする）
+                if (dx !== 0 || dy !== 0) {
+                    const length = Math.sqrt(dx * dx + dy * dy);
+                    dx = (dx / length) * PLAYER_SPEED;
+                    dy = (dy / length) * PLAYER_SPEED;
+                }
+
+                // 移動適用の前に衝突判定を行う（簡易的な円と線分の衝突応答）
+                // まずX方向に移動
+                this.x += dx;
+                this.resolveCollisions(segments);
+                // 画面端の制限
+                this.x = Math.max(this.radius, Math.min(width - this.radius, this.x));
+
+                // 次にY方向に移動
+                this.y += dy;
+                this.resolveCollisions(segments);
+                // 画面端の制限
+                this.y = Math.max(this.radius, Math.min(height - this.radius, this.y));
+            }
+
+            // 壁との衝突解決
+            resolveCollisions(segments) {
+                for (let seg of segments) {
+                    // 線分上の最も近い点を求める
+                    const closest = this.getClosestPointOnSegment(this, seg);
+                    const distX = this.x - closest.x;
+                    const distY = this.y - closest.y;
+                    const distance = Math.sqrt(distX * distX + distY * distY);
+
+                    if (distance < this.radius) {
+                        // めり込んでいる場合、押し戻す
+                        const overlap = this.radius - distance;
+                        
+                        // 押し戻す方向（正規化）
+                        let nx = distX / distance;
+                        let ny = distY / distance;
+
+                        // 完全に中心が重なった場合の安全策
+                        if (distance === 0) {
+                            nx = 1; ny = 0;
+                        }
+
+                        this.x += nx * overlap;
+                        this.y += ny * overlap;
+                    }
+                }
+            }
+
+            getClosestPointOnSegment(p, seg) {
+                const x1 = seg.a.x;
+                const y1 = seg.a.y;
+                const x2 = seg.b.x;
+                const y2 = seg.b.y;
+                const px = p.x;
+                const py = p.y;
+
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                
+                if (dx === 0 && dy === 0) return {x: x1, y: y1};
+
+                // 投影係数 t を求める
+                const t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
+
+                // 線分内にクランプ
+                const tClamped = Math.max(0, Math.min(1, t));
+
+                return {
+                    x: x1 + tClamped * dx,
+                    y: y1 + tClamped * dy
+                };
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = "#FFF";
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // グロー効果（プレイヤーの色）
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius - 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0; // リセット
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.segments = []; 
+                this.players = [];
+                this.grid = []; 
+                this.rows = 0;
+                this.cols = 0;
+
+                this.init();
+                this.animate();
+            }
+
+            init() {
+                this.parseMap();
+                this.resizeCanvas();
+                this.createSegments();
+            }
+
+            parseMap() {
+                this.rows = rawMapData.length;
+                this.cols = 0;
+
+                rawMapData.forEach(rowStr => {
+                    const cols = rowStr.split(',').length;
+                    if (cols > this.cols) this.cols = cols;
+                });
+
+                let playerCount = 0;
+
+                for (let y = 0; y < this.rows; y++) {
+                    const rowStr = rawMapData[y];
+                    const cells = rowStr.split(',').map(s => s.trim());
+                    const rowData = [];
+
+                    for (let x = 0; x < this.cols; x++) {
+                        const char = cells[x] || '.';
+                        
+                        const cell = {
+                            x: x,
+                            y: y,
+                            wallRight: char === '|',
+                            wallBottom: char === '_',
+                        };
+
+                        // プレイヤー（光源）の生成
+                        if (char === 'a') {
+                            const px = x * TILE_SIZE + TILE_SIZE / 2;
+                            const py = y * TILE_SIZE + TILE_SIZE / 2;
+                            
+                            if (playerCount === 0) {
+                                // Player 1 (Blue)
+                                this.players.push(new Player(px, py, '#4facfe', {up: 'w', down: 's', left: 'a', right: 'd'}));
+                            } else {
+                                // Player 2 (Red)
+                                this.players.push(new Player(px, py, '#ff6b6b', {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight'}));
+                            }
+                            playerCount++;
+                        }
+
+                        rowData.push(cell);
+                    }
+                    this.grid.push(rowData);
+                }
+            }
+
+            resizeCanvas() {
+                this.canvas.width = this.cols * TILE_SIZE;
+                this.canvas.height = this.rows * TILE_SIZE;
+            }
+
+            createSegments() {
+                this.segments = [];
+
+                // 外枠
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                this.segments.push(new Segment(new Point(0, 0), new Point(w, 0)));
+                this.segments.push(new Segment(new Point(w, 0), new Point(w, h)));
+                this.segments.push(new Segment(new Point(w, h), new Point(0, h)));
+                this.segments.push(new Segment(new Point(0, h), new Point(0, 0)));
+
+                // 内部の壁
+                for (let y = 0; y < this.rows; y++) {
+                    for (let x = 0; x < this.cols; x++) {
+                        const cell = this.grid[y][x];
+                        const px = x * TILE_SIZE;
+                        const py = y * TILE_SIZE;
+
+                        if (cell.wallRight) {
+                            this.segments.push(new Segment(
+                                new Point(px + TILE_SIZE, py),
+                                new Point(px + TILE_SIZE, py + TILE_SIZE)
+                            ));
+                        }
+                        if (cell.wallBottom) {
+                            this.segments.push(new Segment(
+                                new Point(px, py + TILE_SIZE),
+                                new Point(px + TILE_SIZE, py + TILE_SIZE)
+                            ));
+                        }
+                    }
+                }
+            }
+
+            animate() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.animate());
+            }
+
+            update() {
+                this.players.forEach(p => p.update(this.segments, this.canvas.width, this.canvas.height));
+            }
+
+            draw() {
+                // 背景クリア
+                this.ctx.fillStyle = "#111";
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // 光の描画 (加算合成)
+                this.ctx.globalCompositeOperation = "lighter";
+                
+                this.players.forEach(player => {
+                    this.drawLightPolygon(player);
+                });
+
+                // 通常描画モード
+                this.ctx.globalCompositeOperation = "source-over";
+
+                // 壁の描画
+                this.drawWalls();
+
+                // プレイヤー自身の描画
+                this.players.forEach(player => {
+                    player.draw(this.ctx);
+                });
+            }
+
+            drawWalls() {
+                this.ctx.strokeStyle = "#555";
+                this.ctx.lineWidth = WALL_THICKNESS;
+                this.ctx.lineCap = "round";
+                this.ctx.beginPath();
+                this.segments.forEach(seg => {
+                    this.ctx.moveTo(seg.a.x, seg.a.y);
+                    this.ctx.lineTo(seg.b.x, seg.b.y);
+                });
+                this.ctx.stroke();
+            }
+
+            drawLightPolygon(source) {
+                // 光の色を設定
+                const gradient = this.ctx.createRadialGradient(source.x, source.y, 0, source.x, source.y, 600);
+                // プレイヤーの色をベースに光を作る
+                if (source.color === '#4facfe') {
+                    gradient.addColorStop(0, "rgba(79, 172, 254, 0.6)");
+                    gradient.addColorStop(1, "rgba(79, 172, 254, 0)");
+                } else {
+                    gradient.addColorStop(0, "rgba(255, 107, 107, 0.6)");
+                    gradient.addColorStop(1, "rgba(255, 107, 107, 0)");
+                }
+                
+                this.ctx.fillStyle = gradient;
+
+                // 視界計算 (Raycasting)
+                let points = [];
+                this.segments.forEach(seg => { points.push(seg.a, seg.b); });
+
+                let uniqueAngles = [];
+                points.forEach(p => {
+                    const angle = Math.atan2(p.y - source.y, p.x - source.x);
+                    uniqueAngles.push(angle - 0.0001, angle, angle + 0.0001);
+                });
+
+                let intersects = [];
+                uniqueAngles.forEach(angle => {
+                    const dx = Math.cos(angle);
+                    const dy = Math.sin(angle);
+                    
+                    const ray = {
+                        a: source,
+                        b: { x: source.x + dx, y: source.y + dy }
+                    };
+
+                    let closestIntersect = null;
+                    this.segments.forEach(seg => {
+                        const intersect = this.getIntersection(ray, seg);
+                        if (!intersect) return;
+                        if (!closestIntersect || intersect.param < closestIntersect.param) {
+                            closestIntersect = intersect;
+                        }
+                    });
+
+                    if (closestIntersect) {
+                        closestIntersect.angle = angle;
+                        intersects.push(closestIntersect);
+                    }
+                });
+
+                intersects.sort((a, b) => a.angle - b.angle);
+
+                if (intersects.length > 0) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(intersects[0].x, intersects[0].y);
+                    for (let i = 1; i < intersects.length; i++) {
+                        this.ctx.lineTo(intersects[i].x, intersects[i].y);
+                    }
+                    this.ctx.lineTo(intersects[0].x, intersects[0].y);
+                    this.ctx.fill();
+                }
+            }
+
+            getIntersection(ray, segment) {
+                const r_px = ray.a.x; const r_py = ray.a.y;
+                const r_dx = ray.b.x - ray.a.x; const r_dy = ray.b.y - ray.a.y;
+                const s_px = segment.a.x; const s_py = segment.a.y;
+                const s_dx = segment.b.x - segment.a.x; const s_dy = segment.b.y - segment.a.y;
+
+                const r_mag = Math.sqrt(r_dx * r_dx + r_dy * r_dy);
+                const s_mag = Math.sqrt(s_dx * s_dx + s_dy * s_dy);
+
+                if (r_dx / r_mag == s_dx / s_mag && r_dy / r_mag == s_dy / s_mag) return null;
+
+                const T2 = (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) / (s_dx * r_dy - s_dy * r_dx);
+                const T1 = (s_px + s_dx * T2 - r_px) / r_dx;
+
+                if (T1 > 0 && T2 >= 0 && T2 <= 1) {
+                    return { x: r_px + r_dx * T1, y: r_py + r_dy * T1, param: T1 };
+                }
+                return null;
+            }
+        }
+
+        window.onload = () => { new Game(); };
+
+    </script>
+</body>
+</html>
