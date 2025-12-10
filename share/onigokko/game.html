@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oni Tag Online (Fixed Lobby)</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+        
+        /* --- ロビー用スタイル --- */
+        .screen { display: none; background-color: white; border: 1px solid #ccc; padding: 20px; margin: 15px auto; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 600px; width: 90%; }
+        #name-entry-screen { display: block; }
+        
+        button { font-size: 16px; padding: 10px 15px; margin: 5px; cursor: pointer; border-radius: 5px; border: none; color: white; background-color: #007bff; transition: background-color 0.2s; font-weight: bold; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; color: #666; }
+        input, select { font-size: 16px; padding: 10px; margin: 5px; border: 1px solid #ccc; border-radius: 5px; }
+        
+        #public-rooms-container { margin-top: 20px; text-align: left; }
+        #public-rooms-list { list-style: none; padding: 0; max-height: 200px; overflow-y: auto; }
+        #public-rooms-list li { background-color: #f8f9fa; border: 1px solid #ddd; padding: 10px; margin-bottom: 5px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
+        #public-rooms-list button { background-color: #28a745; padding: 5px 10px; font-size: 14px; }
+        #player-list { list-style: none; padding: 0; text-align: left; display: inline-block; width: 100%; }
+        #player-list li { padding: 5px; border-bottom: 1px solid #eee; }
+
+        /* --- ゲーム画面用スタイル --- */
+        #game-screen { 
+            max-width: none; width: 100%; height: 100vh; border: none; padding: 0; margin: 0; background-color: #1a1a1a; color: #eee;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+        }
+        
+        #game-container { position: relative; box-shadow: 0 0 30px rgba(0, 0, 0, 0.9); border: 2px solid #444; background-color: #000; margin-top: 10px; }
+        canvas { display: block; }
+
+        .ui-panel { display: flex; justify-content: center; gap: 20px; width: 100%; max-width: 800px; z-index: 5; }
+        .score-board { display: flex; gap: 20px; background: #222; padding: 8px 20px; border-radius: 8px; border: 1px solid #444; font-weight: bold; align-items: center; }
+        #exit-button { background-color: #dc3545; font-size: 0.9rem; padding: 8px 12px; }
+        
+        #message-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); display: none;
+            flex-direction: column; align-items: center; justify-content: center; z-index: 10; color: white;
+        }
+        #message-title { font-size: 3rem; font-weight: bold; margin-bottom: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <!-- 0. 名前入力画面 -->
+    <div id="name-entry-screen" class="screen">
+        <h2>ようこそ！</h2>
+        <p>ゲームで使用する名前を入力してください。</p>
+        <input type="text" id="playerNameInput" placeholder="例: 勇者" maxlength="10">
+        <button id="entry-button" onclick="setPlayerName()" disabled>読み込み中...</button>
+    </div>
+
+    <!-- 1. ロビー選択画面 -->
+    <div id="lobby-screen" class="screen">
+        <h1>マッチングロビー</h1>
+        <p>こんにちは、<strong id="displayPlayerName" style="color:#007bff"></strong>さん</p>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+            <label for="maxPlayersSelect">開始人数:</label>
+            <select id="maxPlayersSelect">
+                <option value="2">2人</option>
+                <option value="3">3人</option>
+                <option value="4">4人</option>
+            </select>
+            <input type="checkbox" id="isPublicCheckbox" checked>
+            <label for="isPublicCheckbox">公開ルーム</label>
+            <br>
+            <button onclick="createRoom()">ルームを作成</button>
+        </div>
+        <hr style="margin: 20px 0;">
+        <input type="text" id="roomIdInput" placeholder="IDを入力" style="text-transform: uppercase;">
+        <button onclick="joinRoomById()" style="background-color: #6c757d;">IDで参加</button>
+        
+        <div id="public-rooms-container">
+            <h3>参加可能な公開ルーム</h3>
+            <ul id="public-rooms-list"><p>読み込み中...</p></ul>
+        </div>
+    </div>
+
+    <!-- 2. 待機画面 -->
+    <div id="waiting-room" class="screen">
+        <h1>待機中...</h1>
+        <p>ルームID: <strong id="roomIdDisplay" style="color:#007bff; font-size:1.2rem;"></strong></p>
+        <p style="font-size:0.9rem; color:#666;">(IDを友達に教えて招待できます)</p>
+        
+        <h3>参加プレイヤー (<span id="player-count">0</span>/<span id="max-player-count">0</span>)</h3>
+        <ul id="player-list"></ul>
+        
+        <div id="host-controls" style="display: none; margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+            <button id="start-game-button" onclick="forceStartGame()" disabled>人数が揃うまで待機</button>
+        </div>
+        <div id="guest-controls" style="margin-top: 20px; color: #888; font-style: italic;">
+            ホストが開始するのを待っています...
+        </div>
+        <button onclick="exitRoom()" style="background-color: #dc3545; margin-top: 20px;">退出</button>
+    </div>
+
+    <!-- 3. ゲーム画面 -->
+    <div id="game-screen" class="screen">
+        <div class="ui-panel">
+            <div class="score-board">
+                <span id="role-display" style="color:#fff;">---</span>
+            </div>
+            <div class="score-board">
+                <div style="color: #ff6b6b;">👹 Catch: <span id="score-oni">0</span>/3</div>
+                <div style="color: #4facfe;">🍏 Fruits: <span id="score-villager">0</span>/<span id="quota-villager">--</span></div>
+            </div>
+            <button id="exit-button" onclick="exitRoom()">退出</button>
+        </div>
+
+        <div id="game-container">
+            <canvas id="gameCanvas"></canvas>
+            <div id="message-overlay">
+                <div id="message-title"></div>
+                <button onclick="exitRoom()" style="font-size: 1.2rem; background:#4facfe; border:none; padding:10px 20px; color:white; cursor:pointer;">ロビーに戻る</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK v8 -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+        // --- 1. Firebase Configuration ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyBWwwvomoI_pskQYfWlvzTpijj86lLhWdE",
+          authDomain: "onigokko1.firebaseapp.com",
+          databaseURL: "https://onigokko1-default-rtdb.firebaseio.com",
+          projectId: "onigokko1",
+          storageBucket: "onigokko1.firebasestorage.app",
+          messagingSenderId: "638030419042",
+          appId: "1:638030419042:web:28b06dbf12c4dc5db7ed3b"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+        const auth = firebase.auth();
+
+        // --- 2. Constants & Map Data ---
+        const TILE_SIZE = 80;
+        const WALL_THICKNESS = 4;
+        const PLAYER_RADIUS = 12;
+        const ONI_SPEED = 3.0;
+        const VILLAGER_SPEED = 2.2;
+        const FOV_DEGREES = 150; 
+        const FOV_RADIANS = FOV_DEGREES * Math.PI / 180;
+        const VIEW_DISTANCE = 800;
+        const AMBIENT_LIGHT_RADIUS = PLAYER_RADIUS * 4.0;
+        const WIN_CATCHES = 3;
+        const FRUIT_RADIUS = 8;
+        
+        const rawMapData = [
+            ".,_,.,_,.,.",
+            "|,.,.,|,.,.",
+            ".,.,.,|,.,.",
+            ".,.,_,.,_,.",
+            ".,_,_,.,.,.",
+            ".,.,.,|,.,."
+        ];
+
+        // --- 3. Lobby Logic ---
+        const screens = { 
+            nameEntry: document.getElementById('name-entry-screen'), 
+            lobby: document.getElementById('lobby-screen'), 
+            waiting: document.getElementById('waiting-room'), 
+            game: document.getElementById('game-screen') 
+        };
+        
+        let myPlayerId = null, myPlayerName = null, currentRoomId = null, roomRef = null, lobbyListener = null;
+        let gameInstance = null;
+
+        const showScreen = (screenName) => {
+            if (screenName === 'lobby') startLobbyListener();
+            else if (lobbyListener) lobbyListener.off();
+            
+            for (const key in screens) {
+                screens[key].style.display = (key === screenName) ? (key === 'game' ? 'flex' : 'block') : 'none';
+            }
+        };
+        
+        // 匿名ログイン
+        auth.signInAnonymously().then(({ user }) => {
+            myPlayerId = user.uid;
+            console.log("Logged in:", myPlayerId);
+            const btn = document.getElementById('entry-button');
+            btn.disabled = false;
+            btn.innerText = "決定";
+        }).catch(console.error);
+
+        window.setPlayerName = () => {
+            const nameInput = document.getElementById('playerNameInput');
+            if (nameInput.value.trim().length < 1) return alert('名前を1文字以上入力してください。');
+            myPlayerName = nameInput.value.trim();
+            document.getElementById('displayPlayerName').textContent = myPlayerName;
+            showScreen('lobby');
+        };
+
+        const startLobbyListener = () => {
+            lobbyListener = db.ref('rooms').orderByChild('status').equalTo('waiting');
+            lobbyListener.on('value', snapshot => {
+                const listEl = document.getElementById('public-rooms-list');
+                listEl.innerHTML = '';
+                const rooms = snapshot.val();
+                let hasPublicRooms = false;
+                if (rooms) {
+                    for (const roomId in rooms) {
+                        const room = rooms[roomId];
+                        const numPlayers = room.players ? Object.keys(room.players).length : 0;
+                        if (room.isPublic && numPlayers < room.maxPlayers) {
+                            hasPublicRooms = true;
+                            const li = document.createElement('li');
+                            li.innerHTML = `<span>ルーム ${roomId} (${numPlayers}/${room.maxPlayers}人)</span><button onclick="joinRoom('${roomId}')">参加</button>`;
+                            listEl.appendChild(li);
+                        }
+                    }
+                }
+                if (!hasPublicRooms) listEl.innerHTML = '<p style="color:#888">現在、参加可能なルームはありません。</p>';
+            });
+        };
+
+        window.createRoom = () => {
+            if (!myPlayerId) return alert("認証準備中です。");
+            const maxPlayers = parseInt(document.getElementById('maxPlayersSelect').value, 10);
+            const isPublic = document.getElementById('isPublicCheckbox').checked;
+            const newRoomId = Math.random().toString(36).substr(2, 6).toUpperCase();
+            roomRef = db.ref('rooms/' + newRoomId);
+            
+            roomRef.set({
+                status: 'waiting',
+                hostId: myPlayerId,
+                isPublic: isPublic,
+                maxPlayers: maxPlayers,
+                players: {},
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => enterRoom(newRoomId));
+        };
+
+        window.joinRoomById = () => {
+            const roomId = document.getElementById('roomIdInput').value.toUpperCase();
+            if (!roomId) return alert('ルームIDを入力してください。');
+            joinRoom(roomId);
+        }
+
+        window.joinRoom = (roomId) => {
+            const checkRoomRef = db.ref('rooms/' + roomId);
+            checkRoomRef.once('value', snapshot => {
+                if (!snapshot.exists()) return alert('ルームが見つかりません。');
+                const roomData = snapshot.val();
+                if (roomData.status !== 'waiting') return alert('すでにゲームが始まっています。');
+                
+                const numPlayers = roomData.players ? Object.keys(roomData.players).length : 0;
+                if (numPlayers >= roomData.maxPlayers) return alert('このルームは満員です。');
+                
+                enterRoom(roomId);
+            });
+        };
+        
+        const enterRoom = (roomId) => {
+            currentRoomId = roomId;
+            roomRef = db.ref('rooms/' + currentRoomId);
+            const myPlayerRef = db.ref(`rooms/${currentRoomId}/players/${myPlayerId}`);
+            
+            myPlayerRef.set({
+                name: myPlayerName,
+                role: 'waiting', 
+                x: 0, y: 0
+            });
+            myPlayerRef.onDisconnect().remove();
+
+            roomRef.on('value', snapshot => {
+                if (!snapshot.exists()) {
+                    if (screens.waiting.style.display === 'block' || screens.game.style.display === 'flex') {
+                        alert("ルームが解散されました");
+                        exitRoom();
+                    }
+                    return;
+                }
+                const roomData = snapshot.val();
+                const players = roomData.players || {};
+                const numPlayers = Object.keys(players).length;
+                const maxPlayers = roomData.maxPlayers;
+                const hostId = roomData.hostId;
+
+                // ★修正点: 条件分岐を外して常に最新情報でDOMを更新する
+                document.getElementById('player-list').innerHTML = Object.values(players)
+                    .map(p => `<li>${p.name === myPlayerName ? '<b>' : ''}${p.name}${p.name === myPlayerName ? '</b>' : ''}</li>`)
+                    .join('');
+                document.getElementById('player-count').textContent = numPlayers;
+                document.getElementById('max-player-count').textContent = maxPlayers;
+                document.getElementById('roomIdDisplay').textContent = currentRoomId;
+                
+                const hostControls = document.getElementById('host-controls');
+                const guestControls = document.getElementById('guest-controls');
+                if (myPlayerId === hostId) {
+                    hostControls.style.display = 'block';
+                    guestControls.style.display = 'none';
+                    const startButton = document.getElementById('start-game-button');
+                    if (numPlayers >= 2) { 
+                        startButton.disabled = false;
+                        startButton.textContent = 'ゲーム開始！';
+                        startButton.style.backgroundColor = '#28a745';
+                    } else {
+                        startButton.disabled = true;
+                        startButton.textContent = `${maxPlayers - numPlayers}人待っています...`;
+                        startButton.style.backgroundColor = '#cccccc';
+                    }
+                } else {
+                    hostControls.style.display = 'none';
+                    guestControls.style.display = 'block';
+                }
+                
+                // ゲーム開始判定
+                if (roomData.status === 'playing') {
+                    if (!gameInstance) {
+                        launchCanvasGame(roomData);
+                    }
+                } else {
+                    showScreen('waiting');
+                }
+            });
+        };
+
+        // --- 4. Game Start Logic (Host Only) ---
+        window.forceStartGame = async () => {
+            if (!roomRef) return;
+            const snapshot = await roomRef.once('value');
+            const roomData = snapshot.val();
+            const players = roomData.players;
+            const pIds = Object.keys(players);
+            
+            for (let i = pIds.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pIds[i], pIds[j]] = [pIds[j], pIds[i]];
+            }
+
+            const rows = rawMapData.length;
+            let cols = 0;
+            rawMapData.forEach(r => cols = Math.max(cols, r.split(',').length));
+            
+            let availableSpots = [];
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    availableSpots.push({
+                        x: x * TILE_SIZE + TILE_SIZE / 2,
+                        y: y * TILE_SIZE + TILE_SIZE / 2
+                    });
+                }
+            }
+            
+            const shuffle = (array) => {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            };
+            availableSpots = shuffle(availableSpots);
+
+            const updates = {};
+            
+            const oniId = pIds[0];
+            const oniPos = availableSpots.pop(); 
+            updates[`players/${oniId}/role`] = 'oni';
+            updates[`players/${oniId}/x`] = oniPos.x;
+            updates[`players/${oniId}/y`] = oniPos.y;
+            updates[`players/${oniId}/direction`] = Math.random() * Math.PI * 2;
+
+            const villagerCount = pIds.length - 1;
+            const fruitQuota = villagerCount * 10;
+            const SAFE_DISTANCE = TILE_SIZE * 3; 
+
+            for (let i = 1; i < pIds.length; i++) {
+                const pid = pIds[i];
+                let spawnPos = null;
+                
+                for (let j = 0; j < availableSpots.length; j++) {
+                    const spot = availableSpots[j];
+                    const dist = Math.hypot(spot.x - oniPos.x, spot.y - oniPos.y);
+                    if (dist >= SAFE_DISTANCE) {
+                        spawnPos = availableSpots.splice(j, 1)[0]; 
+                        break;
+                    }
+                }
+                
+                if (!spawnPos) spawnPos = availableSpots.pop();
+
+                updates[`players/${pid}/role`] = 'villager';
+                updates[`players/${pid}/x`] = spawnPos.x;
+                updates[`players/${pid}/y`] = spawnPos.y;
+                updates[`players/${pid}/direction`] = Math.random() * Math.PI * 2;
+            }
+
+            const fruits = {};
+            availableSpots = shuffle(availableSpots); 
+            
+            const placedFruits = [];
+            const FRUIT_SPREAD = TILE_SIZE * 2.5; 
+
+            let fruitCount = 0;
+            const MAX_FRUITS = 3;
+            
+            for (let i = 0; i < availableSpots.length && fruitCount < MAX_FRUITS; i++) {
+                const spot = availableSpots[i];
+                let tooClose = false;
+                
+                for (const pf of placedFruits) {
+                    if (Math.hypot(spot.x - pf.x, spot.y - pf.y) < FRUIT_SPREAD) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                
+                if (!tooClose) {
+                    const fid = 'f_' + Date.now() + '_' + fruitCount;
+                    fruits[fid] = { x: spot.x, y: spot.y };
+                    placedFruits.push(spot);
+                    fruitCount++;
+                }
+            }
+            
+            if (fruitCount < MAX_FRUITS) {
+                for (let i = 0; i < availableSpots.length && fruitCount < MAX_FRUITS; i++) {
+                    const spot = availableSpots[i];
+                    const isUsed = placedFruits.some(pf => pf === spot);
+                    if (!isUsed) {
+                        const fid = 'f_' + Date.now() + '_' + fruitCount;
+                        fruits[fid] = { x: spot.x, y: spot.y };
+                        placedFruits.push(spot);
+                        fruitCount++;
+                    }
+                }
+            }
+
+            updates['fruits'] = fruits;
+            updates['fruitTarget'] = fruitQuota;
+            updates['catchCount'] = 0;
+            updates['fruitCount'] = 0;
+            updates['status'] = 'playing';
+
+            roomRef.update(updates);
+        };
+        
+        const launchCanvasGame = (initialRoomData) => {
+            showScreen('game');
+            if (gameInstance) gameInstance.stop();
+            gameInstance = new Game(currentRoomId, myPlayerId, initialRoomData);
+        };
+        
+        window.exitRoom = () => {
+            if (gameInstance) {
+                gameInstance.stop();
+                gameInstance = null;
+            }
+            if (currentRoomId && myPlayerId) {
+                db.ref(`rooms/${currentRoomId}/players/${myPlayerId}`).remove();
+            }
+            if (roomRef) roomRef.off();
+            currentRoomId = null;
+            roomRef = null;
+            document.getElementById('message-overlay').style.display = 'none';
+            document.getElementById('start-game-button').disabled = true;
+            showScreen('lobby');
+        };
+
+        // --- 5. Game Engine Class ---
+        class Game {
+            constructor(roomId, myUid, initialData) {
+                this.roomId = roomId;
+                this.myUid = myUid;
+                this.stopped = false;
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                
+                const myData = initialData.players[myUid];
+                this.myRole = (myData && myData.role) ? myData.role : 'villager';
+                
+                const roleEl = document.getElementById('role-display');
+                if (this.myRole === 'oni') {
+                    roleEl.innerText = "あなたは 👹 鬼 です";
+                    roleEl.style.color = '#ff6b6b'; // Oni Red
+                } else {
+                    roleEl.innerText = "あなたは 🏃 村人 です";
+                    roleEl.style.color = '#4facfe'; // Villager Blue
+                }
+                document.getElementById('quota-villager').innerText = initialData.fruitTarget || 10;
+                document.getElementById('message-overlay').style.display = 'none';
+
+                this.players = initialData.players || {};
+                this.fruits = initialData.fruits || {};
+                this.catchCount = initialData.catchCount || 0;
+                this.fruitCount = initialData.fruitCount || 0;
+                this.fruitTarget = initialData.fruitTarget;
+                
+                this.x = (myData && myData.x) ? myData.x : 0;
+                this.y = (myData && myData.y) ? myData.y : 0;
+                this.direction = (myData && myData.direction) !== undefined ? myData.direction : 0;
+                
+                this.segments = [];
+                this.initMap();
+                
+                this.keys = {};
+                this.onKeyDown = (e) => this.keys[e.code] = true;
+                this.onKeyUp = (e) => this.keys[e.code] = false;
+                window.addEventListener('keydown', this.onKeyDown);
+                window.addEventListener('keyup', this.onKeyUp);
+
+                this.setupNetwork();
+                this.lastUploadTime = 0;
+                this.animate();
+            }
+
+            stop() {
+                this.stopped = true;
+                window.removeEventListener('keydown', this.onKeyDown);
+                window.removeEventListener('keyup', this.onKeyUp);
+                if (this.roomListenerRef) this.roomListenerRef.off();
+            }
+
+            initMap() {
+                this.rows = rawMapData.length;
+                this.cols = 0;
+                rawMapData.forEach(r => this.cols = Math.max(this.cols, r.split(',').length));
+                this.canvas.width = this.cols * TILE_SIZE;
+                this.canvas.height = this.rows * TILE_SIZE;
+
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                this.segments = [
+                    {a:{x:0,y:0}, b:{x:w,y:0}},
+                    {a:{x:w,y:0}, b:{x:w,y:h}},
+                    {a:{x:w,y:h}, b:{x:0,y:h}},
+                    {a:{x:0,y:h}, b:{x:0,y:0}}
+                ];
+
+                for (let y = 0; y < this.rows; y++) {
+                    const cells = rawMapData[y].split(',').map(s=>s.trim());
+                    for (let x = 0; x < this.cols; x++) {
+                        const char = cells[x] || '.';
+                        const px = x * TILE_SIZE;
+                        const py = y * TILE_SIZE;
+                        if (char === '|') this.segments.push({a:{x:px+TILE_SIZE,y:py}, b:{x:px+TILE_SIZE,y:py+TILE_SIZE}});
+                        if (char === '_') this.segments.push({a:{x:px,y:py+TILE_SIZE}, b:{x:px+TILE_SIZE,y:py+TILE_SIZE}});
+                    }
+                }
+            }
+
+            setupNetwork() {
+                this.roomListenerRef = db.ref('rooms/' + this.roomId);
+                this.roomListenerRef.on('value', snap => {
+                    if (!snap.exists()) return;
+                    const data = snap.val();
+                    
+                    this.players = data.players || {};
+                    this.fruits = data.fruits || {};
+                    this.catchCount = data.catchCount || 0;
+                    this.fruitCount = data.fruitCount || 0;
+                    
+                    document.getElementById('score-oni').innerText = this.catchCount;
+                    document.getElementById('score-villager').innerText = this.fruitCount;
+
+                    if (data.winner) {
+                        this.showGameOver(data.winner);
+                    }
+                    
+                    const myServerData = this.players[this.myUid];
+                    if (myServerData) {
+                        const dist = Math.hypot(this.x - myServerData.x, this.y - myServerData.y);
+                        if (dist > 100) {
+                            this.x = myServerData.x;
+                            this.y = myServerData.y;
+                        }
+                    }
+                });
+            }
+
+            uploadPosition() {
+                const now = Date.now();
+                if (now - this.lastUploadTime < 50) return;
+
+                db.ref(`rooms/${this.roomId}/players/${this.myUid}`).update({
+                    x: this.x,
+                    y: this.y,
+                    direction: this.direction
+                });
+                
+                this.lastUploadTime = now;
+            }
+
+            handleCollisions() {
+                if (this.myRole === 'oni') {
+                    Object.keys(this.players).forEach(pid => {
+                        const p = this.players[pid];
+                        if (p.role === 'villager') {
+                            const dist = Math.hypot(this.x - p.x, this.y - p.y);
+                            if (dist < PLAYER_RADIUS * 2) {
+                                const tx = Math.floor(Math.random() * this.cols) * TILE_SIZE + TILE_SIZE/2;
+                                const ty = Math.floor(Math.random() * this.rows) * TILE_SIZE + TILE_SIZE/2;
+                                
+                                db.ref(`rooms/${this.roomId}`).transaction(room => {
+                                    if (room && room.players && room.players[pid]) {
+                                        room.players[pid].x = tx;
+                                        room.players[pid].y = ty;
+                                        room.catchCount = (room.catchCount || 0) + 1;
+                                        if (room.catchCount >= WIN_CATCHES) room.winner = 'ONI';
+                                    }
+                                    return room;
+                                });
+                            }
+                        }
+                    });
+                } else {
+                    Object.keys(this.fruits).forEach(fid => {
+                        const f = this.fruits[fid];
+                        const dist = Math.hypot(this.x - f.x, this.y - f.y);
+                        if (dist < PLAYER_RADIUS + FRUIT_RADIUS) {
+                            db.ref(`rooms/${this.roomId}`).transaction(room => {
+                                if (room && room.fruits && room.fruits[fid]) {
+                                    delete room.fruits[fid];
+                                    room.fruitCount = (room.fruitCount || 0) + 1;
+                                    const newFid = 'f_' + Date.now() + Math.random().toString(36).substr(2,5);
+                                    if(!room.fruits) room.fruits = {};
+                                    room.fruits[newFid] = {
+                                        x: Math.random() * (this.cols * TILE_SIZE),
+                                        y: Math.random() * (this.rows * TILE_SIZE)
+                                    };
+                                    if (room.fruitCount >= this.fruitTarget) room.winner = 'VILLAGERS';
+                                }
+                                return room;
+                            });
+                        }
+                    });
+                }
+            }
+
+            animate() {
+                if (this.stopped) return;
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.animate());
+            }
+
+            update() {
+                let dx = 0, dy = 0;
+                const speed = this.myRole === 'oni' ? ONI_SPEED : VILLAGER_SPEED;
+
+                if (this.keys['KeyW'] || this.keys['ArrowUp']) dy -= 1;
+                if (this.keys['KeyS'] || this.keys['ArrowDown']) dy += 1;
+                if (this.keys['KeyA'] || this.keys['ArrowLeft']) dx -= 1;
+                if (this.keys['KeyD'] || this.keys['ArrowRight']) dx += 1;
+
+                if (dx !== 0 || dy !== 0) {
+                    this.direction = Math.atan2(dy, dx);
+                    const len = Math.sqrt(dx*dx + dy*dy);
+                    dx = (dx/len) * speed;
+                    dy = (dy/len) * speed;
+                    
+                    let nextX = this.x + dx;
+                    let nextY = this.y + dy;
+                    
+                    this.segments.forEach(seg => {
+                        const closest = this.getClosestPointOnSegment({x:nextX, y:nextY}, seg);
+                        const dist = Math.hypot(nextX - closest.x, nextY - closest.y);
+                        if (dist < PLAYER_RADIUS) {
+                            const overlap = PLAYER_RADIUS - dist;
+                            const nx = (nextX - closest.x) / dist || 1;
+                            const ny = (nextY - closest.y) / dist || 0;
+                            nextX += nx * overlap;
+                            nextY += ny * overlap;
+                        }
+                    });
+                    
+                    nextX = Math.max(PLAYER_RADIUS, Math.min(this.canvas.width - PLAYER_RADIUS, nextX));
+                    nextY = Math.max(PLAYER_RADIUS, Math.min(this.canvas.height - PLAYER_RADIUS, nextY));
+
+                    this.x = nextX;
+                    this.y = nextY;
+                    this.uploadPosition();
+                }
+                this.handleCollisions();
+            }
+
+            draw() {
+                this.ctx.fillStyle = "#1a1a1a";
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.ctx.strokeStyle = "#555";
+                this.ctx.lineWidth = WALL_THICKNESS;
+                this.ctx.beginPath();
+                this.segments.forEach(s => {
+                    this.ctx.moveTo(s.a.x, s.a.y);
+                    this.ctx.lineTo(s.b.x, s.b.y);
+                });
+                this.ctx.stroke();
+
+                let oniPlayer = null;
+                Object.values(this.players).forEach(p => { if (p.role === 'oni') oniPlayer = p; });
+
+                let sightPolygon = null;
+                if (oniPlayer) {
+                    sightPolygon = this.calculateSightPolygon(oniPlayer);
+                    this.drawLightEffect(oniPlayer, sightPolygon);
+                }
+
+                this.drawFruits(oniPlayer, sightPolygon);
+
+                if (this.myRole === 'oni') {
+                    if (oniPlayer) {
+                        this.drawPlayerCircle(oniPlayer);
+                        this.ctx.save();
+                        this.createLightClipPath(oniPlayer, sightPolygon);
+                        Object.values(this.players).forEach(p => {
+                            if (p.role === 'villager') this.drawPlayerCircle(p);
+                        });
+                        this.ctx.restore();
+                    }
+                } else {
+                    Object.values(this.players).forEach(p => this.drawPlayerCircle(p));
+                }
+            }
+
+            drawPlayerCircle(p) {
+                const color = p.role === 'oni' ? '#ff6b6b' : '#4facfe';
+                this.ctx.fillStyle = "#FFF";
+                this.ctx.beginPath();
+                this.ctx.arc(p.x, p.y, PLAYER_RADIUS, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.strokeStyle = color;
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                this.ctx.arc(p.x, p.y, PLAYER_RADIUS, 0, Math.PI * 2);
+                this.ctx.stroke();
+            }
+
+            drawFruits(oni, sightPolygon) {
+                this.ctx.fillStyle = "#6bff6b";
+                Object.values(this.fruits).forEach(f => {
+                    let visible = true;
+                    if (this.myRole === 'oni' && oni) {
+                        const dist = Math.hypot(f.x - oni.x, f.y - oni.y);
+                        const inAmbient = dist < AMBIENT_LIGHT_RADIUS;
+                        let inFOV = false;
+                        if (!inAmbient && sightPolygon) inFOV = this.isPointInPolygon(f, sightPolygon);
+                        visible = inAmbient || inFOV;
+                    }
+                    if (visible) {
+                        this.ctx.beginPath();
+                        this.ctx.arc(f.x, f.y, FRUIT_RADIUS, 0, Math.PI*2);
+                        this.ctx.fill();
+                    }
+                });
+            }
+
+            drawLightEffect(source, polygon) {
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = "lighter";
+                const ambientGrad = this.ctx.createRadialGradient(source.x, source.y, 0, source.x, source.y, AMBIENT_LIGHT_RADIUS);
+                ambientGrad.addColorStop(0, "rgba(255, 230, 150, 0.4)");
+                ambientGrad.addColorStop(1, "rgba(255, 230, 150, 0)");
+                this.ctx.fillStyle = ambientGrad;
+                this.ctx.beginPath();
+                this.ctx.arc(source.x, source.y, AMBIENT_LIGHT_RADIUS, 0, Math.PI * 2);
+                this.ctx.fill();
+                if (polygon && polygon.length > 0) {
+                    const beamGrad = this.ctx.createRadialGradient(source.x, source.y, 0, source.x, source.y, VIEW_DISTANCE);
+                    beamGrad.addColorStop(0, "rgba(255, 230, 100, 0.3)");
+                    beamGrad.addColorStop(1, "rgba(255, 230, 100, 0)");
+                    this.ctx.fillStyle = beamGrad;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(polygon[0].x, polygon[0].y);
+                    for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i].x, polygon[i].y);
+                    this.ctx.closePath();
+                    this.ctx.fill();
+                }
+                this.ctx.restore();
+            }
+
+            createLightClipPath(source, polygon) {
+                this.ctx.beginPath();
+                this.ctx.arc(source.x, source.y, AMBIENT_LIGHT_RADIUS, 0, Math.PI * 2);
+                if (polygon && polygon.length > 0) {
+                    this.ctx.moveTo(polygon[0].x, polygon[0].y);
+                    for (let i = 1; i < polygon.length; i++) this.ctx.lineTo(polygon[i].x, polygon[i].y);
+                    this.ctx.lineTo(polygon[0].x, polygon[0].y);
+                }
+                this.ctx.clip();
+            }
+
+            calculateSightPolygon(source) {
+                const points = [];
+                this.segments.forEach(seg => { points.push(seg.a, seg.b); });
+                const startAngle = source.direction - FOV_RADIANS / 2;
+                const endAngle = source.direction + FOV_RADIANS / 2;
+                let uniqueAngles = [startAngle, endAngle];
+                points.forEach(p => {
+                    const angle = Math.atan2(p.y - source.y, p.x - source.x);
+                    let angleDiff = angle - source.direction;
+                    while (angleDiff <= -Math.PI) angleDiff += Math.PI * 2;
+                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                    if (Math.abs(angleDiff) <= FOV_RADIANS / 2) uniqueAngles.push(angle - 0.0001, angle, angle + 0.0001);
+                });
+                let intersects = [];
+                uniqueAngles.forEach(angle => {
+                    const dx = Math.cos(angle);
+                    const dy = Math.sin(angle);
+                    const ray = { a: source, b: { x: source.x + dx * VIEW_DISTANCE, y: source.y + dy * VIEW_DISTANCE } };
+                    let closest = null, minP = Infinity;
+                    this.segments.forEach(seg => {
+                        const hit = this.getIntersection(ray, seg);
+                        if (hit && hit.param < minP) { minP = hit.param; closest = hit; }
+                    });
+                    if (!closest) closest = {x: ray.b.x, y: ray.b.y, angle};
+                    else closest.angle = angle;
+                    intersects.push(closest);
+                });
+                intersects.sort((a, b) => {
+                    let da = a.angle - source.direction;
+                    let db = b.angle - source.direction;
+                    const normalize = (ang) => {
+                        let d = ang; 
+                        while (d <= -Math.PI) d += Math.PI * 2;
+                        while (d > Math.PI) d -= Math.PI * 2;
+                        return d;
+                    }
+                    return normalize(da) - normalize(db);
+                });
+                intersects.unshift({x: source.x, y: source.y});
+                return intersects;
+            }
+
+            getIntersection(ray, segment) {
+                const r_px = ray.a.x; const r_py = ray.a.y;
+                const r_dx = ray.b.x - ray.a.x; const r_dy = ray.b.y - ray.a.y;
+                const s_px = segment.a.x; const s_py = segment.a.y;
+                const s_dx = segment.b.x - segment.a.x; const s_dy = segment.b.y - segment.a.y;
+                const r_mag = Math.sqrt(r_dx * r_dx + r_dy * r_dy);
+                const s_mag = Math.sqrt(s_dx * s_dx + s_dy * s_dy);
+                if (r_dx / r_mag == s_dx / s_mag && r_dy / r_mag == s_dy / s_mag) return null;
+                const T2 = (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) / (s_dx * r_dy - s_dy * r_dx);
+                const T1 = (s_px + s_dx * T2 - r_px) / r_dx;
+                if (T1 > 0 && T2 >= 0 && T2 <= 1) return { x: r_px + r_dx * T1, y: r_py + r_dy * T1, param: T1 };
+                return null;
+            }
+
+            getClosestPointOnSegment(p, seg) {
+                const x1 = seg.a.x; const y1 = seg.a.y;
+                const x2 = seg.b.x; const y2 = seg.b.y;
+                const px = p.x; const py = p.y;
+                const dx = x2 - x1; const dy = y2 - y1;
+                if (dx === 0 && dy === 0) return {x: x1, y: y1};
+                const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+                return { x: x1 + t * dx, y: y1 + t * dy };
+            }
+
+            isPointInPolygon(p, vs) {
+                let x = p.x, y = p.y, inside = false;
+                for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                    let xi = vs[i].x, yi = vs[i].y, xj = vs[j].x, yj = vs[j].y;
+                    let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                    if (intersect) inside = !inside;
+                }
+                return inside;
+            }
+
+            showGameOver(winner) {
+                this.stopped = true;
+                const title = document.getElementById('message-title');
+                const overlay = document.getElementById('message-overlay');
+                title.innerText = winner === 'ONI' ? "ONI WINS!" : "VILLAGERS WIN!";
+                title.style.color = winner === 'ONI' ? '#ff6b6b' : '#4facfe'; // Red or Blue
+                overlay.style.display = 'flex';
+            }
+        }
+
+        showScreen('nameEntry');
+    </script>
+</body>
+</html>
