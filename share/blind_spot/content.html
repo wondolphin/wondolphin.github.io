@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hide in the Shadow Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #eee;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-size: 1.5rem;
+            color: #aaa;
+        }
+
+        .controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        select {
+            padding: 5px 10px;
+            font-size: 1rem;
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        p.instruction {
+            margin-bottom: 20px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            border: 2px solid #444;
+            background-color: #000;
+            cursor: crosshair;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #message-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 10;
+        }
+        #message-overlay.show {
+            display: block;
+            opacity: 1;
+        }
+        .msg-title {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px #FFD700;
+            margin-bottom: 10px;
+        }
+        .msg-sub {
+            font-size: 1.2rem;
+            color: #ccc;
+            text-shadow: 0 0 5px #000;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Find the Blind Spot</h1>
+    
+    <div class="controls">
+        <label for="level-select">Level:</label>
+        <select id="level-select"></select>
+    </div>
+
+    <p class="instruction">盤面をタップして、どの光も当たらない場所に円を置いてください。</p>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="message-overlay">
+            <div class="msg-title">CLEAR!!</div>
+            <div class="msg-sub">Tap to Retry</div>
+        </div>
+    </div>
+
+    <script>
+        // --- 設定定数 ---
+        const TILE_SIZE = 60;
+        const WALL_THICKNESS = 4;
+        const PLAYER_RADIUS = 10; 
+
+        // --- レベルデータ定義 ---
+        const levels = [
+            {
+                name: "Level 1: Basic",
+                lights: [[5, 45], [95, 10], [55, 90]],
+                map: [
+                    ".,_,.,_,.,.",
+                    "|,.,.,|,.,.",
+                    ".,.,.,|,.,.",
+                    ".,.,_,.,_,.",
+                    ".,_,_,.,.,.",
+                    ".,.,.,|,.,."
+                ]
+            },
+            {
+                name: "Level 2: Corridor",
+                lights: [[5, 50], [95, 70],[95,35]],
+                map: [
+                    ".,.,.,.,.,.,.",
+                    ".,.,_,_,_,.,.",
+                    ".,.,.,.,.,.,.",
+                    ".,_,.,_,.,_,.",
+                    ".,.,.,.,.,.,."
+                ]
+            },
+            {
+                name: "Level 3: Pillars",
+                lights: [[10, 10], [90, 10], [10, 90], [90, 90]],
+                map: [
+                    ".,.,.,.,.,.,.,.",
+                    ".,|,.,_,.,_,.,.",
+                    ".,_,.,.,.,.,.,.",
+                    ".,.,.,|,.,|,.,.",
+                    ".,.,.,_,.,_,.,.",
+                    ".,|,.,.,.,.,.,.",
+                    ".,.,.,.,.,.,.,."
+                ]
+            }
+        ];
+
+        // --- クラス定義 ---
+        class Point {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+        }
+
+        class Segment {
+            constructor(a, b) {
+                this.a = a;
+                this.b = b;
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.messageOverlay = document.getElementById('message-overlay');
+                this.levelSelect = document.getElementById('level-select');
+
+                this.lights = [];
+                this.segments = []; 
+                this.grid = []; 
+                this.rows = 0;
+                this.cols = 0;
+
+                this.gameState = 'idle'; // idle, flashing, cleared
+                
+                this.playerPos = null;
+                this.ngLightInfo = null; 
+                this.flashCounter = 0;
+                this.flashDuration = 60; // 点滅にかける総フレーム数 (約1秒)
+
+                this.initLevelSelector();
+                
+                // 初期レベルロード
+                this.loadLevel(0);
+
+                // イベントリスナー
+                this.canvas.addEventListener('mousedown', (e) => this.handleInput(e));
+                this.levelSelect.addEventListener('change', (e) => {
+                    this.loadLevel(parseInt(e.target.value));
+                });
+                
+                requestAnimationFrame(() => this.loop());
+            }
+
+            initLevelSelector() {
+                levels.forEach((lvl, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = idx;
+                    opt.textContent = lvl.name;
+                    this.levelSelect.appendChild(opt);
+                });
+            }
+
+            loadLevel(index) {
+                this.resetState();
+                const levelData = levels[index];
+                
+                // マップ解析
+                this.parseMap(levelData.map);
+                this.resizeCanvas();
+                this.createSegments();
+                
+                // 光源初期化
+                this.lights = levelData.lights.map(conf => {
+                    const lx = this.canvas.width * (conf[0] / 100);
+                    const ly = this.canvas.height * (conf[1] / 100);
+                    return new Point(lx, ly);
+                });
+            }
+
+            resetState() {
+                this.gameState = 'idle';
+                this.playerPos = null;
+                this.ngLightInfo = null;
+                this.messageOverlay.classList.remove('show');
+            }
+
+            parseMap(mapData) {
+                this.grid = [];
+                this.rows = mapData.length;
+                this.cols = 0;
+                mapData.forEach(rowStr => {
+                    const cols = rowStr.split(',').length;
+                    if (cols > this.cols) this.cols = cols;
+                });
+
+                for (let y = 0; y < this.rows; y++) {
+                    const rowStr = mapData[y];
+                    const cells = rowStr.split(',').map(s => s.trim());
+                    const rowData = [];
+                    for (let x = 0; x < this.cols; x++) {
+                        const char = cells[x] || '.';
+                        rowData.push({
+                            x: x,
+                            y: y,
+                            wallRight: char === '|',
+                            wallBottom: char === '_'
+                        });
+                    }
+                    this.grid.push(rowData);
+                }
+            }
+
+            resizeCanvas() {
+                this.canvas.width = this.cols * TILE_SIZE;
+                this.canvas.height = this.rows * TILE_SIZE;
+            }
+
+            createSegments() {
+                this.segments = [];
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                // 外枠
+                this.segments.push(new Segment(new Point(0, 0), new Point(w, 0)));
+                this.segments.push(new Segment(new Point(w, 0), new Point(w, h)));
+                this.segments.push(new Segment(new Point(w, h), new Point(0, h)));
+                this.segments.push(new Segment(new Point(0, h), new Point(0, 0)));
+
+                // 内部の壁
+                for (let y = 0; y < this.rows; y++) {
+                    for (let x = 0; x < this.cols; x++) {
+                        const cell = this.grid[y][x];
+                        const px = x * TILE_SIZE;
+                        const py = y * TILE_SIZE;
+                        if (cell.wallRight) {
+                            this.segments.push(new Segment(new Point(px + TILE_SIZE, py), new Point(px + TILE_SIZE, py + TILE_SIZE)));
+                        }
+                        if (cell.wallBottom) {
+                            this.segments.push(new Segment(new Point(px, py + TILE_SIZE), new Point(px + TILE_SIZE, py + TILE_SIZE)));
+                        }
+                    }
+                }
+            }
+
+            handleInput(e) {
+                // クリア時はクリックでリセット（同じレベルを再プレイ）
+                if (this.gameState === 'cleared') {
+                    this.resetState();
+                    return;
+                }
+
+                // 点滅アニメーション中は入力を受け付けない
+                if (this.gameState !== 'idle') return;
+
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                this.playerPos = new Point(x, y);
+                this.checkPlacement();
+            }
+
+            checkPlacement() {
+                let detectedLightIndex = -1;
+                let hitAngles = null;
+
+                for (let i = 0; i < this.lights.length; i++) {
+                    const light = this.lights[i];
+                    
+                    const result = this.checkCircleVisibility(light, this.playerPos, PLAYER_RADIUS);
+                    
+                    if (result.isVisible) {
+                        detectedLightIndex = i;
+                        hitAngles = { minAngle: result.minAngle, maxAngle: result.maxAngle };
+                        break; 
+                    }
+                }
+
+                if (detectedLightIndex !== -1) {
+                    // NG演出開始
+                    this.gameState = 'flashing';
+                    this.ngLightInfo = { index: detectedLightIndex, ...hitAngles };
+                    this.flashCounter = 0;
+                    // setTimeoutではなく、updateループ内でカウント監視してリセットする方式に変更
+                } else {
+                    // クリア
+                    this.gameState = 'cleared';
+                    this.messageOverlay.classList.add('show');
+                }
+            }
+
+            checkCircleVisibility(light, center, radius) {
+                const dx = center.x - light.x;
+                const dy = center.y - light.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                // 光源と円が近すぎる場合
+                if (dist <= radius) {
+                    return { isVisible: true, minAngle: 0, maxAngle: Math.PI * 2 };
+                }
+
+                const angleToCenter = Math.atan2(dy, dx);
+                const angleSpread = Math.asin(radius / dist);
+                
+                const minAngle = angleToCenter - angleSpread;
+                const maxAngle = angleToCenter + angleSpread;
+
+                const checkCount = 5; 
+                let isVisible = false;
+
+                for (let i = 0; i <= checkCount; i++) {
+                    const t = i / checkCount;
+                    const angle = minAngle + (maxAngle - minAngle) * t;
+                    
+                    const rayDirX = Math.cos(angle);
+                    const rayDirY = Math.sin(angle);
+
+                    const ray = {
+                        a: light,
+                        b: { x: light.x + rayDirX, y: light.y + rayDirY }
+                    };
+
+                    let closestWallDist = Infinity;
+                    for (let seg of this.segments) {
+                        const intersect = this.getIntersection(ray, seg);
+                        if (intersect) {
+                            const d = Math.sqrt((intersect.x - light.x)**2 + (intersect.y - light.y)**2);
+                            if (d < closestWallDist) closestWallDist = d;
+                        }
+                    }
+
+                    const distToPlayerApprox = dist - radius;
+                    const isBlocked = closestWallDist < distToPlayerApprox + 0.1;
+
+                    if (!isBlocked) {
+                        isVisible = true;
+                        break; 
+                    }
+                }
+
+                return { isVisible, minAngle, maxAngle };
+            }
+
+            loop() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.loop());
+            }
+
+            update() {
+                if (this.gameState === 'flashing') {
+                    this.flashCounter++;
+                    // 点滅が完了したらリセット
+                    // 点滅2回 = (ON -> OFF) * 2
+                    // 1サイクル 30フレーム (ON:15, OFF:15) とすると 60フレームで終了
+                    if (this.flashCounter > this.flashDuration) {
+                        this.gameState = 'idle';
+                        this.playerPos = null;
+                        this.ngLightInfo = null;
+                    }
+                }
+            }
+
+            draw() {
+                // 背景
+                this.ctx.fillStyle = "#111";
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.ctx.globalCompositeOperation = "lighter";
+
+                // クリア時の全周ライト
+                if (this.gameState === 'cleared') {
+                    this.lights.forEach(light => {
+                        this.drawLightFan(light, 0, Math.PI * 2 + 0.01, "rgba(255, 230, 150, 0.4)");
+                    });
+                } 
+                
+                // NG時の点滅ライト (2回点滅)
+                if (this.gameState === 'flashing' && this.ngLightInfo) {
+                    this.ctx.globalCompositeOperation = "source-over"; 
+                    
+                    // 30フレームで1周期 (0.5秒)
+                    // 0-14: ON, 15-29: OFF, 30-44: ON, 45-59: OFF
+                    const cycle = 30;
+                    const phase = this.flashCounter % cycle;
+                    const isVisible = phase < 15; // 前半15フレームだけ表示
+
+                    if (isVisible) {
+                        const light = this.lights[this.ngLightInfo.index];
+                        const margin = 0.05;
+                        this.drawLightFan(
+                            light, 
+                            this.ngLightInfo.minAngle - margin, 
+                            this.ngLightInfo.maxAngle + margin, 
+                            "rgba(255, 50, 50, 0.8)"
+                        );
+                    }
+                }
+
+                this.ctx.globalCompositeOperation = "source-over";
+
+                this.drawWalls();
+                this.drawLightIcons();
+
+                // プレイヤー円
+                if (this.playerPos) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(this.playerPos.x, this.playerPos.y, PLAYER_RADIUS, 0, Math.PI * 2);
+                    
+                    if (this.gameState === 'cleared') {
+                        this.ctx.fillStyle = "#00FF00"; 
+                    } else if (this.gameState === 'flashing') {
+                        this.ctx.fillStyle = "#FF0000"; 
+                    } else {
+                        this.ctx.fillStyle = "#FFFFFF"; 
+                    }
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = "#FFF";
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+            }
+
+            drawWalls() {
+                this.ctx.strokeStyle = "#3498db";
+                this.ctx.lineWidth = WALL_THICKNESS;
+                this.ctx.lineCap = "round";
+                this.ctx.beginPath();
+                this.segments.forEach(seg => {
+                    this.ctx.moveTo(seg.a.x, seg.a.y);
+                    this.ctx.lineTo(seg.b.x, seg.b.y);
+                });
+                this.ctx.stroke();
+            }
+
+            drawLightIcons() {
+                this.lights.forEach(light => {
+                    this.ctx.shadowBlur = 10;
+                    this.ctx.shadowColor = "#FFFF00";
+                    this.ctx.fillStyle = "#FFFF00";
+                    this.ctx.beginPath();
+                    this.ctx.arc(light.x, light.y, 4, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.shadowBlur = 0;
+                });
+            }
+
+            drawLightFan(source, startAngle, endAngle, color) {
+                let rayAngles = [];
+                rayAngles.push(startAngle);
+                rayAngles.push(endAngle);
+
+                const isFullCircle = (endAngle - startAngle) >= Math.PI * 2 - 0.01;
+                const PI2 = Math.PI * 2;
+
+                this.segments.forEach(seg => {
+                    [seg.a, seg.b].forEach(p => {
+                        const rawAngle = Math.atan2(p.y - source.y, p.x - source.x);
+                        [rawAngle, rawAngle - 0.0001, rawAngle + 0.0001].forEach(ang => {
+                            let diff = ang - startAngle;
+                            diff = ((diff % PI2) + PI2) % PI2;
+                            const mappedAngle = startAngle + diff;
+
+                            if (isFullCircle || mappedAngle <= endAngle) {
+                                rayAngles.push(mappedAngle);
+                            }
+                        });
+                    });
+                });
+
+                rayAngles.sort((a, b) => a - b);
+
+                let points = [source];
+
+                rayAngles.forEach(angle => {
+                    const dx = Math.cos(angle);
+                    const dy = Math.sin(angle);
+                    const ray = { a: source, b: { x: source.x + dx, y: source.y + dy } };
+
+                    let closestIntersect = null;
+                    let minParam = Infinity;
+
+                    this.segments.forEach(seg => {
+                        const intersect = this.getIntersection(ray, seg);
+                        if (intersect && intersect.param < minParam) {
+                            minParam = intersect.param;
+                            closestIntersect = intersect;
+                        }
+                    });
+
+                    if (closestIntersect) {
+                        points.push(closestIntersect);
+                    } else {
+                        points.push({ x: source.x + dx * 3000, y: source.y + dy * 3000 });
+                    }
+                });
+
+                if (points.length > 2) {
+                    this.ctx.fillStyle = color;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(points[0].x, points[0].y);
+                    for (let i = 1; i < points.length; i++) {
+                        this.ctx.lineTo(points[i].x, points[i].y);
+                    }
+                    this.ctx.lineTo(points[0].x, points[0].y);
+                    this.ctx.fill();
+                }
+            }
+
+            getIntersection(ray, segment) {
+                const r_px = ray.a.x;
+                const r_py = ray.a.y;
+                const r_dx = ray.b.x - ray.a.x;
+                const r_dy = ray.b.y - ray.a.y;
+                const s_px = segment.a.x;
+                const s_py = segment.a.y;
+                const s_dx = segment.b.x - segment.a.x;
+                const s_dy = segment.b.y - segment.a.y;
+
+                const r_mag = Math.sqrt(r_dx * r_dx + r_dy * r_dy);
+                const s_mag = Math.sqrt(s_dx * s_dx + s_dy * s_dy);
+
+                if (r_dx / r_mag == s_dx / s_mag && r_dy / r_mag == s_dy / s_mag) return null;
+
+                const T2 = (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) / (s_dx * r_dy - s_dy * r_dx);
+                const T1 = (s_px + s_dx * T2 - r_px) / r_dx;
+
+                if (T1 > 0 && T2 >= 0 && T2 <= 1) {
+                    return { x: r_px + r_dx * T1, y: r_py + r_dy * T1, param: T1 };
+                }
+                return null;
+            }
+        }
+
+        window.onload = () => { new Game(); };
+    </script>
+</body>
+</html>

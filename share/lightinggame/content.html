@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Light & Shadow Puzzle - Multi Levels</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        canvas {
+            display: block;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            color: #eee;
+            z-index: 10;
+            max-width: 300px;
+        }
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            text-shadow: 0 0 10px rgba(0,255,255,0.5);
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        p {
+            margin: 5px 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .instruction {
+            color: #aaa;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        /* レベル選択ボタン */
+        #level-select {
+            pointer-events: auto;
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .lvl-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #444;
+            color: #aaa;
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .lvl-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+        }
+        .lvl-btn.active {
+            background: #00ccff;
+            color: #000;
+            border-color: #00ccff;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 204, 255, 0.5);
+        }
+
+        #error-msg {
+            display: none;
+            color: red;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <h1>LIGHT PUZZLE</h1>
+        <p>全ての<span style="color:#0f0">緑(A)</span>を照らし、</p>
+        <p>全ての<span style="color:#f00">赤(B)</span>を影に隠せ。</p>
+        
+        <div id="level-select">
+            <button class="lvl-btn" onclick="selectLevel(0)">1</button>
+            <button class="lvl-btn" onclick="selectLevel(1)">2</button>
+            <button class="lvl-btn" onclick="selectLevel(2)">3</button>
+            <button class="lvl-btn" onclick="selectLevel(3)">4</button>
+        </div>
+
+        <p class="instruction" id="instruction-text">ドラッグで光源を移動</p>
+    </div>
+    <div id="error-msg">画面サイズが小さすぎるか、エラーが発生しました。</div>
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+    /**
+     * ==========================================
+     * ステージデータ (4つのレベル)
+     * ==========================================
+     */
+    const levels = [
+        // Level 1: チュートリアル
+        {
+            lights: [[50, 20]],
+            objA: [[80, 80]],
+            objB: [[80, 20], [20, 20]],
+            walls: [
+                { start: [40, 40], end: [60, 60] },
+                { start: [10, 50], end: [20, 50] }
+            ],
+            moveableWalls: []
+        },
+        // Level 2: 標準
+        {
+            lights: [[50, 50]],
+            objA: [[10, 80], [90, 80], [50, 15]],
+            objB: [[30, 60], [70, 60]],
+            walls: [
+                { start: [20, 50], end: [40, 50] }, 
+                { start: [60, 50], end: [80, 50] }, 
+                { start: [45, 30], end: [55, 30] },
+                { start: [80, 50], end: [80, 60] }
+            ],
+            moveableWalls: []
+        },
+        // Level 3: 応用 (2つの光源)
+        {
+            lights: [[40, 10], [60, 10]], 
+            objA: [[50, 50], [20, 80], [80, 80], [10, 50], [90, 50]],
+            objB: [[50, 90], [10, 65], [90, 65], [10, 10], [90, 10]],
+            walls: [
+                { start: [40, 70], end: [60, 70] },
+                { start: [40, 40], end: [40, 60] },
+                { start: [60, 40], end: [60, 60] },
+                { start: [10, 20], end: [30, 20] },
+                { start: [70, 20], end: [90, 20] }
+            ],
+            moveableWalls: []
+        },
+        // Level 4: 動かせる壁 (Moveable Wall)
+        {
+            lights: [[50, 20]], 
+objA: [
+                [50, 90], // 最奥
+                [10, 50], // 左端
+                [90, 50]  // 右端
+            ],
+            objB: [
+                [50, 50], // 中央（これを避けるのが難しい）
+                [20, 80],
+                [80, 80]
+            ],
+            walls: [
+                // 中央のBを囲むようなコの字
+                { start: [40, 70], end: [60, 70] },
+                { start: [40, 40], end: [40, 60] }, // 左側面
+                { start: [60, 40], end: [60, 60] }, // 右側面
+                
+                // 左右の遮蔽板
+                { start: [10, 30], end: [30, 30] },
+                { start: [70, 30], end: [90, 30] }
+            ],
+            moveableWalls: [
+                // プレイヤーが動かせる壁（初期位置は右端）
+                { start: [40, 10], end: [55, 10] }
+            ]
+        }
+    ];
+
+    // 現在のレベル設定
+    let currentLevelIndex = 0;
+    let levelConfig = levels[0];
+
+    /**
+     * ==========================================
+     * ゲームエンジン
+     * ==========================================
+     */
+    
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const instructionText = document.getElementById('instruction-text');
+    const levelButtons = document.querySelectorAll('.lvl-btn');
+
+    // ゲームの状態
+    let lightPositions = []; 
+    // ドラッグ管理: { type: 'light'|'wall', index: number, offset: {x,y} }
+    let dragTarget = null; 
+    let lastPointerPos = { x: 0, y: 0 };
+    
+    let isGameClear = false;
+    let showClearMessage = false;
+    
+    // 画面・ボードサイズ情報
+    let width, height;
+    let board = { x: 0, y: 0, w: 0, h: 0 };
+    
+    // オブジェクトデータ
+    let gameObjects = {
+        objA: [], 
+        objB: [], 
+        walls: [],          // 静的壁
+        moveableWalls: []   // 動的壁
+    };
+
+    function init() {
+        window.addEventListener('resize', onResize);
+        
+        canvas.addEventListener('mousedown', onPointerDown);
+        canvas.addEventListener('mousemove', onPointerMove);
+        window.addEventListener('mouseup', onPointerUp);
+        
+        canvas.addEventListener('touchstart', (e) => onPointerDown(e.touches[0]), {passive: false});
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            onPointerMove(e.touches[0]);
+        }, {passive: false});
+        window.addEventListener('touchend', onPointerUp);
+
+        selectLevel(0);
+        loop();
+    }
+
+    // グローバル関数として公開
+    window.selectLevel = function(index) {
+        if (index < 0 || index >= levels.length) return;
+        
+        currentLevelIndex = index;
+        levelConfig = levels[index];
+
+        levelButtons.forEach((btn, i) => {
+            if (i === index) btn.classList.add('active');
+            else btn.classList.remove('active');
+        });
+
+        resize(true);
+    };
+
+    function nextLevel() {
+        let next = currentLevelIndex + 1;
+        if (next >= levels.length) next = 0;
+        selectLevel(next);
+    }
+
+    function resetGame() {
+        isGameClear = false;
+        showClearMessage = false;
+        
+        let msg = "ドラッグで光源を移動";
+        if (levelConfig.moveableWalls && levelConfig.moveableWalls.length > 0) {
+            msg = "光源と「紫の壁」を移動できます";
+        } else if (levelConfig.lights.length > 1) {
+            msg = "複数の光源を動かせます";
+        }
+        instructionText.innerText = msg;
+        
+        // 光源位置の初期化
+        lightPositions = levelConfig.lights.map(pos => percentToPixel(pos[0], pos[1]));
+
+        // 動く壁の初期化
+        gameObjects.moveableWalls = (levelConfig.moveableWalls || []).map(w => ({
+            a: percentToPixel(w.start[0], w.start[1]),
+            b: percentToPixel(w.end[0], w.end[1])
+        }));
+    }
+
+    // 座標変換ヘルパー
+    function percentToPixel(pX, pY) {
+        return {
+            x: board.x + board.w * (pX / 100),
+            y: (board.y + board.h) - (board.h * (pY / 100))
+        };
+    }
+    
+    // リサイズ時の位置維持用
+    function pixelToPercent(x, y) {
+        if (board.w === 0 || board.h === 0) return { pX: 50, pY: 50 };
+        return {
+            pX: ((x - board.x) / board.w) * 100,
+            pY: ((board.y + board.h - y) / board.h) * 100
+        };
+    }
+
+    function onResize() {
+        resize(false);
+    }
+
+    function resize(isInit = false) {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+
+        if (width === 0 || height === 0) return;
+
+        // 相対位置の保存 (初期化時以外)
+        let savedLightsRel = [];
+        let savedWallsRel = [];
+
+        if (!isInit && !isGameClear) {
+            savedLightsRel = lightPositions.map(pos => pixelToPercent(pos.x, pos.y));
+            savedWallsRel = gameObjects.moveableWalls.map(w => ({
+                start: pixelToPercent(w.a.x, w.a.y),
+                end: pixelToPercent(w.b.x, w.b.y)
+            }));
+        }
+
+        // ボードサイズ計算
+        const margin = 20; 
+        const availableW = Math.max(0, width - margin * 2);
+        const availableH = Math.max(0, height - margin * 2);
+        const boardSize = Math.min(availableW, availableH);
+        
+        board.w = boardSize;
+        board.h = boardSize;
+        board.x = (width - board.w) / 2;
+        board.y = (height - board.h) / 2;
+
+        // 静的オブジェクトの再構築
+        rebuildStaticLevel();
+
+        if (isInit) {
+            resetGame();
+        } else {
+            // 光源の復元
+            lightPositions = levelConfig.lights.map((defaultPos, i) => {
+                if (savedLightsRel[i]) {
+                    const p = percentToPixel(savedLightsRel[i].pX, savedLightsRel[i].pY);
+                    return clampToBoard(p);
+                }
+                return percentToPixel(defaultPos[0], defaultPos[1]);
+            });
+
+            // 動く壁の復元
+            const configWalls = levelConfig.moveableWalls || [];
+            gameObjects.moveableWalls = configWalls.map((defaultW, i) => {
+                if (savedWallsRel[i]) {
+                    return {
+                        a: percentToPixel(savedWallsRel[i].start.pX, savedWallsRel[i].start.pY),
+                        b: percentToPixel(savedWallsRel[i].end.pX, savedWallsRel[i].end.pY)
+                    };
+                }
+                return {
+                    a: percentToPixel(defaultW.start[0], defaultW.start[1]),
+                    b: percentToPixel(defaultW.end[0], defaultW.end[1])
+                };
+            });
+        }
+    }
+
+    function clampToBoard(pos, padding = 2) {
+        pos.x = Math.max(board.x + padding, Math.min(board.x + board.w - padding, pos.x));
+        pos.y = Math.max(board.y + padding, Math.min(board.y + board.h - padding, pos.y));
+        return pos;
+    }
+
+    function rebuildStaticLevel() {
+        gameObjects.walls = [];
+        
+        levelConfig.walls.forEach(w => {
+            const s = percentToPixel(w.start[0], w.start[1]);
+            const e = percentToPixel(w.end[0], w.end[1]);
+            gameObjects.walls.push({ a: s, b: e });
+        });
+
+        // ボード外枠
+        const bx = board.x - 1, by = board.y - 1, bw = board.w + 2, bh = board.h + 2;
+        gameObjects.walls.push({ a: {x:bx, y:by}, b: {x:bx+bw, y:by} });       
+        gameObjects.walls.push({ a: {x:bx+bw, y:by}, b: {x:bx+bw, y:by+bh} }); 
+        gameObjects.walls.push({ a: {x:bx+bw, y:by+bh}, b: {x:bx, y:by+bh} }); 
+        gameObjects.walls.push({ a: {x:bx, y:by+bh}, b: {x:bx, y:by} });       
+
+        gameObjects.objA = levelConfig.objA.map(pos => {
+            const p = percentToPixel(pos[0], pos[1]);
+            return { x: p.x, y: p.y, radius: 12, lit: false };
+        });
+        gameObjects.objB = levelConfig.objB.map(pos => {
+            const p = percentToPixel(pos[0], pos[1]);
+            return { x: p.x, y: p.y, radius: 12, lit: false };
+        });
+    }
+
+    // 入力処理
+    function onPointerDown(e) {
+        if (showClearMessage) {
+            nextLevel();
+            return;
+        }
+        if (isGameClear) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.clientX || e.pageX;
+        const clientY = e.clientY || e.pageY;
+        
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+        lastPointerPos = { x, y };
+        
+        // 優先度1: 光源
+        let minDist = 40 * 40; 
+        let targetIndex = -1;
+
+        lightPositions.forEach((pos, index) => {
+            const dx = x - pos.x;
+            const dy = y - pos.y;
+            const dist = dx*dx + dy*dy;
+            if (dist < minDist) {
+                minDist = dist;
+                targetIndex = index;
+            }
+        });
+
+        if (targetIndex !== -1) {
+            dragTarget = { type: 'light', index: targetIndex };
+            return;
+        }
+
+        // 優先度2: 動かせる壁（中心のハンドル判定）
+        gameObjects.moveableWalls.forEach((w, index) => {
+            const cx = (w.a.x + w.b.x) / 2;
+            const cy = (w.a.y + w.b.y) / 2;
+            const dx = x - cx;
+            const dy = y - cy;
+            if (dx*dx + dy*dy < 30*30) { // ハンドル半径
+                dragTarget = { type: 'wall', index: index };
+            }
+        });
+    }
+
+    function onPointerMove(e) {
+        if (!dragTarget || isGameClear) return;
+        
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.clientX || e.pageX;
+        const clientY = e.clientY || e.pageY;
+
+        let x = clientX - rect.left;
+        let y = clientY - rect.top;
+
+        // 移動量
+        const dx = x - lastPointerPos.x;
+        const dy = y - lastPointerPos.y;
+        lastPointerPos = { x, y };
+
+        if (dragTarget.type === 'light') {
+            const pos = lightPositions[dragTarget.index];
+            pos.x += dx;
+            pos.y += dy;
+            clampToBoard(pos, 5);
+        } else if (dragTarget.type === 'wall') {
+            const w = gameObjects.moveableWalls[dragTarget.index];
+            // 壁全体を移動
+            w.a.x += dx; w.a.y += dy;
+            w.b.x += dx; w.b.y += dy;
+            
+            // 簡易的な壁クランプ（中心点がボード内にあるように）
+            const cx = (w.a.x + w.b.x) / 2;
+            const cy = (w.a.y + w.b.y) / 2;
+            const clampedC = clampToBoard({x: cx, y: cy}, 5);
+            const diffX = clampedC.x - cx;
+            const diffY = clampedC.y - cy;
+            
+            w.a.x += diffX; w.a.y += diffY;
+            w.b.x += diffX; w.b.y += diffY;
+        }
+    }
+
+    function onPointerUp() {
+        dragTarget = null;
+    }
+
+    // Raycasting
+    function getIntersection(ray, segment) {
+        const r_px = ray.px, r_py = ray.py, r_dx = ray.dx, r_dy = ray.dy;
+        const s_px = segment.a.x, s_py = segment.a.y;
+        const s_dx = segment.b.x - segment.a.x;
+        const s_dy = segment.b.y - segment.a.y;
+
+        const mag = Math.sqrt(s_dx*s_dx + s_dy*s_dy);
+        if(mag === 0) return null;
+
+        const T2 = (r_dx*(s_py-r_py) + r_dy*(r_px-s_px))/(s_dx*r_dy - s_dy*r_dx);
+        const T1 = (s_px+s_dx*T2-r_px)/r_dx;
+
+        if (T1 > 0.0001 && T2 >= 0 && T2 <= 1) {
+            return { x: r_px + r_dx * T1, y: r_py + r_dy * T1, param: T1 };
+        }
+        return null;
+    }
+
+    function calculateSightPolygon(sourcePos, allWalls) {
+        const uniquePoints = new Set();
+        allWalls.forEach(wall => {
+            uniquePoints.add(wall.a.x + "," + wall.a.y);
+            uniquePoints.add(wall.b.x + "," + wall.b.y);
+        });
+
+        const angles = [];
+        uniquePoints.forEach(ptStr => {
+            const [wx, wy] = ptStr.split(",").map(Number);
+            const angle = Math.atan2(wy - sourcePos.y, wx - sourcePos.x);
+            angles.push(angle - 0.0001, angle, angle + 0.0001);
+        });
+
+        const intersections = [];
+        angles.forEach(angle => {
+            const dx = Math.cos(angle);
+            const dy = Math.sin(angle);
+            const ray = { px: sourcePos.x, py: sourcePos.y, dx: dx, dy: dy };
+
+            let closest = null;
+            let minT = Infinity;
+            allWalls.forEach(wall => {
+                const hit = getIntersection(ray, wall);
+                if (hit && hit.param < minT) {
+                    minT = hit.param;
+                    closest = hit;
+                }
+            });
+            if (closest) {
+                closest.angle = angle;
+                intersections.push(closest);
+            }
+        });
+        intersections.sort((a, b) => a.angle - b.angle);
+        return intersections;
+    }
+
+    function isPointInPolygon(point, polygon) {
+        let inside = false;
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            const xi = polygon[i].x, yi = polygon[i].y;
+            const xj = polygon[j].x, yj = polygon[j].y;
+            const intersect = ((yi > point.y) !== (yj > point.y))
+                && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    function loop() {
+        if (!width || !height) { requestAnimationFrame(loop); return; }
+
+        ctx.fillStyle = "#111"; 
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.fillStyle = "#222";
+        ctx.fillRect(board.x, board.y, board.w, board.h);
+        ctx.strokeStyle = "#666";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(board.x, board.y, board.w, board.h);
+
+        // 全ての壁（静的＋動的）を統合
+        const allWalls = [...gameObjects.walls, ...gameObjects.moveableWalls];
+
+        // 全光源のポリゴン計算
+        let allPolygons = [];
+        lightPositions.forEach(pos => {
+            try {
+                allPolygons.push({
+                    poly: calculateSightPolygon(pos, allWalls),
+                    source: pos
+                });
+            } catch(e) {}
+        });
+
+        // 光描画
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(board.x, board.y, board.w, board.h);
+        ctx.clip();
+
+        const maxRadius = Math.max(board.w, board.h);
+
+        allPolygons.forEach(({poly, source}) => {
+            ctx.beginPath();
+            if (poly.length > 0) {
+                ctx.moveTo(poly[0].x, poly[0].y);
+                for (let i = 1; i < poly.length; i++) {
+                    ctx.lineTo(poly[i].x, poly[i].y);
+                }
+            }
+            ctx.closePath();
+
+            const gradient = ctx.createRadialGradient(source.x, source.y, 10, source.x, source.y, maxRadius);
+            gradient.addColorStop(0, "rgba(255, 255, 200, 0.6)");
+            gradient.addColorStop(1, "rgba(255, 255, 200, 0.05)");
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        });
+        ctx.restore();
+
+        // 判定
+        let allALit = true;
+        let anyBLit = false;
+        const checkHit = (obj) => allPolygons.some(({poly}) => isPointInPolygon(obj, poly));
+
+        const drawObject = (obj, type, isLit) => {
+            ctx.beginPath();
+            if (type === 'A') {
+                ctx.rect(obj.x - obj.radius, obj.y - obj.radius, obj.radius*2, obj.radius*2);
+            } else {
+                ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI * 2);
+            }
+
+            if (type === 'A') {
+                ctx.fillStyle = isLit ? "#00ff00" : "#004400";
+                if (isLit) ctx.shadowColor = "#00ff00";
+            } else {
+                ctx.fillStyle = isLit ? "#ff0000" : "#330000";
+                if (isLit) ctx.shadowColor = "#ff0000";
+            }
+            if (isLit) ctx.shadowBlur = 10;
+            
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.fillStyle = "white";
+            ctx.font = "11px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(type, obj.x, obj.y);
+        };
+
+        gameObjects.objA.forEach(obj => {
+            const hit = checkHit(obj);
+            if (!hit) allALit = false;
+            drawObject(obj, 'A', hit);
+        });
+
+        gameObjects.objB.forEach(obj => {
+            const hit = checkHit(obj);
+            if (hit) anyBLit = true;
+            drawObject(obj, 'B', hit);
+        });
+
+        // 静的壁描画
+        ctx.save();
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        gameObjects.walls.forEach(w => {
+            const isBorder = (
+                (w.a.x < board.x && w.b.x < board.x) || 
+                (w.a.x > board.x + board.w && w.b.x > board.x + board.w) ||
+                (w.a.y < board.y && w.b.y < board.y) ||
+                (w.a.y > board.y + board.h && w.b.y > board.y + board.h)
+            );
+            if (isBorder) return;
+            ctx.moveTo(w.a.x, w.a.y);
+            ctx.lineTo(w.b.x, w.b.y);
+        });
+        ctx.strokeStyle = "#00ccff";
+        ctx.shadowColor = "#00ccff";
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+        
+        // 動的壁描画 (紫色)
+        ctx.beginPath();
+        gameObjects.moveableWalls.forEach(w => {
+            ctx.moveTo(w.a.x, w.a.y);
+            ctx.lineTo(w.b.x, w.b.y);
+        });
+        ctx.strokeStyle = "#dd00ff";
+        ctx.shadowColor = "#dd00ff";
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+
+        // 動的壁のハンドル描画
+        gameObjects.moveableWalls.forEach(w => {
+            const cx = (w.a.x + w.b.x) / 2;
+            const cy = (w.a.y + w.b.y) / 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 6, 0, Math.PI*2);
+            ctx.fillStyle = "#dd00ff";
+            ctx.fill();
+            ctx.stroke(); // 枠線
+        });
+        ctx.restore();
+
+        // 光源描画
+        lightPositions.forEach((pos, idx) => {
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
+            if (dragTarget && dragTarget.type === 'light' && dragTarget.index === idx) {
+                ctx.fillStyle = "#ffffff";
+            } else {
+                ctx.fillStyle = "#ffffaa";
+            }
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+
+        // クリア処理
+        if (!isGameClear && allALit && !anyBLit) {
+            isGameClear = true;
+            dragTarget = null;
+            instructionText.innerText = "";
+            setTimeout(() => { showClearMessage = true; }, 500);
+        }
+
+        if (showClearMessage) {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.save();
+            ctx.translate(width/2, height/2);
+            
+            ctx.shadowColor = "#44ffff";
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 60px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("CLEAR!", 0, -20);
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "#cccccc";
+            ctx.font = "20px Arial";
+            ctx.fillText("Tap to Next Level", 0, 40);
+            
+            ctx.restore();
+        }
+
+        requestAnimationFrame(loop);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+</script>
+</body>
+</html>
