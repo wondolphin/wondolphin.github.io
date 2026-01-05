@@ -106,7 +106,7 @@
         <div class="mt-4 p-2 bg-slate-50 rounded border border-slate-100">
             <p class="text-[10px] text-gray-500 leading-tight italic">
                 ※ 回転軸は世界座標の原点を通ります。<br>
-                ※ 黄色の平面 (z=0) で切断します。
+                ※ 黄色の平面 (z=0) で切断し、z≧0 の部分が消えます。
             </p>
         </div>
     </div>
@@ -159,7 +159,7 @@
             dirLight.position.set(5, 10, 7);
             scene.add(dirLight);
 
-            // 軸の可視化
+            // 軸の可視化 (X:赤, Y:緑, Z:青)
             const axisLength = 6;
             const axes = [
                 { dir: [1,0,0], color: 0xff0000 },
@@ -228,16 +228,17 @@
             const currentQuat = compositeGroup.quaternion.clone();
             scene.remove(compositeGroup);
 
-            upperGroup = new THREE.Group();
-            lowerGroup = new THREE.Group();
+            upperGroup = new THREE.Group(); // 消えるパーツ (z >= 0)
+            lowerGroup = new THREE.Group(); // 残るパーツ (z <= 0)
             
-            const clippingPlaneUpper = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
-            const clippingPlaneLower = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+            // THREE.Plane(normal, d) は normal * p + d = 0
+            // クリッピングは normal * p + d > 0 の部分を表示し、負の部分をカットする
+            const planeToKeepTop = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);    // z >= 0 を残す
+            const planeToKeepBottom = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0); // z <= 0 を残す
+            
             const allSectionPoints = [];
 
             parts.forEach(p => {
-                // 正しいワールド座標行列を計算
-                // WorldMatrix = GroupRotation * PartTranslation
                 const partWorldMatrix = new THREE.Matrix4();
                 partWorldMatrix.makeRotationFromQuaternion(currentQuat);
                 partWorldMatrix.multiply(new THREE.Matrix4().makeTranslation(...p.pos));
@@ -247,23 +248,31 @@
 
                 const boxGeom = new THREE.BoxGeometry(...p.size);
                 
-                // 上側パーツ
-                const uMesh = new THREE.Mesh(boxGeom, new THREE.MeshPhongMaterial({ color: p.color, clippingPlanes: [clippingPlaneUpper], transparent: true }));
+                // 上側パーツ (z >= 0): これが飛んでいく
+                const uMesh = new THREE.Mesh(boxGeom, new THREE.MeshPhongMaterial({ 
+                    color: p.color, 
+                    clippingPlanes: [planeToKeepTop], 
+                    transparent: true 
+                }));
                 uMesh.applyMatrix4(partWorldMatrix);
                 upperGroup.add(uMesh);
 
-                // 下側パーツ
-                const lMesh = new THREE.Mesh(boxGeom, new THREE.MeshPhongMaterial({ color: p.color, clippingPlanes: [clippingPlaneLower] }));
+                // 下側パーツ (z <= 0): これが残る
+                const lMesh = new THREE.Mesh(boxGeom, new THREE.MeshPhongMaterial({ 
+                    color: p.color, 
+                    clippingPlanes: [planeToKeepBottom] 
+                }));
                 lMesh.applyMatrix4(partWorldMatrix);
                 lowerGroup.add(lMesh);
 
-                // 断面キャップ
+                // 断面キャップ (残るパーツ z <= 0 の切り口に付ける)
                 if (points.length >= 3) {
                     const shape = new THREE.Shape();
                     shape.moveTo(points[0].x, points[0].y);
                     for(let i=1; i<points.length; i++) shape.lineTo(points[i].x, points[i].y);
                     shape.closePath();
-                    lowerGroup.add(new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshPhongMaterial({ color: p.sectionColor, side: THREE.DoubleSide })));
+                    const capMesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshPhongMaterial({ color: p.sectionColor, side: THREE.DoubleSide }));
+                    lowerGroup.add(capMesh);
                 }
             });
 
@@ -328,8 +337,12 @@
             else sliceProgress += (0 - sliceProgress) * 0.15;
 
             if (upperGroup && lowerGroup) {
+                // 上のパーツ (z >= 0) を Z軸正方向に移動させて消す
                 upperGroup.position.z = sliceProgress * SLICE_DISTANCE;
                 upperGroup.children.forEach(c => { if(c.material) c.material.opacity = 1 - sliceProgress; });
+                
+                // 下のパーツ (z <= 0) はその場に留める
+                lowerGroup.position.z = 0;
                 lowerGroup.rotation.set(0, 0, 0); 
             }
             controls.update();
