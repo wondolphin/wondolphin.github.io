@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最短ルート・クイズレース</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #ef4444;
+            --success: #22c55e;
+            --field-bg: #f8fafc;
+        }
+
+        body {
+            background-color: #e2e8f0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        #game-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .field {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background-color: var(--field-bg);
+            border-radius: 12px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            border: 4px solid #fff;
+        }
+
+        .path-line {
+            fill: none;
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: opacity 0.3s;
+        }
+
+        .waypoint-bike {
+            cursor: pointer;
+            transition: filter 0.2s;
+        }
+
+        /* 震え防止のため transform: scale は使用しない */
+        .waypoint-bike:hover {
+            filter: brightness(1.2);
+        }
+
+        .bike-emoji {
+            font-size: 14px;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .character {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        .goal {
+            position: absolute;
+            font-size: 32px;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+
+        .message-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            z-index: 100;
+            display: none;
+            width: 85%;
+        }
+
+        .btn-restart {
+            margin-top: 15px;
+            background-color: var(--primary);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="p-4 flex flex-col items-center min-h-screen">
+
+    <div id="game-container" class="w-full">
+        <header class="text-center mb-4">
+            <h1 class="text-2xl font-bold text-slate-800">どっちが早く着く？ 🚲</h1>
+            <p class="text-sm text-slate-600">自転車をタップして、最速だと思うルートを選ぼう！</p>
+        </header>
+
+        <div class="field" id="field">
+            <!-- SVG Layer -->
+            <svg id="svg-layer" width="100%" height="100%" viewBox="0 0 100 100" class="absolute top-0 left-0 z-0">
+                <!-- Grid and Paths will be drawn here -->
+            </svg>
+
+            <!-- Goal -->
+            <div id="goal" class="goal">🏠</div>
+
+            <!-- Characters -->
+            <div id="char-a" class="character">🏃</div>
+            <div id="char-b" class="character">🤖</div>
+
+            <!-- Message Box -->
+            <div id="message-box" class="message-overlay">
+                <h2 id="result-text" class="text-3xl font-bold mb-2"></h2>
+                <p id="detail-text" class="text-slate-600 mb-4"></p>
+                <button onclick="resetGame()" class="btn-restart">もう一度遊ぶ</button>
+            </div>
+        </div>
+
+        <div class="mt-6 bg-white p-4 rounded-xl shadow-md">
+            <h3 class="font-bold text-slate-700 border-b pb-2 mb-2">レース情報</h3>
+            <div id="stats" class="text-sm text-slate-600 space-y-1">
+                自転車アイコンをタップしてスタート！
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const svgLayer = document.getElementById('svg-layer');
+        const charA = document.getElementById('char-a');
+        const charB = document.getElementById('char-b');
+        const goalEl = document.getElementById('goal');
+        const messageBox = document.getElementById('message-box');
+        const resultText = document.getElementById('result-text');
+        const detailText = document.getElementById('detail-text');
+        const statsEl = document.getElementById('stats');
+
+        let gameState = 'IDLE';
+        let routes = [];
+        let selectedRoute = null;
+        let rivalRoute = null;
+        let winnerPath = null;
+        let animationId = null;
+        let startTime = null;
+        
+        const BASE_SPEED = 37.5; 
+
+        // 簡易記述文字列をパース
+        function parseCoord(str) {
+            const hasBike = str.includes('b');
+            const numStr = str.replace('b', '');
+            const x = parseInt(numStr.substring(0, 2));
+            const y = parseInt(numStr.substring(2, 4));
+            return { x, y, hasBike };
+        }
+
+        function getDistance(p1, p2) {
+            return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+        }
+
+        // 到達予想時間を計算
+        function calculateFastestTime(route) {
+            let totalTime = 0;
+            let currentDist = 0;
+            const bikeDist = route.bikeDistance;
+
+            for (let i = 0; i < route.points.length - 1; i++) {
+                const segLen = getDistance(route.points[i], route.points[i+1]);
+                if (segLen === 0) continue;
+
+                const segStartDist = currentDist;
+                const segEndDist = currentDist + segLen;
+
+                if (segEndDist <= bikeDist) {
+                    totalTime += segLen / BASE_SPEED;
+                } else if (segStartDist >= bikeDist) {
+                    totalTime += segLen / (BASE_SPEED * 2);
+                } else {
+                    const beforeDist = bikeDist - segStartDist;
+                    const afterDist = segEndDist - bikeDist;
+                    totalTime += (beforeDist / BASE_SPEED) + (afterDist / (BASE_SPEED * 2));
+                }
+                currentDist += segLen;
+            }
+            return totalTime;
+        }
+
+        // 経過時間から状態を取得
+        function getStatusAtTime(route, time) {
+            let elapsed = 0;
+            let distCovered = 0;
+            const bikeDist = route.bikeDistance;
+
+            for (let i = 0; i < route.points.length - 1; i++) {
+                const segLen = getDistance(route.points[i], route.points[i+1]);
+                if (segLen === 0) continue;
+
+                let segTime;
+                const segStartDist = distCovered;
+                const segEndDist = distCovered + segLen;
+
+                if (segEndDist <= bikeDist) {
+                    segTime = segLen / BASE_SPEED;
+                } else if (segStartDist >= bikeDist) {
+                    segTime = segLen / (BASE_SPEED * 2);
+                } else {
+                    const beforeDist = bikeDist - segStartDist;
+                    const afterDist = segEndDist - bikeDist;
+                    segTime = (beforeDist / BASE_SPEED) + (afterDist / (BASE_SPEED * 2));
+                }
+
+                if (elapsed + segTime >= time) {
+                    const remainingTimeInSeg = time - elapsed;
+                    let distInSeg = 0;
+                    const segStartSpeed = (segStartDist >= bikeDist) ? BASE_SPEED * 2 : BASE_SPEED;
+                    
+                    if (segStartDist < bikeDist && (segStartDist + remainingTimeInSeg * BASE_SPEED) > bikeDist) {
+                        const timeToBike = (bikeDist - segStartDist) / BASE_SPEED;
+                        const timeAfterBike = remainingTimeInSeg - timeToBike;
+                        distInSeg = (bikeDist - segStartDist) + (timeAfterBike * BASE_SPEED * 2);
+                    } else {
+                        distInSeg = remainingTimeInSeg * segStartSpeed;
+                    }
+
+                    const ratio = distInSeg / segLen;
+                    const pos = {
+                        x: route.points[i].x + (route.points[i+1].x - route.points[i].x) * ratio,
+                        y: route.points[i].y + (route.points[i+1].y - route.points[i].y) * ratio
+                    };
+                    return { pos, hasBike: (distCovered + distInSeg >= bikeDist) };
+                }
+                elapsed += segTime;
+                distCovered += segLen;
+            }
+            return { pos: route.points[route.points.length - 1], hasBike: true, finished: true };
+        }
+
+        // グリッド線の描画
+        function drawGrid() {
+            for (let i = 10; i < 100; i += 10) {
+                // 垂直線
+                const vLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                vLine.setAttribute("x1", i); vLine.setAttribute("y1", 0);
+                vLine.setAttribute("x2", i); vLine.setAttribute("y2", 100);
+                vLine.setAttribute("stroke", "#cbd5e1");
+                vLine.setAttribute("stroke-width", "0.2");
+                vLine.setAttribute("stroke-dasharray", "1,1");
+                svgLayer.appendChild(vLine);
+
+                // 水平線
+                const hLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                hLine.setAttribute("x1", 0); hLine.setAttribute("y1", i);
+                hLine.setAttribute("x2", 100); hLine.setAttribute("y2", i);
+                hLine.setAttribute("stroke", "#cbd5e1");
+                hLine.setAttribute("stroke-width", "0.2");
+                hLine.setAttribute("stroke-dasharray", "1,1");
+                svgLayer.appendChild(hLine);
+            }
+        }
+
+        function initGame() {
+            gameState = 'IDLE';
+            messageBox.style.display = 'none';
+            svgLayer.innerHTML = '';
+            charA.innerText = "🏃";
+            charB.innerText = "🤖";
+            statsEl.innerText = "自転車をタップして、最も早くゴールへ着くルートを予想してください。";
+            
+            // グリッド描画
+            drawGrid();
+
+            const startStr = "1010";
+            const goalStr = "9090";
+            const rawRoutes = [
+                { id: 0, color: '#6366f1', path: ["9010b"] },
+                { id: 1, color: '#f59e0b', path: ["6010",  "6060b"] },
+                { id: 2, color: '#ec4899', path: ["1050", "5090b"] }
+            ];
+
+            const startObj = parseCoord(startStr);
+            const goalObj = parseCoord(goalStr);
+
+            updatePos(charA, startObj);
+            updatePos(charB, startObj);
+            updatePos(goalEl, goalObj);
+
+            routes = rawRoutes.map(r => {
+                const midPoints = r.path.map(p => parseCoord(p));
+                const allPoints = [startObj, ...midPoints, goalObj];
+                const bikeCoord = midPoints.find(p => p.hasBike);
+                
+                let bikeDist = 0;
+                for(let i=0; i<allPoints.length-1; i++) {
+                    if(allPoints[i].x === bikeCoord.x && allPoints[i].y === bikeCoord.y) break;
+                    bikeDist += getDistance(allPoints[i], allPoints[i+1]);
+                }
+
+                const routeObj = {
+                    id: r.id,
+                    color: r.color,
+                    points: allPoints,
+                    bikePoint: bikeCoord,
+                    bikeDistance: bikeDist
+                };
+                routeObj.timeToGoal = calculateFastestTime(routeObj);
+                return routeObj;
+            });
+
+            const sortedByTime = [...routes].sort((a, b) => a.timeToGoal - b.timeToGoal);
+            winnerPath = sortedByTime[0];
+
+            routes.forEach((route, index) => drawRoute(route, index));
+        }
+
+        function drawRoute(route, index) {
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            const d = route.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+            path.setAttribute("d", d);
+            path.setAttribute("stroke", route.color);
+            path.setAttribute("class", "path-line opacity-30");
+            path.id = `path-${index}`;
+            svgLayer.appendChild(path);
+
+            route.points.forEach((p, pIdx) => {
+                if (pIdx === 0 || pIdx === route.points.length - 1) return;
+                
+                const isBike = (p.x === route.bikePoint.x && p.y === route.bikePoint.y);
+                
+                if (isBike) {
+                    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                    group.setAttribute("class", "waypoint-bike");
+                    group.onclick = () => selectRoute(index);
+
+                    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    circle.setAttribute("cx", p.x);
+                    circle.setAttribute("cy", p.y);
+                    circle.setAttribute("r", 7);
+                    circle.setAttribute("fill", route.color);
+                    circle.setAttribute("stroke", "white");
+                    circle.setAttribute("stroke-width", "1");
+                    
+                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    text.setAttribute("x", p.x);
+                    text.setAttribute("y", p.y + 4.5);
+                    text.setAttribute("text-anchor", "middle");
+                    text.setAttribute("class", "bike-emoji");
+                    text.textContent = "🚲";
+
+                    group.appendChild(circle);
+                    group.appendChild(text);
+                    svgLayer.appendChild(group);
+                } else {
+                    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    circle.setAttribute("cx", p.x);
+                    circle.setAttribute("cy", p.y);
+                    circle.setAttribute("r", 2);
+                    circle.setAttribute("fill", route.color);
+                    circle.setAttribute("opacity", 0.5);
+                    svgLayer.appendChild(circle);
+                }
+            });
+        }
+
+        function selectRoute(index) {
+            if (gameState !== 'IDLE') return;
+            
+            selectedRoute = routes[index];
+            const isCorrect = (selectedRoute.id === winnerPath.id);
+
+            if (isCorrect) {
+                const sorted = [...routes].sort((a, b) => a.timeToGoal - b.timeToGoal);
+                rivalRoute = sorted[1];
+            } else {
+                rivalRoute = winnerPath;
+            }
+
+            document.querySelectorAll('.path-line').forEach(p => p.classList.add('opacity-10'));
+            const activePath = document.getElementById(`path-${index}`);
+            activePath.classList.remove('opacity-10');
+            activePath.classList.add('opacity-100');
+            activePath.setAttribute('stroke-width', 5);
+
+            gameState = 'RACING';
+            startTime = performance.now();
+            requestAnimationFrame(raceLoop);
+        }
+
+        function raceLoop(timestamp) {
+            if (gameState !== 'RACING') return;
+
+            const elapsed = (timestamp - startTime) / 1000;
+
+            const statusA = getStatusAtTime(selectedRoute, elapsed);
+            updatePos(charA, statusA.pos);
+            if (statusA.hasBike) charA.innerText = "🚴";
+
+            const statusB = getStatusAtTime(rivalRoute, elapsed);
+            updatePos(charB, statusB.pos);
+            if (statusB.hasBike) charB.innerText = "🤖🚲";
+
+            if (statusA.finished || statusB.finished) {
+                gameState = 'FINISHED';
+                showResult();
+                return;
+            }
+
+            animationId = requestAnimationFrame(raceLoop);
+        }
+
+        function showResult() {
+            const isCorrect = (selectedRoute.id === winnerPath.id);
+            
+            if (isCorrect) {
+                resultText.innerText = "正解！";
+                resultText.className = "text-3xl font-bold mb-2 text-green-600";
+                detailText.innerText = `素晴らしい！最速ルート (${selectedRoute.timeToGoal.toFixed(2)}秒) を見抜きました！`;
+            } else {
+                resultText.innerText = "不正解！";
+                resultText.className = "text-3xl font-bold mb-2 text-red-600";
+                detailText.innerText = `残念。最速は ${winnerPath.timeToGoal.toFixed(2)}秒 のルートでした。`;
+            }
+
+            messageBox.style.display = 'block';
+            statsEl.innerHTML = `あなたの記録: ${selectedRoute.timeToGoal.toFixed(2)}秒<br>最速記録: ${winnerPath.timeToGoal.toFixed(2)}秒`;
+        }
+
+        function updatePos(el, pos) {
+            el.style.left = pos.x + '%';
+            el.style.top = pos.y + '%';
+        }
+
+        function resetGame() {
+            if (animationId) cancelAnimationFrame(animationId);
+            initGame();
+        }
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>

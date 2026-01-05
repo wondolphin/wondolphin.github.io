@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>展開図クイズ：面当てゲーム</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background-color: #222;
+            color: #fff;
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* 画面分割レイアウト */
+        #container-left {
+            /* 解答エリアを大きく */
+            width: 65%;
+            height: 100%;
+            border-right: 2px solid #444;
+            position: relative;
+            background: #2a2a2a;
+        }
+        #container-right {
+            /* 見本エリアを小さく */
+            width: 35%;
+            height: 100%;
+            position: relative;
+            background: #1a1a1a;
+        }
+
+        /* UI要素 */
+        .overlay-label {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 1.2rem;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        #message-area {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.5rem;
+            display: none; /* 初期は非表示 */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            text-align: center;
+            z-index: 20;
+        }
+
+        #result-text {
+            margin-bottom: 10px;
+        }
+
+        #reset-btn {
+            padding: 8px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            display: block;
+            width: 100%;
+        }
+        #reset-btn:hover { background: #45a049; }
+
+        canvas { display: block; }
+    </style>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <!-- 左画面：回答エリア（展開図） -->
+    <div id="container-left">
+        <div class="overlay-label">回答エリア (タップして回答)</div>
+    </div>
+
+    <!-- 右画面：ヒントエリア（完成図） -->
+    <div id="container-right">
+        <div class="overlay-label">見本 (完成形)</div>
+    </div>
+
+    <!-- 結果メッセージ -->
+    <div id="message-area">
+        <div id="result-text">正解！</div>
+        <button id="reset-btn">もう一度</button>
+    </div>
+
+    <script>
+        // === 設定 ===
+        // 0:なし, 1:通常面, 2:底面(固定), 3:ターゲット面
+        // a:内折り, b:外折り, c:固定接続
+        const QUIZ_LAYOUT = 
+`0,0,0,0,1,0,0,0,1
+0,0,0,0,a,0,0,0,a
+0,0,1,a,1,c,1,a,1
+0,0,0,0,c,0,0,0,a
+0,0,0,0,1,0,0,0,3
+0,0,0,0,a,0,0,0,b
+0,0,1,a,1,0,0,0,1
+0,0,a,0,0,0,0,0,0
+1,c,2,0,0,0,0,0,0
+c,0,0,0,0,0,0,0,0
+1,0,0,0,0,0,0,0,0`;
+
+        const COLORS = {
+            BASE: 0xff6b6b,    // 赤系 ("2")
+            NORMAL: 0x4ecdc4,  // 青緑系 ("1")
+            TARGET: 0xffd93d,  // 黄色系 ("3" - 正解の面)
+            SELECTED: 0xff8800, // 選択した面の色（オレンジ）
+            HINGE: 0x555555,
+            BG_LEFT: 0x2a2a2a,
+            BG_RIGHT: 0x1a1a1a
+        };
+
+        // === グローバル状態 ===
+        // LeftとRightの2つの「ワールド」を管理するオブジェクト
+        const worldLeft = {
+            container: document.getElementById('container-left'),
+            scene: null, camera: null, renderer: null, controls: null,
+            rootGroup: null, folds: [], // アニメーション用データ
+            faces: [], // raycast判定用
+            isQuizMode: true, // 色を隠すかどうか
+            currentFoldRatio: 0
+        };
+
+        const worldRight = {
+            container: document.getElementById('container-right'),
+            scene: null, camera: null, renderer: null, controls: null,
+            rootGroup: null, folds: [],
+            faces: [],
+            isQuizMode: false, // 答えを最初から見せる
+            currentFoldRatio: 1 // 最初から組み立て済み
+        };
+
+        let isAnimatingResult = false; // 結果アニメーション中か
+        let resultAnimationTime = 0;
+        let hasAnswered = false; // 回答済みか
+        let currentResultIsCorrect = false; // 直前の回答が正解だったか
+
+        // Raycaster (クリック判定用)
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        init();
+        animate();
+
+        function init() {
+            // 左（回答用）の初期化
+            initWorld(worldLeft, COLORS.BG_LEFT);
+            buildScene(worldLeft, QUIZ_LAYOUT);
+            
+            // 右（見本用）の初期化
+            initWorld(worldRight, COLORS.BG_RIGHT);
+            buildScene(worldRight, QUIZ_LAYOUT);
+            // 右側は最初から組み立てた状態にする
+            updateWorldFolds(worldRight, 1.0);
+
+            // イベントリスナー
+            window.addEventListener('resize', onWindowResize);
+            
+            // 左画面でのクリック/タップイベント
+            const leftCanvas = worldLeft.renderer.domElement;
+            leftCanvas.addEventListener('pointerdown', onPointerDown);
+
+            // リセットボタン
+            document.getElementById('reset-btn').addEventListener('click', resetGame);
+        }
+
+        function initWorld(world, bgColor) {
+            // シーン
+            world.scene = new THREE.Scene();
+            world.scene.background = new THREE.Color(bgColor);
+
+            // カメラ
+            const aspect = world.container.clientWidth / world.container.clientHeight;
+            world.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
+            // カメラ位置（初期値）
+            world.camera.position.set(6, 8, 6); 
+            world.camera.lookAt(0, 0, 0);
+
+            // レンダラー
+            world.renderer = new THREE.WebGLRenderer({ antialias: true });
+            world.renderer.setSize(world.container.clientWidth, world.container.clientHeight);
+            world.renderer.shadowMap.enabled = true;
+            world.container.appendChild(world.renderer.domElement);
+
+            // ライト
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            world.scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+            dirLight.position.set(5, 10, 7);
+            dirLight.castShadow = true;
+            world.scene.add(dirLight);
+
+            // コントロール
+            world.controls = new THREE.OrbitControls(world.camera, world.renderer.domElement);
+            world.controls.enableDamping = true;
+            world.controls.dampingFactor = 0.05;
+
+            // グリッド（少し薄く）
+            const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x333333);
+            world.scene.add(gridHelper);
+        }
+
+        // === メッシュ生成ロジック ===
+
+        function createFaceMesh(val, isQuizHidden) {
+            // 数字は書かないという要件
+            const geometry = new THREE.BoxGeometry(0.95, 0.05, 0.95);
+            
+            let color;
+            if (val === '2') {
+                color = COLORS.BASE;
+            } else if (val === '3') {
+                // クイズモード（左画面）で、まだ回答していない場合は、通常色(1)に偽装する
+                if (isQuizHidden) {
+                    color = COLORS.NORMAL; 
+                } else {
+                    color = COLORS.TARGET;
+                }
+            } else {
+                color = COLORS.NORMAL;
+            }
+
+            // 半透明設定を追加
+            const material = new THREE.MeshStandardMaterial({ 
+                color: color, 
+                roughness: 0.6,
+                transparent: true,
+                opacity: 0.85
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            
+            // ユーザーデータとして本来の値を保持
+            mesh.userData = { originalValue: val, isFace: true };
+            
+            return mesh;
+        }
+
+        function createHingeMesh(length) {
+            const geometry = new THREE.CylinderGeometry(0.02, 0.02, length, 12);
+            const material = new THREE.MeshStandardMaterial({ color: COLORS.HINGE });
+            return new THREE.Mesh(geometry, material);
+        }
+
+        function attachFace(world, parent, position, axisVector, angleDir, val) {
+            const hinge = new THREE.Group();
+            hinge.position.copy(position);
+            parent.add(hinge);
+
+            // ヒンジの軸表示
+            const hingeMesh = createHingeMesh(0.95);
+            if (axisVector.x > 0.9) hingeMesh.rotation.z = Math.PI / 2;
+            else if (axisVector.z > 0.9) hingeMesh.rotation.x = Math.PI / 2;
+            hinge.add(hingeMesh);
+
+            // 面の作成
+            // world.isQuizMode が true の場合、'3'の色を隠す
+            const face = createFaceMesh(val, world.isQuizMode);
+            face.position.copy(position);
+            hinge.add(face);
+
+            // world.faces に追加（Raycast用）
+            world.faces.push(face);
+
+            // アニメーション用データの保存
+            world.folds.push({
+                hinge: hinge,
+                axis: axisVector,
+                targetAngle: (Math.PI / 2) * angleDir
+            });
+
+            return face;
+        }
+
+        function buildScene(world, layoutCsv) {
+            // リセット
+            if (world.rootGroup) world.scene.remove(world.rootGroup);
+            world.rootGroup = new THREE.Group();
+            world.scene.add(world.rootGroup);
+            world.folds = [];
+            world.faces = [];
+
+            const input = layoutCsv.trim();
+            const lines = input.split('\n');
+            const grid = lines.map(line => line.split(',').map(s => s.trim()));
+
+            // グリッド範囲計算用（中心特定のため）
+            let minR = Infinity, maxR = -Infinity;
+            let minC = Infinity, maxC = -Infinity;
+
+            // 開始点('2')を探す
+            let startR = -1, startC = -1;
+            for(let r=0; r<grid.length; r++) {
+                for(let c=0; c<grid[r].length; c++) {
+                    const cell = grid[r][c];
+                    if(cell === '2') {
+                        startR = r;
+                        startC = c;
+                    }
+                    if(['1','2','3'].includes(cell)) {
+                        if (r < minR) minR = r;
+                        if (r > maxR) maxR = r;
+                        if (c < minC) minC = c;
+                        if (c > maxC) maxC = c;
+                    }
+                }
+            }
+
+            if(startR === -1) {
+                console.error("Base face '2' not found");
+                return;
+            }
+
+            // ベースの作成
+            const baseMesh = createFaceMesh("2", world.isQuizMode);
+            baseMesh.position.set(0, 0, 0);
+            world.rootGroup.add(baseMesh);
+            world.faces.push(baseMesh);
+
+            const visited = new Set();
+            visited.add(`${startR},${startC}`);
+
+            buildRecursive(world, grid, startR, startC, baseMesh, visited);
+
+            // カメラ位置の調整（左画面のみ、展開図の中心にカメラを合わせる）
+            if (world.isQuizMode) {
+                // 展開図の中心座標 (Three.jsのワールド座標系へ変換)
+                // c (列) -> x軸, r (行) -> z軸
+                // startC, startR が (0,0,0) にあるため、差分が座標となる
+                const centerC = (minC + maxC) / 2;
+                const centerR = (minR + maxR) / 2;
+                
+                const centerX = centerC - startC;
+                const centerZ = centerR - startR;
+
+                // 注視点を展開図の中心に設定
+                world.controls.target.set(centerX, 0, centerZ);
+                
+                // カメラ位置も平行移動して、見え方を維持しつつ中心を捉える
+                // デフォルトのオフセット(6, 8, 6)を基準にする
+                const defaultOffset = new THREE.Vector3(6, 8, 6);
+                world.camera.position.copy(defaultOffset).add(new THREE.Vector3(centerX, 0, centerZ));
+                
+                world.controls.update();
+            }
+        }
+
+        function buildRecursive(world, grid, r, c, parentMesh, visited) {
+            const directions = [
+                { dr: -1, dc: 0, name: 'up' },
+                { dr: 1, dc: 0, name: 'down' },
+                { dr: 0, dc: -1, name: 'left' },
+                { dr: 0, dc: 1, name: 'right' }
+            ];
+
+            directions.forEach(dir => {
+                const connR = r + dir.dr;
+                const connC = c + dir.dc;
+                if(connR < 0 || connR >= grid.length || connC < 0 || connC >= grid[connR].length) return;
+
+                const connector = grid[connR][connC]; 
+                if(connector !== 'a' && connector !== 'b' && connector !== 'c') return;
+
+                const targetR = r + dir.dr * 2;
+                const targetC = c + dir.dc * 2;
+                if(targetR < 0 || targetR >= grid.length || targetC < 0 || targetC >= grid[targetR].length) return;
+                
+                const key = `${targetR},${targetC}`;
+                if(visited.has(key)) return;
+
+                const targetVal = grid[targetR][targetC];
+                // 1, 2, 3 のいずれかなら面として扱う
+                if(!['1','2','3'].includes(targetVal)) return;
+
+                visited.add(key);
+
+                let hingePos, axis, angleDir;
+                
+                // 回転方向
+                let typeFactor = 0;
+                if (connector === 'a') typeFactor = 1;      // 内折り
+                else if (connector === 'b') typeFactor = -1; // 外折り
+                else if (connector === 'c') typeFactor = 0;  // 固定（折り曲げない）
+
+                // 位置計算
+                if (dir.name === 'right') { 
+                    hingePos = new THREE.Vector3(0.5, 0, 0);
+                    axis = new THREE.Vector3(0, 0, 1);
+                    angleDir = typeFactor * 1; 
+                } 
+                else if (dir.name === 'left') { 
+                    hingePos = new THREE.Vector3(-0.5, 0, 0);
+                    axis = new THREE.Vector3(0, 0, 1);
+                    angleDir = typeFactor * -1; 
+                }
+                else if (dir.name === 'up') { 
+                    hingePos = new THREE.Vector3(0, 0, -0.5);
+                    axis = new THREE.Vector3(1, 0, 0);
+                    angleDir = typeFactor * 1; 
+                }
+                else if (dir.name === 'down') { 
+                    hingePos = new THREE.Vector3(0, 0, 0.5);
+                    axis = new THREE.Vector3(1, 0, 0);
+                    angleDir = typeFactor * -1; 
+                }
+
+                const newFace = attachFace(world, parentMesh, hingePos, axis, angleDir, targetVal);
+                buildRecursive(world, grid, targetR, targetC, newFace, visited);
+            });
+        }
+
+        // 折り曲げ更新
+        function updateWorldFolds(world, ratio) {
+            world.currentFoldRatio = ratio;
+            world.folds.forEach(fold => {
+                fold.hinge.quaternion.setFromAxisAngle(fold.axis, fold.targetAngle * ratio);
+            });
+        }
+
+        // === インタラクション ===
+
+        function onPointerDown(event) {
+            if (hasAnswered) return; // 回答済みなら無視
+
+            // 左画面のRect取得
+            const rect = worldLeft.renderer.domElement.getBoundingClientRect();
+            
+            // マウス座標を正規化 (-1 to +1)
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, worldLeft.camera);
+            
+            // 面との交差判定
+            const intersects = raycaster.intersectObjects(worldLeft.faces);
+
+            if (intersects.length > 0) {
+                const hitObj = intersects[0].object;
+                
+                // userDataをチェック
+                if (hitObj.userData && hitObj.userData.isFace) {
+                    checkAnswer(hitObj);
+                }
+            }
+        }
+
+        function checkAnswer(mesh) {
+            hasAnswered = true;
+            const val = mesh.userData.originalValue;
+            
+            // 修正: クリックした面の色を「選択色」に変更する
+            mesh.material.color.setHex(COLORS.SELECTED);
+            
+            // 正解判定を保存
+            currentResultIsCorrect = (val === '3');
+
+            // 答え合わせアニメーション開始 (メッセージはまだ出さない)
+            isAnimatingResult = true;
+            resultAnimationTime = 0;
+        }
+
+        function showResult() {
+            const messageArea = document.getElementById('message-area');
+            const resultText = document.getElementById('result-text');
+            messageArea.style.display = 'block';
+
+            if (currentResultIsCorrect) {
+                resultText.textContent = "正解！ (Great!)";
+                resultText.style.color = "#4CAF50";
+            } else {
+                resultText.textContent = "残念、不正解... (Wrong)";
+                resultText.style.color = "#f44336";
+            }
+        }
+
+        function resetGame() {
+            hasAnswered = false;
+            isAnimatingResult = false;
+            resultAnimationTime = 0;
+            document.getElementById('message-area').style.display = 'none';
+
+            // 左画面を再構築（色を隠し、平らに戻す）
+            buildScene(worldLeft, QUIZ_LAYOUT);
+            worldLeft.currentFoldRatio = 0;
+        }
+
+        function onWindowResize() {
+            [worldLeft, worldRight].forEach(world => {
+                if(!world.container) return;
+                const aspect = world.container.clientWidth / world.container.clientHeight;
+                world.camera.aspect = aspect;
+                world.camera.updateProjectionMatrix();
+                world.renderer.setSize(world.container.clientWidth, world.container.clientHeight);
+            });
+        }
+
+        // === アニメーションループ ===
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 回答後のアニメーション（左画面が組み上がる）
+            if (isAnimatingResult) {
+                resultAnimationTime += 0.02;
+                // Easing
+                let val = (Math.sin(resultAnimationTime * Math.PI - Math.PI/2) + 1) / 2;
+                
+                if (resultAnimationTime >= 1.0) {
+                    val = 1.0;
+                    // アニメーション完了時に一回だけ結果表示を行う
+                    // style.displayの初期値は空文字なので、blockでないことを確認する条件に変更
+                    const msgArea = document.getElementById('message-area');
+                    if (msgArea.style.display !== 'block') {
+                        showResult();
+                    }
+                }
+                updateWorldFolds(worldLeft, val);
+            }
+
+            // レンダリング
+            worldLeft.controls.update();
+            worldRight.controls.update();
+            worldLeft.renderer.render(worldLeft.scene, worldLeft.camera);
+            worldRight.renderer.render(worldRight.scene, worldRight.camera);
+        }
+
+    </script>
+</body>
+</html>

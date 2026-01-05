@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D複合立体切断シミュレーター</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f8fafc; font-family: 'sans-serif'; }
+        canvas { display: block; }
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 320px;
+            z-index: 10;
+            border: 1px solid #e2e8f0;
+        }
+        .section-view {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            z-index: 10;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+        .btn-rotate {
+            background-color: #3b82f6;
+            color: white;
+            padding: 8px 10px;
+            border-radius: 6px;
+            margin: 2px;
+            font-size: 11px;
+            font-weight: bold;
+            transition: all 0.2s;
+            flex: 1;
+        }
+        .btn-rotate:hover { background-color: #2563eb; transform: translateY(-1px); }
+        .btn-go {
+            background-color: #f97316;
+            color: white;
+            font-weight: bold;
+            padding: 12px;
+            width: 100%;
+            border-radius: 8px;
+            margin-top: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 0 #c2410c;
+        }
+        .btn-go:hover { background-color: #ea580c; }
+        .btn-go:active { transform: translateY(2px); box-shadow: 0 2px 0 #c2410c; }
+        .reset-btn {
+            background-color: #64748b;
+            color: white;
+            margin-top: 10px;
+            width: 100%;
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="control-panel">
+        <h2 class="text-xl font-bold mb-2 text-gray-800 border-b pb-2">複合立体シミュレーター</h2>
+        <div class="mb-4">
+            <div class="space-y-1 mb-3">
+                <p class="text-[10px] text-red-600 font-bold">赤パーツ: 0 ≤ x ≤ 1, |y|≤1, |z|≤1</p>
+                <p class="text-[10px] text-blue-600 font-bold">青パーツ: -2 ≤ x ≤ 0, |y|≤1, |z|≤1</p>
+            </div>
+            
+            <div class="space-y-3">
+                <div class="flex items-center">
+                    <span class="w-20 text-xs font-bold text-red-500">世界X軸まわり</span>
+                    <button class="btn-rotate" onclick="rotateTargetGlobal('x', 45)">+45°</button>
+                    <button class="btn-rotate" onclick="rotateTargetGlobal('x', -45)">-45°</button>
+                </div>
+                <div class="flex items-center">
+                    <span class="w-20 text-xs font-bold text-green-600">世界Y軸まわり</span>
+                    <button class="btn-rotate" onclick="rotateTargetGlobal('y', 45)">+45°</button>
+                    <button class="btn-rotate" onclick="rotateTargetGlobal('y', -45)">-45°</button>
+                </div>
+                <div class="flex items-center">
+                    <span class="w-20 text-xs font-bold text-blue-500">世界Z軸まわり</span>
+                    <button class="btn-rotate" onclick="rotateTargetGlobal('z', 45)">+45°</button>
+                    <button class="btn-rotate" onclick="rotateTargetGlobal('z', -45)">-45°</button>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-go" id="go-button" onclick="handleGo()">GO! (切断して観察)</button>
+        <button class="reset-btn" onclick="resetAll()">リセット</button>
+
+        <div class="mt-4 p-2 bg-slate-50 rounded border border-slate-100">
+            <p class="text-[10px] text-gray-500 leading-tight italic">
+                ※ 回転軸は世界座標の原点を通ります。<br>
+                ※ 黄色の平面 (z=0) で切断します。
+            </p>
+        </div>
+    </div>
+
+    <div class="section-view" id="section-view-panel">
+        <h3 class="text-xs font-bold mb-2">断面 (z=0 平面)</h3>
+        <canvas id="section-canvas" width="200" height="200" style="border: 1px solid #cbd5e1; background: #fff;"></canvas>
+    </div>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let compositeGroup, upperGroup, lowerGroup;
+        let slicePlaneHelper;
+        let isSliced = false;
+        
+        let targetQuaternion = new THREE.Quaternion();
+        const ROTATION_SMOOTHNESS = 0.15;
+        
+        let sliceProgress = 0;
+        const SLICE_DISTANCE = 15.0; 
+        
+        const parts = [
+            { name: 'red', color: 0xef4444, sectionColor: 0x991b1b, size: [1, 2, 2], pos: [0.5, 0, 0] },
+            { name: 'blue', color: 0x3b82f6, sectionColor: 0x1e3a8a, size: [2, 2, 2], pos: [-1.0, 0, 0] }
+        ];
+
+        window.onload = function() {
+            init();
+            animate();
+        };
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf8fafc);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(8, 6, 12);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.localClippingEnabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight.position.set(5, 10, 7);
+            scene.add(dirLight);
+
+            // 軸の可視化
+            const axisLength = 6;
+            const axes = [
+                { dir: [1,0,0], color: 0xff0000 },
+                { dir: [0,1,0], color: 0x00ff00 },
+                { dir: [0,0,1], color: 0x0000ff }
+            ];
+            axes.forEach(a => {
+                const points = [new THREE.Vector3(0,0,0), new THREE.Vector3(...a.dir).multiplyScalar(axisLength)];
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                scene.add(new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: a.color, linewidth: 2 })));
+            });
+
+            // z=0 平面ガイド
+            slicePlaneHelper = new THREE.Mesh(
+                new THREE.PlaneGeometry(12, 12),
+                new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide, transparent: true, opacity: 0.08, depthWrite: false })
+            );
+            scene.add(slicePlaneHelper);
+
+            createCompositeCuboid();
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function createCompositeCuboid() {
+            if (compositeGroup) scene.remove(compositeGroup);
+            if (upperGroup) scene.remove(upperGroup);
+            if (lowerGroup) scene.remove(lowerGroup);
+
+            compositeGroup = new THREE.Group();
+            parts.forEach(p => {
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(...p.size), new THREE.MeshPhongMaterial({ color: p.color, transparent: true, opacity: 0.9 }));
+                mesh.position.set(...p.pos);
+                mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: 0x334155, opacity: 0.5, transparent: true })));
+                compositeGroup.add(mesh);
+            });
+            compositeGroup.quaternion.copy(targetQuaternion);
+            scene.add(compositeGroup);
+            isSliced = false;
+            sliceProgress = 0;
+            document.getElementById('go-button').innerText = "GO! (切断して観察)";
+        }
+
+        function rotateTargetGlobal(axis, degrees) {
+            if (isSliced) resetToBeforeSlice();
+            const angle = THREE.MathUtils.degToRad(degrees);
+            const axisVec = new THREE.Vector3(axis==='x'?1:0, axis==='y'?1:0, axis==='z'?1:0);
+            targetQuaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(axisVec, angle));
+        }
+
+        function handleGo() {
+            if (!isSliced) {
+                performSlice();
+                isSliced = true;
+                document.getElementById('go-button').innerText = "元に戻す";
+            } else {
+                resetToBeforeSlice();
+            }
+        }
+
+        function resetToBeforeSlice() {
+            createCompositeCuboid();
+            document.getElementById('section-canvas').getContext('2d').clearRect(0, 0, 200, 200);
+        }
+
+        function performSlice() {
+            const currentQuat = compositeGroup.quaternion.clone();
+            scene.remove(compositeGroup);
+
+            upperGroup = new THREE.Group();
+            lowerGroup = new THREE.Group();
+            
+            const clippingPlaneUpper = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+            const clippingPlaneLower = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+            const allSectionPoints = [];
+
+            parts.forEach(p => {
+                // 正しいワールド座標行列を計算
+                // WorldMatrix = GroupRotation * PartTranslation
+                const partWorldMatrix = new THREE.Matrix4();
+                partWorldMatrix.makeRotationFromQuaternion(currentQuat);
+                partWorldMatrix.multiply(new THREE.Matrix4().makeTranslation(...p.pos));
+
+                const points = getIntersectionPointsForMatrix(p.size, partWorldMatrix);
+                allSectionPoints.push({ color: p.sectionColor, points: points });
+
+                const boxGeom = new THREE.BoxGeometry(...p.size);
+                
+                // 上側パーツ
+                const uMesh = new THREE.Mesh(boxGeom, new THREE.MeshPhongMaterial({ color: p.color, clippingPlanes: [clippingPlaneUpper], transparent: true }));
+                uMesh.applyMatrix4(partWorldMatrix);
+                upperGroup.add(uMesh);
+
+                // 下側パーツ
+                const lMesh = new THREE.Mesh(boxGeom, new THREE.MeshPhongMaterial({ color: p.color, clippingPlanes: [clippingPlaneLower] }));
+                lMesh.applyMatrix4(partWorldMatrix);
+                lowerGroup.add(lMesh);
+
+                // 断面キャップ
+                if (points.length >= 3) {
+                    const shape = new THREE.Shape();
+                    shape.moveTo(points[0].x, points[0].y);
+                    for(let i=1; i<points.length; i++) shape.lineTo(points[i].x, points[i].y);
+                    shape.closePath();
+                    lowerGroup.add(new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshPhongMaterial({ color: p.sectionColor, side: THREE.DoubleSide })));
+                }
+            });
+
+            scene.add(upperGroup);
+            scene.add(lowerGroup);
+            drawMultiSection2D(allSectionPoints);
+        }
+
+        function getIntersectionPointsForMatrix(size, matrix) {
+            const hx = size[0]/2, hy = size[1]/2, hz = size[2]/2;
+            const worldVertices = [
+                new THREE.Vector3(-hx, -hy, -hz), new THREE.Vector3(hx, -hy, -hz),
+                new THREE.Vector3(hx, hy, -hz), new THREE.Vector3(-hx, hy, -hz),
+                new THREE.Vector3(-hx, -hy, hz), new THREE.Vector3(hx, -hy, hz),
+                new THREE.Vector3(hx, hy, hz), new THREE.Vector3(-hx, hy, hz)
+            ].map(v => v.applyMatrix4(matrix));
+
+            const edges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+            const points = [];
+            edges.forEach(e => {
+                const p1 = worldVertices[e[0]], p2 = worldVertices[e[1]];
+                if (p1.z * p2.z <= 0 && p1.z !== p2.z) {
+                    points.push(new THREE.Vector3().lerpVectors(p1, p2, -p1.z / (p2.z - p1.z)));
+                }
+            });
+
+            if (points.length < 3) return [];
+            const center = new THREE.Vector3(0,0,0);
+            points.forEach(p => center.add(p));
+            center.divideScalar(points.length);
+            return points.sort((a,b) => Math.atan2(a.y-center.y, a.x-center.x) - Math.atan2(b.y-center.y, b.x-center.x));
+        }
+
+        function drawMultiSection2D(allPoints) {
+            const canvas = document.getElementById('section-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 200, 200);
+            const scale = 35, cx = 100, cy = 100;
+
+            ctx.setLineDash([2, 2]); ctx.strokeStyle = "#e2e8f0";
+            ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(200, cy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, 200); ctx.stroke();
+            ctx.setLineDash([]);
+
+            allPoints.forEach(pGroup => {
+                if (pGroup.points.length < 3) return;
+                ctx.beginPath();
+                ctx.fillStyle = `rgba(${(pGroup.color >> 16) & 255}, ${(pGroup.color >> 8) & 255}, ${pGroup.color & 255}, 0.7)`;
+                ctx.strokeStyle = `rgb(${(pGroup.color >> 16) & 255}, ${(pGroup.color >> 8) & 255}, ${pGroup.color & 255})`;
+                pGroup.points.forEach((p, i) => {
+                    const x = cx + p.x * scale, y = cy - p.y * scale;
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                });
+                ctx.closePath(); ctx.fill(); ctx.stroke();
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (compositeGroup && !isSliced) compositeGroup.quaternion.slerp(targetQuaternion, ROTATION_SMOOTHNESS);
+            if (isSliced) sliceProgress += (1 - sliceProgress) * 0.1;
+            else sliceProgress += (0 - sliceProgress) * 0.15;
+
+            if (upperGroup && lowerGroup) {
+                upperGroup.position.z = sliceProgress * SLICE_DISTANCE;
+                upperGroup.children.forEach(c => { if(c.material) c.material.opacity = 1 - sliceProgress; });
+                lowerGroup.rotation.set(0, 0, 0); 
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function resetAll() {
+            targetQuaternion.set(0, 0, 0, 1);
+            resetToBeforeSlice();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>

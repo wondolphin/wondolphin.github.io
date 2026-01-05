@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アルケミー・ロジック - 魔法の調合パズル</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap');
+
+        body {
+            font-family: 'Yuji+Syuku', serif;
+            background-color: #1a1a2e;
+            color: #e2e2e2;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .game-container {
+            max-width: 500px;
+            height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 0.5rem;
+        }
+
+        .cauldron-container {
+            perspective: 1000px;
+        }
+
+        .cauldron {
+            width: 120px;
+            height: 100px;
+            background: radial-gradient(circle at 30% 30%, #4a4e69, #22223b);
+            border-radius: 50% 50% 40% 40%;
+            position: relative;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.5), inset 0 -8px 15px rgba(0,0,0,0.5);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .cauldron::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: 10%;
+            width: 80%;
+            height: 20px;
+            background: #333;
+            border-radius: 50%;
+            border: 3px solid #4a4e69;
+        }
+
+        .liquid {
+            position: absolute;
+            top: 4px;
+            left: 15%;
+            width: 70%;
+            height: 12px;
+            background: #9b5de5;
+            border-radius: 50%;
+            filter: blur(2px);
+            animation: bubble 2s infinite ease-in-out;
+        }
+
+        @keyframes bubble {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; filter: hue-rotate(45deg); }
+        }
+
+        .ingredient-card {
+            transition: all 0.2s;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .selected {
+            border: 2px solid #ffffff;
+            background-color: #2d314d !important;
+            box-shadow: 0 0 15px 5px rgba(247, 37, 133, 0.8), inset 0 0 10px rgba(247, 37, 133, 0.4);
+            transform: translateY(-8px) scale(1.05);
+        }
+
+        .ng-list-item {
+            background: rgba(255, 255, 255, 0.08);
+            border-left: 3px solid #ff4d4d;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+
+        .blink-red {
+            animation: blink 0.5s infinite alternate;
+            background-color: rgba(255, 0, 0, 0.6) !important;
+            border: 2px solid white;
+            z-index: 10;
+        }
+
+        @keyframes blink {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0.8; transform: scale(1.02); }
+        }
+
+        .shake {
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-12px) rotate(-4deg); }
+            75% { transform: translateX(12px) rotate(4deg); }
+        }
+
+        .success-flash {
+            animation: flash 0.5s;
+        }
+
+        @keyframes flash {
+            50% { background-color: #4cc9f0; }
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4cc9f0, #f72585);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* モード切替タブ */
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            text-align: center;
+            font-size: 0.8rem;
+            cursor: pointer;
+            background: #2d314d;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .tab-btn.active {
+            background: #4361ee;
+            border-bottom: 3px solid #4cc9f0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center">
+
+    <div class="game-container w-full flex flex-col">
+        <!-- Mode Switcher -->
+        <div class="flex w-full overflow-hidden rounded-t-xl mb-1">
+            <div id="mode-2" class="tab-btn active" onclick="switchMode(2)">2種類ver (8問)</div>
+            <div id="mode-3" class="tab-btn" onclick="switchMode(3)">3種類ver (11問)</div>
+        </div>
+
+        <!-- Header -->
+        <div class="w-full bg-gray-800/70 p-3 rounded-b-xl backdrop-blur-md shadow-lg border border-gray-600 mb-1">
+            <div class="flex justify-between items-center mb-1">
+                <div class="text-sm font-bold">第 <span id="level-num">1</span> 問 / <span id="total-levels">8</span></div>
+                <div id="mode-label" class="text-[10px] bg-indigo-900 px-2 py-0.5 rounded text-indigo-200">2 INGREDIENTS</div>
+            </div>
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+        </div>
+
+        <!-- NG Recipes Panel -->
+        <div class="w-full flex-1 flex flex-col justify-start overflow-y-auto py-2">
+            <h2 class="text-center text-red-400 mb-1 text-[10px] uppercase tracking-widest font-bold">Forbidden Recipes (失敗レシピ)</h2>
+            <div id="ng-list" class="grid grid-cols-2 gap-1 px-1">
+                <!-- NG items injected here -->
+            </div>
+        </div>
+
+        <!-- Cauldron Visual -->
+        <div class="cauldron-container flex flex-col items-center my-1">
+            <div id="cauldron" class="cauldron">
+                <div id="liquid" class="liquid"></div>
+            </div>
+            <div id="feedback-text" class="text-center mt-1 font-bold text-base h-6"></div>
+        </div>
+
+        <!-- Ingredient Selector -->
+        <div class="w-full bg-gray-900/90 p-3 rounded-2xl shadow-2xl border-t border-gray-700">
+            <p class="text-center text-[10px] text-gray-400 mb-2">正しい <span id="req-count">2</span>つ の組み合わせを選べ</p>
+            <div id="ingredient-shelf" class="flex justify-around items-center gap-1 flex-wrap">
+                <!-- Ingredients injected here -->
+            </div>
+            <button id="brew-btn" class="w-full mt-3 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-lg font-bold shadow-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                調合する (Brew)
+            </button>
+        </div>
+    </div>
+
+    <!-- Clear Modal -->
+    <div id="game-clear" class="fixed inset-0 bg-black/95 hidden flex-col items-center justify-center z-50 p-10 text-center">
+        <div class="text-6xl mb-4">🏆</div>
+        <h1 class="text-4xl font-bold text-yellow-400 mb-2">全問クリア！</h1>
+        <p id="clear-msg" class="text-base mb-8 text-gray-300">あなたは伝説の錬金術師です。</p>
+        <button onclick="location.reload()" class="px-10 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-full font-bold text-xl transition-transform active:scale-95">最初から遊ぶ</button>
+    </div>
+
+    <script>
+        const ALL_INGREDIENTS = [
+            { id: 1, name: 'Mandragora', emoji: '🌱' },
+            { id: 2, name: 'Mushroom', emoji: '🍄' },
+            { id: 3, name: 'Lizard Tail', emoji: '🦎' },
+            { id: 4, name: 'Crystal', emoji: '💎' },
+            { id: 5, name: 'Nightshade', emoji: '🍇' },
+            { id: 6, name: 'Eye Ball', emoji: '👁️' },
+            { id: 7, name: 'Fire Flower', emoji: '🔥' },
+            { id: 8, name: 'Magic Feather', emoji: '🪶' }
+        ];
+
+        let gameMode = 2; // 2 or 3
+        let currentLevel = 1;
+        let selectedIngredients = [];
+        let levelData = {
+            available: [],
+            ngRecipes: [], 
+        };
+
+        const levelEl = document.getElementById('level-num');
+        const totalLevelsEl = document.getElementById('total-levels');
+        const reqCountEl = document.getElementById('req-count');
+        const progressFill = document.getElementById('progress-fill');
+        const ngListEl = document.getElementById('ng-list');
+        const shelfEl = document.getElementById('ingredient-shelf');
+        const brewBtn = document.getElementById('brew-btn');
+        const cauldron = document.getElementById('cauldron');
+        const feedbackText = document.getElementById('feedback-text');
+
+        function switchMode(mode) {
+            gameMode = mode;
+            document.getElementById('mode-2').classList.toggle('active', mode === 2);
+            document.getElementById('mode-3').classList.toggle('active', mode === 3);
+            document.getElementById('mode-label').textContent = mode === 2 ? '2 INGREDIENTS' : '3 INGREDIENTS';
+            totalLevelsEl.textContent = mode === 2 ? '8' : '11';
+            reqCountEl.textContent = mode;
+            currentLevel = 1;
+            startLevel();
+        }
+
+        function initGame() {
+            startLevel();
+        }
+
+        function startLevel() {
+            selectedIngredients = [];
+            levelEl.textContent = currentLevel;
+            const maxLv = gameMode === 2 ? 8 : 11;
+            progressFill.style.width = ((currentLevel - 1) / maxLv * 100) + '%';
+            feedbackText.textContent = "";
+            brewBtn.disabled = true;
+            
+            generatePatternLevel(currentLevel);
+            renderUI();
+        }
+
+        function generatePatternLevel(lv) {
+            const shuffledPool = [...ALL_INGREDIENTS].sort(() => Math.random() - 0.5);
+            const getMapping = (count) => {
+                const mapping = {};
+                for(let i=1; i<=count; i++) mapping[i] = shuffledPool[i-1];
+                return mapping;
+            };
+
+            let mapping, ngs = [];
+            
+            if (gameMode === 2) {
+                mapping = getMapping(lv >= 6 ? 5 : lv >= 3 ? 4 : 3);
+                switch(lv) {
+                    case 1: ngs = [[1, null]]; break;
+                    case 2: ngs = [[1, 2], [2, 3]]; break;
+                    case 3: ngs = [[1, 2], [1, 3], [1, 4], [2, 3], [2, 4]]; break;
+                    case 4: ngs = [[1, null], [2, 3], [2, 4]]; break;
+                    case 5: ngs = [[1, null], [2, null]]; break;
+                    case 6: ngs = [[1, null], [2, null], [3, null]]; break;
+                    case 7: ngs = [[1, null], [2, null], [3, 4], [3, 5]]; break;
+                    case 8: ngs = [[1, null], [2, 3], [2, 4], [2, 5], [3, 4], [3, 5]]; break;
+                }
+            } else {
+                mapping = getMapping(lv >= 4 ? 5 : 4);
+                switch(lv) {
+                    case 1: ngs = [[1, null, null]]; break; // Correct: 2,3,4
+                    case 2: ngs = [[1, 2, null], [1, 3, 4]]; break; // Correct: 2,3,4
+                    case 3: ngs = [[1, 2, 3], [1, 2, 4], [1, 3, 4]]; break; // Correct: 2,3,4
+                    case 4: ngs = [[1, null, null], [2, null, null]]; break; // Correct: 3,4,5
+                    case 5: ngs = [[1, null, null], [2, 3, null], [2, 4, 5]]; break; // Correct: 3,4,5
+                    case 6: ngs = [[1, null, null], [2, 3, 4], [2, 3, 5], [2, 4, 5]]; break; // Correct: 3,4,5
+                    case 7: ngs = [[1, 2, null], [1, 3, null], [1, 4, null], [2, 3, null], [2, 4, 5]]; break; // Correct: 3,4,5
+                    case 8: ngs = [[1, 2, null], [1, 3, null], [4, 5, null], [2, 3, 4]]; break; // Correct: 2,3,5
+                    case 9: ngs = [[1, 2, null], [1, 3, 4], [1, 3, 5], [4, 5, null], [2, 3, 4]]; break; // Correct: 2,3,5
+                    case 10: ngs = [[1, 2, null], [1, 3, null], [2, 3, 4], [2, 3, 5], [2, 4, 5], [3, 4, 5]]; break; // Correct: 1,4,5
+                    case 11: ngs = [[1, 2, null], [1, 3, null], [3, 4, null], [2, 5, null]]; break; // Correct: 1,4,5
+                }
+            }
+
+            levelData.available = Object.values(mapping);
+            levelData.ngRecipes = ngs.map(ng => {
+                const ids = ng.map(n => n === null ? null : mapping[n].id);
+                return ids;
+            });
+        }
+
+        function renderUI() {
+            shelfEl.innerHTML = '';
+            const displayOrder = [...levelData.available].sort(() => Math.random() - 0.5);
+            displayOrder.forEach(ing => {
+                const div = document.createElement('div');
+                div.className = 'ingredient-card flex flex-col items-center p-2 bg-gray-700 rounded-xl w-14 shadow-md';
+                div.innerHTML = `<span class="text-2xl">${ing.emoji}</span>`;
+                div.onclick = () => toggleSelect(ing.id, div);
+                shelfEl.appendChild(div);
+            });
+
+            ngListEl.innerHTML = '';
+            levelData.ngRecipes.forEach((recipe, index) => {
+                const div = document.createElement('div');
+                div.id = `ng-item-${index}`;
+                div.className = 'ng-list-item flex items-center justify-center py-2 px-1 rounded-lg shadow-inner gap-1';
+                
+                let content = '';
+                recipe.forEach((id, idx) => {
+                    if (id === null) {
+                        content += `<span class="text-xl font-bold text-red-500">❓</span>`;
+                    } else {
+                        const ing = ALL_INGREDIENTS.find(i => i.id === id);
+                        content += `<span class="text-xl">${ing.emoji}</span>`;
+                    }
+                    if (idx < recipe.length - 1) content += `<span class="text-gray-600 text-[10px]">×</span>`;
+                });
+                div.innerHTML = content;
+                ngListEl.appendChild(div);
+            });
+        }
+
+        function toggleSelect(id, el) {
+            document.querySelectorAll('.ng-list-item').forEach(item => item.classList.remove('blink-red'));
+            const index = selectedIngredients.indexOf(id);
+            if (index > -1) {
+                selectedIngredients.splice(index, 1);
+                el.classList.remove('selected');
+            } else if (selectedIngredients.length < gameMode) {
+                selectedIngredients.push(id);
+                el.classList.add('selected');
+            }
+            brewBtn.disabled = selectedIngredients.length !== gameMode;
+        }
+
+        brewBtn.onclick = checkSolution;
+
+        function checkSolution() {
+            const sel = [...selectedIngredients].sort((a,b) => a-b);
+            let matchedNGIndex = -1;
+
+            levelData.ngRecipes.forEach((ng, index) => {
+                const ngValid = ng.filter(id => id !== null).sort((a,b) => a-b);
+                const nullCount = ng.filter(id => id === null).length;
+
+                // NG判定ロジック
+                // ngValidに含まれるすべてのIDがselに含まれているかチェック
+                const containsAll = ngValid.every(id => sel.includes(id));
+                if (containsAll) matchedNGIndex = index;
+            });
+
+            if (matchedNGIndex === -1) handleSuccess();
+            else handleFailure(matchedNGIndex);
+        }
+
+        function handleSuccess() {
+            feedbackText.textContent = "成功！✨";
+            feedbackText.className = "text-center mt-1 font-bold text-lg h-6 text-cyan-400";
+            document.getElementById('liquid').style.backgroundColor = '#4cc9f0';
+            cauldron.classList.add('success-flash');
+            
+            currentLevel++;
+            const maxLv = gameMode === 2 ? 8 : 11;
+            if (currentLevel > maxLv) {
+                setTimeout(showClear, 800);
+            } else {
+                setTimeout(startLevel, 800);
+            }
+        }
+
+        function handleFailure(ngIndex) {
+            feedbackText.textContent = "爆発！！💥";
+            feedbackText.className = "text-center mt-1 font-bold text-lg h-6 text-red-500";
+            cauldron.classList.add('shake');
+            document.getElementById('liquid').style.backgroundColor = '#ff4d4d';
+            const ngItem = document.getElementById(`ng-item-${ngIndex}`);
+            if (ngItem) ngItem.classList.add('blink-red');
+
+            setTimeout(() => {
+                cauldron.classList.remove('shake');
+                document.getElementById('liquid').style.backgroundColor = '#9b5de5';
+                selectedIngredients = [];
+                document.querySelectorAll('.ingredient-card').forEach(el => el.classList.remove('selected'));
+                brewBtn.disabled = true;
+            }, 1000);
+        }
+
+        function showClear() {
+            progressFill.style.width = '100%';
+            document.getElementById('clear-msg').textContent = gameMode === 2 ? "2種類マスター達成！" : "難関！3種類マスター達成！";
+            document.getElementById('game-clear').style.display = 'flex';
+        }
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
