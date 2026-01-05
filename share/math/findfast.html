@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fastest Orbit - 線速度で競う</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        canvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            cursor: pointer;
+        }
+        .ui-container {
+            position: relative;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .interactive {
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center h-[100dvh] w-full">
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Header Stats -->
+    <div id="game-stats" class="fixed top-6 left-0 w-full px-6 flex justify-between items-center z-20 pointer-events-none hidden">
+        <div class="bg-slate-800/80 backdrop-blur px-4 py-2 rounded-lg border border-slate-700 shadow-lg">
+            <span class="text-slate-400 text-xs uppercase tracking-widest">Time</span>
+            <div id="timer-display" class="font-mono text-xl font-bold">0.0s</div>
+        </div>
+        <div class="bg-slate-800/80 backdrop-blur px-4 py-2 rounded-lg border border-slate-700 shadow-lg">
+            <span class="text-slate-400 text-xs uppercase tracking-widest">Miss</span>
+            <div id="miss-display" class="font-mono text-xl font-bold text-red-400">0</div>
+        </div>
+    </div>
+
+    <!-- UI Overlay Area -->
+    <div class="ui-container flex flex-col items-center justify-center w-full px-4">
+        
+        <!-- Main Menu -->
+        <div id="start-screen" class="interactive flex flex-col items-center gap-6 p-8 bg-slate-800/95 backdrop-blur rounded-2xl border border-slate-700 shadow-2xl max-w-sm text-center">
+            <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent italic">Fastest Orbit</h1>
+            <p class="text-slate-300 leading-relaxed text-sm">
+                円のサイズに関係なく、<br><b class="text-white text-lg underline decoration-blue-500">「点自体が一番速く走っている」</b><br>円を順番にタップしてください。
+            </p>
+            <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-10 rounded-xl transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-blue-900/40">
+                START GAME
+            </button>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result-screen" class="interactive hidden flex flex-col items-center gap-6 p-8 bg-slate-800/95 backdrop-blur rounded-2xl border border-slate-700 shadow-2xl max-w-sm text-center">
+            <h2 class="text-3xl font-bold text-emerald-400">Game Clear!</h2>
+            <div class="space-y-3 text-left w-full py-4">
+                <div class="flex justify-between border-b border-slate-700/50 pb-2">
+                    <span class="text-slate-400">タイム:</span>
+                    <span id="final-time" class="font-mono font-bold">0.0s</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-700/50 pb-2">
+                    <span class="text-slate-400">ミス:</span>
+                    <span id="final-miss" class="font-mono font-bold text-red-400">0</span>
+                </div>
+                <div class="flex justify-between pt-2 text-2xl font-black italic">
+                    <span class="text-slate-200">SCORE:</span>
+                    <span id="final-score" class="text-yellow-400 font-mono">0</span>
+                </div>
+            </div>
+            <button id="restart-btn" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 px-10 rounded-xl transition-all transform hover:scale-105 shadow-xl">
+                RETRY
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('start-screen');
+        const resultScreen = document.getElementById('result-screen');
+        const gameStats = document.getElementById('game-stats');
+        const timerDisplay = document.getElementById('timer-display');
+        const missDisplay = document.getElementById('miss-display');
+        
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        let circles = [];
+        const CIRCLE_COUNT = 8;
+        let gameState = 'START';
+        let startTime = 0;
+        let currentTime = 0;
+        let missCount = 0;
+        let animationId;
+
+        class OrbitCircle {
+            constructor(id, x, y, radius, linearSpeed) {
+                this.id = id;
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.linearSpeed = linearSpeed; // ピクセル/フレーム単位の速度
+                this.angle = Math.random() * Math.PI * 2;
+                this.isActive = true;
+                this.errorTime = 0;
+                this.hue = Math.floor(Math.random() * 60) + 180;
+            }
+
+            update(dt) {
+                if (!this.isActive) return;
+                // 線速度を半径で割ることで、必要な角速度を計算
+                // v = r * omega => omega = v / r
+                const angularVelocity = this.linearSpeed / this.radius;
+                this.angle += angularVelocity;
+                
+                if (this.errorTime > 0) {
+                    this.errorTime -= dt;
+                }
+            }
+
+            draw(ctx) {
+                if (!this.isActive) return;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                if (this.errorTime > 0) {
+                    ctx.strokeStyle = `rgba(239, 68, 68, ${Math.min(1, this.errorTime / 500)})`;
+                    ctx.lineWidth = 4;
+                } else {
+                    ctx.strokeStyle = `hsla(${this.hue}, 70%, 50%, 0.3)`;
+                    ctx.lineWidth = 2;
+                }
+                ctx.stroke();
+
+                const dotX = this.x + Math.cos(this.angle) * this.radius;
+                const dotY = this.y + Math.sin(this.angle) * this.radius;
+
+                ctx.beginPath();
+                ctx.arc(dotX, dotY, 7, 0, Math.PI * 2);
+                ctx.fillStyle = this.errorTime > 0 ? '#ef4444' : `hsl(${this.hue}, 80%, 60%)`;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            isHit(mx, my) {
+                const dist = Math.sqrt((mx - this.x) ** 2 + (my - this.y) ** 2);
+                return dist < this.radius + 30;
+            }
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        function initGame() {
+            resize();
+            circles = [];
+            missCount = 0;
+            startTime = Date.now();
+            
+            // 線速度 (linear speed) のリストを作成
+            const speeds = [];
+            for (let i = 0; i < CIRCLE_COUNT; i++) {
+                // 1.5ピクセル/フレーム ~ 6.0ピクセル/フレーム 程度の範囲で差をつける
+                speeds.push(1.5 + (i * 0.8) + (Math.random() * 0.4));
+            }
+            speeds.sort(() => Math.random() - 0.5);
+
+            const padding = 120;
+            const minDistance = 180;
+
+            for (let i = 0; i < CIRCLE_COUNT; i++) {
+                let x, y, tooClose;
+                let attempts = 0;
+                
+                do {
+                    tooClose = false;
+                    x = padding + Math.random() * (canvas.width - padding * 2);
+                    y = padding + Math.random() * (canvas.height - padding * 2);
+                    
+                    for (let c of circles) {
+                        const d = Math.sqrt((x - c.x) ** 2 + (y - c.y) ** 2);
+                        if (d < minDistance) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                    attempts++;
+                } while (tooClose && attempts < 100);
+
+                // 半径をバラバラにする (30 ~ 80ピクセル)
+                const radius = 30 + Math.random() * 50;
+                circles.push(new OrbitCircle(i, x, y, radius, speeds[i]));
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (gameState === 'PLAYING') {
+                const now = Date.now();
+                currentTime = (now - startTime) / 1000;
+                timerDisplay.innerText = currentTime.toFixed(1) + 's';
+                missDisplay.innerText = missCount;
+            }
+
+            circles.forEach(c => {
+                c.update(16);
+                c.draw(ctx);
+            });
+
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function handleTap(e) {
+            if (gameState !== 'PLAYING') return;
+
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            let clickedCircle = null;
+            let minDist = 999;
+            for (let c of circles) {
+                if (c.isActive && c.isHit(x, y)) {
+                    const d = Math.sqrt((x - c.x) ** 2 + (y - c.y) ** 2);
+                    if (d < minDist) {
+                        minDist = d;
+                        clickedCircle = c;
+                    }
+                }
+            }
+
+            if (clickedCircle) {
+                const activeCircles = circles.filter(c => c.isActive);
+                // 判定も linearSpeed (線速度) で行う
+                const fastestSpeed = Math.max(...activeCircles.map(c => c.linearSpeed));
+
+                if (clickedCircle.linearSpeed >= fastestSpeed - 0.0001) {
+                    clickedCircle.isActive = false;
+                    checkClear();
+                } else {
+                    clickedCircle.errorTime = 600;
+                    missCount++;
+                }
+            }
+        }
+
+        function checkClear() {
+            if (circles.every(c => !c.isActive)) {
+                gameState = 'RESULT';
+                showResult();
+            }
+        }
+
+        function showResult() {
+            gameStats.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+            
+            const finalTimeVal = currentTime;
+            const finalMissVal = missCount;
+            const score = Math.max(0, Math.floor(10000 - (finalTimeVal * 120) - (finalMissVal * 600)));
+            
+            document.getElementById('final-time').innerText = finalTimeVal.toFixed(1) + 's';
+            document.getElementById('final-miss').innerText = finalMissVal;
+            document.getElementById('final-score').innerText = score.toLocaleString();
+        }
+
+        startBtn.addEventListener('click', () => {
+            gameState = 'PLAYING';
+            startScreen.classList.add('hidden');
+            gameStats.classList.remove('hidden');
+            initGame();
+        });
+
+        restartBtn.addEventListener('click', () => {
+            resultScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            gameState = 'START';
+        });
+
+        canvas.addEventListener('mousedown', handleTap);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleTap(e);
+        }, { passive: false });
+
+        window.addEventListener('resize', resize);
+
+        resize();
+        gameLoop();
+    </script>
+</body>
+</html>
