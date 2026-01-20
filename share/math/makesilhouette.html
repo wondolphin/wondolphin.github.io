@@ -1,517 +1,1120 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3Dブロック積み上げゲーム</title>
+    <title>メイクシルエット</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; overflow: hidden; background-color: #1a1a1a; font-family: 'sans-serif'; }
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .preview-slot { 
-            width: 120px; height: 120px; 
-            background: rgba(0, 0, 0, 0.4); 
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            touch-action: manipulation;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .preview-slot {
+            width: 100px;
+            height: 100px;
+            background: rgba(0, 0, 0, 0.6);
             border: 2px solid #444;
-            border-radius: 8px; 
-            pointer-events: auto; 
+            border-radius: 8px;
+            pointer-events: auto;
             cursor: grab;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.2s, border-color 0.2s;
+            transition: opacity 0.3s, transform 0.2s, border-color 0.2s;
             overflow: hidden;
         }
-        .preview-slot:hover { border-color: #888; }
-        .preview-slot:active { cursor: grabbing; transform: scale(0.95); }
-        .preview-slot canvas { display: block; }
+
+        .preview-slot.used {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.8);
+        }
+
+        .preview-slot:hover:not(.used) {
+            border-color: #888;
+        }
+
+        .preview-slot canvas {
+            display: block;
+            width: 100px !important;
+            height: 100px !important;
+        }
+
+        .control-btn {
+            pointer-events: auto;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: white;
+        }
+
+        .hidden-screen {
+            display: none !important;
+        }
+
+        #problem-selector {
+            pointer-events: auto;
+            background-color: #222;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            font-weight: bold;
+        }
+
+        #clear-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 255, 100, 0.6);
+            color: black;
+            padding: 30px 60px;
+            border-radius: 20px;
+            font-size: 4rem;
+            font-weight: 900;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 0 50px rgba(0, 255, 100, 0.3);
+            backdrop-filter: blur(4px);
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+
         #message-box {
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.8);
             color: white;
             padding: 10px 20px;
             border-radius: 20px;
             display: none;
             z-index: 100;
         }
-        #clear-display {
+
+        /* 結果表示モーダル */
+        #result-modal {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 255, 100, 0.9);
-            color: black;
-            padding: 20px 60px;
-            border-radius: 10px;
-            font-size: 48px;
-            font-weight: bold;
-            display: none;
-            z-index: 200;
-            box-shadow: 0 0 30px rgba(0, 255, 100, 0.5);
-        }
-        .control-btn {
-            pointer-events: auto;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 8px 16px;
-            border-radius: 6px;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-        .control-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: white;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
         }
     </style>
 </head>
+
 <body>
 
-<div id="ui-layer">
-    <div class="flex justify-center gap-6 mt-6">
-        <div id="slot-0" class="preview-slot" onpointerdown="startDrag(0, event)"></div>
-        <div id="slot-1" class="preview-slot" onpointerdown="startDrag(1, event)"></div>
-        <div id="slot-2" class="preview-slot" onpointerdown="startDrag(2, event)"></div>
+    <div id="ui-layer">
+        <!-- ==================== スタート画面 ==================== -->
+        <div id="start-screen"
+            class="flex flex-col items-center justify-center h-full bg-slate-900 text-white p-8 pointer-events-auto">
+            <h1 class="text-5xl font-black text-blue-400 mb-8 text-center">メイクシルエット</h1>
+
+            <div class="bg-white/10 p-8 rounded-2xl mb-10 w-full max-lg text-center">
+                <p class="text-xl font-bold mb-4">がくねんを えらんでね</p>
+                <div class="flex justify-center gap-4 mb-8">
+                    <label
+                        class="flex items-center gap-3 cursor-pointer p-4 rounded-lg border-2 border-transparent bg-white/5 hover:border-blue-400 min-w-[200px] transition-all">
+                        <input type="radio" name="stage-select" value="1" checked class="w-6 h-6">
+                        <span class="text-xl font-bold">1,2ねんせい</span>
+                    </label>
+                    <label
+                        class="flex items-center gap-3 cursor-pointer p-4 rounded-lg border-2 border-transparent bg-white/5 hover:border-blue-400 min-w-[200px] transition-all">
+                        <input type="radio" name="stage-select" value="2" class="w-6 h-6">
+                        <span class="text-xl font-bold">3,4ねんせい</span>
+                    </label>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4">
+                    <button id="score-attack-btn"
+                        class="bg-orange-500 hover:bg-orange-600 p-6 rounded-xl text-2xl font-black shadow-lg">
+                        スコアアタック
+                        <div class="text-sm font-normal opacity-80 mt-1">3分で何問とけるかな？</div>
+                    </button>
+                    <button id="free-mode-btn"
+                        class="bg-sky-500 hover:bg-sky-600 p-6 rounded-xl text-2xl font-black shadow-lg">
+                        フリーモード
+                        <div class="text-sm font-normal opacity-80 mt-1">じっくり問題をえらんで挑戦</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== ゲーム画面 ==================== -->
+        <div id="game-screen" class="hidden-screen h-full w-full flex flex-col">
+            <!-- 上部コントロール (システムパネル) -->
+            <div id="free-mode-panel" class="flex justify-between items-center p-4 bg-black/60 hidden-screen">
+                <div class="flex items-center gap-4">
+                    <select id="problem-selector" class="text-lg"></select>
+                    <button id="next-problem-btn" class="control-btn bg-indigo-600 border-none font-bold text-lg">
+                        つぎの もんだいへ →
+                    </button>
+                </div>
+                <button class="control-btn" onclick="backToTitle()">タイトルへ</button>
+            </div>
+
+            <div id="score-attack-panel" class="flex justify-between items-center p-4 bg-orange-900/60 hidden-screen">
+                <div class="text-orange-400 text-3xl font-black font-mono" id="timer-display">3:00</div>
+                <div class="flex items-center gap-4 absolute left-1/2 -translate-x-1/2">
+                    <div class="text-white text-4xl font-black">スコア: <span id="score-display">0</span></div>
+                    <button class="control-btn bg-white/20 border-white/40" onclick="skipProblem()">スキップ</button>
+                </div>
+                <button class="control-btn" onclick="backToTitle()">やめる</button>
+            </div>
+
+            <!-- ゲーム内操作UI -->
+            <div class="flex flex-col items-center p-4 gap-2">
+                <div class="w-full max-w-sm flex justify-end gap-2 pointer-events-auto">
+                    <button class="control-btn" onclick="undoLastMove()">1手もどす</button>
+                    <button class="control-btn" onclick="reloadProblem()">リトライ</button>
+                </div>
+
+                <div class="flex gap-4 pointer-events-auto">
+                    <div id="slot-0" class="preview-slot" onpointerdown="startDrag(0, event)"></div>
+                    <div id="slot-1" class="preview-slot" onpointerdown="startDrag(1, event)"></div>
+                    <div id="slot-2" class="preview-slot" onpointerdown="startDrag(2, event)"></div>
+                </div>
+            </div>
+
+            <div class="flex-grow"></div>
+        </div>
+
+        <!-- ==================== 結果画面 ==================== -->
+        <div id="result-modal" class="hidden-screen pointer-events-auto">
+            <div class="bg-white p-10 rounded-3xl text-center shadow-2xl animate-bounce-in max-w-sm w-full mx-4">
+                <h2 class="text-3xl font-black text-orange-500 mb-2">タイムアップ！</h2>
+                <p class="text-gray-600 mb-6 font-bold">あなたのスコアは...</p>
+                <div class="text-7xl font-black text-blue-600 mb-10"><span id="final-score">0</span>点</div>
+                <button
+                    class="bg-blue-500 hover:bg-blue-600 text-white font-black py-4 px-8 rounded-xl text-2xl shadow-lg w-full transition-transform active:scale-95"
+                    onclick="backToTitle()">
+                    タイトルへ
+                </button>
+            </div>
+        </div>
+
+        <div id="message-box"></div>
+        <div id="clear-overlay">CLEAR!!</div>
     </div>
 
-    <div class="fixed top-6 right-6 flex gap-2">
-        <button class="control-btn" onclick="undoLastMove()">一手戻る</button>
-        <button class="control-btn" onclick="resetGame()">リセット</button>
-    </div>
-    
-    <div id="message-box"></div>
-    <div id="clear-display">CLEAR!!</div>
-</div>
+    <script>
+        /**
+         * 定数とデータ
+         */
+        const STAGE_SIZE = 4;
+        const TARGET_HEIGHT = 4;
+        const FALL_SPEED = 0.2;
+        const POINT_PER_PROBLEM = 6;
+        const TIME_LIMIT = 180;
 
-<script>
-/**
- * 定数と設定
- */
-const STAGE_SIZE = 4;
-const TARGET_HEIGHT = 4; 
-const FALL_SPEED = 0.2; 
+        const SLOT_COLORS = [0xff5555, 0x55ff55, 0xffff55];
 
-const TARGET_BACK = [ 
-    [0,0,0,0],
-    [0,1,1,0],
-    [0,0,1,0],
-    [1,1,1,1]
-];
+        const DEFAULT_PIECES = [
+            { shape: [[0, 0, 0], [0, 1, 0], [0, 2, 0], [1, 0, 0]] },
+            { shape: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0]] },
+            { shape: [[0, 0, 0], [0, 1, 0]] }
+        ];
 
-const TARGET_LEFT = [ 
-    [0,0,0,0],
-    [0,0,1,1],
-    [1,0,0,1],
-    [1,1,1,1]
-];
+            const PROBLEMS = [
+                {
+                    level: 11,
+                    title: "A-1",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 1, 1]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-2, 0, 0], [0, 0, -1], [-1, 0, -1], [-2, 0, -1]] },
+                        { shape: [[0, 0, 0], [0, 1, 0]] }
+                    ]
+                },
+                {
+                    level: 11,
+                    title: "A-2",
+                    targetBack: [[0, 0, 0, 0], [1, 1, 0, 0], [0, 1, 0, 0], [0, 1, 1, 0]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [0, 0, -1], [-1, 0, -1]] },
+                        { shape: [[0, 0, 0], [0, 1, 0], [-1, 1, 0]] }
+                    ]
+                },
+                {
+                    level: 11,
+                    title: "A-3",
+                    targetBack: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 1, 1, 0], [1, 1, 1, 1]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [0, 0, -1], [-1, 0, -1]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 1, 0], [-2, 1, 0]] }
+                    ]
+                },
+                {
+                    level: 11,
+                    title: "A-4",
+                    targetBack: [[0, 0, 0, 0], [1, 1, 1, 0], [0, 1, 0, 0], [0, 1, 0, 0]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 0, -1], [0, 1, -1]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-2, 0, 0]] }
+                    ]
+                },
+                {
+                    level: 11,
+                    title: "A-5",
+                    targetBack: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 1, 1, 1], [1, 1, 1, 1]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-2, 0, 0], [-3, 0, 0], [0, 0, -1], [0, 1, -1]] }
+                    ]
+                },
+                {
+                    level: 11,
+                    title: "A-6",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 1, 0], [0, 1, 0, 0], [0, 1, 1, 0]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 1, 0], [1, 1, 0]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 1, 0], [-1, 0, -1]] }
+                    ]
+                },
+                {
+                    level: 11,
+                    title: "A-7",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 0, 0], [1, 1, 1, 0], [0, 1, 0, 0]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 0, -1], [-1, 0, 0], [-2, 0, 0]] },
+                        { shape: [[0, 0, 0], [0, 0, -1], [0, 1, -1], [0, 2, -1]] }
+                    ]
+                },
+                {
+                    level: 19,
+                    title: "A-8",
+                    targetBack: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 1, 1, 0], [0, 1, 1, 0]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, -1]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [0, 0, -1], [-1, 0, -1], [-1, 1, -1], [-1, 1, -2]] }
+                    ]
+                },
+                {
+                    level: 19,
+                    title: "A-9",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 0, 0], [0, 1, 1, 0], [0, 1, 0, 0]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 0, -1], [0, 0, -2], [0, 1, -2], [1, 1, -2]] },
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 2, 0]] }
+                    ]
+                },
+                {
+                    level: 21,
+                    title: "B-1",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 0, 1], [0, 1, 0, 1], [0, 1, 1, 1]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 1, 0]] },
+                        { shape: [[0, 0, 0], [0, 1, 0]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [0, 0, -1], [0, 0, -2], [1, 0, -2]] }
+                    ]
+                },
+                {
+                    level: 23,
+                    title: "B-2",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 1, 1], [0, 1, 0, 1], [0, 1, 0, 1]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 0, -1], [0, 0, -2], [0, 1, -2]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [0, 0, -1]] },
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 2, 0]] }
+                    ]
+                },
+                {
+                    level: 21,
+                    title: "B-3",
+                    targetBack: [[1, 1, 0, 0], [0, 1, 1, 0], [0, 0, 1, 0], [0, 0, 1, 1]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, -1]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, -1]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [0, 0, -1], [-1, 0, -1], [0, 0, -2], [-1, 0, -2], [-1, 1, -2]] }
+                    ]
+                },
 
-const PIECE_DEFINITIONS = [
-    { name: "L字テトロミノ", shape: [[0,0,0], [0,1,0], [1,0,0]], color: 0xff5555 },
-    { name: "O型テトロミノ", shape: [[0,0,0], [-1,0,0], [0,0,1], [-1,0,1]], color: 0xffff55 },
-    { name: "ドミノ", shape: [[0,0,0], [0,1,0]], color: 0x55ff55 }
-];
+                {
+                    level: 21,
+                    title: "B-4",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 1, 1], [0, 1, 0, 1], [0, 1, 1, 1]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 1, 0], [1, 1, 0]] },
+                        { shape: [[0, 0, 0], [0, 1, 0]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, -1], [-1, 0, -2], [-1, 0, -3], [-2, 0, -3]] }
+                    ]
+                },
+                {
+                    level: 22,
+                    title: "B-5",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 0, 0], [0, 1, 0, 1], [0, 1, 1, 1]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 1, 1]] },
+                        { shape: [[0, 0, 0], [0, 0, -1]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [0, 0, -1], [0, 0, -2], [1, 0, -2]] }
+                    ]
+                },
+                {
+                    level: 23,
+                    title: "B-6",
+                    targetBack: [[1, 0, 0, 0], [1, 1, 1, 1], [1, 0, 0, 0], [1, 0, 0, 0]],
+                    hideLeft: true,
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 2, 0]] },
+                        { shape: [[0, 0, 0], [0, 0, -1], [0, 1, -1], [0, 2, -1], [0, 2, -2]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-2, 0, 0], [-3, 0, 0]] }
+                    ]
+                },
 
-/**
- * ゲーム状態
- */
-let scene, camera, renderer, raycaster;
-let previewScenes = [], previewCameras = [], previewRenderers = [];
 
-let stageOccupied = Array(STAGE_SIZE).fill().map(() => Array(STAGE_SIZE).fill(0));
-let voxelData = Array(STAGE_SIZE).fill().map(() => 
-    Array(STAGE_SIZE * 2).fill().map(() => 
-        Array(STAGE_SIZE).fill(false)
-    )
-);
 
-let draggingPiece = null;
-let dragMesh = null;
-let targetPlane; 
-let fallingPieces = []; 
-let placedPiecesGroup;
-let isCleared = false;
-let history = []; // 履歴スタック
+                {
+                    level: 32,
+                    title: "C-1",
+                    targetBack: [[0, 0, 0, 0], [0, 0, 1, 1], [0, 0, 1, 1], [0, 0, 1, 1]],
+                    targetLeft: [[0, 0, 0, 0], [1, 1, 0, 0], [1, 1, 0, 0], [1, 1, 0, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, -1], [0, 0, -1]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, -1], [0, 0, -1], [0, 1, 0], [-1, 1, 0], [-1, 1, -1], [0, 1, -1]] }
+                    ]
+                },
+                {
+                    level: 31,
+                    title: "C-2",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 1, 0], [0, 1, 1, 0], [1, 1, 1, 1]],
+                    targetLeft: [[0, 0, 0, 0], [0, 1, 1, 0], [0, 1, 1, 0], [0, 1, 1, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, -1], [0, 0, -1], [-2, 0, 0], [-2, 0, -1], [-3, 0, 0], [-3, 0, -1]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, -1], [0, 0, -1], [0, 1, 0], [-1, 1, 0], [-1, 1, -1], [0, 1, -1]] }
+                    ]
+                },
+                {
+                    level: 31,
+                    title: "C-3",
+                    targetBack: [[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 0, 1], [0, 1, 1, 1]],
+                    targetLeft: [[0, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 1, 1, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-2, 0, 0], [0, 0, -1], [-1, 0, -1], [-2, 0, -1], [0, 0, -2], [-1, 0, -2], [-2, 0, -2]] },
+                        { shape: [[0, 0, 0], [0, 1, 0]] }
+                    ]
+                },
+                {
+                    level: 31,
+                    title: "C-4",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 1, 0]],
+                    targetLeft: [[0, 0, 0, 0], [0, 1, 1, 0], [0, 0, 1, 0], [0, 1, 1, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 0, -1]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [0, 0, -1], [-1, 0, -1], [-1, 1, -1]] }
+                    ]
+                },
+                {
+                    level: 31,
+                    title: "C-5",
+                    targetBack: [[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 0, 1], [0, 1, 1, 1]],
+                    targetLeft: [[0, 0, 0, 0], [0, 1, 1, 0], [0, 0, 1, 0], [1, 1, 1, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-2, 0, 0], [-2, 0, 1], [-2, 0, 2]] },
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 1, 1]] }
+                    ]
+                },
+                {
+                    level: 32,
+                    title: "C-6",
+                    targetBack: [[0, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 0], [0, 1, 1, 0]],
+                    targetLeft: [[0, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 0], [0, 1, 1, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 1, 0]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, 1]] }
+                    ]
+                },
+                {
+                    level: 33,
+                    title: "C-7",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 0, 0], [0, 1, 1, 1], [0, 0, 1, 1]],
+                    targetLeft: [[0, 0, 0, 0], [0, 0, 1, 0], [1, 1, 1, 1], [0, 0, 1, 1]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-2, 0, 0], [-2, 0, 1], [-2, 0, 2], [-2, 1, 0]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [0, 0, -1], [-1, 0, -1], [-1, 1, -1], [0, 1, -1]] }
+                    ]
+                },
+                {
+                    level: 33,
+                    title: "C-8",
+                    targetBack: [[0, 1, 1, 0], [0, 1, 1, 0], [0, 1, 0, 0], [0, 1, 0, 0]],
+                    targetLeft: [[0, 1, 1, 0], [0, 1, 0, 0], [0, 1, 0, 0], [0, 1, 0, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 1, 0], [-1, 1, 0], [0, 1, -1]] },
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 2, 0]] }
+                    ]
+                },
+                {
+                    level: 31,
+                    title: "C-9",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 0, 0], [0, 1, 1, 0], [0, 1, 1, 1]],
+                    targetLeft: [[0, 0, 0, 0], [0, 0, 1, 0], [0, 1, 1, 0], [1, 1, 1, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 1, 0], [-1, 0, 1]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-2, 0, 0], [-1, 0, 1], [-1, 0, -1]] }
+                    ]
+                },
+                {
+                    level: 31,
+                    title: "C-10",
+                    targetBack: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 1, 1], [0, 1, 1, 0]],
+                    targetLeft: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 1, 1], [0, 1, 1, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, -1]] },
+                        { shape: [[0, 0, 0], [0, 0, -1], [-1, 0, -1]] }
+                    ]
+                },
 
-let screenBackCtx, screenLeftCtx;
-let screenBackTexture, screenLeftTexture;
 
-/**
- * 初期化
- */
-function init() {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x111111);
-
-    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(12, 14, 12);
-    camera.lookAt(1.0, 2.0, 1.0); 
-
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    document.body.appendChild(renderer.domElement);
-
-    raycaster = new THREE.Raycaster();
-    placedPiecesGroup = new THREE.Group();
-    scene.add(placedPiecesGroup);
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 15, 5);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
-
-    // 床
-    const gridHelperBottom = new THREE.GridHelper(STAGE_SIZE, STAGE_SIZE, 0x888888, 0x333333);
-    gridHelperBottom.position.set(1.5, 0, 1.5);
-    scene.add(gridHelperBottom);
-
-    const floorGeo = new THREE.PlaneGeometry(STAGE_SIZE, STAGE_SIZE);
-    const floorMesh = new THREE.Mesh(floorGeo, new THREE.MeshStandardMaterial({ color: 0x222222 }));
-    floorMesh.rotation.x = -Math.PI / 2;
-    floorMesh.position.set(1.5, -0.01, 1.5);
-    floorMesh.receiveShadow = true;
-    scene.add(floorMesh);
-
-    // 判定用透明平面 (y=4)
-    const targetPlaneGeo = new THREE.PlaneGeometry(STAGE_SIZE * 6, STAGE_SIZE * 6);
-    targetPlane = new THREE.Mesh(targetPlaneGeo, new THREE.MeshBasicMaterial({ visible: false }));
-    targetPlane.rotation.x = -Math.PI / 2;
-    targetPlane.position.set(1.5, TARGET_HEIGHT, 1.5);
-    scene.add(targetPlane);
-
-    // 高さ4の可視レイヤー
-    const targetVisMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(STAGE_SIZE, STAGE_SIZE),
-        new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.1, side: THREE.DoubleSide })
-    );
-    targetVisMesh.rotation.x = -Math.PI / 2;
-    targetVisMesh.position.set(1.5, TARGET_HEIGHT, 1.5);
-    scene.add(targetVisMesh);
-
-    const gridHelperTop = new THREE.GridHelper(STAGE_SIZE, STAGE_SIZE, 0xffffff, 0xffffff);
-    gridHelperTop.position.set(1.5, TARGET_HEIGHT, 1.5);
-    gridHelperTop.material.opacity = 0.3;
-    gridHelperTop.material.transparent = true;
-    scene.add(gridHelperTop);
-
-    initScreens();
-
-    for(let i=0; i<3; i++) initPreview3D(i);
-
-    window.addEventListener('resize', onWindowResize);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-
-    animate();
-}
-
-function initScreens() {
-    const canvasSize = 256;
-    const createScreenCanvas = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = canvasSize; canvas.height = canvasSize;
-        const ctx = canvas.getContext('2d');
-        const texture = new THREE.CanvasTexture(canvas);
-        return { canvas, ctx, texture };
-    };
-
-    const back = createScreenCanvas();
-    screenBackCtx = back.ctx;
-    screenBackTexture = back.texture;
-
-    const left = createScreenCanvas();
-    screenLeftCtx = left.ctx;
-    screenLeftTexture = left.texture;
-
-    const screenGeo = new THREE.PlaneGeometry(STAGE_SIZE, STAGE_SIZE);
-    const screenMatBase = { roughness: 0.8, transparent: true, opacity: 0.9 };
-
-    const screenBackMesh = new THREE.Mesh(screenGeo, new THREE.MeshStandardMaterial({ ...screenMatBase, map: screenBackTexture }));
-    screenBackMesh.position.set(1.5, 2, -3.5); 
-    scene.add(screenBackMesh);
-
-    const screenLeftMesh = new THREE.Mesh(screenGeo, new THREE.MeshStandardMaterial({ ...screenMatBase, map: screenLeftTexture }));
-    screenLeftMesh.rotation.y = Math.PI / 2;
-    screenLeftMesh.position.set(-3.5, 2, 1.5); 
-    scene.add(screenLeftMesh);
-}
-
-/**
- * スクリーン表示の更新 (点滅ロジック追加)
- */
-function updateScreens() {
-    const isFlashOn = (Math.floor(Date.now() / 250) % 2 === 0);
-
-    const drawScreen = (ctx, texture, targetMatrix, projectionType) => {
-        const size = ctx.canvas.width;
-        const step = size / 4;
-
-        ctx.fillStyle = '#f5f5f5';
-        ctx.fillRect(0, 0, size, size);
-
-        ctx.strokeStyle = '#dddddd';
-        ctx.lineWidth = 1;
-        for(let i=1; i<4; i++) {
-            ctx.beginPath(); ctx.moveTo(i*step, 0); ctx.lineTo(i*step, size); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0, i*step); ctx.lineTo(size, i*step); ctx.stroke();
-        }
-
-        let currentMatrix = Array(4).fill().map(() => Array(4).fill(0));
-        for(let y=0; y<4; y++) {
-            for(let i=0; i<4; i++) {
-                let hasBlock = false;
-                if (projectionType === 'back') { 
-                    for(let z=0; z<4; z++) if(voxelData[i][y][z]) hasBlock = true;
-                    if(hasBlock) currentMatrix[3-y][i] = 1; 
-                } else { 
-                    for(let x=0; x<4; x++) if(voxelData[x][y][i]) hasBlock = true;
-                    if(hasBlock) currentMatrix[3-y][3-i] = 1;
+                {
+                    level: 41,
+                    title: "D-1",
+                    targetBack: [[0, 0, 0, 0], [0, 1, 1, 0], [0, 1, 1, 0], [0, 1, 1, 0]],
+                    targetLeft: [[0, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 0], [1, 1, 1, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 0, -1], [0, 1, -1]] },
+                        { shape: [[0, 0, 0]] },
+                        { shape: [[0, 0, 0], [0, 1, 0], [-1, 1, 0]] }
+                    ]
+                },
+                {
+                    level: 41,
+                    title: "D-2",
+                    targetBack: [[1, 1, 1, 1], [1, 0, 0, 1], [1, 0, 0, 1], [1, 0, 0, 1]],
+                    targetLeft: [[1, 1, 1, 1], [1, 0, 0, 1], [1, 0, 0, 1], [1, 0, 0, 1]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 2, 0]] },
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 2, 0]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, 1], [-2, 0, 1], [-2, 0, 2], [-3, 0, 2], [-3, 0, 3]] }
+                    ]
+                },
+                {
+                    level: 43,
+                    title: "D-3",
+                    targetBack: [[0, 0, 0, 0], [1, 1, 1, 0], [1, 0, 1, 0], [1, 1, 1, 0]],
+                    targetLeft: [[0, 0, 0, 0], [0, 1, 0, 0], [1, 1, 1, 0], [0, 1, 0, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 1, -1], [-1, 0, 0]] },
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 2, 0], [0, 1, 1]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0]] }
+                    ]
+                },
+                {
+                    level: 43,
+                    title: "D-4",
+                    targetBack: [[0, 0, 0, 1], [0, 0, 1, 1], [0, 1, 1, 0], [0, 1, 0, 0]],
+                    targetLeft: [[0, 1, 1, 0], [0, 1, 1, 0], [0, 0, 1, 0], [0, 0, 1, 0]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [0, 1, 0], [0, 1, 1]] },
+                        { shape: [[0, 0, 0], [0, 1, 0], [1, 1, 0]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 0, -1]] }
+                    ]
+                },
+                {
+                    level: 43,
+                    title: "D-5",
+                    targetBack: [[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 1], [0, 1, 1, 1]],
+                    targetLeft: [[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 1], [0, 1, 1, 1]],
+                    pieces: [
+                        { shape: [[0, 0, 0], [-1, 0, 0], [-1, 1, 0]] },
+                        { shape: [[0, 0, 0], [-1, 0, 0], [0, 0, -1]] },
+                        { shape: [[0, 0, 0], [0, 0, -1], [0, 1, -1]] }
+                    ]
                 }
-            }
-        }
+            ];
 
-        // シルエット描画
-        for(let r=0; r<4; r++) {
-            for(let c=0; c<4; c++) {
-                if(currentMatrix[r][c]) {
-                    // 目標外のシルエット判定
-                    if (!targetMatrix[r][c]) {
-                        ctx.fillStyle = isFlashOn ? '#ff0000' : '#222222';
+        const STAGE_CONFIG = {
+            1: [11, 12, 21, 22, 31, 32, 41, 42],
+            2: [11, 13, 21, 23, 31, 33, 41, 43]
+        };
+
+        /**
+         * 状態管理
+         */
+        let scene, camera, renderer, raycaster;
+        let previewScenes = [], previewCameras = [], previewRenderers = [];
+        let stageOccupied, voxelData, draggingPiece, dragMesh, floorShadowGroup, targetPlane, placedPiecesGroup;
+        let screenBackMesh, screenLeftMesh;
+        let fallingPieces = [];
+        let history = [];
+        let usedSlots = [false, false, false];
+        let screenBackCtx, screenLeftCtx, screenBackTexture, screenLeftTexture;
+
+        let currentMode = '';
+        let currentStage = 1;
+        let currentProblemList = [];
+        let currentProblemIndex = 0;
+        let score = 0;
+        let timeLeft = TIME_LIMIT;
+        let timerInterval = null;
+        let isProblemCleared = false;
+
+        /**
+         * 描画・判定
+         */
+        function drawAndMatch(ctx, texture, target, type) {
+            if (!ctx || !voxelData) return false;
+            const size = 256, step = 64;
+            const isFlashOn = (Math.floor(Date.now() / 250) % 2 === 0);
+            ctx.fillStyle = '#f5f5f5'; ctx.fillRect(0, 0, size, size);
+
+            let current = Array(4).fill().map(() => Array(4).fill(0));
+            for (let y = 0; y < 4; y++) {
+                for (let i = 0; i < 4; i++) {
+                    let has = false;
+                    if (type === 'back') {
+                        for (let z = 0; z < 4; z++) if (voxelData[i][y][z]) has = true;
+                        if (has) current[3 - y][i] = 1;
                     } else {
-                        ctx.fillStyle = '#222222';
+                        for (let x = 0; x < 4; x++) if (voxelData[x][y][i]) has = true;
+                        if (has) current[3 - y][3 - i] = 1;
                     }
-                    ctx.fillRect(c*step + 4, r*step + 4, step - 8, step - 8);
+                }
+            }
+
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    if (current[r][c]) {
+                        ctx.fillStyle = (target && !target[r][c] && isFlashOn) ? '#ff0000' : '#222222';
+                        ctx.fillRect(c * step + 4, r * step + 4, step - 8, step - 8);
+                    }
+                }
+            }
+
+            if (target) {
+                ctx.strokeStyle = '#00aa44'; ctx.setLineDash([6, 4]); ctx.lineWidth = 4;
+                for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) if (target[r][c]) ctx.strokeRect(c * step + 10, r * step + 10, step - 20, step - 20);
+                ctx.setLineDash([]);
+            }
+
+            texture.needsUpdate = true;
+            return target ? (JSON.stringify(current) === JSON.stringify(target)) : true;
+        }
+
+        function updateScreens() {
+            if (currentMode === '' || currentProblemList.length === 0) return;
+            const problem = currentProblemList[currentProblemIndex];
+            if (!problem) return;
+
+            const isBackOk = problem.hideBack || drawAndMatch(screenBackCtx, screenBackTexture, problem.targetBack, 'back');
+            const isLeftOk = problem.hideLeft || drawAndMatch(screenLeftCtx, screenLeftTexture, problem.targetLeft, 'left');
+
+            if (!isProblemCleared && isBackOk && isLeftOk) {
+                isProblemCleared = true;
+                setTimeout(() => {
+                    document.getElementById('clear-overlay').style.display = 'block';
+                    sessionStorage.setItem(`cleared_p${problem.originalIndex}`, 'true');
+
+                    if (currentMode === 'score') {
+                        score += POINT_PER_PROBLEM;
+                        const scoreDisp = document.getElementById('score-display');
+                        if (scoreDisp) scoreDisp.innerText = score;
+                        setTimeout(() => { loadProblem(currentProblemIndex + 1); }, 1500);
+                    } else {
+                        updateProblemSelector();
+                    }
+                }, 600);
+            }
+        }
+
+        /**
+         * 初期化
+         */
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111111);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(13, 16, 13);
+            camera.lookAt(1.0, 5.0, 1.0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            raycaster = new THREE.Raycaster();
+            placedPiecesGroup = new THREE.Group();
+            scene.add(placedPiecesGroup);
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(5, 15, 5);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            const floorGrid = new THREE.GridHelper(STAGE_SIZE, STAGE_SIZE, 0x666666, 0x444444);
+            floorGrid.position.set(1.5, 0, 1.5);
+            scene.add(floorGrid);
+
+            const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(STAGE_SIZE, STAGE_SIZE), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+            floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.position.set(1.5, -0.01, 1.5);
+            floorMesh.receiveShadow = true;
+            scene.add(floorMesh);
+
+            targetPlane = new THREE.Mesh(new THREE.PlaneGeometry(STAGE_SIZE * 6, STAGE_SIZE * 6), new THREE.MeshBasicMaterial({ visible: false }));
+            targetPlane.rotation.x = -Math.PI / 2;
+            targetPlane.position.set(1.5, TARGET_HEIGHT, 1.5);
+            scene.add(targetPlane);
+
+            const targetVisMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(STAGE_SIZE, STAGE_SIZE),
+                new THREE.MeshBasicMaterial({
+                    color: 0x00aaff,
+                    transparent: true,
+                    opacity: 0.2,
+                    side: THREE.DoubleSide
+                })
+            );
+            targetVisMesh.rotation.x = -Math.PI / 2;
+            targetVisMesh.position.set(1.5, TARGET_HEIGHT, 1.5);
+            scene.add(targetVisMesh);
+
+            const targetGrid = new THREE.GridHelper(STAGE_SIZE, STAGE_SIZE, 0x888888, 0x888888);
+            targetGrid.position.set(1.5, TARGET_HEIGHT, 1.5);
+            targetGrid.material.opacity = 0.5;
+            targetGrid.material.transparent = true;
+            scene.add(targetGrid);
+
+            stageOccupied = Array(STAGE_SIZE).fill().map(() => Array(STAGE_SIZE).fill(0));
+            voxelData = Array(STAGE_SIZE).fill().map(() => Array(STAGE_SIZE * 2).fill().map(() => Array(STAGE_SIZE).fill(false)));
+            fallingPieces = [];
+
+            initScreens();
+
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('pointerup', onPointerUp);
+
+            animate();
+        }
+
+        function initScreens() {
+            const create = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                const texture = new THREE.CanvasTexture(canvas);
+                return { ctx, texture };
+            };
+            const b = create(); screenBackCtx = b.ctx; screenBackTexture = b.texture;
+            const l = create(); screenLeftCtx = l.ctx; screenLeftTexture = l.texture;
+
+            const geo = new THREE.PlaneGeometry(STAGE_SIZE, STAGE_SIZE);
+            const mat = { roughness: 0.8, transparent: true, opacity: 0.9 };
+            screenBackMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ ...mat, map: screenBackTexture }));
+            screenBackMesh.position.set(1.5, 2, -5.5); scene.add(screenBackMesh);
+            screenLeftMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ ...mat, map: screenLeftTexture }));
+            screenLeftMesh.rotation.y = Math.PI / 2; screenLeftMesh.position.set(-5.5, 2, 1.5); scene.add(screenLeftMesh);
+        }
+
+        function refreshPreviews() {
+            previewRenderers.forEach(r => {
+                if (r && r.domElement.parentElement) r.domElement.parentElement.removeChild(r.domElement);
+            });
+            previewScenes = []; previewCameras = []; previewRenderers = [];
+
+            const problem = currentProblemList[currentProblemIndex];
+            const pieces = (problem && problem.pieces) ? problem.pieces : DEFAULT_PIECES;
+
+            for (let i = 0; i < 3; i++) {
+                const slot = document.getElementById(`slot-${i}`);
+                if (!slot) continue;
+
+                const data = pieces[i];
+                if (!data) {
+                    slot.style.display = 'none';
+                    continue;
+                } else {
+                    slot.style.display = 'flex';
+                }
+
+                if (usedSlots[i]) slot.classList.add('used');
+                else slot.classList.remove('used');
+
+                const width = 100, height = 100;
+                const pScene = new THREE.Scene();
+                pScene.background = new THREE.Color(0x222222);
+                const pCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+                pCamera.position.set(4, 4, 4);
+                pScene.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+                const pRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                pRenderer.setSize(width, height);
+                slot.appendChild(pRenderer.domElement);
+
+                previewScenes[i] = pScene;
+                previewCameras[i] = pCamera;
+                previewRenderers[i] = pRenderer;
+
+                const group = new THREE.Group();
+                const material = new THREE.MeshStandardMaterial({ color: data.color || SLOT_COLORS[i] });
+                const geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+
+                let sumX = 0, sumY = 0, sumZ = 0;
+                data.shape.forEach(p => { sumX += p[0]; sumY += p[1]; sumZ += p[2]; });
+                const count = data.shape.length;
+                data.shape.forEach(p => {
+                    const cube = new THREE.Mesh(geometry, material);
+                    cube.position.set(p[0] - sumX / count, p[1] - sumY / count, p[2] - sumZ / count);
+
+                    const edges = new THREE.EdgesGeometry(geometry);
+                    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
+                    cube.add(line);
+
+                    group.add(cube);
+                });
+                pScene.add(group);
+                pCamera.lookAt(0, 0, 0);
+            }
+        }
+
+        /**
+         * 進行管理
+         */
+        function startGame(mode) {
+            currentMode = mode;
+            const radios = document.getElementsByName('stage-select');
+            let sel = "1";
+            for (let r of radios) { if (r.checked) sel = r.value; }
+            currentStage = parseInt(sel);
+
+            const allowedLevels = STAGE_CONFIG[currentStage] || [11];
+            currentProblemList = PROBLEMS
+                .map((p, idx) => ({ ...p, originalIndex: idx }))
+                .filter(p => allowedLevels.includes(p.level));
+
+            currentProblemIndex = 0;
+            isProblemCleared = false;
+
+            document.getElementById('start-screen').classList.add('hidden-screen');
+            document.getElementById('game-screen').classList.remove('hidden-screen');
+            document.getElementById('result-modal').classList.add('hidden-screen');
+
+            if (mode === 'score') {
+                score = 0; timeLeft = TIME_LIMIT;
+                document.getElementById('score-attack-panel').classList.remove('hidden-screen');
+                document.getElementById('free-mode-panel').classList.add('hidden-screen');
+                const scoreDisp = document.getElementById('score-display');
+                if (scoreDisp) scoreDisp.innerText = score;
+                updateTimerDisplay();
+                startTimer();
+            } else {
+                document.getElementById('free-mode-panel').classList.remove('hidden-screen');
+                document.getElementById('score-attack-panel').classList.add('hidden-screen');
+                updateProblemSelector();
+            }
+            loadProblem(0);
+        }
+
+        function backToTitle() {
+            stopTimer();
+            currentMode = '';
+            document.getElementById('start-screen').classList.remove('hidden-screen');
+            document.getElementById('game-screen').classList.add('hidden-screen');
+            document.getElementById('result-modal').classList.add('hidden-screen');
+            document.getElementById('clear-overlay').style.display = 'none';
+        }
+
+        function loadProblem(index) {
+            if (index >= currentProblemList.length) {
+                if (currentMode === 'score') index = 0;
+                else return;
+            }
+
+            currentProblemIndex = index;
+            isProblemCleared = false;
+            usedSlots = [false, false, false];
+            document.getElementById('clear-overlay').style.display = 'none';
+
+            if (currentMode === 'free') {
+                const nextBtn = document.getElementById('next-problem-btn');
+                if (nextBtn) {
+                    nextBtn.classList.remove('hidden');
+                    nextBtn.style.opacity = (currentProblemIndex >= currentProblemList.length - 1) ? "0.5" : "1";
+                    nextBtn.style.pointerEvents = (currentProblemIndex >= currentProblemList.length - 1) ? "none" : "auto";
+                }
+            }
+
+            while (placedPiecesGroup.children.length > 0) placedPiecesGroup.remove(placedPiecesGroup.children[0]);
+            stageOccupied = Array(STAGE_SIZE).fill().map(() => Array(STAGE_SIZE).fill(0));
+            voxelData = Array(STAGE_SIZE).fill().map(() => Array(STAGE_SIZE * 2).fill().map(() => Array(STAGE_SIZE).fill(false)));
+            fallingPieces = [];
+            history = [];
+
+            const prob = currentProblemList[currentProblemIndex];
+            if (screenBackMesh) screenBackMesh.visible = !prob.hideBack;
+            if (screenLeftMesh) screenLeftMesh.visible = !prob.hideLeft;
+
+            refreshPreviews();
+
+            if (currentMode === 'free') {
+                const selector = document.getElementById('problem-selector');
+                if (selector) selector.value = index;
+            }
+        }
+
+        function reloadProblem() { loadProblem(currentProblemIndex); }
+
+        function skipProblem() {
+            if (currentMode === 'score') {
+                loadProblem(currentProblemIndex + 1);
+            }
+        }
+
+        function updateProblemSelector() {
+            const selector = document.getElementById('problem-selector');
+            if (!selector) return;
+
+            // 現在の選択値を保存
+            const currentIndex = selector.value !== "" ? selector.value : currentProblemIndex;
+
+            selector.innerHTML = '';
+            currentProblemList.forEach((prob, listIdx) => {
+                const option = document.createElement('option');
+                option.value = listIdx;
+                const isDone = sessionStorage.getItem(`cleared_p${prob.originalIndex}`);
+                option.innerText = prob.title + (isDone ? ' ★' : '');
+                selector.appendChild(option);
+            });
+
+            // 選択値を復元
+            selector.value = currentIndex;
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                if (timeLeft <= 0) {
+                    finishScoreAttack();
+                }
+            }, 1000);
+        }
+
+        function finishScoreAttack() {
+            stopTimer();
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('result-modal').classList.remove('hidden-screen');
+        }
+
+        function updateTimerDisplay() {
+            const m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+            const disp = document.getElementById('timer-display');
+            if (disp) disp.innerText = `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function stopTimer() { if (timerInterval) { clearInterval(timerInterval); timerInterval = null; } }
+
+        /**
+         * ピース操作
+         */
+        function startDrag(index, event) {
+            if (isProblemCleared || usedSlots[index]) return;
+            const problem = currentProblemList[currentProblemIndex];
+            const pieces = (problem && problem.pieces) ? problem.pieces : DEFAULT_PIECES;
+            const data = pieces[index];
+            if (!data) return;
+
+            const pieceColor = data.color || SLOT_COLORS[index];
+            draggingPiece = { ...data, slotIndex: index, color: pieceColor };
+
+            const group = new THREE.Group();
+            const material = new THREE.MeshStandardMaterial({ color: pieceColor, transparent: true, opacity: 0.5 });
+            data.shape.forEach(p => {
+                const cube = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.96, 0.96), material);
+                cube.position.set(p[0], p[1] + 0.5, p[2]); group.add(cube);
+            });
+            dragMesh = group; scene.add(dragMesh);
+
+            floorShadowGroup = new THREE.Group();
+            const unique = new Set();
+            data.shape.forEach(p => unique.add(`${p[0]},${p[2]}`));
+            unique.forEach(c => {
+                const [cx, cz] = c.split(',').map(Number);
+                const s = new THREE.Mesh(new THREE.PlaneGeometry(0.98, 0.98), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 }));
+                s.rotation.x = -Math.PI / 2; s.position.set(cx, 0, cz); floorShadowGroup.add(s);
+            });
+            scene.add(floorShadowGroup);
+            onPointerMove(event);
+        }
+
+        function onPointerMove(event) {
+            if (!dragMesh) return;
+            const mouse = new THREE.Vector2((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+            raycaster.setFromCamera(mouse, camera);
+            const inters = raycaster.intersectObject(targetPlane);
+            if (inters.length > 0) {
+                const gx = Math.round(inters[0].point.x), gz = Math.round(inters[0].point.z);
+                dragMesh.position.set(gx, TARGET_HEIGHT, gz);
+
+                if (floorShadowGroup) {
+                    const valid = isInsideStage(gx, gz, draggingPiece.shape);
+                    const partiallyInside = draggingPiece.shape.some(p => {
+                        const nx = gx + p[0], nz = gz + p[2];
+                        return nx >= 0 && nx < STAGE_SIZE && nz >= 0 && nz < STAGE_SIZE;
+                    });
+
+                    if (!partiallyInside) {
+                        floorShadowGroup.visible = false;
+                    } else {
+                        floorShadowGroup.visible = true;
+                        floorShadowGroup.children.forEach(child => {
+                            child.material.color.setHex(valid ? 0xffffff : 0xff0000);
+                            child.material.opacity = valid ? 0.25 : 0.4;
+                        });
+                        if (valid) {
+                            const ty = calculateDropHeight(gx, gz, draggingPiece.shape);
+                            floorShadowGroup.position.set(gx, ty + 0.01, gz);
+                        } else {
+                            floorShadowGroup.position.set(gx, 0.01, gz);
+                        }
+                    }
                 }
             }
         }
 
-        // 目標描画 (緑の破線)
-        ctx.strokeStyle = '#00aa44';
-        ctx.setLineDash([6, 4]);
-        ctx.lineWidth = 4;
-        for(let r=0; r<4; r++) {
-            for(let c=0; c<4; c++) {
-                if(targetMatrix[r][c]) {
-                    ctx.strokeRect(c*step + 10, r*step + 10, step - 20, step - 20);
+        function onPointerUp(event) {
+            if (!dragMesh) return;
+            const mouse = new THREE.Vector2((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+            raycaster.setFromCamera(mouse, camera);
+            const inters = raycaster.intersectObject(targetPlane);
+            if (inters.length > 0) {
+                const gx = Math.round(inters[0].point.x), gz = Math.round(inters[0].point.z);
+                if (isInsideStage(gx, gz, draggingPiece.shape)) {
+                    const slotIdx = draggingPiece.slotIndex;
+                    usedSlots[slotIdx] = true;
+                    document.getElementById(`slot-${slotIdx}`).classList.add('used');
+                    const ty = calculateDropHeight(gx, gz, draggingPiece.shape);
+                    const group = new THREE.Group();
+                    const mat = new THREE.MeshStandardMaterial({ color: draggingPiece.color, roughness: 0.7 });
+                    draggingPiece.shape.forEach(p => {
+                        const c = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.98, 0.98), mat);
+                        c.position.set(p[0], p[1] + 0.5, p[2]); c.castShadow = c.receiveShadow = true; group.add(c);
+                    });
+                    group.position.set(gx, TARGET_HEIGHT, gz); placedPiecesGroup.add(group);
+                    fallingPieces.push({ mesh: group, x: gx, z: gz, currentY: TARGET_HEIGHT, targetY: ty, shape: draggingPiece.shape, slotIndex: slotIdx });
                 }
             }
+            scene.remove(dragMesh); scene.remove(floorShadowGroup);
+            dragMesh = floorShadowGroup = draggingPiece = null;
         }
-        ctx.setLineDash([]);
-        texture.needsUpdate = true;
 
-        return JSON.stringify(currentMatrix) === JSON.stringify(targetMatrix);
-    };
-
-    const isBackOk = drawScreen(screenBackCtx, screenBackTexture, TARGET_BACK, 'back');
-    const isLeftOk = drawScreen(screenLeftCtx, screenLeftTexture, TARGET_LEFT, 'left');
-
-    if (isBackOk && isLeftOk && !isCleared) {
-        isCleared = true;
-        document.getElementById('clear-display').style.display = 'block';
-    }
-}
-
-function initPreview3D(index) {
-    const slot = document.getElementById(`slot-${index}`);
-    const width = slot.clientWidth, height = slot.clientHeight;
-    const pScene = new THREE.Scene();
-    pScene.background = new THREE.Color(0x222222);
-    const pCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    pCamera.position.set(3.5, 3.5, 3.5);
-    pScene.add(new THREE.AmbientLight(0xffffff, 1.0));
-    const pRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    pRenderer.setSize(width, height);
-    slot.appendChild(pRenderer.domElement);
-    previewScenes[index] = pScene;
-    previewCameras[index] = pCamera;
-    previewRenderers[index] = pRenderer;
-
-    const data = PIECE_DEFINITIONS[index];
-    const group = new THREE.Group();
-    const material = new THREE.MeshStandardMaterial({ color: data.color });
-    const geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
-    let sumX = 0, sumY = 0, sumZ = 0, count = data.shape.length;
-    data.shape.forEach(p => { sumX += p[0]; sumY += p[1]; sumZ += p[2]; });
-    data.shape.forEach(p => {
-        const cube = new THREE.Mesh(geometry, material);
-        cube.position.set(p[0] - sumX/count, p[1] - sumY/count, p[2] - sumZ/count);
-        group.add(cube);
-    });
-    pScene.add(group);
-    pCamera.lookAt(0,0,0);
-    group.rotation.y = Math.PI / 4;
-}
-
-function startDrag(index, event) {
-    if (isCleared) return;
-    const data = PIECE_DEFINITIONS[index];
-    draggingPiece = { ...data, slotIndex: index };
-    const group = new THREE.Group();
-    const material = new THREE.MeshStandardMaterial({ color: data.color, transparent: true, opacity: 0.5 });
-    data.shape.forEach(p => {
-        const cube = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.96, 0.96), material);
-        cube.position.set(p[0], p[1] + 0.5, p[2]);
-        group.add(cube);
-    });
-    dragMesh = group;
-    scene.add(dragMesh);
-    onPointerMove(event);
-}
-
-function onPointerMove(event) {
-    if (!dragMesh) return;
-    const mouse = new THREE.Vector2((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(targetPlane);
-    if (intersects.length > 0) {
-        const pt = intersects[0].point;
-        dragMesh.position.set(Math.round(pt.x), TARGET_HEIGHT, Math.round(pt.z));
-    }
-}
-
-function onPointerUp(event) {
-    if (!dragMesh) return;
-    const mouse = new THREE.Vector2((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(targetPlane);
-    if (intersects.length > 0) {
-        const gx = Math.round(intersects[0].point.x), gz = Math.round(intersects[0].point.z);
-        if (isInsideStage(gx, gz, draggingPiece.shape)) {
-            const targetY = calculateDropHeight(gx, gz, draggingPiece.shape);
-            startFallingAnimation(gx, TARGET_HEIGHT, gz, targetY, draggingPiece);
-        } else {
-            showMessage("ステージの範囲内に置いてください");
+        function isInsideStage(x, z, shape) {
+            return shape.every(p => {
+                const nx = x + p[0], nz = z + p[2];
+                return nx >= 0 && nx < STAGE_SIZE && nz >= 0 && nz < STAGE_SIZE;
+            });
         }
-    }
-    scene.remove(dragMesh);
-    dragMesh = null; draggingPiece = null;
-}
 
-function isInsideStage(x, z, shape) {
-    return shape.every(p => {
-        const nx = x + p[0], nz = z + p[2];
-        return nx >= 0 && nx < STAGE_SIZE && nz >= 0 && nz < STAGE_SIZE;
-    });
-}
-
-function calculateDropHeight(x, z, shape) {
-    let maxHeight = 0;
-    shape.forEach(p => {
-        const nx = x + p[0], nz = z + p[2];
-        if (nx >= 0 && nx < STAGE_SIZE && nz >= 0 && nz < STAGE_SIZE) {
-            maxHeight = Math.max(maxHeight, stageOccupied[nx][nz] - p[1]);
+        function calculateDropHeight(x, z, shape) {
+            let max = 0;
+            shape.forEach(p => {
+                const nx = x + p[0], nz = z + p[2];
+                if (nx >= 0 && nx < STAGE_SIZE && nz >= 0 && nz < STAGE_SIZE) max = Math.max(max, stageOccupied[nx][nz] - p[1]);
+            });
+            return max;
         }
-    });
-    return maxHeight;
-}
 
-function startFallingAnimation(x, startY, z, targetY, pieceData) {
-    const group = new THREE.Group();
-    const material = new THREE.MeshStandardMaterial({ color: pieceData.color, roughness: 0.7 });
-    pieceData.shape.forEach(p => {
-        const cube = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.98, 0.98), material);
-        cube.position.set(p[0], p[1] + 0.5, p[2]);
-        cube.castShadow = true; cube.receiveShadow = true;
-        group.add(cube);
-    });
-    group.position.set(x, startY, z);
-    placedPiecesGroup.add(group);
-    fallingPieces.push({ mesh: group, x, z, currentY: startY, targetY, shape: pieceData.shape });
-}
+        function undoLastMove() {
+            if (history.length === 0 || isProblemCleared) return;
+            const last = history.pop();
+            last.added.forEach(v => voxelData[v.x][v.y][v.z] = false);
+            stageOccupied = JSON.parse(JSON.stringify(last.prev));
+            placedPiecesGroup.remove(last.mesh);
+            if (last.slotIndex !== undefined) {
+                usedSlots[last.slotIndex] = false;
+                document.getElementById(`slot-${last.slotIndex}`).classList.remove('used');
+            }
+        }
 
-/**
- * 一手戻る処理
- */
-function undoLastMove() {
-    if (history.length === 0 || isCleared) return;
-    
-    const last = history.pop();
-    
-    // ボクセルデータを削除
-    last.addedVoxels.forEach(v => {
-        voxelData[v.x][v.y][v.z] = false;
-    });
-    
-    // ステージの高さを以前の状態に戻す
-    stageOccupied = JSON.parse(JSON.stringify(last.prevHeights));
-    
-    // 3Dオブジェクトを削除
-    placedPiecesGroup.remove(last.mesh);
-    
-    showMessage("一手戻しました");
-}
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
 
-function resetGame() {
-    stageOccupied = Array(STAGE_SIZE).fill().map(() => Array(STAGE_SIZE).fill(0));
-    voxelData = Array(STAGE_SIZE).fill().map(() => Array(STAGE_SIZE * 2).fill().map(() => Array(STAGE_SIZE).fill(false)));
-    while(placedPiecesGroup.children.length > 0) placedPiecesGroup.remove(placedPiecesGroup.children[0]);
-    fallingPieces = [];
-    history = [];
-    isCleared = false;
-    document.getElementById('clear-display').style.display = 'none';
-    showMessage("リセットしました");
-}
-
-function showMessage(txt) {
-    const box = document.getElementById('message-box');
-    box.innerText = txt; box.style.display = 'block';
-    setTimeout(() => { box.style.display = 'none'; }, 2000);
-}
-
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-function animate() {
-    requestAnimationFrame(animate);
-    
-    for (let i = fallingPieces.length - 1; i >= 0; i--) {
-        const p = fallingPieces[i];
-        p.currentY -= FALL_SPEED;
-        if (p.currentY <= p.targetY) {
-            p.currentY = p.targetY;
-            
-            // ヒストリー用に現在の高さ情報をディープコピー
-            const prevHeights = JSON.parse(JSON.stringify(stageOccupied));
-            const addedVoxels = [];
-
-            p.shape.forEach(s => {
-                const fx = p.x + s[0], fy = Math.round(p.targetY + s[1]), fz = p.z + s[2];
-                if (fx >= 0 && fx < STAGE_SIZE && fz >= 0 && fz < STAGE_SIZE) {
-                    stageOccupied[fx][fz] = Math.max(stageOccupied[fx][fz], fy + 1);
-                    if(fy >= 0 && fy < STAGE_SIZE * 2) {
-                        voxelData[fx][fy][fz] = true;
-                        addedVoxels.push({x: fx, y: fy, z: fz});
+        function animate() {
+            requestAnimationFrame(animate);
+            if (fallingPieces) {
+                for (let i = fallingPieces.length - 1; i >= 0; i--) {
+                    const p = fallingPieces[i]; p.currentY -= FALL_SPEED;
+                    if (p.currentY <= p.targetY) {
+                        p.currentY = p.targetY;
+                        const prev = JSON.parse(JSON.stringify(stageOccupied)), added = [];
+                        p.shape.forEach(s => {
+                            const fx = p.x + s[0], fy = Math.round(p.targetY + s[1]), fz = p.z + s[2];
+                            if (fx >= 0 && fx < STAGE_SIZE && fz >= 0 && fz < STAGE_SIZE) {
+                                stageOccupied[fx][fz] = Math.max(stageOccupied[fx][fz], fy + 1);
+                                if (fy >= 0 && fy < STAGE_SIZE * 2) { voxelData[fx][fy][fz] = true; added.push({ x: fx, y: fy, z: fz }); }
+                            }
+                        });
+                        history.push({ mesh: p.mesh, added, prev, slotIndex: p.slotIndex });
+                        fallingPieces.splice(i, 1);
                     }
+                    p.mesh.position.y = p.currentY;
                 }
-            });
-            
-            // 履歴に追加
-            history.push({
-                mesh: p.mesh,
-                addedVoxels: addedVoxels,
-                prevHeights: prevHeights
-            });
-
-            fallingPieces.splice(i, 1);
+            }
+            updateScreens();
+            renderer.render(scene, camera);
+            if (previewRenderers) {
+                previewRenderers.forEach((r, i) => {
+                    if (r && previewScenes[i] && previewCameras[i]) r.render(previewScenes[i], previewCameras[i]);
+                });
+            }
         }
-        p.mesh.position.y = p.currentY;
-    }
 
-    // シルエット点滅のために毎フレーム更新
-    updateScreens();
-
-    renderer.render(scene, camera);
-    previewRenderers.forEach((r, i) => r.render(previewScenes[i], previewCameras[i]));
-}
-
-window.onload = init;
-</script>
+        window.onload = init;
+        document.getElementById('score-attack-btn').onclick = () => startGame('score');
+        document.getElementById('free-mode-btn').onclick = () => startGame('free');
+        document.getElementById('problem-selector').onchange = (e) => loadProblem(parseInt(e.target.value));
+        document.getElementById('next-problem-btn').onclick = () => loadProblem(currentProblemIndex + 1);
+    </script>
 </body>
+
 </html>
