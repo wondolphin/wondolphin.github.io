@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D断面当てゲーム - 直感操作版</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f4f8;
+            font-family: 'sans-serif';
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* 画面左上のコントロール */
+        .top-left-ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* 画面右上のターゲット表示とGOボタン */
+        .top-right-ui {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+            text-align: center;
+            border: 3px solid #3b82f6;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn-go {
+            background-color: #f97316;
+            color: white;
+            font-weight: bold;
+            padding: 12px;
+            width: 100%;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 0 #c2410c;
+        }
+
+        .btn-go:hover {
+            background-color: #ea580c;
+        }
+
+        .btn-go:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #c2410c;
+        }
+
+        .btn-reset {
+            background-color: #64748b;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* 正解ポップアップ：上部配置・半透明 */
+        #message-overlay {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translate(-50%, 0);
+            z-index: 100;
+            display: none;
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(8px);
+            padding: 20px 60px;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        #msg-title {
+            color: #1e293b;
+        }
+
+        #msg-body {
+            color: #475569;
+        }
+
+        select {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            background-color: white;
+            font-size: 14px;
+            min-width: 150px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="message-overlay">
+        <h2 id="msg-title" class="text-2xl font-bold mb-2"></h2>
+        <p id="msg-body" class="mb-4 font-medium"></p>
+        <button id="msg-btn"
+            class="bg-blue-600 text-white px-8 py-2 rounded-full font-bold hover:bg-blue-700 transition"
+            onclick="closeOverlay()">OK</button>
+    </div>
+
+    <div class="top-left-ui">
+        <select id="level-select" onchange="loadLevel(parseInt(this.value))">
+            <option value="0">Level 1: 立方体</option>
+            <option value="1">Level 2: 三角柱</option>
+            <option value="2">Level 3: 五角柱</option>
+            <option value="3">Level 4: L字型</option>
+            <option value="4">Level 5: 複合体</option>
+        </select>
+        <button class="btn-reset" onclick="resetAll()">角度リセット</button>
+    </div>
+
+    <div class="top-right-ui">
+        <h3 class="text-xs font-bold text-blue-600">もくひょう</h3>
+        <canvas id="target-canvas" width="180" height="180"
+            style="background: #fff; border: 1px solid #e2e8f0;"></canvas>
+        <button class="btn-go" id="go-button" onclick="handleGo()">GO!(せつだん)</button>
+    </div>
+
+    <script>
+        let scene, camera, renderer, controls, raycaster;
+        let compositeGroup, upperGroup, lowerGroup, poleArrow, spinHandle;
+        let uiYZ, uiXZ;
+        let slicePlaneHelper, scanningLine;
+        let isSliced = false;
+
+        // 管理変数
+        let rotX = 0, rotY = 0, rotZ = 0;
+        let currentQuat = new THREE.Quaternion();
+
+        const ROTATION_SMOOTHNESS = 0.25;
+        const SLICE_DISTANCE = 15.0;
+        let scannerX = -6;
+        let sliceProgress = 0;
+
+        // マウス操作用
+        let isInteracting = false;
+        let activeUI = null;
+        let dragStart = new THREE.Vector2();
+
+        const presets = {
+            cube: [{ name: 'blue', color: 0x3b82f6, sectionColor: 0x1e3a8a, vertices: [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]], faces: [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]] }],
+            triPrism: [{ name: 'blue', color: 0x3b82f6, sectionColor: 0x1e3a8a, vertices: [[1.2, 0, -1.5], [-0.6, 1.04, -1.5], [-0.6, -1.04, -1.5], [1.2, 0, 1.5], [-0.6, 1.04, 1.5], [-0.6, -1.04, 1.5]], faces: [[0, 1, 2], [3, 4, 5], [0, 1, 4, 3], [1, 2, 5, 4], [2, 0, 3, 5]] }],
+            pentaPrism: [{ name: 'blue', color: 0x3b82f6, sectionColor: 0x1e3a8a, vertices: (() => { const v = []; for (let i = 0; i < 5; i++) { const a = (i * 72 * Math.PI) / 180; v.push([Math.cos(a) * 1.5, Math.sin(a) * 1.5, -1.5]); } for (let i = 0; i < 5; i++) { const a = (i * 72 * Math.PI) / 180; v.push([Math.cos(a) * 1.5, Math.sin(a) * 1.5, 1.5]); } return v; })(), faces: [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9], [0, 1, 6, 5], [1, 2, 7, 6], [2, 3, 8, 7], [3, 4, 9, 8], [4, 0, 5, 9]] }],
+            lShape: [{ name: 'blue', color: 0x3b82f6, sectionColor: 0x1e3a8a, vertices: [[0, 1, -1.5], [-2, 1, -1.5], [-2, 0, -1.5], [-1, 0, -1.5], [-1, -1, -1.5], [0, -1, -1.5], [0, 1, 1.5], [-2, 1, 1.5], [-2, 0, 1.5], [-1, 0, 1.5], [-1, -1, 1.5], [0, -1, 1.5]], faces: [[0, 1, 2, 3, 4, 5], [6, 7, 8, 9, 10, 11], [0, 1, 7, 6], [1, 2, 8, 7], [2, 3, 9, 8], [3, 4, 10, 9], [4, 5, 11, 10], [5, 0, 6, 11]] }],
+            combo: [
+                { name: 'red', color: 0xef4444, sectionColor: 0x991b1b, vertices: [[0, -1, -1], [1, -1, -1], [1, 1, -1], [0, 1, -1], [0, -1, 1], [1, -1, 1], [1, 1, 1], [0, 1, 1]], faces: [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]] },
+                { name: 'blue', color: 0x3b82f6, sectionColor: 0x1e3a8a, vertices: [[-2, -1, -1], [0, -1, -1], [0, 1, -1], [-2, 1, -1], [-2, -1, 1], [0, -1, 1], [0, 1, 1], [-2, 1, 1]], faces: [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]] }
+            ]
+        };
+
+        const levels = [
+            { id: 'cube', solutions: [[45, 45, 0], [45, 135, 0], [45, 225, 0]], title: "Level 1" },
+            { id: 'triPrism', solutions: [[90, 45, 0], [90, 135, 0]], title: "Level 2" },
+            { id: 'pentaPrism', solutions: [[45, 0, 0]], title: "Level 3" },
+            { id: 'lShape', solutions: [[45, 45, 45], [45, 135, 45]], title: "Level 4" },
+            { id: 'combo', solutions: [[0, 90, 0], [0, 270, 0]], title: "Level 5" }
+        ];
+
+        let currentLevelIdx = 0;
+
+        window.onload = init;
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf8fafc);
+
+            // カメラを近づけて立体を大きく表示
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(8.5, 6.5, 10.5);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.localClippingEnabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            raycaster = new THREE.Raycaster();
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            const dl = new THREE.DirectionalLight(0xffffff, 0.5);
+            dl.position.set(5, 10, 7);
+            scene.add(dl);
+
+            createUIHandles();
+
+            // z=0の平面。扇形UIより背面に描画されるよう設定
+            slicePlaneHelper = new THREE.Mesh(
+                new THREE.PlaneGeometry(12, 12),
+                new THREE.MeshBasicMaterial({ color: 0x111100, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false })
+            );
+            slicePlaneHelper.renderOrder = 1;
+            scene.add(slicePlaneHelper);
+
+            const scanGeom = new THREE.PlaneGeometry(0.5, 12);
+            scanningLine = new THREE.Mesh(scanGeom, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
+            scanningLine.renderOrder = 1000;
+            scene.add(scanningLine);
+
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            window.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('pointerup', onPointerUp);
+
+            loadLevel(0);
+            animate();
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // TubeGeometry用のカスタム3次元曲線クラス
+        class ArcCurve extends THREE.Curve {
+            constructor(radius, startAngle, lengthAngle) {
+                super();
+                this.radius = radius;
+                this.startAngle = startAngle;
+                this.lengthAngle = lengthAngle;
+            }
+            getPoint(t) {
+                const angle = this.startAngle + t * this.lengthAngle;
+                return new THREE.Vector3(Math.cos(angle) * this.radius, Math.sin(angle) * this.radius, 0);
+            }
+        }
+
+        function createArcArrow(startAngle, lengthAngle, radius, thickness, rotationAxis) {
+            const group = new THREE.Group();
+
+            const curve = new ArcCurve(radius, startAngle, lengthAngle);
+            const tubeGeom = new THREE.TubeGeometry(curve, 40, thickness, 8, false);
+            const tubeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const line = new THREE.Mesh(tubeGeom, tubeMat);
+            group.add(line);
+
+            const headGeom = new THREE.ConeGeometry(0.25, 0.6, 12);
+            const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+            const head1 = new THREE.Mesh(headGeom, headMat);
+            const pos1 = curve.getPoint(0);
+            head1.position.copy(pos1);
+            head1.rotation.z = startAngle + Math.PI; // 接線方向(逆)
+            group.add(head1);
+
+            const head2 = new THREE.Mesh(headGeom, headMat);
+            const pos2 = curve.getPoint(1);
+            head2.position.copy(pos2);
+            head2.rotation.z = (startAngle + lengthAngle); // 接線方向
+            group.add(head2);
+
+            if (rotationAxis === 'y') group.rotation.y = Math.PI / 2;
+            if (rotationAxis === 'x') group.rotation.x = -Math.PI / 2;
+
+            return group;
+        }
+
+        function createUIHandles() {
+            const innerR = 4.5, outerR = 7.0;
+            const midR = (innerR + outerR) / 2;
+
+            // --- YZ平面の扇形 (上下回転用) ---
+            const ringYZ = new THREE.RingGeometry(innerR, outerR, 32, 1, Math.PI * 11 / 20, Math.PI * 2 / 5);
+            uiYZ = new THREE.Mesh(ringYZ, new THREE.MeshBasicMaterial({ color: 0xff9900, side: THREE.DoubleSide }));
+            uiYZ.rotation.y = Math.PI / 2;
+            uiYZ.name = "uiYZ";
+            uiYZ.renderOrder = 2000;
+            scene.add(uiYZ);
+
+            // 矢印ガイド (太さ0.05)
+            const arrowYZ = createArcArrow(Math.PI * 13 / 20, Math.PI * 1 / 5, midR, 0.05, 'y');
+            arrowYZ.children.forEach(c => c.renderOrder = 2001);
+            scene.add(arrowYZ);
+
+            // --- XZ平面の扇形 (左右回転用) ---
+            const ringXZ = new THREE.RingGeometry(innerR, outerR, 32, 1, Math.PI * 1 / 20, Math.PI * 2 / 5);
+            uiXZ = new THREE.Mesh(ringXZ, new THREE.MeshBasicMaterial({ color: 0x10b981, side: THREE.DoubleSide }));
+            uiXZ.rotation.x = Math.PI / 2;
+            uiXZ.name = "uiXZ";
+            uiXZ.renderOrder = 2000;
+            scene.add(uiXZ);
+
+            const arrowXZ = createArcArrow(-Math.PI * 7 / 20, Math.PI * 1 / 5, midR, 0.05, 'x');
+            arrowXZ.children.forEach(c => c.renderOrder = 2001);
+            scene.add(arrowXZ);
+        }
+
+        function loadLevel(idx) {
+            currentLevelIdx = idx;
+            const level = levels[idx];
+            document.getElementById('level-select').value = idx;
+
+            isSliced = false;
+            sliceProgress = 0;
+            document.getElementById('go-button').innerText = "GO!(せつだん)";
+
+            if (upperGroup) scene.remove(upperGroup);
+            if (lowerGroup) scene.remove(lowerGroup);
+
+            currentQuat.set(0, 0, 0, 1);
+            decomposeRotation();
+            createCompositeObject(presets[level.id]);
+            const sol = level.solutions[0];
+            const targetQuat = composeRotation(sol[0], sol[1], sol[2]);
+            drawTargetSection(calculateSectionPointsForQuaternion(presets[level.id], targetQuat));
+            document.getElementById('message-overlay').style.display = 'none';
+        }
+
+        function composeRotation(lat, lon, spin) {
+            const qLon = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(lon));
+            const qLat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(lat));
+            const qSpin = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(spin));
+            let q = new THREE.Quaternion().copy(qSpin);
+            q.premultiply(qLat);
+            q.premultiply(qLon);
+            return q;
+        }
+
+        function decomposeRotation() {
+            const pole = new THREE.Vector3(0, 1, 0).applyQuaternion(currentQuat);
+            let latRad = Math.acos(THREE.MathUtils.clamp(pole.y, -1, 1));
+            let lonRad = (Math.abs(pole.y) < 0.9999) ? Math.atan2(pole.x, pole.z) : 0;
+            const qLat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), latRad);
+            const qLon = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), lonRad);
+            const qBase = new THREE.Quaternion().multiplyQuaternions(qLon, qLat);
+            const qSpinRemainder = qBase.clone().invert().multiply(currentQuat);
+            let spinRad = 2 * Math.atan2(qSpinRemainder.y, qSpinRemainder.w);
+            const round45 = (rad) => (Math.round(THREE.MathUtils.radToDeg(rad) / 45) * 45 % 360 + 360) % 360;
+            rotX = round45(latRad); rotY = round45(lonRad); rotZ = round45(spinRad);
+            currentQuat.copy(composeRotation(rotX, rotY, rotZ));
+        }
+
+        function onPointerDown(e) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouse = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObjects([uiYZ, uiXZ, spinHandle].filter(o => o));
+            if (hits.length > 0) {
+                const hit = hits[0].object;
+                if (hit.name === "spinHandle") {
+                    handleRotate('localY', 45);
+                } else {
+                    activeUI = hit.name;
+                    dragStart.set(e.clientX, e.clientY);
+                    isInteracting = true;
+                    controls.enabled = false;
+                }
+            }
+        }
+
+        function onPointerUp(e) {
+            if (!isInteracting) return;
+            isInteracting = false;
+            controls.enabled = true;
+            const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+            const threshold = 20;
+
+            if (activeUI === "uiYZ") {
+                if (Math.abs(dy) > threshold) handleRotate('worldX', dy > 0 ? 45 : -45);
+            } else if (activeUI === "uiXZ") {
+                if (Math.abs(dx) > threshold) handleRotate('worldY', dx > 0 ? 45 : -45);
+            }
+            activeUI = null;
+        }
+
+        function onPointerMove(e) { }
+
+        function handleRotate(type, deg) {
+            if (isSliced) resetToLevelStart();
+            const prevLon = ((rotY % 360) + 360) % 360;
+            const prevSpin = ((rotZ % 360) + 360) % 360;
+            const deltaRad = THREE.MathUtils.degToRad(deg);
+            const deltaQ = new THREE.Quaternion();
+            if (type === 'worldX') {
+                deltaQ.setFromAxisAngle(new THREE.Vector3(1, 0, 0), deltaRad);
+                currentQuat.premultiply(deltaQ);
+            } else if (type === 'worldY') {
+                deltaQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), deltaRad);
+                currentQuat.premultiply(deltaQ);
+            } else if (type === 'localY') {
+                deltaQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), deltaRad);
+                currentQuat.multiply(deltaQ);
+            }
+            decomposeRotation();
+            if (type === 'worldX' && (prevLon === 45 || prevLon === 135 || prevLon === 225 || prevLon === 315)) {
+                const direction = (prevLon === 45 || prevLon === 135) ? 1 : -1;
+                rotZ = (prevSpin + (deg > 0 ? 45 : -45) * direction + 360) % 360;
+                currentQuat.copy(composeRotation(rotX, rotY, rotZ));
+            }
+        }
+
+        function createCompositeObject(partsArr) {
+            if (compositeGroup) scene.remove(compositeGroup);
+            if (upperGroup) scene.remove(upperGroup);
+            if (lowerGroup) scene.remove(lowerGroup);
+
+            compositeGroup = new THREE.Group();
+            partsArr.forEach(def => {
+                const g = new THREE.BufferGeometry(); const ids = [];
+                def.faces.forEach(face => { for (let i = 1; i < face.length - 1; i++) ids.push(face[0], face[i], face[i + 1]); });
+                g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(def.vertices.flat()), 3));
+                g.setIndex(ids); g.computeVertexNormals();
+                const mesh = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color: def.color, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
+                mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({ color: 0x334155, opacity: 0.3, transparent: true })));
+                compositeGroup.add(mesh);
+            });
+            poleArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), 2.8, 0xffffff, 0.4, 0.25);
+            compositeGroup.add(poleArrow);
+            spinHandle = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), new THREE.MeshBasicMaterial({ color: 0x3b82f6 }));
+            spinHandle.position.set(0, 2.8, 0);
+            spinHandle.name = "spinHandle";
+            compositeGroup.add(spinHandle);
+            compositeGroup.quaternion.copy(currentQuat);
+            scene.add(compositeGroup);
+            isSliced = false;
+        }
+
+        function handleGo() {
+            if (!isSliced) {
+                performSlice();
+                isSliced = true;
+                document.getElementById('go-button').innerText = "もどる";
+                checkClear();
+            }
+            else {
+                resetToLevelStart();
+            }
+        }
+
+        function resetToLevelStart() {
+            createCompositeObject(presets[levels[currentLevelIdx].id]);
+            document.getElementById('go-button').innerText = "GO!(せつだん)";
+        }
+
+        function performSlice() {
+            scene.remove(compositeGroup);
+            upperGroup = new THREE.Group(); lowerGroup = new THREE.Group();
+            const pTop = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), pBottom = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+            presets[levels[currentLevelIdx].id].forEach(def => {
+                const worldMatrix = new THREE.Matrix4().makeRotationFromQuaternion(currentQuat);
+                const worldVertices = def.vertices.map(v => new THREE.Vector3(...v).applyMatrix4(worldMatrix));
+                const segments = [];
+                def.faces.forEach(f => {
+                    const hit = [];
+                    for (let i = 0; i < f.length; i++) {
+                        const p1 = worldVertices[f[i]], p2 = worldVertices[f[(i + 1) % f.length]];
+                        if (p1.z * p2.z <= 0 && p1.z !== p2.z) hit.push(new THREE.Vector3().lerpVectors(p1, p2, -p1.z / (p2.z - p1.z)));
+                    }
+                    if (hit.length >= 2) segments.push([hit[0], hit[1]]);
+                });
+                const path = stitchSegments(segments);
+                const createMesh = (planes) => {
+                    const g = new THREE.BufferGeometry(); const ids = [];
+                    def.faces.forEach(face => { for (let i = 1; i < face.length - 1; i++) ids.push(face[0], face[i], face[i + 1]); });
+                    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(def.vertices.flat()), 3));
+                    g.setIndex(ids); g.computeVertexNormals();
+                    const m = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color: def.color, side: THREE.DoubleSide, clippingPlanes: planes, transparent: true, opacity: 0.9 }));
+                    m.quaternion.copy(currentQuat); return m;
+                };
+                upperGroup.add(createMesh([pTop])); lowerGroup.add(createMesh([pBottom]));
+                path.forEach(loop => {
+                    if (loop.length >= 3) {
+                        const shape = new THREE.Shape(); shape.moveTo(loop[0].x, loop[0].y);
+                        for (let i = 1; i < loop.length; i++) shape.lineTo(loop[i].x, loop[i].y);
+                        shape.closePath();
+                        const cap = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshPhongMaterial({ color: def.sectionColor, side: THREE.DoubleSide }));
+                        cap.renderOrder = 2; lowerGroup.add(cap);
+                    }
+                });
+            });
+            scene.add(upperGroup); scene.add(lowerGroup);
+        }
+
+        function stitchSegments(segments) {
+            if (segments.length === 0) return [];
+            const loops = []; const used = new Array(segments.length).fill(false);
+            while (used.includes(false)) {
+                let curr = used.indexOf(false); const loop = [segments[curr][0], segments[curr][1]]; used[curr] = true;
+                let found = true;
+                while (found) {
+                    found = false; const last = loop[loop.length - 1];
+                    for (let i = 0; i < segments.length; i++) {
+                        if (used[i]) continue;
+                        if (last.distanceTo(segments[i][0]) < 0.001) { loop.push(segments[i][1]); used[i] = true; found = true; break; }
+                        else if (last.distanceTo(segments[i][1]) < 0.001) { loop.push(segments[i][0]); used[i] = true; found = true; break; }
+                    }
+                }
+                loops.push(loop);
+            }
+            return loops;
+        }
+
+        function calculateSectionPointsForQuaternion(parts, q) {
+            const results = [];
+            parts.forEach(def => {
+                const mat = new THREE.Matrix4().makeRotationFromQuaternion(q);
+                const worldV = def.vertices.map(v => new THREE.Vector3(...v).applyMatrix4(mat));
+                const segments = [];
+                def.faces.forEach(f => {
+                    const hit = [];
+                    for (let i = 0; i < f.length; i++) {
+                        const p1 = worldV[f[i]], p2 = worldV[f[(i + 1) % f.length]];
+                        if (p1.z * p2.z <= 0 && p1.z !== p2.z) hit.push(new THREE.Vector3().lerpVectors(p1, p2, -p1.z / (p2.z - p1.z)));
+                    }
+                    if (hit.length >= 2) segments.push([hit[0], hit[1]]);
+                });
+                results.push({ color: def.sectionColor, path: stitchSegments(segments) });
+            });
+            return results;
+        }
+
+        function drawTargetSection(data) {
+            const canvas = document.getElementById('target-canvas'); const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 180, 180); const scale = 30, cx = 90, cy = 90;
+            ctx.setLineDash([2, 2]); ctx.strokeStyle = "#e2e8f0";
+            ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(180, cy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, 180); ctx.stroke();
+            data.forEach(d => d.path.forEach(loop => {
+                if (loop.length < 3) return;
+                ctx.beginPath(); ctx.fillStyle = `rgba(${(d.color >> 16) & 255}, ${(d.color >> 8) & 255}, ${d.color & 255}, 0.7)`;
+                ctx.strokeStyle = `rgb(${(d.color >> 16) & 255}, ${(d.color >> 8) & 255}, ${d.color & 255})`;
+                loop.forEach((p, i) => { const x = cx + p.x * scale, y = cy - p.y * scale; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+                ctx.closePath(); ctx.fill(); ctx.stroke();
+            }));
+        }
+
+        function checkClear() {
+            for (let sol of levels[currentLevelIdx].solutions) {
+                if (rotX === sol[0] && rotY === sol[1] && rotZ === sol[2]) {
+                    setTimeout(() => {
+                        showModal("正解！", "回転角度がピッタリ一致しました。");
+                    }, 1000);
+                    return;
+                }
+            }
+        }
+        function showModal(title, body) {
+            document.getElementById('msg-title').innerText = title;
+            document.getElementById('msg-body').innerText = body;
+            document.getElementById('message-overlay').style.display = 'block';
+        }
+        function closeOverlay() { document.getElementById('message-overlay').style.display = 'none'; }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (compositeGroup && !isSliced) {
+                compositeGroup.quaternion.slerp(currentQuat, ROTATION_SMOOTHNESS);
+                scannerX += 0.22; if (scannerX > 6) scannerX = -6;
+
+                scanningLine.position.x = scannerX;
+                scanningLine.visible = true;
+                slicePlaneHelper.visible = true;
+            } else {
+                scanningLine.visible = false;
+                slicePlaneHelper.visible = !isSliced;
+            }
+
+            sliceProgress += ((isSliced ? 1 : 0) - sliceProgress) * 0.1;
+            if (upperGroup && lowerGroup) {
+                upperGroup.position.z = sliceProgress * SLICE_DISTANCE;
+                upperGroup.children.forEach(c => { if (c.material) c.material.opacity = 1 - sliceProgress; });
+                lowerGroup.rotation.set(0, 0, 0);
+            }
+            controls.update(); renderer.render(scene, camera);
+        }
+
+        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+        function resetAll() {
+            rotX = 0; rotY = 0; rotZ = 0; sliceProgress = 0;
+            currentQuat.set(0, 0, 0, 1);
+            decomposeRotation();
+            resetToLevelStart();
+        }
+    </script>
+</body>
+
+</html>
