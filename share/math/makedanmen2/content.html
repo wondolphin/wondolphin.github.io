@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D断面パズル - 3点選択切断</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f8fafc; font-family: sans-serif; touch-action: none; }
+        canvas { display: block; }
+        .ui-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 260px;
+            z-index: 20;
+            border: 1px solid rgba(255,255,255,0.5);
+            pointer-events: auto;
+        }
+        .target-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            z-index: 20;
+            text-align: center;
+            border: 3px solid #3b82f6;
+            pointer-events: none;
+        }
+        .point-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin: 0 4px;
+            border: 1px solid #cbd5e1;
+        }
+        .point-selected { background-color: #ef4444; border-color: #b91c1c; }
+        .btn-cut {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            font-weight: bold;
+            padding: 10px;
+            width: 100%;
+            border-radius: 8px;
+            margin-top: 10px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 0 #1d4ed8;
+        }
+        .btn-cut:disabled { background: #94a3b8; box-shadow: 0 4px 0 #64748b; opacity: 0.6; cursor: not-allowed; }
+        
+        #overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.2);
+            display: none; justify-content: center; align-items: flex-start; 
+            padding-top: 40px; z-index: 100;
+            pointer-events: none;
+        }
+        .modal-content {
+            background: white; padding: 24px; border-radius: 20px; 
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3); text-align: center; 
+            max-width: 90%; width: 320px; pointer-events: auto;
+            border: 2px solid #3b82f6;
+            animation: slideDown 0.4s ease-out;
+        }
+        @keyframes slideDown {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="overlay">
+        <div class="modal-content">
+            <h2 id="modal-title" class="text-xl font-bold mb-2"></h2>
+            <p id="modal-body" class="text-gray-600 text-sm mb-6"></p>
+            <button onclick="closeModal()" class="bg-blue-600 text-white px-8 py-2 rounded-full font-bold shadow-lg hover:bg-blue-700 transition-colors">次へ進む</button>
+        </div>
+    </div>
+
+    <div class="ui-panel" id="ui-panel">
+        <h1 class="text-lg font-bold text-gray-800 mb-1">3D断面パズル</h1>
+        <p class="text-[10px] text-gray-500 mb-3">空間の点から3つ選んで切断しよう</p>
+        
+        <div class="mb-3">
+            <label class="text-[10px] font-bold text-gray-400 uppercase">選択中の点</label>
+            <div class="flex mt-1 items-center justify-center bg-gray-50 py-2 rounded-lg border border-dashed border-gray-300">
+                <div id="p-dot-0" class="point-indicator"></div>
+                <div id="p-dot-1" class="point-indicator"></div>
+                <div id="p-dot-2" class="point-indicator"></div>
+            </div>
+        </div>
+
+        <select id="level-select" onchange="initLevel(this.value)" class="w-full p-2 mb-3 border rounded-lg text-xs bg-white">
+            <option value="0">Level 1: 立方体 (正三角形)</option>
+            <option value="1">Level 2: 立方体</option>
+            <option value="2">Level 3: 三角柱 (斜め切り)</option>
+            <option value="3">Level 4: 立方体 (六角形)</option>
+        </select>
+
+        <button id="cut-btn" class="btn-cut" disabled onclick="handleCut()">切断実行！</button>
+        <button onclick="resetSelection()" class="w-full mt-2 text-xs text-gray-400 hover:text-gray-600">選択リセット / 戻る</button>
+    </div>
+
+    <div class="target-panel">
+        <h3 class="text-[10px] font-bold mb-1 text-blue-600">目標の断面</h3>
+        <canvas id="target-canvas" width="120" height="120"></canvas>
+    </div>
+
+    <script>
+        let scene, camera, renderer, controls, raycaster, mouse;
+        let mainObject, pointGroup, previewPlane;
+        let selectedPoints = [];
+        let isSliced = false;
+        let currentLevel = 0;
+        let upperPart, lowerPart;
+        let sliceNormal = new THREE.Vector3();
+        
+        let upperClippingPlane, lowerClippingPlane;
+        let baseUpperConstant, baseLowerConstant;
+
+        const COLORS = {
+            primary: 0x3b82f6,
+            secondary: 0x0077ff, 
+            point: 0xff4444,
+            pointSelected: 0xffff00,
+            plane: 0x10b981
+        };
+
+        const levels = [
+            {
+                title: "立方体 (正三角形)",
+                vertices: [[-1,-1,-1], [1,-1,-1], [1,1,-1], [-1,1,-1], [-1,-1,1], [1,-1,1], [1,1,1], [-1,1,1]],
+                faces: [[0,1,2,3], [4,5,6,7], [0,1,5,4], [1,2,6,5], [2,3,7,6], [3,0,4,7]],
+                points: [[1,1,-1], [1,-1,1], [-1,1,1], [1,1,1], [-1,-1,-1], [-1,1,-1], [-1,-1,1]],
+                targetPoints: [[1,1,-1], [1,-1,1], [-1,1,1]]
+            },
+            {
+                title: "立方体",
+                vertices: [[-1,-1,-1], [1,-1,-1], [1,1,-1], [-1,1,-1], [-1,-1,1], [1,-1,1], [1,1,1], [-1,1,1]],
+                faces: [[0,1,2,3], [4,5,6,7], [0,1,5,4], [1,2,6,5], [2,3,7,6], [3,0,4,7]],
+                points: [[1,0,-1], [-1,0,-1], [1,0,1], [-1,0,1], [0,1,1], [0,-1,1],[2,-2,2]],
+                targetPoints: [[2,-2,2], [0,1,1], [1,0,1]]
+            },
+            {
+                title: "三角柱 (斜め)",
+                vertices: [[1.2, 0, -1.5], [-0.6, 1.04, -1.5], [-0.6, -1.04, -1.5], [1.2, 0, 1.5], [-0.6, 1.04, 1.5], [-0.6, -1.04, 1.5]],
+                faces: [[0,1,2], [3,4,5], [0,1,4,3], [1,2,5,4], [2,0,3,5]],
+                points: [[1.2, 0, -1.5], [-0.6, 1.04, 0], [-0.6, -1.04, 1.5], [1.2, 0, 1.5], [-0.6, 1.04, -1.5]],
+                targetPoints: [[1.2, 0, -1.5], [-0.6, 1.04, 0], [-0.6, -1.04, 1.5]]
+            },
+            {
+                title: "立方体 (六角形)",
+                vertices: [[-1,-1,-1], [1,-1,-1], [1,1,-1], [-1,1,-1], [-1,-1,1], [1,-1,1], [1,1,1], [-1,1,1]],
+                faces: [[0,1,2,3], [4,5,6,7], [0,1,5,4], [1,2,6,5], [2,3,7,6], [3,0,4,7]],
+                points: [[0,1,-1], [1,0,-1], [1,-1,0], [0,-1,1], [-1,0,1], [-1,1,0]],
+                targetPoints: [[0,1,-1], [1,0,-1], [1,-1,0]]
+            }
+        ];
+
+        window.onload = init;
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf1f5f9);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(6, 5, 8);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.localClippingEnabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambient);
+            const sun = new THREE.DirectionalLight(0xffffff, 0.5);
+            sun.position.set(5, 10, 5);
+            scene.add(sun);
+
+            raycaster = new THREE.Raycaster();
+            raycaster.params.Points.threshold = 0.2;
+            mouse = new THREE.Vector2();
+
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            window.addEventListener('resize', onWindowResize);
+
+            initLevel(0);
+            animate();
+        }
+
+        function initLevel(idx) {
+            currentLevel = parseInt(idx);
+            isSliced = false;
+            selectedPoints = [];
+            sliceAnimProgress = 0;
+            if (mainObject) scene.remove(mainObject);
+            if (pointGroup) scene.remove(pointGroup);
+            if (upperPart) scene.remove(upperPart);
+            if (lowerPart) scene.remove(lowerPart);
+            if (previewPlane) scene.remove(previewPlane);
+
+            const data = levels[currentLevel];
+            mainObject = createPolyhedron(data, COLORS.primary);
+            scene.add(mainObject);
+
+            pointGroup = new THREE.Group();
+            data.points.forEach((p, i) => {
+                const geom = new THREE.SphereGeometry(0.12, 16, 16);
+                const mat = new THREE.MeshPhongMaterial({ color: COLORS.point });
+                const sphere = new THREE.Mesh(geom, mat);
+                sphere.position.set(...p);
+                sphere.userData = { index: i, pos: new THREE.Vector3(...p) };
+                pointGroup.add(sphere);
+            });
+            scene.add(pointGroup);
+
+            const planeGeom = new THREE.PlaneGeometry(6, 6);
+            const planeMat = new THREE.MeshBasicMaterial({ color: COLORS.plane, transparent: true, opacity: 0.2, side: THREE.DoubleSide, visible: false });
+            previewPlane = new THREE.Mesh(planeGeom, planeMat);
+            scene.add(previewPlane);
+
+            updateUI();
+            
+            const targetPlane = new THREE.Plane().setFromCoplanarPoints(
+                new THREE.Vector3(...data.targetPoints[0]),
+                new THREE.Vector3(...data.targetPoints[1]),
+                new THREE.Vector3(...data.targetPoints[2])
+            );
+            drawTargetSection(data, targetPlane);
+        }
+
+        function createPolyhedron(data, color, clippingPlanes = []) {
+            const geometry = new THREE.BufferGeometry();
+            const vertices = new Float32Array(data.vertices.flat());
+            const indices = [];
+            data.faces.forEach(face => {
+                for (let i = 1; i < face.length - 1; i++) {
+                    indices.push(face[0], face[i], face[i+1]);
+                }
+            });
+            geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+            geometry.setIndex(indices);
+            geometry.computeVertexNormals();
+
+            const material = new THREE.MeshPhongMaterial({ 
+                color: color, 
+                side: THREE.DoubleSide, 
+                clippingPlanes: clippingPlanes,
+                clipShadows: true,
+                transparent: true,
+                opacity: 0.8
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+
+            const edges = new THREE.EdgesGeometry(geometry);
+            const lineMat = new THREE.LineBasicMaterial({ 
+                color: 0x000000, 
+                opacity: 0.2, 
+                transparent: true,
+                clippingPlanes: clippingPlanes
+            });
+            const line = new THREE.LineSegments(edges, lineMat);
+            mesh.add(line);
+
+            return mesh;
+        }
+
+        function onPointerDown(event) {
+            if (isSliced) return;
+            if (event.target !== renderer.domElement) return;
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(pointGroup.children, true);
+            if (intersects.length > 0) {
+                const obj = intersects[0].object;
+                togglePoint(obj);
+            }
+        }
+
+        function togglePoint(obj) {
+            const idx = selectedPoints.indexOf(obj);
+            if (idx > -1) {
+                selectedPoints.splice(idx, 1);
+                obj.material.color.set(COLORS.point);
+                obj.scale.set(1, 1, 1);
+            } else {
+                if (selectedPoints.length < 3) {
+                    selectedPoints.push(obj);
+                    obj.material.color.set(COLORS.pointSelected);
+                    obj.scale.set(1.4, 1.4, 1.4);
+                }
+            }
+            updateUI();
+            updatePreviewPlane();
+        }
+
+        function updatePreviewPlane() {
+            if (selectedPoints.length === 3) {
+                const p1 = selectedPoints[0].userData.pos;
+                const p2 = selectedPoints[1].userData.pos;
+                const p3 = selectedPoints[2].userData.pos;
+                try {
+                    const plane = new THREE.Plane().setFromCoplanarPoints(p1, p2, p3);
+                    const center = new THREE.Vector3().add(p1).add(p2).add(p3).divideScalar(3);
+                    
+                    const xAxis = new THREE.Vector3().subVectors(p1, center).normalize();
+                    const zAxis = plane.normal.clone();
+                    const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+                    
+                    const matrix = new THREE.Matrix4();
+                    matrix.makeBasis(xAxis, yAxis, zAxis);
+                    
+                    previewPlane.position.copy(center);
+                    previewPlane.rotation.setFromRotationMatrix(matrix);
+                    previewPlane.material.visible = true;
+                } catch(e) {
+                    previewPlane.material.visible = false;
+                }
+            } else {
+                previewPlane.material.visible = false;
+            }
+        }
+
+        function updateUI() {
+            for (let i = 0; i < 3; i++) {
+                const dot = document.getElementById(`p-dot-${i}`);
+                if (dot) dot.className = `point-indicator ${i < selectedPoints.length ? 'point-selected' : ''}`;
+            }
+            document.getElementById('cut-btn').disabled = (selectedPoints.length !== 3);
+        }
+
+        function resetSelection() {
+            if (isSliced) {
+                initLevel(currentLevel);
+                return;
+            }
+            selectedPoints.forEach(p => {
+                p.material.color.set(COLORS.point);
+                p.scale.set(1, 1, 1);
+            });
+            selectedPoints = [];
+            updateUI();
+            updatePreviewPlane();
+        }
+
+        function handleCut() {
+            if (selectedPoints.length !== 3) return;
+            
+            const p1 = selectedPoints[0].userData.pos;
+            const p2 = selectedPoints[1].userData.pos;
+            const p3 = selectedPoints[2].userData.pos;
+            
+            const v1 = new THREE.Vector3().subVectors(p2, p1);
+            const v2 = new THREE.Vector3().subVectors(p3, p1);
+            if (v1.cross(v2).length() < 0.001) {
+                showModal("切断不能", "選んだ3点が一直線上にあります。三角形になるように選んでください。");
+                return;
+            }
+
+            isSliced = true;
+            document.getElementById('cut-btn').disabled = true;
+            pointGroup.visible = false;
+            previewPlane.visible = false;
+
+            const plane = new THREE.Plane().setFromCoplanarPoints(p1, p2, p3);
+            sliceNormal.copy(plane.normal);
+
+            upperClippingPlane = plane.clone();
+            lowerClippingPlane = plane.clone().negate();
+            baseUpperConstant = upperClippingPlane.constant;
+            baseLowerConstant = lowerClippingPlane.constant;
+
+            scene.remove(mainObject);
+            const data = levels[currentLevel];
+
+            upperPart = createPolyhedron(data, COLORS.primary, [upperClippingPlane]);
+            lowerPart = createPolyhedron(data, COLORS.primary, [lowerClippingPlane]);
+            
+            const sectionPoints = calculateSectionPath(data, plane);
+            if (sectionPoints.length >= 3) {
+                const capUpper = createCapMesh(sectionPoints, plane.normal, COLORS.secondary);
+                const capLower = createCapMesh(sectionPoints, plane.normal.clone().negate(), COLORS.secondary);
+                
+                upperPart.add(capUpper);
+                lowerPart.add(capLower);
+            }
+
+            scene.add(upperPart);
+            scene.add(lowerPart);
+            sliceAnimProgress = 0;
+            
+            checkResult(plane);
+        }
+
+        function calculateSectionPath(data, plane) {
+            const segments = [];
+            data.faces.forEach(faceIndices => {
+                const faceVertices = faceIndices.map(i => new THREE.Vector3(...data.vertices[i]));
+                const intersects = [];
+                for (let i = 0; i < faceVertices.length; i++) {
+                    const v1 = faceVertices[i];
+                    const v2 = faceVertices[(i + 1) % faceVertices.length];
+                    const d1 = plane.distanceToPoint(v1);
+                    const d2 = plane.distanceToPoint(v2);
+                    
+                    if (d1 * d2 < 0) {
+                        const t = Math.abs(d1) / (Math.abs(d1) + Math.abs(d2));
+                        intersects.push(new THREE.Vector3().lerpVectors(v1, v2, t));
+                    } else if (Math.abs(d1) < 0.0001) {
+                        intersects.push(v1.clone());
+                    }
+                }
+                const unique = [];
+                intersects.forEach(p => {
+                    if (!unique.some(up => up.distanceTo(p) < 0.001)) unique.push(p);
+                });
+                if (unique.length >= 2) segments.push([unique[0], unique[1]]);
+            });
+
+            if (segments.length === 0) return [];
+            const path = [];
+            let current = segments[0][0];
+            path.push(current);
+            const used = new Array(segments.length).fill(false);
+            used[0] = true;
+            current = segments[0][1];
+            path.push(current);
+            
+            for (let i = 0; i < segments.length; i++) {
+                for (let j = 0; j < segments.length; j++) {
+                    if (used[j]) continue;
+                    const s = segments[j];
+                    if (s[0].distanceTo(current) < 0.01) {
+                        current = s[1]; path.push(current); used[j] = true; break;
+                    } else if (s[1].distanceTo(current) < 0.01) {
+                        current = s[0]; path.push(current); used[j] = true; break;
+                    }
+                }
+            }
+            return path;
+        }
+
+        function createCapMesh(path, normal, color) {
+            const center = new THREE.Vector3();
+            path.forEach(p => center.add(p));
+            center.divideScalar(path.length);
+
+            const xAxis = new THREE.Vector3().subVectors(path[0], center).normalize();
+            const yAxis = new THREE.Vector3().crossVectors(normal, xAxis).normalize();
+
+            const shape = new THREE.Shape();
+            path.forEach((p, i) => {
+                const rel = new THREE.Vector3().subVectors(p, center);
+                const x = rel.dot(xAxis);
+                const y = rel.dot(yAxis);
+                if (i === 0) shape.moveTo(x, y);
+                else shape.lineTo(x, y);
+            });
+
+            const geom = new THREE.ShapeGeometry(shape);
+            const mat = new THREE.MeshPhongMaterial({ 
+                color: color, 
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.95
+            });
+            const mesh = new THREE.Mesh(geom, mat);
+
+            const matrix = new THREE.Matrix4();
+            matrix.makeBasis(xAxis, yAxis, normal);
+            mesh.position.copy(center);
+            mesh.rotation.setFromRotationMatrix(matrix);
+
+            return mesh;
+        }
+
+        // 修正：断面の真の形（2D投影）をキャンバスに描画する
+        function drawTargetSection(data, plane) {
+            const canvas = document.getElementById('target-canvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+            
+            const path = calculateSectionPath(data, plane);
+            if (path.length < 3) return;
+
+            // 断面の2D座標系（投影面）を計算
+            const center = new THREE.Vector3();
+            path.forEach(p => center.add(p));
+            center.divideScalar(path.length);
+
+            const normal = plane.normal.clone();
+            const xAxis = new THREE.Vector3().subVectors(path[0], center).normalize();
+            const yAxis = new THREE.Vector3().crossVectors(normal, xAxis).normalize();
+
+            // 全ての3D座標を2D(u, v)に変換
+            const points2D = path.map(p => {
+                const rel = new THREE.Vector3().subVectors(p, center);
+                return {
+                    u: rel.dot(xAxis),
+                    v: rel.dot(yAxis)
+                };
+            });
+
+            // キャンバスに合わせてスケーリングとセンタリングを計算
+            let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+            points2D.forEach(p => {
+                minU = Math.min(minU, p.u); maxU = Math.max(maxU, p.u);
+                minV = Math.min(minV, p.v); maxV = Math.max(maxV, p.v);
+            });
+
+            const shapeWidth = maxU - minU;
+            const shapeHeight = maxV - minV;
+            const padding = 20;
+            const scale = Math.min((w - padding) / shapeWidth, (h - padding) / shapeHeight);
+            
+            const cx = w / 2;
+            const cy = h / 2;
+            const offsetX = (minU + maxU) / 2;
+            const offsetY = (minV + maxV) / 2;
+
+            // 描画実行
+            ctx.beginPath();
+            ctx.fillStyle = "#dbeafe";
+            ctx.strokeStyle = "#2563eb";
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            
+            points2D.forEach((p, i) => {
+                const screenX = cx + (p.u - offsetX) * scale;
+                const screenY = cy - (p.v - offsetY) * scale; // Y軸は反転
+                if (i === 0) ctx.moveTo(screenX, screenY);
+                else ctx.lineTo(screenX, screenY);
+            });
+            
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function checkResult(userPlane) {
+            const data = levels[currentLevel];
+            const targetPlane = new THREE.Plane().setFromCoplanarPoints(
+                new THREE.Vector3(...data.targetPoints[0]),
+                new THREE.Vector3(...data.targetPoints[1]),
+                new THREE.Vector3(...data.targetPoints[2])
+            );
+            const dot = Math.abs(userPlane.normal.dot(targetPlane.normal));
+            const distDiff = Math.abs(Math.abs(userPlane.constant) - Math.abs(targetPlane.constant));
+            
+            setTimeout(() => {
+                if (dot > 0.98 && distDiff < 0.15) {
+                    showModal("🎉 正解！", "見事に目標の断面で2つに割れました！");
+                } else {
+                    showModal("🤔 おしい！", "断面の角度や位置が少し違うようです。もう一度挑戦してみましょう。");
+                }
+            }, 1500);
+        }
+
+        function showModal(title, body) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-body').innerText = body;
+            document.getElementById('overlay').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('overlay').style.display = 'none';
+            if (document.getElementById('modal-title').innerText.includes("正解")) {
+                const next = (currentLevel + 1) % levels.length;
+                document.getElementById('level-select').value = next;
+                initLevel(next);
+            } else {
+                initLevel(currentLevel);
+            }
+        }
+
+        let sliceAnimProgress = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            if (isSliced && upperPart && lowerPart) {
+                sliceAnimProgress += (1 - sliceAnimProgress) * 0.035;
+                const offsetVec = sliceNormal.clone().multiplyScalar(sliceAnimProgress * 1.5);
+                upperPart.position.copy(offsetVec);
+                lowerPart.position.copy(offsetVec.clone().negate());
+                
+                upperClippingPlane.constant = baseUpperConstant - sliceNormal.dot(upperPart.position);
+                lowerClippingPlane.constant = baseLowerConstant - (sliceNormal.clone().negate()).dot(lowerPart.position);
+                
+                upperPart.material.opacity = 0.8 - sliceAnimProgress * 0.4;
+                lowerPart.material.opacity = 0.8 - sliceAnimProgress * 0.4;
+            }
+            if (controls) controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
