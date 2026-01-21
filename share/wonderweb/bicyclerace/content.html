@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>草原の最速レース！クイズ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --field-grass-light: #f7fee7;
+            --field-grass-subtle: #ecfccb;
+        }
+
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background: linear-gradient(135deg, #f7fee7 0%, #ecfccb 100%);
+            margin: 0;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            pointer-events: auto;
+            padding-bottom: 120px;
+        }
+
+        .hidden-screen {
+            display: none !important;
+        }
+
+        .field-container {
+            position: relative;
+            width: 82vmin;
+            aspect-ratio: 1 / 1;
+            margin: auto;
+            background: radial-gradient(circle at center, var(--field-grass-light) 0%, var(--field-grass-subtle) 100%);
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1), inset 0 0 60px rgba(255, 255, 255, 0.5);
+            overflow: hidden;
+            border: 10px solid #fff;
+        }
+
+        .path-line {
+            fill: none;
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: opacity 0.3s;
+        }
+
+        .waypoint-bicycle {
+            cursor: pointer;
+            transition: filter 0.2s;
+        }
+
+        .waypoint-bicycle:hover {
+            filter: brightness(1.1);
+        }
+
+        .waypoint-mushroom {
+            pointer-events: none;
+        }
+
+        .item-img {
+            pointer-events: none;
+            user-select: none;
+            width: 90%;
+            height: 90%;
+            object-fit: contain;
+        }
+
+        .character-player {
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translate(-50%, -50%);
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .character-rival {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translate(-50%, -50%);
+            z-index: 40;
+            pointer-events: none;
+            opacity: 0.9;
+        }
+
+        .character img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.15));
+        }
+
+        .goal {
+            position: absolute;
+            font-size: 64px;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+        }
+
+        .message-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.98);
+            padding: 30px;
+            border-radius: 32px;
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+            z-index: 200;
+            display: none;
+            width: 80%;
+            max-width: 500px;
+            min-height: 240px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 6px solid var(--primary);
+            transition: border-color 0.3s;
+        }
+
+        #problem-selector {
+            background: white;
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 4px 12px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .control-btn {
+            background: var(--primary);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            opacity: 0.9;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="ui-layer">
+        <!-- スタート画面 -->
+        <div id="start-screen" class="screen bg-lime-50 p-8 text-center items-center justify-center">
+            <h1 class="text-5xl font-black text-indigo-900 mb-8">最速レース！クイズ</h1>
+
+            <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-lg border-4 border-white">
+                <p class="text-xl font-bold text-slate-700 mb-4">がくねんを えらんでね</p>
+                <div class="flex justify-center gap-4 mb-8">
+                    <label
+                        class="flex items-center gap-2 cursor-pointer p-4 rounded-xl border-2 border-slate-200 bg-slate-50 hover:border-indigo-400 transition-all">
+                        <input type="radio" name="grade-select" value="1" checked class="w-5 h-5">
+                        <span class="font-bold">1,2ねんせい</span>
+                    </label>
+                    <label
+                        class="flex items-center gap-2 cursor-pointer p-4 rounded-xl border-2 border-slate-200 bg-slate-50 hover:border-indigo-400 transition-all">
+                        <input type="radio" name="grade-select" value="2" class="w-5 h-5">
+                        <span class="font-bold">3,4ねんせい</span>
+                    </label>
+                </div>
+
+                <div class="flex flex-col gap-4 items-center">
+                    <button onclick="startGame('score')"
+                        class="bg-orange-500 hover:bg-orange-600 text-white p-6 rounded-2xl text-2xl font-black shadow-lg transition-all w-full max-w-xs">
+                        スコアアタック
+                        <div class="text-xs font-normal opacity-90 mt-1">3分間で何問とけるかな？</div>
+                    </button>
+                    <button onclick="startGame('free')"
+                        class="bg-sky-500 hover:bg-sky-600 text-white p-6 rounded-2xl text-2xl font-black shadow-lg transition-all w-full max-w-xs">
+                        フリーモード
+                        <div class="text-xs font-normal opacity-90 mt-1">好きな問題をえらんで挑戦</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <div id="game-screen" class="screen hidden-screen">
+            <!-- 上部パネル: フリーモード -->
+            <div id="free-mode-panel"
+                class="flex justify-between items-center p-4 bg-white/60 backdrop-blur hidden-screen">
+                <div class="flex items-center gap-4">
+                    <select id="problem-selector" onchange="loadProblem(parseInt(this.value))"></select>
+                    <button onclick="loadNextProblem()" class="control-btn bg-indigo-600">つぎの もんだいへ →</button>
+                </div>
+                <button onclick="backToTitle()" class="text-slate-500 font-bold hover:text-slate-800">タイトルへ</button>
+            </div>
+
+            <!-- 上部パネル: スコアアタック -->
+            <div id="score-attack-panel"
+                class="flex justify-between items-center p-4 bg-orange-500/80 backdrop-blur text-white hidden-screen">
+                <div class="text-2xl font-black" id="timer-display">3:00</div>
+                <div class="text-2xl font-black">スコア: <span id="score-display">0</span></div>
+                <button onclick="backToTitle()" class="bg-white/20 px-4 py-1 rounded-lg font-bold">やめる</button>
+            </div>
+
+            <!-- メインフィールド -->
+            <div class="flex-grow flex items-center justify-center p-4">
+                <div class="field-container" id="field">
+                    <svg id="svg-layer" width="100%" height="100%" viewBox="0 0 100 100"
+                        class="absolute top-0 left-0"></svg>
+                    <div id="goal" class="goal">🏠</div>
+                    <div id="char-a" class="character-player">
+                        <img src="chara1.png" alt="Player"
+                            onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏃</text></svg>'">
+                    </div>
+                    <div id="rival-container"></div>
+
+                    <!-- 結果オーバーレイ -->
+                    <div id="message-box" class="message-overlay" style="display: none;">
+                        <h2 id="result-text" class="text-5xl font-black mb-8"></h2>
+                        <div id="result-buttons" class="flex flex-col gap-4 items-center w-full">
+                            <button id="retry-btn" onclick="retryProblem()"
+                                class="bg-amber-500 hover:bg-amber-600 text-white p-4 rounded-xl text-xl font-bold shadow-md transition-all w-full max-w-xs">もういちど</button>
+                            <button id="next-action-btn" onclick="handleNextAction()"
+                                class="bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-xl text-xl font-bold shadow-md transition-all w-full max-w-xs">つぎへ進む</button>
+                        </div>
+                    </div>
+
+                    <!-- スコアアタック終了時オーバーレイ -->
+                    <div id="score-final-overlay" class="message-overlay" style="display: none;">
+                        <h2 class="text-4xl font-black mb-4">おわり！</h2>
+                        <div class="text-6xl font-black text-orange-500 my-6">スコア: <span
+                                id="final-score-display">0</span></div>
+                        <button onclick="backToTitle()"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-xl text-xl font-bold shadow-md transition-all w-full max-w-xs">タイトルへ</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 下部のガイドパネル -->
+            <div class="px-6 pb-6">
+                <div
+                    class="bg-white/80 backdrop-blur p-4 rounded-2xl shadow-lg border border-white flex justify-around items-center text-sm">
+                    <div class="flex items-center gap-2">
+                        <span class="bg-white p-1 rounded border">🚲</span> <span>スピード <b>2倍</b></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="bg-white p-1 rounded border">🍄</span> <span>スピード <b>4倍</b></span>
+                    </div>
+                    <div class="text-indigo-600 font-bold">自転車をタップしてね！</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * データ定義
+         */
+        const PROBLEMS = [
+            { id: 11, level: 1, title: "A-1", start: "2020", goal: "8070", routes: [{ id: 0, path: ["5020b", "8020"] }, { id: 1, path: ["2070", "5070b"] }] },
+            { id: 12, level: 1, title: "A-2", start: "2020", goal: "8080", routes: [{ id: 0, path: ["2060b", "2080"] }, { id: 1, path: ["8020", "8050b", "8080"] }] },
+            { id: 13, level: 1, title: "A-3", start: "2020", goal: "8070", routes: [{ id: 0, path: ["8020b"] }, { id: 1, path: ["2070b"] }] },
+            { id: 14, level: 1, title: "A-4", start: "2080", goal: "8020", routes: [{ id: 0, path: ["2020b"] }, { id: 1, path: ["5080b", "5060", "7060", "7040", "8040"] }] },
+            { id: 15, level: 1, title: "A-5", start: "2020", goal: "8070", routes: [{ id: 0, path: ["7020b", "8020"] }, { id: 1, path: ["2070", "4070b"] }] },
+            { id: 16, level: 1, title: "A-6", start: "2070", goal: "8030", routes: [{ id: 0, path: ["2020", "4020b", "8020"] }, { id: 1, path: ["2080", "6080b", "8080"] }] },
+            { id: 17, level: 1, title: "A-7", start: "1050", goal: "9080", routes: [{ id: 0, path: ["3050", "3030", "6030b", "6050", "9050"] }, { id: 1, path: ["1080", "3080", "3060", "5060b", "5080"] }] },
+            { id: 18, level: 1, title: "A-8", start: "1070", goal: "7040", routes: [{ id: 0, path: ["1020", "3020b", "5020", "5040"] }, { id: 1, path: ["7070b", "9070", "9050", "7050"] }] },
+            { id: 21, level: 1, title: "B-1", start: "3040", goal: "7080", routes: [{ id: 0, path: ["3020b", "7020"] }, { id: 1, path: ["3060", "4060", "4070", "5070b", "5080"] }] },
+            { id: 22, level: 1, title: "B-2", start: "2030", goal: "7070", routes: [{ id: 0, path: ["3030", "3020b", "7020"] }, { id: 1, path: ["2070", "4070b"] }] },
+            { id: 23, level: 1, title: "B-3", start: "2060", goal: "8070", routes: [{ id: 0, path: ["2030b", "8030"] }, { id: 1, path: ["4060", "4070", "6070", "6060b", "8060"] }] },
+            { id: 31, level: 1, title: "C-1", start: "5010", goal: "5090", routes: [{ id: 0, path: ["3030b", "3060m", "3090"] }, { id: 1, path: ["7030b", "7090"] }] },
+            { id: 32, level: 1, title: "C-2", start: "2020", goal: "8080", routes: [{ id: 0, path: ["2050b", "2080"] }, { id: 1, path: ["6020b", "8020m"] }] },
+            {
+                id: 33, level: 4, title: "C-3",
+                start: "2040", goal: "8080",
+                routes: [
+                    { id: 0, path: ["2020b", "5020", "5030m", "5050", "8050"] },
+                    { id: 1, path: ["2080b"] }]
+            },
+            {
+                id: 34, level: 4, title: "C-4",
+                start: "1050", goal: "8050",
+                routes: [
+                    { id: 0, path: ["3040b", "5040", "5020m", "8020"] },
+                    { id: 1, path: ["3060b", "3080", "6080m", "6050"] }]
+            },
+            {
+                id: 35, level: 4, title: "C-5",
+                start: "2080", goal: "8020",
+                routes: [
+                    { id: 0, path: ["2060b", "2020m"] },
+                    { id: 1, path: ["4080b", "6080m", "8080", "8060", "4060", "4040", "8040"] }]
+            },
+            {
+                id: 36, level: 4, title: "C-6",
+                start: "1050", goal: "9090",
+                routes: [
+                    { id: 0, path: ["3030b", "3010m", "9010"] },
+                    { id: 1, path: ["3070b", "5070", "5090", "7090m"] }]
+            },
+            {
+                id: 37, level: 4, title: "C-7",
+                start: "1010", goal: "9090",
+                routes: [
+                    { id: 0, path: ["3010b", "3030m", "5030", "5010", "7010", "7050", "5050", "5070", "9070"] },
+                    { id: 1, path: ["1030b", "1090", "7090m"] }]
+            },
+            {
+                id: 41, level: 5, title: "D-1",
+                start: "5010", goal: "5090",
+                routes: [
+                    { id: 0, path: ["5020", "2020", "2050b", "2080", "5080"] },
+                    { id: 1, path: ["5030", "4030", "4040", "6040", "6050", "5050b", "4050", "4060", "5060"] },
+                    { id: 2, path: ["5020", "8020", "8060b", "8080", "5080"] }]
+            },
+            {
+                id: 42, level: 5, title: "D-2",
+                start: "2020", goal: "8080",
+                routes: [
+                    { id: 0, path: ["2050", "4050", "4060b", "4080"] },
+                    { id: 1, path: ["2030", "5030", "5040b", "5050", "8050"] },
+                    { id: 2, path: ["6020b", "7020", "7030", "8030"] }]
+            },
+            {
+                id: 43, level: 5, title: "D-3",
+                start: "4010", goal: "6090",
+                routes: [
+                    { id: 0, path: ["2010", "2070b", "2090"] },
+                    { id: 1, path: ["4030", "6030", "6050", "5050b", "4050", "4070", "6070"] },
+                    { id: 2, path: ["8010", "8050b", "8090"] }]
+            },
+            {
+                id: 44, level: 5, title: "D-4",
+                start: "4050", goal: "6050",
+                routes: [
+                    { id: 0, path: ["1050", "1010b", "9010", "9050"] },
+                    { id: 1, path: ["1050", "1090b", "5090m", "9090", "9050"] },
+                    { id: 2, path: ["4040", "2040", "2020", "5020b", "8020", "8040", "6040"] }]
+            },
+            {
+                id: 45, level: 5, title: "D-5",
+                start: "3030", goal: "7070",
+                routes: [
+                    { id: 0, path: ["1030", "1050b", "1070", "3070m", "3090", "7090"] },
+                    { id: 1, path: ["3060", "5060", "5050b", "5040", "7040"] },
+                    { id: 2, path: ["3010b", "7010", "7030m", "9030", "9070"] }]
+            },
+            {
+                id: 46, level: 5, title: "D-6",
+                start: "1010", goal: "9090",
+                routes: [
+                    { id: 0, path: ["1050b", "1090", "3090m"] },
+                    { id: 1, path: ["1030", "3030b", "3070m", "7070", "7090"] },
+                    { id: 2, path: ["5010", "5020b", "5050m", "9050"] }]
+            },
+            {
+                id: 51, level: 5, title: "E-1",
+                start: "1020", goal: "8080",
+                routes: [
+                    { id: 0, path: ["1080", "2080b"] },
+                    { id: 1, path: ["3020", "3060b", "8060"] },
+                    { id: 2, path: ["4020", "6050b", "8050"] }]
+            },
+            {
+                id: 52, level: 5, title: "E-2",
+                start: "1080", goal: "9020",
+                routes: [
+                    { id: 0, path: ["1060b", "1040", "3040", "3020"] },
+                    { id: 1, path: ["3080", "7040b", "9040"] },
+                    { id: 2, path: ["9080", "9060b"] }]
+            },
+            {
+                id: 53, level: 5, title: "E-3",
+                start: "3030", goal: "8080",
+                routes: [
+                    { id: 0, path: ["3010b", "9010", "9080"] },
+                    { id: 1, path: ["8020b"] },
+                    { id: 2, path: ["1050b"] }]
+            },
+            {
+                id: 54, level: 5, title: "E-4",
+                start: "1010", goal: "9090",
+                routes: [
+                    { id: 0, path: ["9010b"] },
+                    { id: 1, path: ["6010", "6060b"] },
+                    { id: 2, path: ["1050", "5090b"] }]
+            }
+        ];
+
+        const ROUTE_COLORS = ['#6366f1', '#f59e0b', '#ec4899', '#22c55e', '#8b5cf6'];
+        const GRADE_CONFIG = { 1: [1, 2, 3, 4, 5, 6], 2: [1, 2, 3, 4, 5, 6] };
+        const BASE_SPEED = 37.5;
+        const TIME_LIMIT = 180;
+
+        let currentMode = '';
+        let currentGrade = 1;
+        let filteredProblems = [];
+        let currentIndex = 0;
+        let score = 0;
+        let timeLeft = TIME_LIMIT;
+        let timerInterval = null;
+        let animationId = null;
+        let lastTimestamp = null;
+        let finishStartTime = null;
+        let gameState = 'IDLE';
+        let playerRunner = null;
+        let rivalRunners = [];
+        let winnerPathId = null;
+        let activeRoutesData = [];
+
+        /**
+         * ユーティリティ
+         */
+        function parseCoord(str) {
+            const hasBike = str.includes('b');
+            const hasMushroom = str.includes('m');
+            const numStr = str.replace(/[bm]/g, '');
+            const x = parseInt(numStr.substring(0, 2));
+            const y = parseInt(numStr.substring(2, 4));
+            return { x, y, hasBike, hasMushroom };
+        }
+
+        function getDistance(p1, p2) {
+            return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+        }
+
+        function getStatusAtDistanceSafe(points, distance) {
+            if (distance <= 0) return { pos: points[0], mult: 1, finished: false, passedItems: [] };
+            let covered = 0;
+            let currentMult = 1;
+            let passedItems = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                if (points[i].hasBike) currentMult = 2;
+                if (points[i].hasMushroom) currentMult = 4;
+
+                if (distance > covered) {
+                    if (points[i].hasBike || points[i].hasMushroom) passedItems.push(i);
+                }
+
+                const segLen = getDistance(points[i], points[i + 1]);
+                if (covered + segLen >= distance) {
+                    const ratio = segLen === 0 ? 0 : (distance - covered) / segLen;
+                    return {
+                        pos: { x: points[i].x + (points[i + 1].x - points[i].x) * ratio, y: points[i].y + (points[i + 1].y - points[i].y) * ratio },
+                        mult: currentMult, finished: false, passedItems
+                    };
+                }
+                covered += segLen;
+            }
+            const lastIdx = points.length - 1;
+            if (points[lastIdx].hasBike || points[lastIdx].hasMushroom) passedItems.push(lastIdx);
+            return { pos: points[points.length - 1], mult: currentMult, finished: true, passedItems };
+        }
+
+        function calculateFastestTime(points) {
+            let total = 0, mult = 1;
+            for (let i = 0; i < points.length - 1; i++) {
+                if (points[i].hasBike) mult = 2;
+                if (points[i].hasMushroom) mult = 4;
+                total += getDistance(points[i], points[i + 1]) / (BASE_SPEED * mult);
+            }
+            return total;
+        }
+
+        function drawGrid() {
+            const svg = document.getElementById('svg-layer');
+            svg.innerHTML = '';
+            for (let i = 10; i < 100; i += 10) {
+                const l1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                l1.setAttribute("x1", i); l1.setAttribute("y1", 0); l1.setAttribute("x2", i); l1.setAttribute("y2", 100);
+                l1.setAttribute("stroke", "rgba(0,0,0,0.08)"); l1.setAttribute("stroke-width", "0.3"); svg.appendChild(l1);
+                const l2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                l2.setAttribute("x1", 0); l2.setAttribute("y1", i); l2.setAttribute("x2", 100); l2.setAttribute("y2", i);
+                l2.setAttribute("stroke", "rgba(0,0,0,0.08)"); l2.setAttribute("stroke-width", "0.3"); svg.appendChild(l2);
+            }
+        }
+
+        /**
+         * ゲーム進行
+         */
+        function startGame(mode) {
+            currentMode = mode;
+            const radios = document.getElementsByName('grade-select');
+            for (let r of radios) if (r.checked) currentGrade = parseInt(r.value);
+
+            filteredProblems = PROBLEMS.filter(p => GRADE_CONFIG[currentGrade].includes(p.level));
+            currentIndex = 0;
+
+            document.getElementById('start-screen').classList.add('hidden-screen');
+            document.getElementById('game-screen').classList.remove('hidden-screen');
+            document.getElementById('score-final-overlay').style.display = 'none';
+
+            if (mode === 'score') {
+                score = 0; timeLeft = TIME_LIMIT;
+                document.getElementById('score-attack-panel').classList.remove('hidden-screen');
+                document.getElementById('free-mode-panel').classList.add('hidden-screen');
+                document.getElementById('score-display').innerText = score;
+                startTimer();
+            } else {
+                document.getElementById('free-mode-panel').classList.remove('hidden-screen');
+                document.getElementById('score-attack-panel').classList.add('hidden-screen');
+                updateProblemSelector();
+            }
+            loadProblem(0);
+        }
+
+        function loadProblem(index) {
+            if (index >= filteredProblems.length) {
+                if (currentMode === 'score') index = 0; else return;
+            }
+            currentIndex = index;
+            gameState = 'IDLE';
+            lastTimestamp = null;
+            finishStartTime = null;
+            document.getElementById('message-box').style.display = 'none';
+            document.getElementById('rival-container').innerHTML = '';
+            drawGrid();
+
+            const data = filteredProblems[index];
+            const startCoord = parseCoord(data.start);
+            const goalCoord = parseCoord(data.goal);
+
+            updatePos(document.getElementById('char-a'), startCoord);
+            updatePos(document.getElementById('goal'), goalCoord);
+
+            const routesData = data.routes.map((r, i) => {
+                const mid = r.path.map(p => parseCoord(p));
+                const points = [startCoord, ...mid, goalCoord];
+                let totalLen = 0;
+                for (let k = 0; k < points.length - 1; k++) totalLen += getDistance(points[k], points[k + 1]);
+
+                return {
+                    id: r.id,
+                    points: points,
+                    color: ROUTE_COLORS[i % ROUTE_COLORS.length],
+                    totalLen: totalLen,
+                    time: calculateFastestTime(points)
+                };
+            });
+
+            winnerPathId = [...routesData].sort((a, b) => a.time - b.time)[0].id;
+            routesData.forEach((r, i) => drawRoute(r, i));
+            activeRoutesData = routesData;
+
+            if (currentMode === 'free') updateProblemSelector();
+        }
+
+        function retryProblem() {
+            loadProblem(currentIndex);
+        }
+
+        function drawRoute(route, routeIdx) {
+            const svg = document.getElementById('svg-layer');
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", route.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' '));
+            path.setAttribute("stroke", route.color); path.setAttribute("stroke-width", 3);
+            path.setAttribute("class", "path-line opacity-50"); path.id = `path-${routeIdx}`;
+            svg.appendChild(path);
+
+            route.points.forEach((p, pointIdx) => {
+                if (!p.hasBike && !p.hasMushroom) return;
+                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                g.id = `item-${routeIdx}-${pointIdx}`;
+                if (p.hasBike) { g.setAttribute("class", "waypoint-bicycle"); g.onclick = () => selectRoute(routeIdx); }
+                else g.setAttribute("class", "waypoint-mushroom");
+
+                if (p.hasBike) {
+                    const rad = 8;
+                    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    c.setAttribute("cx", p.x); c.setAttribute("cy", p.y); c.setAttribute("r", rad);
+                    c.setAttribute("fill", route.color); c.setAttribute("fill-opacity", "0.15");
+                    c.setAttribute("stroke", route.color); c.setAttribute("stroke-width", "1.5");
+                    g.appendChild(c);
+                }
+
+                const iconSize = p.hasBike ? 15 : 12;
+                const fo = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+                fo.setAttribute("x", p.x - iconSize / 2); fo.setAttribute("y", p.y - iconSize / 2);
+                fo.setAttribute("width", iconSize); fo.setAttribute("height", iconSize);
+
+                const div = document.createElement("div");
+                div.className = "w-full h-full flex items-center justify-center";
+                const img = document.createElement("img");
+                img.src = p.hasBike ? "bicycle.png" : "mashroom.png";
+                img.className = "item-img";
+                img.onerror = () => { img.style.display = 'none'; div.innerHTML = `<span style="font-size:10px">${p.hasBike ? '🚲' : '🍄'}</span>`; };
+
+                div.appendChild(img); fo.appendChild(div); g.appendChild(fo); svg.appendChild(g);
+            });
+        }
+
+        function selectRoute(routeIdx) {
+            if (gameState !== 'IDLE') return;
+
+            const selected = activeRoutesData[routeIdx];
+            playerRunner = { element: document.getElementById('char-a'), points: selected.points, dist: 0, total: selected.totalLen, id: selected.id, routeIdx: routeIdx };
+
+            rivalRunners = [];
+            activeRoutesData.forEach((r, i) => {
+                if (i !== routeIdx) {
+                    const div = document.createElement('div');
+                    div.className = 'character-rival';
+                    div.innerHTML = `<img src="chara2.png" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>'">`;
+                    document.getElementById('rival-container').appendChild(div);
+                    rivalRunners.push({ element: div, points: r.points, dist: 0, total: r.totalLen, id: r.id, routeIdx: i });
+                    document.getElementById(`path-${i}`).classList.replace('opacity-50', 'opacity-20');
+                }
+            });
+
+            document.getElementById(`path-${routeIdx}`).classList.replace('opacity-50', 'opacity-100');
+            document.getElementById(`path-${routeIdx}`).setAttribute('stroke-width', 6);
+
+            gameState = 'RACING';
+            lastTimestamp = null;
+            finishStartTime = null;
+            requestAnimationFrame(raceLoop);
+        }
+
+        function raceLoop(timestamp) {
+            if (gameState !== 'RACING') return;
+
+            if (!lastTimestamp) {
+                lastTimestamp = timestamp;
+                requestAnimationFrame(raceLoop);
+                return;
+            }
+
+            const dt = (timestamp - lastTimestamp) / 1000;
+            lastTimestamp = timestamp;
+
+            if (!finishStartTime) {
+                let anyoneFinished = false;
+
+                // プレイヤー更新
+                const pResult = getStatusAtDistanceSafe(playerRunner.points, playerRunner.dist);
+                playerRunner.dist += BASE_SPEED * pResult.mult * dt;
+                if (playerRunner.dist >= playerRunner.total) {
+                    playerRunner.dist = playerRunner.total;
+                    anyoneFinished = true;
+                }
+                const pPosFinal = getStatusAtDistanceSafe(playerRunner.points, playerRunner.dist);
+                updatePos(playerRunner.element, pPosFinal.pos);
+                updateItemOpacities(playerRunner.routeIdx, pPosFinal.passedItems);
+
+                // ライバル更新
+                rivalRunners.forEach(rival => {
+                    const rResult = getStatusAtDistanceSafe(rival.points, rival.dist);
+                    rival.dist += BASE_SPEED * rResult.mult * dt;
+                    if (rival.dist >= rival.total) {
+                        rival.dist = rival.total;
+                        anyoneFinished = true;
+                    }
+                    const rPosFinal = getStatusAtDistanceSafe(rival.points, rival.dist);
+                    updatePos(rival.element, rPosFinal.pos);
+                    updateItemOpacities(rival.routeIdx, rPosFinal.passedItems);
+                });
+
+                if (anyoneFinished) {
+                    finishStartTime = timestamp;
+                }
+            } else {
+                if (timestamp - finishStartTime >= 600) {
+                    gameState = 'FINISHED';
+                    showResult();
+                    return;
+                }
+            }
+
+            animationId = requestAnimationFrame(raceLoop);
+        }
+
+        function updateItemOpacities(routeIdx, passedIndices) {
+            passedIndices.forEach(pointIdx => {
+                const el = document.getElementById(`item-${routeIdx}-${pointIdx}`);
+                if (el && el.classList.contains('waypoint-mushroom')) {
+                    el.style.opacity = '0.3';
+                }
+            });
+        }
+
+        function showResult() {
+            const isCorrect = (playerRunner.id === winnerPathId);
+            const msgBox = document.getElementById('message-box');
+            const resText = document.getElementById('result-text');
+
+            if (isCorrect) {
+                resText.innerText = "せいかい！";
+                resText.className = "text-5xl font-black text-green-600";
+                msgBox.style.borderColor = "var(--success)";
+                sessionStorage.setItem(`cleared_race_${filteredProblems[currentIndex].id}`, 'true');
+                if (currentMode === 'score') score += 4;
+            } else {
+                resText.innerText = "ふせいかい><";
+                resText.className = "text-5xl font-black text-red-600";
+                msgBox.style.borderColor = "var(--danger)";
+                if (currentMode === 'score') score = Math.max(0, score - 2);
+            }
+
+            if (currentMode === 'score') {
+                document.getElementById('score-display').innerText = score;
+                document.getElementById('result-buttons').classList.add('hidden');
+                setTimeout(() => {
+                    if (gameState === 'FINISHED') handleNextAction();
+                }, 1500);
+            } else {
+                document.getElementById('result-buttons').classList.remove('hidden');
+                document.getElementById('retry-btn').classList.remove('hidden');
+                document.getElementById('next-action-btn').classList.remove('hidden');
+            }
+
+            msgBox.style.display = 'flex';
+            if (currentMode === 'free') updateProblemSelector();
+        }
+
+        function handleNextAction() {
+            loadProblem(currentIndex + 1);
+        }
+
+        function loadNextProblem() {
+            loadProblem(currentIndex + 1);
+        }
+
+        function updateProblemSelector() {
+            const sel = document.getElementById('problem-selector');
+            if (!sel) return;
+            sel.innerHTML = '';
+            filteredProblems.forEach((p, i) => {
+                const opt = document.createElement('option');
+                opt.value = i;
+                const cleared = sessionStorage.getItem(`cleared_race_${p.id}`);
+                opt.innerText = p.title + (cleared ? ' ★' : '');
+                sel.appendChild(opt);
+            });
+            sel.value = currentIndex;
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                const m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+                document.getElementById('timer-display').innerText = `${m}:${s.toString().padStart(2, '0')}`;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    showFinalScore();
+                }
+            }, 1000);
+        }
+
+        function showFinalScore() {
+            // アニメーションを停止
+            gameState = 'FINISHED';
+            if (animationId) cancelAnimationFrame(animationId);
+
+            document.getElementById('message-box').style.display = 'none';
+            document.getElementById('final-score-display').innerText = score;
+            document.getElementById('score-final-overlay').style.display = 'flex';
+        }
+
+        function backToTitle() {
+            if (timerInterval) clearInterval(timerInterval);
+            document.getElementById('start-screen').classList.remove('hidden-screen');
+            document.getElementById('game-screen').classList.add('hidden-screen');
+            document.getElementById('score-final-overlay').style.display = 'none';
+            if (animationId) cancelAnimationFrame(animationId);
+            gameState = 'IDLE';
+        }
+
+        function updatePos(el, pos) {
+            if (!pos) return;
+            el.style.left = pos.x + '%';
+            el.style.top = pos.y + '%';
+        }
+
+        window.onload = drawGrid;
+    </script>
+</body>
+
+</html>
