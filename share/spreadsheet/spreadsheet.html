@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel分析ロジック・トレーニング Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .cell {
+            width: 120px;
+            height: 32px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            font-size: 13px;
+            background: white;
+            user-select: none;
+            cursor: cell;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        .cell.header {
+            background: #f1f5f9;
+            font-weight: bold;
+            justify-content: center;
+            cursor: default;
+        }
+        .cell.selected {
+            background: #e0f2fe;
+            outline: 2px solid #3b82f6;
+            z-index: 10;
+        }
+        .excel-grid {
+            display: grid;
+            grid-template-columns: 40px repeat(5, 120px);
+            width: fit-content;
+            border-top: 1px solid #cbd5e1;
+            border-left: 1px solid #cbd5e1;
+        }
+        .row-num {
+            width: 40px;
+            background: #f1f5f9;
+            border-right: 1px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #64748b;
+        }
+        /* 計算結果が入る予定の場所 */
+        .target-slot {
+            background: #fefce8;
+            border: 2px dashed #facc15;
+            color: #a16207;
+            font-size: 10px;
+            justify-content: center;
+        }
+        .result-cell {
+            background: #f0fdf4 !important;
+            color: #166534 !important;
+            font-weight: bold;
+            border: 2px solid #22c55e !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans">
+
+    <div class="max-w-6xl mx-auto p-4 md:p-8">
+        <!-- Header -->
+        <div class="bg-white rounded-t-xl shadow-sm border border-slate-200 p-6 mb-0">
+            <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+                <h1 class="text-2xl font-black text-slate-800 flex items-center gap-2">
+                    <span class="bg-green-600 text-white px-2 py-1 rounded">X</span>
+                    データ分析思考テスト
+                </h1>
+                <div class="flex items-center gap-2">
+                    <label for="stage-select" class="text-sm font-bold text-slate-500">STAGE:</label>
+                    <select id="stage-select" class="bg-slate-100 border border-slate-300 rounded px-3 py-1 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500">
+                    </select>
+                </div>
+            </div>
+            
+            <div id="mission-box" class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                <h2 class="text-blue-800 font-bold mb-1">現在のミッション：</h2>
+                <p id="mission-text" class="text-blue-900 text-lg"></p>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="flex items-center gap-1 p-3 bg-white border-x border-slate-200 overflow-x-auto shadow-sm">
+            <button id="btn-sum" class="op-btn px-3 py-2 bg-slate-100 hover:bg-blue-100 border border-slate-300 rounded text-xs font-bold transition-colors flex items-center gap-1" data-op="SUM">
+                <span class="text-blue-600 text-lg">Σ</span> 合計
+            </button>
+            <button id="btn-sub" class="op-btn px-3 py-2 bg-slate-100 hover:bg-blue-100 border border-slate-300 rounded text-xs font-bold transition-colors flex items-center gap-1" data-op="SUB">
+                <span class="text-red-600 text-lg">-</span> 引算
+            </button>
+            <button id="btn-mul" class="op-btn px-3 py-2 bg-slate-100 hover:bg-blue-100 border border-slate-300 rounded text-xs font-bold transition-colors flex items-center gap-1" data-op="MUL">
+                <span class="text-purple-600 text-lg">×</span> 掛算
+            </button>
+            <button id="btn-div" class="op-btn px-3 py-2 bg-slate-100 hover:bg-blue-100 border border-slate-300 rounded text-xs font-bold transition-colors flex items-center gap-1" data-op="DIV">
+                <span class="text-orange-600 text-lg">÷</span> 除算
+            </button>
+            
+            <div class="h-6 w-px bg-slate-300 mx-2"></div>
+            
+            <button id="btn-ok" class="px-6 py-2 bg-green-600 text-white rounded text-sm font-bold hover:bg-green-700 hidden">
+                実行 (OK)
+            </button>
+            <button id="btn-cancel" class="px-4 py-2 bg-slate-200 text-slate-700 rounded text-sm font-bold hover:bg-slate-300 hidden">
+                取消
+            </button>
+            
+            <div class="flex-grow"></div>
+            
+            <button id="btn-answer" class="px-8 py-2 bg-indigo-600 text-white rounded text-sm font-bold hover:bg-indigo-700 shadow-md">
+                回答を提出する
+            </button>
+        </div>
+
+        <!-- Grid Container -->
+        <div class="bg-white border border-slate-200 shadow-sm p-6 overflow-auto min-h-[400px]">
+            <div id="status-bar" class="mb-4 text-[10px] font-bold text-slate-400 flex justify-between uppercase tracking-widest">
+                <span id="mode-text">READY</span>
+                <span id="selection-info">NO SELECTION</span>
+            </div>
+            <div class="excel-grid" id="excel-grid">
+            </div>
+            
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                        <span>💡</span> 分析のヒント
+                    </h3>
+                    <p id="hint-text" class="text-xs text-slate-600 leading-relaxed"></p>
+                </div>
+                <div class="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <h3 class="text-sm font-bold text-amber-800 mb-2 flex items-center gap-2">
+                        <span>📝</span> 計算ログ
+                    </h3>
+                    <div id="calc-history" class="text-xs text-amber-900 font-mono space-y-1 max-h-[100px] overflow-y-auto">
+                        計算結果がここに記録されます...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay -->
+    <div id="overlay" class="fixed inset-0 bg-slate-900/80 hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl text-center max-w-md w-full">
+            <div id="overlay-icon" class="text-6xl mb-4"></div>
+            <h2 id="overlay-title" class="text-2xl font-bold mb-2 text-slate-800"></h2>
+            <p id="overlay-message" class="text-slate-600 mb-8"></p>
+            <button id="overlay-btn" class="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg">
+                NEXT
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const stages = [
+            {
+                title: "1. ゴールの成功率（順位付け）",
+                mission: "成功率が一番高いのは誰ですか？ A列の人物名を選択して回答してください。",
+                hint: "D列の「ここに結果」セルを順番に埋めましょう。すべて埋まると、E列に自動的に順位が表示されます。順位が「1」の人を選んでください。",
+                cols: 5,
+                data: [
+                    ['人物', 'ゴール数', 'シュート数', '成功率', '順位'],
+                    ['田中', 5, 10, '', '?'],
+                    ['佐藤', 8, 20, '', '?'],
+                    ['鈴木', 3, 4, '', '?'],
+                    ['', '', '', '', ''],
+                ],
+                resultSlots: [{r: 1, c: 3}, {r: 2, c: 3}, {r: 3, c: 3}],
+                check: (val) => val === "鈴木",
+                specialLogic: "ranking"
+            },
+            {
+                title: "2. カレーの支持率",
+                mission: "カレーが好きな人は全体の何%ですか？ (小数で回答)",
+                hint: "まずB6に合計を出し、次にC2に割合を出しましょう。",
+                cols: 4,
+                data: [
+                    ['料理', '人数', '割合', ''],
+                    ['カレー', 45, '', ''],
+                    ['寿司', 30, '', ''],
+                    ['ラーメン', 50, '', ''],
+                    ['ハンバーグ', 25, '', ''],
+                    ['合計', '', '', ''],
+                    ['', '', '', ''],
+                ],
+                resultSlots: [{r: 5, c: 1}, {r: 1, c: 2}],
+                check: (val) => Math.abs(val - 0.3) < 0.01
+            },
+            {
+                title: "3. 特定カテゴリの抽出",
+                mission: "「飲み物」だけの合計売上を算出してください。",
+                hint: "カテゴリが飲み物のセル（C2, C4, C6）を選択して、C8に合計を出しましょう。",
+                cols: 4,
+                data: [
+                    ['カテゴリ', '商品名', '売上', ''],
+                    ['飲み物', 'コーヒー', 450, ''],
+                    ['食べ物', 'サンドイッチ', 600, ''],
+                    ['飲み物', '紅茶', 380, ''],
+                    ['食べ物', 'カレー', 850, ''],
+                    ['飲み物', 'オレンジJ', 300, ''],
+                    ['合計', '', '', ''],
+                    ['', '', '', ''],
+                ],
+                resultSlots: [{r: 7, c: 2}],
+                check: (val) => val === 1130
+            },
+            {
+                title: "4. 純利益の計算",
+                mission: "売上から経費（原価と人件費）を引いて「利益」を算出してください。",
+                hint: "「引算」モードでB2、B3、B4の順に選択し、B6に結果を出しましょう。",
+                cols: 4,
+                data: [
+                    ['項目', '金額', '', ''],
+                    ['総売上', 15000, '', ''],
+                    ['仕入原価', 7000, '', ''],
+                    ['人件費', 3000, '', ''],
+                    ['利益', '', '', ''],
+                    ['', '', '', ''],
+                    ['', '', '', ''],
+                ],
+                resultSlots: [{r: 5, c: 1}],
+                check: (val) => val === 5000
+            },
+            {
+                title: "5. 在庫の総価値",
+                mission: "リンゴの在庫金額（単価 × 個数）を出してください。",
+                hint: "単価(B2)と個数(C2)を掛けて、D2に結果を出します。",
+                cols: 4,
+                data: [
+                    ['商品', '単価', '個数', '在庫金額'],
+                    ['リンゴ', 150, 80, ''],
+                    ['ミカン', 100, 120, ''],
+                    ['', '', '', ''],
+                    ['', '', '', ''],
+                    ['', '', '', ''],
+                ],
+                resultSlots: [{r: 1, c: 3}],
+                check: (val) => val === 12000
+            }
+        ];
+
+        let currentStageIdx = 0;
+        let cells = [];
+        let isDragging = false;
+        let startPos = null;
+        let selectedCells = [];
+        let currentOp = null;
+        let history = [];
+        let calcCount = 0;
+
+        const gridElement = document.getElementById('excel-grid');
+        const stageSelect = document.getElementById('stage-select');
+        const missionText = document.getElementById('mission-text');
+        const hintText = document.getElementById('hint-text');
+        const statusBar = document.getElementById('mode-text');
+        const selectionInfo = document.getElementById('selection-info');
+        const btnOk = document.getElementById('btn-ok');
+        const btnCancel = document.getElementById('btn-cancel');
+        const btnAnswer = document.getElementById('btn-answer');
+        const historyEl = document.getElementById('calc-history');
+
+        stages.forEach((s, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = s.title;
+            stageSelect.appendChild(opt);
+        });
+
+        stageSelect.addEventListener('change', (e) => {
+            currentStageIdx = parseInt(e.target.value);
+            initStage();
+        });
+
+        function initStage() {
+            const stage = stages[currentStageIdx];
+            missionText.textContent = stage.mission;
+            hintText.textContent = stage.hint;
+            history = [];
+            calcCount = 0;
+            historyEl.innerHTML = '計算結果がここに記録されます...';
+            renderGrid(stage);
+            setMode(null);
+        }
+
+        function renderGrid(stage) {
+            const { data, resultSlots, cols } = stage;
+            gridElement.style.gridTemplateColumns = `40px repeat(${cols}, 120px)`;
+            gridElement.innerHTML = '';
+            cells = [];
+            gridElement.appendChild(createDiv('', 'row-num'));
+            for(let i=0; i<cols; i++) gridElement.appendChild(createDiv(String.fromCharCode(65+i), 'cell header'));
+
+            for(let r=0; r<data.length; r++) {
+                gridElement.appendChild(createDiv(r+1, 'row-num'));
+                cells[r] = [];
+                for(let c=0; c<cols; c++) {
+                    const val = data[r][c];
+                    const cell = createDiv(val, 'cell');
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+                    
+                    const isSlot = resultSlots.some(s => s.r === r && s.c === c);
+                    if (isSlot && val === '') {
+                        cell.classList.add('target-slot');
+                        cell.textContent = "ここに結果";
+                    }
+
+                    cell.addEventListener('mousedown', (e) => onMouseDown(r, c));
+                    cell.addEventListener('mouseover', (e) => onMouseOver(r, c));
+                    gridElement.appendChild(cell);
+                    cells[r][c] = cell;
+                }
+            }
+        }
+
+        function createDiv(text, className) {
+            const div = document.createElement('div');
+            div.className = className;
+            div.textContent = text;
+            return div;
+        }
+
+        function onMouseDown(r, c) {
+            isDragging = true;
+            startPos = {r, c};
+            if (currentOp) {
+                toggleCell(r, c);
+            } else {
+                selectedCells = [{r, c}];
+                refreshCellStyles();
+            }
+        }
+
+        function onMouseOver(r, c) {
+            if (!isDragging || currentOp) return;
+            selectedCells = [];
+            const minR = Math.min(startPos.r, r);
+            const maxR = Math.max(startPos.r, r);
+            const minC = Math.min(startPos.c, c);
+            const maxC = Math.max(startPos.c, c);
+            for(let i=minR; i<=maxR; i++) {
+                for(let j=minC; j<=maxC; j++) {
+                    if (cells[i] && cells[i][j]) selectedCells.push({r:i, c:j});
+                }
+            }
+            refreshCellStyles();
+        }
+
+        function toggleCell(r, c) {
+            const idx = selectedCells.findIndex(p => p.r === r && p.c === c);
+            if (idx > -1) selectedCells.splice(idx, 1);
+            else selectedCells.push({r, c});
+            refreshCellStyles();
+        }
+
+        function refreshCellStyles() {
+            cells.forEach(row => row.forEach(c => c.classList.remove('selected')));
+            selectedCells.forEach(p => cells[p.r][p.c].classList.add('selected'));
+            
+            if (selectedCells.length === 0) selectionInfo.textContent = "選択なし";
+            else if (selectedCells.length === 1) selectionInfo.textContent = getLabel(selectedCells[0]);
+            else selectionInfo.textContent = `${selectedCells.length} セル選択中`;
+
+            if(currentOp) statusBar.textContent = `${currentOp}: ${selectedCells.length}個選択中。OKで実行`;
+        }
+
+        function getLabel(pos) {
+            return String.fromCharCode(65 + pos.c) + (pos.r + 1);
+        }
+
+        window.addEventListener('mouseup', () => isDragging = false);
+
+        document.querySelectorAll('.op-btn').forEach(btn => {
+            btn.addEventListener('click', () => setMode(btn.dataset.op));
+        });
+
+        function setMode(op) {
+            currentOp = op;
+            document.querySelectorAll('.op-btn').forEach(b => b.classList.remove('bg-blue-600', 'text-white'));
+            if (op) {
+                document.querySelector(`[data-op="${op}"]`).classList.add('bg-blue-600', 'text-white');
+                btnOk.classList.remove('hidden');
+                btnCancel.classList.remove('hidden');
+                selectedCells = [];
+                refreshCellStyles();
+            } else {
+                btnOk.classList.add('hidden');
+                btnCancel.classList.add('hidden');
+                statusBar.textContent = "READY";
+            }
+        }
+
+        btnCancel.addEventListener('click', () => setMode(null));
+
+        btnOk.addEventListener('click', () => {
+            if (selectedCells.length === 0) return;
+            const values = selectedCells.map(p => parseFloat(cells[p.r][p.c].textContent)).filter(v => !isNaN(v));
+            if (values.length === 0) return;
+
+            let result = 0;
+            let logMsg = "";
+            switch(currentOp) {
+                case 'SUM': result = values.reduce((a, b) => a + b, 0); logMsg = `SUM = ${result}`; break;
+                case 'SUB': result = values[0]; for(let i=1; i<values.length; i++) result -= values[i]; logMsg = `SUB = ${result}`; break;
+                case 'MUL': result = values.reduce((a, b) => a * b, 1); logMsg = `MUL = ${result}`; break;
+                case 'DIV': if(values.length < 2) return; result = values[0] / values[1]; logMsg = `DIV = ${result.toFixed(4)}`; break;
+            }
+
+            const stage = stages[currentStageIdx];
+            if (calcCount < stage.resultSlots.length) {
+                const target = stage.resultSlots[calcCount];
+                const cell = cells[target.r][target.c];
+                cell.textContent = Number.isInteger(result) ? result : result.toFixed(4);
+                cell.classList.remove('target-slot');
+                cell.classList.add('result-cell');
+                calcCount++;
+
+                // スペシャルロジック：順位更新
+                if (stage.specialLogic === "ranking") updateRanking(stage);
+            }
+
+            if(history.length === 0) historyEl.innerHTML = '';
+            const div = document.createElement('div');
+            div.textContent = "> " + logMsg;
+            historyEl.prepend(div);
+            setMode(null);
+        });
+
+        function updateRanking(stage) {
+            const rows = stage.resultSlots.map(s => s.r);
+            const results = rows.map(r => ({
+                row: r,
+                val: parseFloat(cells[r][3].textContent)
+            }));
+
+            // すべて埋まっているかチェック
+            if (results.some(res => isNaN(res.val))) return;
+
+            // 降順ソート
+            const sorted = [...results].sort((a, b) => b.val - a.val);
+            
+            results.forEach(res => {
+                const rank = sorted.findIndex(s => s.row === res.row) + 1;
+                cells[res.row][4].textContent = rank;
+                cells[res.row][4].classList.add('font-bold', 'text-blue-600');
+            });
+        }
+
+        btnAnswer.addEventListener('click', () => {
+            if (selectedCells.length !== 1) {
+                showModal("🤔", "回答エラー", "答えだと思うセルを「1つだけ」選択してから提出してください。", false);
+                return;
+            }
+            const cell = cells[selectedCells[0].r][selectedCells[0].c];
+            const val = cell.textContent;
+            const stage = stages[currentStageIdx];
+            
+            // 数値変換できる場合は数値で、できない場合は文字列で比較
+            const numericVal = parseFloat(val);
+            const finalVal = isNaN(numericVal) ? val : numericVal;
+
+            if (stage.check(finalVal)) {
+                showModal("🎯", "正解です！", "分析成功です！正しい論理で計算し、答えを見つけることができました。", true);
+            } else {
+                showModal("❌", "不正解...", "選択したセルが正解ではありません。計算過程や順位をもう一度確認しましょう。");
+            }
+        });
+
+        function showModal(icon, title, msg, success) {
+            const overlay = document.getElementById('overlay');
+            const btn = document.getElementById('overlay-btn');
+            document.getElementById('overlay-icon').textContent = icon;
+            document.getElementById('overlay-title').textContent = title;
+            document.getElementById('overlay-message').textContent = msg;
+            
+            btn.onclick = () => {
+                overlay.classList.add('hidden');
+                if (success) {
+                    if (currentStageIdx < stages.length - 1) {
+                        currentStageIdx++;
+                        stageSelect.value = currentStageIdx;
+                        initStage();
+                    } else {
+                        location.reload();
+                    }
+                }
+            };
+            btn.textContent = success ? (currentStageIdx === stages.length - 1 ? "最初に戻る" : "次のステージへ") : "やり直す";
+            overlay.classList.remove('hidden');
+        }
+
+        initStage();
+    </script>
+</body>
+</html>
