@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>麻雀メンツ作成トレーニング</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #1a2e1a; /* 麻雀卓をイメージした深い緑 */
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .tile {
+            width: 50px;
+            height: 70px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+            color: #333;
+            box-shadow: 0 4px 0 #ccc, 0 6px 10px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            position: relative;
+        }
+
+        .tile:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #ccc, 0 3px 5px rgba(0,0,0,0.3);
+        }
+
+        .tile.manzu { color: #d32f2f; }
+        .tile.pinzu { color: #1976d2; }
+        .tile.souzu { color: #2e7d32; }
+
+        .slot {
+            width: 54px;
+            height: 74px;
+            border: 2px dashed rgba(255,255,255,0.3);
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .set-container {
+            border: 3px solid transparent;
+            border-radius: 12px;
+            padding: 8px;
+            transition: border-color 0.3s;
+        }
+
+        .set-invalid {
+            border-color: #ff5252;
+            background-color: rgba(255, 82, 82, 0.1);
+        }
+
+        .set-valid {
+            border-color: #4caf50;
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+
+        .pool-area {
+            background-color: rgba(0,0,0,0.2);
+            border-radius: 16px;
+            padding: 20px;
+            width: 95%;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="py-6 text-center">
+        <h1 class="text-3xl font-bold mb-2">麻雀メンツ作成</h1>
+        <p id="level-indicator" class="text-sm font-bold text-yellow-400 mb-1">Challenge 1</p>
+        <p class="text-xs opacity-80">指定された牌で3つのメンツを完成させてください</p>
+    </header>
+
+    <main class="flex-grow w-full max-w-4xl px-4 flex flex-col items-center">
+        <!-- セット配置エリア -->
+        <div id="game-board" class="flex flex-wrap justify-center gap-6 mb-12">
+            <!-- JavaScriptで生成 -->
+        </div>
+
+        <!-- 手牌プール -->
+        <div class="pool-area shadow-inner">
+            <h2 id="pool-title" class="text-center mb-4 text-xs uppercase tracking-widest opacity-50">Available Tiles</h2>
+            <div id="tile-pool" class="flex flex-wrap justify-center gap-3">
+                <!-- JavaScriptで生成 -->
+            </div>
+        </div>
+
+        <button id="reset-btn" class="mt-8 px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/30 rounded-full transition-colors">
+            スキップ / 再生成
+        </button>
+    </main>
+
+    <!-- クリアモーダル -->
+    <div id="clear-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-50">
+        <div class="bg-white text-gray-900 p-8 rounded-2xl text-center max-w-xs w-full">
+            <div class="text-6xl mb-4">🀄</div>
+            <h2 class="text-2xl font-bold mb-2">クリア！</h2>
+            <p id="clear-message" class="mb-6">お見事！きれいに揃いました。</p>
+            <button id="modal-reset-btn" class="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors">
+                次の問題へ
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 麻雀牌のデータ定義
+        const TILE_TYPES = [
+            { id: 'm', name: '萬子', class: 'manzu', icons: ['🀇','🀈','🀉','🀊','🀋','🀌','🀍','🀎','🀏'] },
+            { id: 'p', name: '筒子', class: 'pinzu', icons: ['🀙','🀚','🀛','🀜','🀝','🀞','🀟','🀠','🀡'] },
+            { id: 's', name: '索子', class: 'souzu', icons: ['🀐','🀑','🀒','🀓','🀔','🀕','🀖','🀗','🀘'] }
+        ];
+
+        let pool = [];
+        let slots = [[null, null, null], [null, null, null], [null, null, null]];
+        let currentLevel = 1;
+        const NUM_SETS = 3;
+
+        // ゲーム初期化
+        function initGame() {
+            pool = [];
+            slots = Array.from({ length: NUM_SETS }, () => [null, null, null]);
+            
+            if (currentLevel === 1) {
+                // 第1問: 指定された牌の構成 (1m,1m,1m, 2m,3m,3m, 4m,4m, 5m)
+                const activeType = TILE_TYPES[0]; // 萬子
+                const values = [1, 1, 1, 2, 3, 3, 4, 4, 5];
+                values.forEach(val => {
+                    pool.push({
+                        typeId: activeType.id,
+                        value: val,
+                        icon: activeType.icons[val - 1],
+                        class: activeType.class,
+                        id: Math.random()
+                    });
+                });
+                document.getElementById('level-indicator').textContent = "Challenge 1 (Fixed Problem)";
+                document.getElementById('pool-title').textContent = activeType.name;
+            } else {
+                // 第2問以降: ランダム生成
+                const activeType = TILE_TYPES[Math.floor(Math.random() * 3)];
+                document.getElementById('level-indicator').textContent = `Challenge ${currentLevel} (Random)`;
+                document.getElementById('pool-title').textContent = activeType.name;
+                
+                for (let i = 0; i < NUM_SETS; i++) {
+                    const isKoutsu = Math.random() > 0.5;
+                    if (isKoutsu) {
+                        const num = Math.floor(Math.random() * 9);
+                        for (let j = 0; j < 3; j++) {
+                            pool.push({ typeId: activeType.id, value: num + 1, icon: activeType.icons[num], class: activeType.class, id: Math.random() });
+                        }
+                    } else {
+                        const startNum = Math.floor(Math.random() * 7);
+                        for (let j = 0; j < 3; j++) {
+                            pool.push({ typeId: activeType.id, value: startNum + j + 1, icon: activeType.icons[startNum + j], class: activeType.class, id: Math.random() });
+                        }
+                    }
+                }
+            }
+
+            sortPool();
+            renderBoard();
+            renderPool();
+            document.getElementById('clear-modal').classList.add('hidden');
+        }
+
+        function sortPool() {
+            pool.sort((a, b) => a.value - b.value);
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('game-board');
+            board.innerHTML = '';
+
+            slots.forEach((set, setIdx) => {
+                const setContainer = document.createElement('div');
+                setContainer.className = 'set-container flex gap-1';
+                
+                const isFull = set.every(t => t !== null);
+                if (isFull) {
+                    const isValid = checkSet(set);
+                    setContainer.classList.add(isValid ? 'set-valid' : 'set-invalid');
+                }
+
+                set.forEach((tile, tileIdx) => {
+                    const slot = document.createElement('div');
+                    slot.className = 'slot';
+                    if (tile) {
+                        const tileEl = createTileElement(tile);
+                        tileEl.onclick = () => moveFromSlotToPool(setIdx, tileIdx);
+                        slot.appendChild(tileEl);
+                    }
+                    setContainer.appendChild(slot);
+                });
+                board.appendChild(setContainer);
+            });
+            checkClear();
+        }
+
+        function renderPool() {
+            const poolEl = document.getElementById('tile-pool');
+            poolEl.innerHTML = '';
+            pool.forEach((tile) => {
+                const tileEl = createTileElement(tile);
+                tileEl.onclick = () => moveFromPoolToSlot(tile);
+                poolEl.appendChild(tileEl);
+            });
+        }
+
+        function createTileElement(tile) {
+            const div = document.createElement('div');
+            div.className = `tile ${tile.class}`;
+            div.textContent = tile.icon;
+            return div;
+        }
+
+        function moveFromPoolToSlot(tile) {
+            for (let i = 0; i < slots.length; i++) {
+                for (let j = 0; j < slots[i].length; j++) {
+                    if (slots[i][j] === null) {
+                        slots[i][j] = tile;
+                        pool = pool.filter(p => p.id !== tile.id);
+                        renderBoard();
+                        renderPool();
+                        return;
+                    }
+                }
+            }
+        }
+
+        function moveFromSlotToPool(setIdx, tileIdx) {
+            const tile = slots[setIdx][tileIdx];
+            if (!tile) return;
+            slots[setIdx][tileIdx] = null;
+            pool.push(tile);
+            sortPool();
+            renderBoard();
+            renderPool();
+        }
+
+        function checkSet(tiles) {
+            if (tiles.length !== 3) return false;
+            const vals = tiles.map(t => t.value).sort((a, b) => a - b);
+            // 刻子
+            if (vals[0] === vals[1] && vals[1] === vals[2]) return true;
+            // 順子
+            if (vals[1] === vals[0] + 1 && vals[2] === vals[1] + 1) return true;
+            return false;
+        }
+
+        function checkClear() {
+            const allFilled = slots.every(set => set.every(t => t !== null));
+            if (!allFilled) return;
+            const allValid = slots.every(set => checkSet(set));
+            if (allValid) {
+                setTimeout(() => {
+                    document.getElementById('clear-modal').classList.remove('hidden');
+                }, 400);
+            }
+        }
+
+        document.getElementById('reset-btn').onclick = () => {
+            currentLevel++;
+            initGame();
+        };
+        document.getElementById('modal-reset-btn').onclick = () => {
+            currentLevel++;
+            initGame();
+        };
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
