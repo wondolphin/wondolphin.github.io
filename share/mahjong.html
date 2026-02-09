@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>麻雀交換パズル - 1手でアガれ！</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #064e3b;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        .tile {
+            width: 38px;
+            height: 54px;
+            background-color: #f8f8f8;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.8rem;
+            color: #333;
+            box-shadow: 0 3px 0 #ccc, 0 4px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            user-select: none;
+        }
+
+        @media (min-width: 640px) {
+            .tile { width: 48px; height: 68px; font-size: 2.4rem; }
+        }
+
+        .tile:hover:not(.selected):not(.disabled) {
+            transform: translateY(-3px);
+            filter: brightness(1.1);
+        }
+
+        .tile.selected {
+            transform: translateY(-8px);
+            box-shadow: 0 0 15px #fbbf24, 0 3px 0 #ccc;
+            outline: 3px solid #fbbf24;
+        }
+
+        .tile.disabled {
+            cursor: default;
+            opacity: 0.8;
+        }
+
+        .tile.manzu { color: #d32f2f; }
+        .tile.pinzu { color: #1976d2; }
+        .tile.souzu { color: #2e7d32; }
+
+        .staging-area {
+            background-color: rgba(0,0,0,0.3);
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 1rem;
+            padding: 1rem;
+            width: 100%;
+        }
+
+        .btn-disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            filter: grayscale(1);
+        }
+
+        .rule-badge {
+            background: linear-gradient(135deg, #fbbf24, #d97706);
+            color: black;
+            padding: 4px 16px;
+            border-radius: 999px;
+            font-weight: bold;
+            font-size: 1rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .message-box {
+            min-height: 1.5rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="w-full py-6 text-center bg-black/20">
+        <h1 class="text-2xl font-bold mb-3">麻雀交換パズル (1手限定)</h1>
+        <div class="flex flex-col items-center gap-2">
+            <div id="rule-display" class="rule-badge">? 枚交換</div>
+            <div id="status-message" class="message-box text-sm text-yellow-400 mt-1">
+                手牌とプールから牌を選んでください
+            </div>
+        </div>
+    </header>
+
+    <div class="w-full max-w-4xl px-4 py-4 flex flex-col gap-6">
+        
+        <!-- 交換候補エリア (プール) -->
+        <section>
+            <h2 class="text-[10px] uppercase tracking-widest text-white/50 text-center mb-2">Pool - 拾う牌</h2>
+            <div id="pool-container" class="bg-black/20 p-4 rounded-xl flex flex-wrap justify-center gap-2 min-h-[100px]">
+                <!-- JSで生成 -->
+            </div>
+        </section>
+
+        <!-- ステージング & 交換ボタン -->
+        <section class="staging-area flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex-1 flex flex-col items-center">
+                <span class="text-[10px] text-white/50 mb-1">捨てる</span>
+                <div id="staging-discard" class="flex gap-2 min-h-[54px] md:min-h-[68px]"></div>
+            </div>
+
+            <div class="flex flex-col items-center gap-1">
+                <button id="execute-swap-btn" class="px-10 py-4 bg-yellow-500 text-black font-bold rounded-full shadow-lg hover:bg-yellow-400 active:scale-95 transition-all btn-disabled text-lg">
+                    交換実行
+                </button>
+                <span id="swap-hint" class="text-[10px] text-white/60">1回限りのチャンス！</span>
+            </div>
+
+            <div class="flex-1 flex flex-col items-center">
+                <span class="text-[10px] text-white/50 mb-1">拾う</span>
+                <div id="staging-pick" class="flex gap-2 min-h-[54px] md:min-h-[68px]"></div>
+            </div>
+        </section>
+
+        <!-- 自分の手牌 -->
+        <section>
+            <h2 class="text-[10px] uppercase tracking-widest text-white/50 text-center mb-2">Your Hand - あなたの手牌 (14枚)</h2>
+            <div id="hand-container" class="bg-black/40 p-4 rounded-xl flex flex-wrap justify-center gap-1 min-h-[100px]">
+                <!-- JSで生成 -->
+            </div>
+        </section>
+
+        <div class="flex justify-center gap-8 mt-2">
+            <button id="reset-btn" class="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-all">
+                この問題をリセット
+            </button>
+            <button id="new-game-btn" class="px-6 py-2 bg-emerald-700 hover:bg-emerald-600 rounded-lg text-sm font-bold transition-all">
+                新しい問題
+            </button>
+        </div>
+    </div>
+
+    <!-- クリアモーダル -->
+    <div id="win-modal" class="fixed inset-0 bg-black/90 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white text-gray-900 p-10 rounded-3xl text-center max-w-sm w-full shadow-2xl">
+            <div class="text-7xl mb-4">💮</div>
+            <h2 class="text-3xl font-bold mb-2">アガリ！</h2>
+            <p class="text-gray-600 mb-8 font-medium">素晴らしい洞察力です！</p>
+            <button id="next-level-btn" class="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold text-xl hover:bg-emerald-700 active:scale-95 transition-all">
+                次のパズルへ
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const TILE_DATA = [
+            { id: 'm', class: 'manzu', icons: ['🀇','🀈','🀉','🀊','🀋','🀌','🀍','🀎','🀏'] },
+            { id: 'p', class: 'pinzu', icons: ['🀙','🀚','🀛','🀜','🀝','🀞','🀟','🀠','🀡'] },
+            { id: 's', class: 'souzu', icons: ['🀐','🀑','🀒','🀓','🀔','🀕','🀖','🀗','🀘'] }
+        ];
+
+        let hand = [];
+        let pool = [];
+        let selectedHandIds = [];
+        let selectedPoolIds = [];
+        let hasSwapped = false;
+        let requiredSwapSize = 1; 
+        let initialHandRaw = "";
+        let initialPoolRaw = "";
+
+        // 在庫（山）を管理
+        function createDeck(type) {
+            let deck = [];
+            for (let v = 1; v <= 9; v++) {
+                for (let i = 0; i < 4; i++) {
+                    deck.push({ 
+                        typeId: type.id, 
+                        value: v, 
+                        class: type.class, 
+                        icon: type.icons[v-1] 
+                    });
+                }
+            }
+            return deck.sort(() => Math.random() - 0.5);
+        }
+
+        function initGame() {
+            document.getElementById('win-modal').classList.add('hidden');
+            
+            hasSwapped = false;
+            selectedHandIds = [];
+            selectedPoolIds = [];
+            
+            const type = TILE_DATA[Math.floor(Math.random() * 3)];
+            let deck = createDeck(type);
+
+            // 1. まずアガリの14枚を抽出
+            const winningHand = generateWinningHandFromDeck(deck, type);
+            
+            // 2. 今回交換する枚数を決定 (1〜3枚)
+            requiredSwapSize = Math.floor(Math.random() * 3) + 1;
+
+            // 3. アガリ形から指定枚数を抜いてプールに混ぜる
+            const scrambled = scrambleHandFromDeck(winningHand, deck, requiredSwapSize);
+            
+            hand = scrambled.h;
+            pool = scrambled.p;
+            initialHandRaw = JSON.stringify(hand);
+            initialPoolRaw = JSON.stringify(pool);
+
+            document.getElementById('rule-display').textContent = `${requiredSwapSize} 枚交換`;
+            document.getElementById('status-message').textContent = "交換する牌を選んでください";
+            document.getElementById('status-message').className = "message-box text-sm text-yellow-400 mt-1";
+
+            updateUI();
+        }
+
+        function generateWinningHandFromDeck(deck, type) {
+            let temp = [];
+            let currentDeck = [...deck];
+            const attempt = () => {
+                temp = [];
+                let d = [...currentDeck];
+                for (let i = 0; i < 4; i++) {
+                    const isKoutsu = Math.random() > 0.4;
+                    if (isKoutsu) {
+                        const possible = Array.from({length:9}, (_,i)=>i+1).filter(v => d.filter(x => x.value === v).length >= 3);
+                        if (possible.length === 0) return false;
+                        const v = possible[Math.floor(Math.random() * possible.length)];
+                        for (let j = 0; j < 3; j++) {
+                            const idx = d.findIndex(x => x.value === v);
+                            temp.push(d.splice(idx, 1)[0]);
+                        }
+                    } else {
+                        const possible = Array.from({length:7}, (_,i)=>i+1).filter(v => 
+                            d.some(x => x.value === v) && d.some(x => x.value === v+1) && d.some(x => x.value === v+2)
+                        );
+                        if (possible.length === 0) return false;
+                        const v = possible[Math.floor(Math.random() * possible.length)];
+                        [v, v+1, v+2].forEach(val => {
+                            const idx = d.findIndex(x => x.value === val);
+                            temp.push(d.splice(idx, 1)[0]);
+                        });
+                    }
+                }
+                const pairs = Array.from({length:9}, (_,i)=>i+1).filter(v => d.filter(x => x.value === v).length >= 2);
+                if (pairs.length === 0) return false;
+                const pv = pairs[Math.floor(Math.random() * pairs.length)];
+                for (let j = 0; j < 2; j++) {
+                    const idx = d.findIndex(x => x.value === pv);
+                    temp.push(d.splice(idx, 1)[0]);
+                }
+                deck.length = 0;
+                deck.push(...d);
+                return true;
+            };
+            while(!attempt()) { currentDeck = createDeck(type); }
+            return temp;
+        }
+
+        function scrambleHandFromDeck(winningHand, deck, count) {
+            let h = [...winningHand];
+            let p = [];
+            // count枚選んでプールへ
+            for (let i = 0; i < count; i++) {
+                const idx = Math.floor(Math.random() * h.length);
+                const tile = h.splice(idx, 1)[0];
+                tile.id = Math.random();
+                p.push(tile);
+            }
+            // 山からハズレ牌を補充
+            for (let i = 0; i < count; i++) {
+                const tile = deck.splice(0, 1)[0];
+                tile.id = Math.random();
+                h.push(tile);
+            }
+            // プールの残りを埋める
+            while (p.length < 8 && deck.length > 0) {
+                const tile = deck.splice(0, 1)[0];
+                tile.id = Math.random();
+                p.push(tile);
+            }
+            h.forEach(t => { if(!t.id) t.id = Math.random(); });
+            return { h, p: p.sort(() => Math.random() - 0.5) };
+        }
+
+        function updateUI() {
+            const handBox = document.getElementById('hand-container');
+            const poolBox = document.getElementById('pool-container');
+            const stageDiscard = document.getElementById('staging-discard');
+            const stagePick = document.getElementById('staging-pick');
+            const swapBtn = document.getElementById('execute-swap-btn');
+            const swapHint = document.getElementById('swap-hint');
+
+            // Hand
+            handBox.innerHTML = '';
+            [...hand].sort((a,b) => a.value - b.value).forEach(t => {
+                const el = createTile(t, selectedHandIds.includes(t.id));
+                if (!hasSwapped) el.onclick = () => toggleSelect(t.id, 'hand');
+                else el.classList.add('disabled');
+                handBox.appendChild(el);
+            });
+
+            // Pool
+            poolBox.innerHTML = '';
+            pool.forEach(t => {
+                const el = createTile(t, selectedPoolIds.includes(t.id));
+                if (!hasSwapped) el.onclick = () => toggleSelect(t.id, 'pool');
+                else el.classList.add('disabled');
+                poolBox.appendChild(el);
+            });
+
+            // Staging
+            stageDiscard.innerHTML = '';
+            selectedHandIds.forEach(id => {
+                const t = hand.find(x => x.id === id);
+                stageDiscard.appendChild(createTile(t));
+            });
+
+            stagePick.innerHTML = '';
+            selectedPoolIds.forEach(id => {
+                const t = pool.find(x => x.id === id);
+                stagePick.appendChild(createTile(t));
+            });
+
+            const hLen = selectedHandIds.length;
+            const pLen = selectedPoolIds.length;
+            const isCorrectCount = hLen === requiredSwapSize && pLen === requiredSwapSize;
+            
+            const canSwap = isCorrectCount && !hasSwapped;
+            swapBtn.className = `px-10 py-4 bg-yellow-500 text-black font-bold rounded-full shadow-lg transition-all ${canSwap ? 'hover:bg-yellow-400 active:scale-95' : 'btn-disabled'}`;
+            swapBtn.onclick = canSwap ? executeSwap : null;
+            
+            if (hasSwapped) {
+                swapHint.textContent = "判定終了";
+            } else if (!isCorrectCount && (hLen > 0 || pLen > 0)) {
+                swapHint.textContent = `あと 捨:${requiredSwapSize - hLen} / 拾:${requiredSwapSize - pLen}`;
+            } else {
+                swapHint.textContent = isCorrectCount ? "準備完了！" : `一度に${requiredSwapSize}枚交換`;
+            }
+        }
+
+        function createTile(tile, isSelected = false) {
+            const el = document.createElement('div');
+            el.className = `tile ${tile.class} ${isSelected ? 'selected' : ''}`;
+            el.textContent = tile.icon;
+            return el;
+        }
+
+        function toggleSelect(id, type) {
+            if (hasSwapped) return;
+            if (type === 'hand') {
+                if (selectedHandIds.includes(id)) {
+                    selectedHandIds = selectedHandIds.filter(x => x !== id);
+                } else if (selectedHandIds.length < requiredSwapSize) {
+                    selectedHandIds.push(id);
+                }
+            } else {
+                if (selectedPoolIds.includes(id)) {
+                    selectedPoolIds = selectedPoolIds.filter(x => x !== id);
+                } else if (selectedPoolIds.length < requiredSwapSize) {
+                    selectedPoolIds.push(id);
+                }
+            }
+            updateUI();
+        }
+
+        function executeSwap() {
+            if (hasSwapped) return;
+
+            // 交換実行
+            selectedHandIds.forEach((hId, i) => {
+                const pId = selectedPoolIds[i];
+                const hIdx = hand.findIndex(t => t.id === hId);
+                const pIdx = pool.findIndex(t => t.id === pId);
+                const hTile = hand[hIdx];
+                const pTile = pool[pIdx];
+                hand[hIdx] = pTile;
+                pool[pIdx] = hTile;
+            });
+
+            hasSwapped = true;
+            selectedHandIds = [];
+            selectedPoolIds = [];
+            updateUI();
+
+            // 正誤判定
+            if (checkAgari(hand)) {
+                document.getElementById('status-message').textContent = "正解！アガリ完成です！";
+                document.getElementById('status-message').className = "message-box text-sm text-emerald-400 mt-1";
+                setTimeout(() => document.getElementById('win-modal').classList.remove('hidden'), 600);
+            } else {
+                document.getElementById('status-message').textContent = "アガリではありません。リセットして考え直しましょう。";
+                document.getElementById('status-message').className = "message-box text-sm text-red-400 mt-1";
+            }
+        }
+
+        function checkAgari(tiles) {
+            const counts = {};
+            tiles.forEach(t => {
+                const key = t.typeId + t.value;
+                counts[key] = (counts[key] || 0) + 1;
+            });
+            const keys = Object.keys(counts);
+            for (let k of keys) {
+                if (counts[k] >= 2) {
+                    const copy = {...counts};
+                    copy[k] -= 2;
+                    if (copy[k] === 0) delete copy[k];
+                    if (canFormSets(copy, 4)) return true;
+                }
+            }
+            return false;
+        }
+
+        function canFormSets(counts, needed) {
+            if (needed === 0) return true;
+            const keys = Object.keys(counts).sort();
+            if (keys.length === 0) return false;
+            const first = keys[0];
+            const type = first[0];
+            const val = parseInt(first.substring(1));
+            
+            // 刻子
+            if (counts[first] >= 3) {
+                const next = {...counts};
+                next[first] -= 3;
+                if (next[first] === 0) delete next[first];
+                if (canFormSets(next, needed - 1)) return true;
+            }
+            
+            // 順子
+            const k2 = type + (val+1);
+            const k3 = type + (val+2);
+            if (counts[k2] > 0 && counts[k3] > 0) {
+                const next = {...counts};
+                next[first]--; next[k2]--; next[k3]--;
+                [first, k2, k3].forEach(k => { if (next[k] === 0) delete next[k]; });
+                if (canFormSets(next, needed - 1)) return true;
+            }
+            return false;
+        }
+
+        document.getElementById('reset-btn').onclick = () => {
+            hand = JSON.parse(initialHandRaw);
+            pool = JSON.parse(initialPoolRaw);
+            selectedHandIds = [];
+            selectedPoolIds = [];
+            hasSwapped = false;
+            document.getElementById('status-message').textContent = "考え直しましょう。牌を選んでください。";
+            document.getElementById('status-message').className = "message-box text-sm text-yellow-400 mt-1";
+            updateUI();
+        };
+
+        document.getElementById('new-game-btn').onclick = initGame;
+        document.getElementById('next-level-btn').onclick = initGame;
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
