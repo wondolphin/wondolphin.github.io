@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>三角形をみつけよう</title>
+<style>
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    text-align: center;
+    background: #f8f9fa;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    user-select: none;
+  }
+  .container {
+    max-width: 500px;
+    margin: 0 auto;
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  }
+  h2 { margin-top: 0; color: #2c3e50; }
+  .status-area {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #e67e22;
+  }
+  .msg-area {
+    height: 1.5em;
+    margin-bottom: 15px;
+    font-weight: bold;
+    color: #27ae60;
+  }
+  svg {
+    background: #fff;
+    border: 3px solid #34495e;
+    border-radius: 8px;
+    touch-action: none;
+    max-width: 100%;
+    height: auto;
+  }
+  .room {
+    fill: #fdfdfd;
+    stroke: #34495e;
+    stroke-width: 2;
+    transition: fill 0.2s;
+    cursor: pointer;
+  }
+  .active {
+    fill: rgba(52, 152, 219, 0.5);
+  }
+  .found-count {
+    font-size: 2rem;
+    color: #d35400;
+  }
+  .clear-screen {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(255, 255, 255, 0.9);
+    z-index: 100;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+  .clear-screen h1 { font-size: 3rem; color: #e67e22; margin: 0; }
+  .clear-screen p { font-size: 1.5rem; }
+  .btn {
+    padding: 10px 20px;
+    font-size: 1rem;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+  }
+  .btn:hover { background: #2980b9; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h2>三角形をぜんぶみつけよう</h2>
+  <div class="status-area">
+    みつけた数: <span id="found-count-display" class="found-count">0</span> / <span id="total-target-display">?</span>
+  </div>
+  <div id="message" class="msg-area">読み込み中...</div>
+
+  <svg id="board" width="360" height="300" viewBox="0 0 360 300">
+    <!-- 上の小三角形 -->
+    <polygon class="room" data-id="A1" points="180,20 120,140 180,140"/>
+    <polygon class="room" data-id="A2" points="180,20 180,140 240,140"/>
+    <!-- 左下三角形 -->
+    <polygon class="room" data-id="B" points="120,140 60,260 180,260"/>
+    <!-- 右下三角形 -->
+    <polygon class="room" data-id="C" points="180,260 300,260 240,140"/>
+    <!-- 中央逆三角形（2分割） -->
+    <polygon class="room" data-id="D1" points="120,140 180,140 180,260"/>
+    <polygon class="room" data-id="D2" points="180,140 240,140 180,260"/>
+  </svg>
+
+  <p style="font-size: 0.9rem; color: #7f8c8d;">なぞって複数の部屋をえらべるよ！</p>
+</div>
+
+<div id="clear-overlay" class="clear-screen">
+  <h1>おめでとう！</h1>
+  <p>すべての三角形をみつけたよ！</p>
+  <button class="btn" onclick="location.reload()">もういちど遊ぶ</button>
+</div>
+
+<script>
+const rooms = document.querySelectorAll('.room');
+const svg = document.getElementById('board');
+const countDisplay = document.getElementById('found-count-display');
+const totalDisplay = document.getElementById('total-target-display');
+const msgArea = document.getElementById('message');
+const clearOverlay = document.getElementById('clear-overlay');
+
+let dragging = false;
+let passedRooms = new Set();
+const foundTriangles = new Set(); 
+let totalTriangleCount = 0;
+
+/* ===== 幾何処理 ===== */
+
+/**
+ * 凸包を求める
+ */
+function convexHull(points) {
+  if (points.length < 3) return points;
+  const uniquePoints = [];
+  const seen = new Set();
+  points.forEach(p => {
+    const key = `${Math.round(p.x)},${Math.round(p.y)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniquePoints.push(p);
+    }
+  });
+
+  uniquePoints.sort((a,b)=>a.x===b.x?a.y-b.y:a.x-b.x);
+  const cross = (o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
+  const lower=[], upper=[];
+  for (let p of uniquePoints) {
+    while (lower.length>=2 && cross(lower[lower.length-2], lower[lower.length-1], p)<=0)
+      lower.pop();
+    lower.push(p);
+  }
+  for (let i=uniquePoints.length-1;i>=0;i--) {
+    const p=uniquePoints[i];
+    while (upper.length>=2 && cross(upper[upper.length-2], upper[upper.length-1], p)<=0)
+      upper.pop();
+    upper.push(p);
+  }
+  upper.pop(); lower.pop();
+  return lower.concat(upper);
+}
+
+/**
+ * 多角形の面積を求める（靴紐の公式）
+ */
+function calculateArea(points) {
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const j = (i + 1) % points.length;
+    area += points[i].x * points[j].y;
+    area -= points[j].x * points[i].y;
+  }
+  return Math.abs(area) / 2;
+}
+
+/**
+ * 各部屋のポイントを取得する
+ */
+function getRoomPoints(room) {
+  return room.getAttribute('points').split(' ').map(p => {
+    const [x,y] = p.split(',').map(Number);
+    return {x,y};
+  });
+}
+
+/**
+ * 組み合わせが三角形かどうか判定する
+ */
+function isTriangleCombination(roomArray) {
+  if (roomArray.length === 0) return false;
+
+  let allPoints = [];
+  let sumOfIndividualAreas = 0;
+
+  roomArray.forEach(room => {
+    const pts = getRoomPoints(room);
+    allPoints.push(...pts);
+    sumOfIndividualAreas += calculateArea(pts);
+  });
+
+  const hull = convexHull(allPoints);
+  
+  // 条件1: 外形が三角形であること
+  if (hull.length !== 3) return false;
+
+  // 条件2: 外形（凸包）の面積が、各パーツの面積の合計と一致すること
+  // (浮動小数点の誤差を考慮して1%程度の許容範囲を設ける)
+  const hullArea = calculateArea(hull);
+  const diff = Math.abs(hullArea - sumOfIndividualAreas);
+  
+  return diff < (hullArea * 0.01);
+}
+
+/* ===== 自動正解判定ロジック ===== */
+
+function preCalculateAnswers() {
+  const roomList = Array.from(rooms);
+  const n = roomList.length;
+  const validCombos = new Set();
+
+  // 全ての組み合わせ（2^n - 1）をチェック
+  for (let i = 1; i < (1 << n); i++) {
+    const combo = [];
+    const ids = [];
+    for (let j = 0; j < n; j++) {
+      if ((i >> j) & 1) {
+        combo.push(roomList[j]);
+        ids.push(roomList[j].getAttribute('data-id'));
+      }
+    }
+    if (isTriangleCombination(combo)) {
+      validCombos.add(ids.sort().join('|'));
+    }
+  }
+  return validCombos.size;
+}
+
+/* ===== 入力処理 ===== */
+
+function resetAll() {
+  dragging = false;
+  passedRooms.clear();
+  rooms.forEach(r => r.classList.remove('active'));
+}
+
+rooms.forEach(room => {
+  room.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    dragging = true;
+    passedRooms.add(room);
+    room.classList.add('active');
+    msgArea.textContent = "えらび中...";
+  });
+
+  room.addEventListener('pointerenter', e => {
+    if (dragging) {
+      passedRooms.add(room);
+      room.classList.add('active');
+    }
+  });
+});
+
+window.addEventListener('pointerup', () => {
+  if (dragging) {
+    judgeAndReset();
+  }
+});
+
+function judgeAndReset() {
+  if (passedRooms.size === 0) {
+    dragging = false;
+    return;
+  }
+
+  const ids = Array.from(passedRooms).map(r => r.getAttribute('data-id'));
+  const comboKey = ids.sort().join('|');
+  
+  if (isTriangleCombination(Array.from(passedRooms))) {
+    if (foundTriangles.has(comboKey)) {
+      msgArea.textContent = "それはもうみつけてるよ！";
+      msgArea.style.color = "#f39c12";
+    } else {
+      foundTriangles.add(comboKey);
+      msgArea.textContent = "正解！三角形だ！";
+      msgArea.style.color = "#27ae60";
+      updateScore();
+    }
+  } else {
+    msgArea.textContent = "ざんねん！三角形じゃないよ";
+    msgArea.style.color = "#e74c3c";
+  }
+
+  setTimeout(resetAll, 500);
+}
+
+function updateScore() {
+  const currentCount = foundTriangles.size;
+  countDisplay.textContent = currentCount;
+  
+  if (currentCount >= totalTriangleCount) {
+    setTimeout(() => {
+      clearOverlay.style.display = 'flex';
+    }, 800);
+  }
+}
+
+// 初期化
+window.onload = () => {
+  totalTriangleCount = preCalculateAnswers();
+  totalDisplay.textContent = totalTriangleCount;
+  msgArea.textContent = "三角形になる組み合わせをなぞってね";
+};
+
+</script>
+
+</body>
+</html>
