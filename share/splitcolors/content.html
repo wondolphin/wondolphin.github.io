@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Split Colors</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --tile-bg: #1e293b;
+            --win-color: #4ade80;
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* 各色の定義（テキスト用と背景用を分ける） */
+        .color-1 { --c: #ff4d4d; } 
+        .color-2 { --c: #3b82f6; } 
+        .color-3 { --c: #16a34a; } /* 緑を少し濃く調整 (#22c55e -> #16a34a) */
+        .color-4 { --c: #eab308; } 
+        .color-5 { --c: #a855f7; } 
+        .color-6 { --c: #f97316; } /* オレンジと水色を入れ替え (元: #06b6d4) */
+        .color-7 { --c: #06b6d4; } /* オレンジと水色を入れ替え (元: #f97316) */
+        .color-8 { --c: #ec4899; } 
+
+        .bg-color-1 { background-color: #ff4d4d; }
+        .bg-color-2 { background-color: #3b82f6; }
+        .bg-color-3 { background-color: #16a34a; } /* 緑を少し濃く */
+        .bg-color-4 { background-color: #eab308; }
+        .bg-color-5 { background-color: #a855f7; }
+        .bg-color-6 { background-color: #f97316; } /* オレンジ */
+        .bg-color-7 { background-color: #06b6d4; } /* 水色 */
+        .bg-color-8 { background-color: #ec4899; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: var(--font-family);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            letter-spacing: 0.1rem;
+            margin: 0;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+            padding: 15px 25px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .indicator {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+
+        .indicator .count {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--c);
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        /* 1になった時の強調 */
+        .indicator.active {
+            background: var(--c);
+            box-shadow: 0 0 20px var(--c);
+            transform: scale(1.1);
+        }
+
+        .indicator.active .count {
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 5px; /* マスの間隔を半分 (10px -> 5px) に変更 */
+            background-color: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .tile {
+            width: 85px;
+            height: 85px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid transparent;
+        }
+
+        .tile:hover {
+            transform: scale(1.03);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .tile:active {
+            transform: scale(0.95);
+        }
+
+        .room {
+            width: 100%;
+            height: 100%;
+            border: 0.5px solid rgba(0,0,0,0.15);
+            box-sizing: border-box;
+        }
+
+        .win-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+            backdrop-filter: blur(8px);
+        }
+
+        .win-modal.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .win-content {
+            background: #1e293b;
+            padding: 50px;
+            border-radius: 30px;
+            text-align: center;
+            border: 2px solid var(--win-color);
+            box-shadow: 0 0 50px rgba(74, 222, 128, 0.2);
+            transform: translateY(20px);
+            transition: transform 0.5s ease;
+        }
+
+        .win-modal.visible .win-content {
+            transform: translateY(0);
+        }
+
+        .win-content h2 {
+            font-size: 3rem;
+            color: var(--win-color);
+            margin: 0 0 20px 0;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 15px 35px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: all 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 500px) {
+            .tile {
+                width: 70px;
+                height: 70px;
+            }
+            .status-bar {
+                gap: 8px;
+                padding: 10px;
+            }
+            .indicator {
+                width: 35px;
+                height: 35px;
+            }
+            .indicator .count {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Split Colors</h1>
+    </div>
+
+    <div id="statusBar" class="status-bar">
+        <!-- JSで生成 -->
+    </div>
+
+    <div id="gameBoard" class="game-board">
+        <!-- JSで生成 -->
+    </div>
+
+    <div id="winModal" class="win-modal">
+        <div class="win-content">
+            <h2>CLEAR!</h2>
+            <button class="btn" onclick="closeModal()">OK</button>
+        </div>
+    </div>
+
+    <script>
+        // 配置パターンの変更
+        const targetPattern = [
+            [2, 2, 2, 3, 3, 3, 7, 3],
+            [1, 1, 2, 3, 7, 7, 7, 3],
+            [4, 1, 4, 4, 6, 3, 3, 3],
+            [4, 1, 2, 2, 6, 3, 8, 8],
+            [5, 5, 2, 5, 5, 5, 3, 8],
+            [4, 4, 2, 5, 6, 6, 3, 8],
+            [3, 4, 3, 3, 3, 6, 3, 3],
+            [3, 4, 6, 6, 3, 6, 8, 8]
+        ];
+
+        let currentGrid = [];
+        const numColors = 8;
+        const boardSize = 4; // 4x4 tiles
+
+        function initGame() {
+            currentGrid = JSON.parse(JSON.stringify(targetPattern));
+            renderStatus();
+            
+            // ゲーム開始時のシャッフルを無効化
+            // shuffleAtStart(); 
+            
+            renderBoard();
+            updateScores();
+        }
+
+        function renderStatus() {
+            const statusBar = document.getElementById('statusBar');
+            statusBar.innerHTML = '';
+            for (let i = 1; i <= numColors; i++) {
+                const div = document.createElement('div');
+                div.className = `indicator color-${i}`;
+                div.id = `indicator-${i}`;
+                div.innerHTML = `<span class="count" id="count-${i}">?</span>`;
+                statusBar.appendChild(div);
+            }
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('gameBoard');
+            board.innerHTML = '';
+            for (let r = 0; r < boardSize; r++) {
+                for (let c = 0; c < boardSize; c++) {
+                    const tile = document.createElement('div');
+                    tile.className = 'tile';
+                    tile.onclick = () => rotateTile(r, c);
+                    
+                    for (let dr = 0; dr < 2; dr++) {
+                        for (let dc = 0; dc < 2; dc++) {
+                            const room = document.createElement('div');
+                            const colorVal = currentGrid[r * 2 + dr][c * 2 + dc];
+                            room.className = `room bg-color-${colorVal}`;
+                            tile.appendChild(room);
+                        }
+                    }
+                    board.appendChild(tile);
+                }
+            }
+        }
+
+        function rotateTile(tr, tc) {
+            const r = tr * 2;
+            const c = tc * 2;
+            
+            const tl = currentGrid[r][c];
+            const tr_val = currentGrid[r][c + 1];
+            const br = currentGrid[r + 1][c + 1];
+            const bl = currentGrid[r + 1][c];
+
+            currentGrid[r][c] = bl;     
+            currentGrid[r][c + 1] = tl; 
+            currentGrid[r + 1][c + 1] = tr_val; 
+            currentGrid[r + 1][c] = br; 
+
+            renderBoard();
+            updateScores();
+        }
+
+        function countComponents(color) {
+            let count = 0;
+            const visited = Array.from({ length: 8 }, () => Array(8).fill(false));
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    if (currentGrid[r][c] === color && !visited[r][c]) {
+                        count++;
+                        const queue = [[r, c]];
+                        visited[r][c] = true;
+                        while (queue.length > 0) {
+                            const [currR, currC] = queue.shift();
+                            const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+                            for (const [dr, dc] of directions) {
+                                const nr = currR + dr;
+                                const nc = currC + dc;
+                                if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && 
+                                    currentGrid[nr][nc] === color && !visited[nr][nc]) {
+                                    visited[nr][nc] = true;
+                                    queue.push([nr, nc]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return count;
+        }
+
+        function updateScores() {
+            let allOne = true;
+            for (let i = 1; i <= numColors; i++) {
+                const count = countComponents(i);
+                const countEl = document.getElementById(`count-${i}`);
+                const indicatorEl = document.getElementById(`indicator-${i}`);
+                
+                countEl.textContent = count;
+                
+                if (count === 1) {
+                    indicatorEl.classList.add('active');
+                } else {
+                    indicatorEl.classList.remove('active');
+                    allOne = false;
+                }
+            }
+
+            if (allOne) {
+                setTimeout(() => {
+                    document.getElementById('winModal').classList.add('visible');
+                }, 300);
+            }
+        }
+
+        function shuffleAtStart() {
+            for (let r = 0; r < boardSize; r++) {
+                for (let c = 0; c < boardSize; c++) {
+                    const rotations = Math.floor(Math.random() * 4);
+                    for(let i = 0; i < rotations; i++) {
+                        const gr = r * 2;
+                        const gc = c * 2;
+                        const tl = currentGrid[gr][gc];
+                        const tr_val = currentGrid[gr][gc + 1];
+                        const br = currentGrid[gr + 1][gc + 1];
+                        const bl = currentGrid[gr + 1][gc];
+                        currentGrid[gr][gc] = bl;
+                        currentGrid[gr][gc + 1] = tl;
+                        currentGrid[gr + 1][gc + 1] = tr_val;
+                        currentGrid[gr + 1][gc] = br;
+                    }
+                }
+            }
+            let checkOne = true;
+            for (let i = 1; i <= numColors; i++) {
+                if (countComponents(i) !== 1) checkOne = false;
+            }
+            if (checkOne) shuffleAtStart();
+        }
+
+        function closeModal() {
+            document.getElementById('winModal').classList.remove('visible');
+        }
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
