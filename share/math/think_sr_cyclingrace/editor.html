@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自転車レース 問題エディタ (プロジェクト版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --field-grass-light: #f7fee7;
+            --field-grass-subtle: #ecfccb;
+        }
+        body {
+            background-color: #f1f5f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        .canvas-container {
+            position: relative;
+            width: 600px; /* 12 units * 50 */
+            height: 500px; /* 10 units * 50 */
+            background: radial-gradient(circle at center, var(--field-grass-light) 0%, var(--field-grass-subtle) 100%);
+            border: 4px solid #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            user-select: none;
+            touch-action: none;
+            overflow: hidden;
+        }
+        .grid-line {
+            stroke: rgba(0, 0, 0, 0.05);
+            stroke-width: 1;
+        }
+        .route-line-bg {
+            fill: none;
+            stroke: transparent;
+            stroke-width: 20;
+            cursor: copy;
+        }
+        .route-line {
+            fill: none;
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            pointer-events: none;
+        }
+        .point { cursor: grab; }
+        .point:active { cursor: grabbing; }
+        .active-btn {
+            background-color: #4f46e5 !important;
+            color: white !important;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .problem-item {
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .problem-item:hover { background-color: #f8fafc; }
+        .problem-item.active {
+            border-left: 4px solid #4f46e5;
+            background-color: #eff6ff;
+        }
+        .delete-btn {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .problem-item:hover .delete-btn {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- ヘッダー -->
+    <header class="bg-white border-b border-slate-200 p-4 flex justify-between items-center z-10">
+        <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            🚲 自転車レース 問題エディタ
+        </h1>
+        <div class="flex gap-2">
+            <button onclick="triggerLoad()" class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                📂 読み込み
+            </button>
+            <button onclick="exportJSON()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
+                📥 すべて出力 (JSON)
+            </button>
+            <input type="file" id="load-file" accept=".json" multiple class="hidden" onchange="loadJSON(event)">
+        </div>
+    </header>
+
+    <main class="flex-grow flex overflow-hidden">
+        <!-- 左サイドバー：問題リスト -->
+        <div class="w-64 bg-white border-r border-slate-200 flex flex-col">
+            <div class="p-3 border-b border-slate-100 flex flex-col gap-2 bg-slate-50">
+                <span class="text-xs font-bold text-slate-500 uppercase">問題リスト</span>
+                <div class="flex gap-1">
+                    <button onclick="addNewProblem()" class="flex-1 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 text-[10px] font-bold py-1 rounded">+ 新規</button>
+                    <button onclick="duplicateCurrentProblem()" class="flex-1 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 text-[10px] font-bold py-1 rounded">複製</button>
+                </div>
+                <div class="flex gap-1 border-t pt-2 mt-1">
+                    <span class="text-[9px] text-slate-400 font-bold self-center mr-1">ソート:</span>
+                    <button onclick="sortProblems('level')" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-600 text-[9px] font-bold py-1 rounded">Lv順</button>
+                    <button onclick="sortProblems('load')" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-600 text-[9px] font-bold py-1 rounded">登録順</button>
+                </div>
+            </div>
+            <div id="problem-list" class="flex-grow overflow-y-auto">
+                <!-- リストアイテムがここに生成される -->
+            </div>
+        </div>
+
+        <!-- 中央：編集エリア -->
+        <div class="flex-grow flex flex-col items-center justify-center p-4 relative">
+            <div id="no-problem-msg" class="absolute inset-0 flex items-center justify-center bg-slate-100/80 z-20 hidden">
+                <p class="text-slate-400 font-bold">問題を選択するか新規作成してください</p>
+            </div>
+            <div class="canvas-container" id="canvas-root">
+                <!-- 12ユニット x 10ユニット (13ライン x 11ライン) -->
+                <svg id="editor-svg" width="100%" height="100%" viewBox="0 0 120 100">
+                    <g id="grid-layer"></g>
+                    <g id="routes-layer"></g>
+                    <g id="points-layer"></g>
+                    <g id="test-layer"></g>
+                    <g id="start-group" class="point">
+                        <circle id="start-node" cx="10" cy="10" r="3.5" fill="#4f46e5" />
+                        <text id="start-label" x="10" y="10" font-size="4" text-anchor="middle" dominant-baseline="central" fill="white" font-weight="bold" pointer-events="none">S</text>
+                    </g>
+                    <g id="goal-group" class="point">
+                        <circle id="goal-node" cx="110" cy="90" r="3.5" fill="#10b981" />
+                        <text id="goal-label" x="110" y="90" font-size="4" text-anchor="middle" dominant-baseline="central" fill="white" font-weight="bold" pointer-events="none">G</text>
+                    </g>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 右サイドバー：プロパティ -->
+        <div id="sidebar-right" class="w-80 bg-white border-l border-slate-200 p-6 space-y-6 overflow-y-auto">
+            <section class="space-y-3">
+                <button onclick="saveCurrentProblem()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-md transition-all">
+                    💾 現在の問題を保存
+                </button>
+                <button onclick="testPlay()" id="btn-test" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 rounded-lg transition-all flex items-center justify-center gap-2">
+                    <span id="test-icon">▶</span> <span id="test-text">テストプレイ</span>
+                </button>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-sm font-bold text-slate-700 border-b pb-2">基本情報</h2>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">タイトル</label>
+                        <input type="text" id="input-title" class="w-full px-3 py-2 border rounded-lg outline-none focus:border-indigo-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">レベル</label>
+                        <input type="number" id="input-level" min="1" max="99" class="w-full px-3 py-2 border rounded-lg outline-none text-sm">
+                    </div>
+                </div>
+            </section>
+
+            <section class="space-y-4">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <h2 class="text-sm font-bold text-slate-700">編集モード</h2>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="check-use-r3" onchange="toggleR3(this.checked)" class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
+                        <span class="text-xs font-bold text-slate-600">ルート3を使う</span>
+                    </label>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="setRoute(0)" id="btn-route-0" class="route-selector py-2 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs">R1</button>
+                    <button onclick="setRoute(1)" id="btn-route-1" class="route-selector py-2 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs">R2</button>
+                    <button onclick="setRoute(2)" id="btn-route-2" class="route-selector py-2 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs hidden">R3</button>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="setTool('bike')" id="btn-tool-bike" class="tool-selector py-2 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs">×2</button>
+                    <button onclick="setTool('mushroom')" id="btn-tool-mushroom" class="tool-selector py-2 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs">×4</button>
+                    <button onclick="setTool('delete')" id="btn-tool-delete" class="tool-selector py-2 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs">🗑️ 削除</button>
+                    <button onclick="setTool('move')" id="btn-tool-move" class="tool-selector py-2 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs">🖐️ 移動/追加</button>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        // --- 状態管理 ---
+        let allProblems = []; 
+        let activeIndex = -1; 
+        let loadOrderCounter = 0; 
+        
+        let startPos = { x: 10, y: 10 }; // Unit 1, 1
+        let goalPos = { x: 110, y: 90 }; // Unit 11, 9
+        let routes = [[], [], []];
+        let useRoute3 = false;
+        let currentRouteIdx = 0;
+        let currentTool = 'move';
+        let draggingTarget = null;
+        let isTesting = false;
+        let animationId = null;
+        let runners = [];
+
+        const svg = document.getElementById('editor-svg');
+        const gridLayer = document.getElementById('grid-layer');
+        const routesLayer = document.getElementById('routes-layer');
+        const pointsLayer = document.getElementById('points-layer');
+        const testLayer = document.getElementById('test-layer');
+        const ROUTE_COLORS = ['#6366f1', '#f59e0b', '#ec4899'];
+        const BASE_SPEED = 30;
+
+        // 制限設定 (1〜11, 1〜9)
+        const LIMIT_X_MIN = 10, LIMIT_X_MAX = 110;
+        const LIMIT_Y_MIN = 10, LIMIT_Y_MAX = 90;
+
+        // --- 初期化 ---
+        function init() {
+            drawGrid();
+            setRoute(0);
+            setTool('move');
+            updateProblemListUI();
+        }
+
+        function drawGrid() {
+            gridLayer.innerHTML = '';
+            for (let i = 0; i <= 120; i += 10) {
+                const lineV = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                lineV.setAttribute("x1", i); lineV.setAttribute("y1", 0); lineV.setAttribute("x2", i); lineV.setAttribute("y2", 100);
+                lineV.setAttribute("class", "grid-line");
+                gridLayer.appendChild(lineV);
+            }
+            for (let i = 0; i <= 100; i += 10) {
+                const lineH = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                lineH.setAttribute("x1", 0); lineH.setAttribute("y1", i); lineH.setAttribute("x2", 120); lineH.setAttribute("y2", i);
+                lineH.setAttribute("class", "grid-line");
+                gridLayer.appendChild(lineH);
+            }
+        }
+
+        // --- リスト管理 ---
+        function updateProblemListUI() {
+            const listEl = document.getElementById('problem-list');
+            listEl.innerHTML = '';
+            
+            allProblems.forEach((p, idx) => {
+                const item = document.createElement('div');
+                item.className = `problem-item p-4 border-b border-slate-100 flex justify-between items-center ${activeIndex === idx ? 'active' : ''}`;
+                item.onclick = () => selectProblem(idx);
+                
+                const infoDiv = document.createElement('div');
+                infoDiv.className = "flex flex-col gap-0.5 pointer-events-none";
+                infoDiv.innerHTML = `<span class="font-bold text-slate-700">${p.title}</span><span class="text-[10px] text-slate-400">Lv.${p.level}</span>`;
+                
+                const delBtn = document.createElement('button');
+                delBtn.className = "delete-btn bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-500 w-6 h-6 rounded-full text-xs font-bold";
+                delBtn.innerText = "×";
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    deleteProblem(idx);
+                };
+
+                item.appendChild(infoDiv);
+                item.appendChild(delBtn);
+                listEl.appendChild(item);
+            });
+
+            document.getElementById('no-problem-msg').classList.toggle('hidden', activeIndex !== -1);
+            document.getElementById('sidebar-right').classList.toggle('opacity-30', activeIndex === -1);
+            document.getElementById('sidebar-right').classList.toggle('pointer-events-none', activeIndex === -1);
+        }
+
+        function sortProblems(mode) {
+            if (allProblems.length <= 1) return;
+            const currentActiveId = activeIndex !== -1 ? allProblems[activeIndex].id : null;
+            if (mode === 'level') allProblems.sort((a, b) => (a.level || 0) - (b.level || 0));
+            else if (mode === 'load') allProblems.sort((a, b) => (a.loadOrder || 0) - (b.loadOrder || 0));
+            if (currentActiveId !== null) activeIndex = allProblems.findIndex(p => p.id === currentActiveId);
+            updateProblemListUI();
+        }
+
+        function addNewProblem() {
+            const newProb = {
+                id: Math.floor(Math.random() * 90000) + 10000,
+                title: "New Problem " + (allProblems.length + 1),
+                level: 1,
+                start: "0101", // 修正: Unit 1, 1
+                goal: "1109",  // 修正: Unit 11, 9
+                routes: [],
+                useRoute3: false,
+                loadOrder: loadOrderCounter++
+            };
+            allProblems.push(newProb);
+            selectProblem(allProblems.length - 1);
+        }
+
+        function duplicateCurrentProblem() {
+            if (activeIndex === -1) return;
+            const current = allProblems[activeIndex];
+            const copy = {
+                id: Math.floor(Math.random() * 90000) + 10000,
+                title: current.title + " (Copy)",
+                level: current.level,
+                start: formatCoord(startPos),
+                goal: formatCoord(goalPos),
+                routes: JSON.parse(JSON.stringify(routes.map((path, idx) => {
+                    return { id: idx, path: path.map(p => formatCoord(p)) };
+                }))),
+                useRoute3: useRoute3,
+                loadOrder: loadOrderCounter++
+            };
+            allProblems.push(copy);
+            selectProblem(allProblems.length - 1);
+        }
+
+        function deleteProblem(index) {
+            if (!confirm("この問題を削除しますか？")) return;
+            allProblems.splice(index, 1);
+            if (activeIndex === index) activeIndex = -1;
+            else if (activeIndex > index) activeIndex--;
+            updateProblemListUI();
+            render();
+        }
+
+        function selectProblem(index) {
+            if (isTesting) stopTest();
+            activeIndex = index;
+            const p = allProblems[index];
+            
+            document.getElementById('input-title').value = p.title;
+            document.getElementById('input-level').value = p.level;
+            document.getElementById('check-use-r3').checked = !!p.useRoute3;
+            toggleR3(!!p.useRoute3);
+            
+            startPos = parseCoord(p.start);
+            goalPos = parseCoord(p.goal);
+            
+            routes = [[], [], []];
+            if (p.routes) {
+                p.routes.forEach(r => {
+                    if (r.id < 3) routes[r.id] = r.path.map(pathStr => parseCoord(pathStr));
+                });
+            }
+            
+            updateProblemListUI();
+            render();
+        }
+
+        function toggleR3(enabled) {
+            useRoute3 = enabled;
+            document.getElementById('btn-route-2').classList.toggle('hidden', !enabled);
+            if (!enabled && currentRouteIdx === 2) setRoute(0);
+            render();
+        }
+
+        function saveCurrentProblem() {
+            if (activeIndex === -1) return;
+            const title = document.getElementById('input-title').value;
+            const level = parseInt(document.getElementById('input-level').value) || 1;
+            const updated = {
+                id: allProblems[activeIndex].id,
+                title: title,
+                level: level,
+                start: formatCoord(startPos),
+                goal: formatCoord(goalPos),
+                useRoute3: useRoute3, 
+                routes: routes.map((path, idx) => {
+                    if (path.length === 0) return null;
+                    return { id: idx, path: path.map(p => formatCoord(p)) };
+                }).filter(r => r !== null),
+                loadOrder: allProblems[activeIndex].loadOrder
+            };
+            const dupIdx = allProblems.findIndex((p, i) => i !== activeIndex && p.title === title);
+            if (dupIdx !== -1) {
+                if(!confirm(`タイトル「${title}」は既に存在します。上書きしますか？`)) return;
+                updated.loadOrder = allProblems[dupIdx].loadOrder;
+                allProblems.splice(dupIdx, 1);
+                activeIndex = allProblems.findIndex(p => p.id === updated.id);
+            }
+            allProblems[activeIndex] = updated;
+            updateProblemListUI();
+        }
+
+        // --- 座標処理 ---
+        function parseCoord(str) {
+            // 文字列 XXYY (各2桁のユニット番号) を座標値に変換
+            const ux = parseInt(str.substring(0, 2));
+            const uy = parseInt(str.substring(2, 4));
+            const x = ux * 10;
+            const y = uy * 10;
+            const hasBike = str.includes('b');
+            const hasMushroom = str.includes('m');
+            return { x, y, hasBike, hasMushroom };
+        }
+
+        function formatCoord(p) {
+            // 座標値をユニット番号 (2桁) に変換して文字列化
+            const ux = Math.round(p.x / 10);
+            const uy = Math.round(p.y / 10);
+            let s = `${ux.toString().padStart(2, '0')}${uy.toString().padStart(2, '0')}`;
+            if (p.hasBike) s += 'b';
+            if (p.hasMushroom) s += 'm';
+            return s;
+        }
+
+        // --- 描画ロジック ---
+        function render() {
+            if (activeIndex === -1) return;
+            routesLayer.innerHTML = '';
+            pointsLayer.innerHTML = '';
+
+            document.getElementById('start-node').setAttribute('cx', startPos.x);
+            document.getElementById('start-node').setAttribute('cy', startPos.y);
+            document.getElementById('start-label').setAttribute('x', startPos.x);
+            document.getElementById('start-label').setAttribute('y', startPos.y);
+            document.getElementById('goal-node').setAttribute('cx', goalPos.x);
+            document.getElementById('goal-node').setAttribute('cy', goalPos.y);
+            document.getElementById('goal-label').setAttribute('x', goalPos.x);
+            document.getElementById('goal-label').setAttribute('y', goalPos.y);
+
+            const order = [0, 1, 2].sort(a => a === currentRouteIdx ? 1 : -1);
+
+            order.forEach((rIdx) => {
+                if (rIdx === 2 && !useRoute3) return; 
+
+                const path = routes[rIdx];
+                const fullPath = [startPos, ...path, goalPos];
+                let d = `M ${fullPath[0].x} ${fullPath[0].y}`;
+                for(let i=1; i<fullPath.length; i++) d += ` L ${fullPath[i].x} ${fullPath[i].y}`;
+
+                const bgLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                bgLine.setAttribute("d", d);
+                bgLine.setAttribute("class", "route-line-bg");
+                if (rIdx === currentRouteIdx) {
+                    bgLine.style.pointerEvents = "visibleStroke";
+                    bgLine.addEventListener('mousedown', (e) => {
+                        if (currentTool === 'move') { e.stopPropagation(); addNewPointOnLine(e, rIdx); }
+                    });
+                } else {
+                    bgLine.style.pointerEvents = "none";
+                }
+                routesLayer.appendChild(bgLine);
+
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                line.setAttribute("d", d);
+                line.setAttribute("stroke", ROUTE_COLORS[rIdx]);
+                line.setAttribute("class", "route-line");
+                line.style.opacity = (rIdx === currentRouteIdx) ? "1.0" : "0.2";
+                routesLayer.appendChild(line);
+
+                path.forEach((p, pIdx) => {
+                    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    circle.setAttribute("cx", p.x); circle.setAttribute("cy", p.y);
+                    circle.setAttribute("r", rIdx === currentRouteIdx ? 2.5 : 1.8);
+                    circle.setAttribute("fill", ROUTE_COLORS[rIdx]);
+                    circle.setAttribute("class", "point point-mid");
+                    circle.style.opacity = (rIdx === currentRouteIdx) ? "1.0" : "0.3";
+
+                    circle.addEventListener('mousedown', (e) => {
+                        e.stopPropagation();
+                        if (rIdx !== currentRouteIdx) { setRoute(rIdx); return; }
+                        if (currentTool === 'delete') { routes[rIdx].splice(pIdx, 1); render(); }
+                        else if (currentTool === 'bike') { p.hasBike = !p.hasBike; if(p.hasBike) p.hasMushroom = false; render(); }
+                        else if (currentTool === 'mushroom') { p.hasMushroom = !p.hasMushroom; if(p.hasMushroom) p.hasBike = false; render(); }
+                        else { draggingTarget = { type: 'mid', routeIdx: rIdx, pointIdx: pIdx }; }
+                    });
+                    pointsLayer.appendChild(circle);
+
+                    if (p.hasBike || p.hasMushroom) {
+                        const icon = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        icon.setAttribute("x", p.x); icon.setAttribute("y", p.y - 4);
+                        icon.setAttribute("font-size", "5"); icon.setAttribute("text-anchor", "middle");
+                        icon.setAttribute("pointer-events", "none");
+                        icon.setAttribute("font-weight", "900");
+                        icon.setAttribute("fill", "#1e293b");
+                        icon.textContent = p.hasBike ? "×2" : "×4";
+                        pointsLayer.appendChild(icon);
+                    }
+                });
+            });
+        }
+
+        // --- インタラクション ---
+        function getSVGEventCoord(e) {
+            const pt = svg.createSVGPoint();
+            pt.x = e.clientX; pt.y = e.clientY;
+            return pt.matrixTransform(svg.getScreenCTM().inverse());
+        }
+
+        function addNewPointOnLine(e, rIdx) {
+            if (isTesting || activeIndex === -1) return;
+            const pt = getSVGEventCoord(e);
+            let nx = Math.round(pt.x / 10) * 10;
+            let ny = Math.round(pt.y / 10) * 10;
+            
+            if (nx < LIMIT_X_MIN || nx > LIMIT_X_MAX || ny < LIMIT_Y_MIN || ny > LIMIT_Y_MAX) return;
+
+            const fullPath = [startPos, ...routes[rIdx], goalPos];
+            if (fullPath.some(p => Math.round(p.x) === nx && Math.round(p.y) === ny)) return;
+
+            let minDistance = Infinity;
+            let insertIndex = -1;
+            for (let i = 0; i < fullPath.length - 1; i++) {
+                const dist = distToSegment({x:nx, y:ny}, fullPath[i], fullPath[i+1]);
+                if (dist < minDistance) { minDistance = dist; insertIndex = i; }
+            }
+            if (insertIndex !== -1) {
+                routes[rIdx].splice(insertIndex, 0, { x: nx, y: ny, hasBike: false, hasMushroom: false });
+                draggingTarget = { type: 'mid', routeIdx: rIdx, pointIdx: insertIndex };
+                render();
+            }
+        }
+
+        function distToSegment(p, v, w) {
+            const l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
+            if (l2 === 0) return Math.sqrt(Math.pow(p.x - v.x, 2) + Math.pow(p.y - v.y, 2));
+            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return Math.sqrt(Math.pow(p.x - (v.x + t * (w.x - v.x)), 2) + Math.pow(p.y - (v.y + t * (w.y - v.y)), 2));
+        }
+
+        document.getElementById('start-group').addEventListener('mousedown', (e) => { if(!isTesting && activeIndex !== -1) { draggingTarget = { type: 'start' }; e.stopPropagation(); } });
+        document.getElementById('goal-group').addEventListener('mousedown', (e) => { if(!isTesting && activeIndex !== -1) { draggingTarget = { type: 'goal' }; e.stopPropagation(); } });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!draggingTarget || isTesting) return;
+            const pt = getSVGEventCoord(e);
+            let nx = Math.round(pt.x / 10) * 10;
+            let ny = Math.round(pt.y / 10) * 10;
+            
+            nx = Math.max(LIMIT_X_MIN, Math.min(LIMIT_X_MAX, nx));
+            ny = Math.max(LIMIT_Y_MIN, Math.min(LIMIT_Y_MAX, ny));
+
+            if (draggingTarget.type === 'start') { startPos.x = nx; startPos.y = ny; }
+            else if (draggingTarget.type === 'goal') { goalPos.x = nx; goalPos.y = ny; }
+            else if (draggingTarget.type === 'mid') {
+                const p = routes[draggingTarget.routeIdx][draggingTarget.pointIdx];
+                p.x = nx; p.y = ny;
+            }
+            render();
+        });
+        window.addEventListener('mouseup', () => draggingTarget = null);
+
+        function setRoute(idx) {
+            currentRouteIdx = idx;
+            document.querySelectorAll('.route-selector').forEach((btn, i) => btn.classList.toggle('active-btn', i === idx));
+            render();
+        }
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-selector').forEach(btn => btn.classList.toggle('active-btn', btn.id === `btn-tool-${tool}`));
+            render();
+        }
+
+        // --- テストプレイ ---
+        function testPlay() {
+            if (activeIndex === -1) return;
+            if (isTesting) { stopTest(); return; }
+            isTesting = true;
+            document.getElementById('test-icon').textContent = '■';
+            document.getElementById('test-text').textContent = 'ストップ';
+            runners = routes.map((path, idx) => {
+                if (idx === 2 && !useRoute3) return null; 
+                if (path.length === 0 && (startPos.x === goalPos.x && startPos.y === goalPos.y)) return null;
+                const fullPath = [startPos, ...path, goalPos];
+                let totalLength = 0, segments = [], currentMultiplier = 1;
+
+                for (let i = 0; i < fullPath.length - 1; i++) {
+                    if (fullPath[i].hasBike) currentMultiplier *= 2;
+                    if (fullPath[i].hasMushroom) currentMultiplier *= 4;
+                    const d = Math.sqrt(Math.pow(fullPath[i+1].x-fullPath[i].x,2)+Math.pow(fullPath[i+1].y-fullPath[i].y,2));
+                    segments.push({ start: fullPath[i], end: fullPath[i+1], length: d, multiplier: currentMultiplier, startDist: totalLength });
+                    totalLength += d;
+                }
+                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                circle.setAttribute("r", 3); circle.setAttribute("fill", ROUTE_COLORS[idx]);
+                circle.setAttribute("stroke", "white"); circle.setAttribute("stroke-width", "1");
+                testLayer.appendChild(circle);
+                return { circle, segments, totalLength, currentPosDist: 0, finished: false };
+            });
+            requestAnimationFrame(testLoop);
+        }
+
+        function testLoop() {
+            if (!isTesting) return;
+            const dt = 1/60; let allFinished = true;
+            runners.forEach(r => {
+                if (!r || r.finished) return;
+                allFinished = false;
+                const seg = r.segments.find(s => r.currentPosDist >= s.startDist && r.currentPosDist < s.startDist + s.length) || r.segments[r.segments.length - 1];
+                r.currentPosDist += (BASE_SPEED * seg.multiplier) * dt;
+                if (r.currentPosDist >= r.totalLength) { 
+                    r.currentPosDist = r.totalLength; r.finished = true; r.circle.setAttribute("cx", goalPos.x); r.circle.setAttribute("cy", goalPos.y); 
+                } else {
+                    const ratio = (r.currentPosDist - seg.startDist) / seg.length;
+                    r.circle.setAttribute("cx", seg.start.x + (seg.end.x - seg.start.x) * ratio);
+                    r.circle.setAttribute("cy", seg.start.y + (seg.end.y - seg.start.y) * ratio);
+                }
+            });
+            if (allFinished) setTimeout(stopTest, 1000);
+            else animationId = requestAnimationFrame(testLoop);
+        }
+
+        function stopTest() {
+            isTesting = false;
+            if (animationId) cancelAnimationFrame(animationId);
+            testLayer.innerHTML = '';
+            document.getElementById('test-icon').textContent = '▶';
+            document.getElementById('test-text').textContent = 'テストプレイ';
+        }
+
+        // --- インポート/エクスポート ---
+        function triggerLoad() { document.getElementById('load-file').click(); }
+
+        async function loadJSON(event) {
+            const files = Array.from(event.target.files);
+            for (const file of files) {
+                const text = await file.text();
+                try {
+                    const data = JSON.parse(text);
+                    const toLoad = Array.isArray(data) ? data : [data];
+                    toLoad.forEach(newProb => {
+                        const hasR3Data = newProb.routes && newProb.routes.some(r => r.id === 2 && r.path && r.path.length > 0);
+                        newProb.useRoute3 = (newProb.useRoute3 !== undefined) ? newProb.useRoute3 : hasR3Data;
+                        newProb.loadOrder = loadOrderCounter++;
+                        const existingIdx = allProblems.findIndex(p => p.title === newProb.title);
+                        if (existingIdx !== -1) {
+                            newProb.loadOrder = allProblems[existingIdx].loadOrder;
+                            allProblems[existingIdx] = newProb;
+                        } else {
+                            allProblems.push(newProb);
+                        }
+                    });
+                } catch (e) { console.error("Parse Error", e); }
+            }
+            if (allProblems.length > 0 && activeIndex === -1) selectProblem(0);
+            updateProblemListUI();
+            event.target.value = '';
+        }
+
+        function exportJSON() {
+            if (allProblems.length === 0) return;
+            const filteredData = allProblems.map(p => {
+                const clone = JSON.parse(JSON.stringify(p));
+                if (clone.useRoute3 === false) {
+                    clone.routes = clone.routes.filter(r => r.id !== 2);
+                }
+                return clone;
+            });
+            const blob = new Blob([JSON.stringify(filteredData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bicycle_race_project.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        init();
+    </script>
+</body>
+</html>
