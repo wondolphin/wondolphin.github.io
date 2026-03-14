@@ -77,22 +77,25 @@
             z-index: 1;
         }
 
-        /* Player, target, and lit target styles using pseudo-elements */
-        .player::after, .target::after {
+        /* Player style (Circle) */
+        .player::after {
             content: '';
             display: block;
             box-sizing: border-box;
             border-radius: 50%;
             z-index: 2;
-        }
-
-        .player::after {
             width: 70%;
             height: 70%;
             background-color: var(--player-color);
         }
 
+        /* Target style (Square) */
         .target::after {
+            content: '';
+            display: block;
+            box-sizing: border-box;
+            border-radius: 15%; /* Changed to square shape with slight rounding */
+            z-index: 2;
             width: 60%;
             height: 60%;
             border: 0.8vmin solid var(--target-color);
@@ -139,10 +142,10 @@
                 ". up ."
                 "left . right"
                 ". down .";
-            grid-template-columns: 1fr 1fr 1fr; /* Make columns flexible */
-            grid-template-rows: 1fr 1fr 1fr;    /* Make rows flexible */
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
             gap: 1vmin;
-            min-height: 0; /* Prevent content from stretching the grid row */
+            min-height: 0;
             min-width: 0;
         }
 
@@ -156,8 +159,8 @@
             transition: background-color 0.1s ease;
             width: 100%;
             height: 100%;
-            min-width: 0; /* Prevent content from breaking grid layout */
-            min-height: 0; /* Prevent content from breaking grid layout */
+            min-width: 0;
+            min-height: 0;
         }
 
         .control-btn:hover {
@@ -167,10 +170,9 @@
         .control-btn svg {
             width: 50%;
             height: 50%;
-            fill: #ffffff; /* Changed */
+            fill: #ffffff;
         }
         
-        /* Assigning buttons to grid areas */
         #btn-up { grid-area: up; }
         #btn-left { grid-area: left; }
         #btn-right { grid-area: right; }
@@ -205,16 +207,16 @@
         /* Share button container */
         #share-container {
             position: fixed;
-            bottom: 15%; /* Changed */
+            bottom: 15%;
             left: 0;
             width: 100%;
             box-sizing: border-box;
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 101; /* Changed */
+            z-index: 101;
             opacity: 0;
-            transition: opacity 0.5s ease 0.2s; /* Add a slight delay */
+            transition: opacity 0.5s ease 0.2s;
             pointer-events: none;
         }
 
@@ -224,7 +226,7 @@
         }
         
         #share-button {
-            background-color: #000000; /* Changed */
+            background-color: #000000;
             color: white;
             padding: 1.5vmin 3vmin;
             border-radius: 50px;
@@ -237,7 +239,7 @@
 
         #share-button:hover {
             transform: scale(1.05);
-            background-color: #333333; /* Changed */
+            background-color: #333333;
         }
 
     </style>
@@ -300,9 +302,6 @@
 
             // --- Game Logic Functions ---
 
-            /**
-             * Initializes the game state from the initial layout.
-             */
             function setupGame() {
                 players = [];
                 targets = [];
@@ -318,12 +317,9 @@
                 renderBoard();
             }
 
-            /**
-             * Renders the entire game board based on the current state.
-             */
             function renderBoard() {
                 gameBoard.innerHTML = '';
-                cellElements = []; // Reset the cell elements array
+                cellElements = [];
                 for (let y = 0; y < BOARD_SIZE; y++) {
                     const rowElements = [];
                     for (let x = 0; x < BOARD_SIZE; x++) {
@@ -340,10 +336,11 @@
                 
                 updateLitTargets();
 
-                // Once cleared for the first time, always show players and lasers
                 if (hasBeenClearedOnce) {
                     players.forEach(p => {
-                        cellElements[p.y][p.x].classList.add('player');
+                        if (cellElements[p.y] && cellElements[p.y][p.x]) {
+                            cellElements[p.y][p.x].classList.add('player');
+                        }
                     });
                     drawLaserBeams(players);
                 } else {
@@ -351,10 +348,6 @@
                 }
             }
             
-            /**
-             * Draws laser rays from player positions, stopping at targets.
-             * @param {object[]} positions - Array of player positions to draw from.
-             */
             function drawLaserBeams(positions) {
                 laserContainer.innerHTML = '';
                 const containerRect = laserContainer.getBoundingClientRect();
@@ -366,15 +359,14 @@
                 const beamWidth = Math.max(2, cellWidth * 0.1);
 
                 positions.forEach(player => {
-                    // Find endpoints, stopping at the first target
                     let endUp = -1, endDown = BOARD_SIZE, endLeft = -1, endRight = BOARD_SIZE;
 
                     targets.forEach(target => {
-                        if (target.x === player.x) { // Vertical alignment
+                        if (target.x === player.x) {
                             if (target.y < player.y) endUp = Math.max(endUp, target.y);
                             else endDown = Math.min(endDown, target.y);
                         }
-                        if (target.y === player.y) { // Horizontal alignment
+                        if (target.y === player.y) {
                             if (target.x < player.x) endLeft = Math.max(endLeft, target.x);
                             else endRight = Math.min(endRight, target.x);
                         }
@@ -384,7 +376,6 @@
                     const cx = (playerCellRect.left - containerRect.left) + playerCellRect.width / 2;
                     const cy = (playerCellRect.top - containerRect.top) + playerCellRect.height / 2;
 
-                    // Calculate pixel coordinates for rays, ending at center of target
                     let upY, downY, leftX, rightX;
                     
                     if (endUp === -1) {
@@ -415,13 +406,11 @@
                         rightX = (endCellRect.left - containerRect.left) + endCellRect.width / 2;
                     }
 
-
-                    // Create ray elements
                     const rays = [
-                        { left: cx - beamWidth / 2, top: upY, width: beamWidth, height: cy - upY }, // Up
-                        { left: cx - beamWidth / 2, top: cy, width: beamWidth, height: downY - cy }, // Down
-                        { left: leftX, top: cy - beamWidth / 2, width: cx - leftX, height: beamWidth }, // Left
-                        { left: cx, top: cy - beamWidth / 2, width: rightX - cx, height: beamWidth }  // Right
+                        { left: cx - beamWidth / 2, top: upY, width: beamWidth, height: cy - upY },
+                        { left: cx - beamWidth / 2, top: cy, width: beamWidth, height: downY - cy },
+                        { left: leftX, top: cy - beamWidth / 2, width: cx - leftX, height: beamWidth },
+                        { left: cx, top: cy - beamWidth / 2, width: rightX - cx, height: beamWidth }
                     ];
 
                     rays.forEach(r => {
@@ -438,21 +427,14 @@
                 });
             }
             
-            /**
-             * Checks if there's a clear line of sight between a target and any player.
-             * @param {object} target - The target to check.
-             * @param {object[]} players - Array of player positions.
-             * @param {object[]} allTargets - Array of all target positions.
-             * @returns {boolean} - True if there is a clear line of sight.
-             */
             function hasClearLineOfSight(target, players, allTargets) {
                 for (const player of players) {
-                    if (player.y === target.y) { // Same row
+                    if (player.y === target.y) {
                         const startX = Math.min(player.x, target.x);
                         const endX = Math.max(player.x, target.x);
                         if (!allTargets.some(other => other.y === target.y && other.x > startX && other.x < endX)) return true;
                     }
-                    if (player.x === target.x) { // Same col
+                    if (player.x === target.x) {
                         const startY = Math.min(player.y, target.y);
                         const endY = Math.max(player.y, target.y);
                         if (!allTargets.some(other => other.x === target.x && other.y > startY && other.y < endY)) return true;
@@ -461,9 +443,6 @@
                 return false;
             }
 
-            /**
-             * Checks which targets should be lit and updates their styles.
-             */
             function updateLitTargets() {
                 let litCount = 0;
                 targets.forEach(target => {
@@ -480,11 +459,10 @@
                 isGameCleared = (litCount === targets.length);
 
                 if (isGameCleared && !isCelebrationActive) {
-                    hasBeenClearedOnce = true; // Set the flag to permanently show players/lasers
+                    hasBeenClearedOnce = true;
                     isCelebrationActive = true;
                     setTimeout(() => {
                         clearMessage.classList.add('show');
-                        // Show share button 1 second after the clear message
                         setTimeout(() => {
                             shareContainer.classList.add('show');
                         }, 1000);
@@ -492,23 +470,12 @@
                 }
             }
 
-            /**
-             * Checks if a given coordinate is a valid, passable position.
-             * @param {number} x - The x-coordinate.
-             * @param {number} y - The y-coordinate.
-             * @returns {boolean} - True if the position is passable.
-             */
             function isPassable(x, y) {
                 if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) return false;
                 if (targets.some(t => t.x === x && t.y === y)) return false;
                 return true;
             }
 
-            /**
-             * Moves players based on the given delta (dx, dy).
-             * @param {number} dx - Change in x-coordinate.
-             * @param {number} dy - Change in y-coordinate.
-             */
             function movePlayers(dx, dy) {
                 const [p1, p2] = players;
                 const p1Next = { x: p1.x + dx, y: p1.y + dy };
@@ -536,8 +503,6 @@
 
                 if (p1Moves || p2Moves) {
                     renderBoard();
-                    // After rendering, isGameCleared is updated.
-                    // If the board is no longer cleared, hide the popups and reset the celebration flag.
                     if (!isGameCleared && isCelebrationActive) {
                         clearMessage.classList.remove('show');
                         shareContainer.classList.remove('show');
@@ -546,12 +511,6 @@
                 }
             }
 
-
-            // --- UI and Event Listeners ---
-
-            /**
-             * Resizes the wrapper to be a square based on the smaller window dimension.
-             */
             function resizeWrapper() {
                 const size = Math.min(window.innerWidth, window.innerHeight) * 0.95;
                 wrapper.style.width = `${size}px`;
@@ -561,9 +520,7 @@
                 }
             }
 
-            // Keyboard controls
             document.addEventListener('keydown', (e) => {
-                // If clear message is shown, block keyboard controls
                 if (clearMessage.classList.contains('show')) {
                     return;
                 }
@@ -575,20 +532,17 @@
                 }
             });
 
-            // On-screen button controls
             document.getElementById('btn-up').addEventListener('click', () => movePlayers(0, -1));
             document.getElementById('btn-down').addEventListener('click', () => movePlayers(0, 1));
             document.getElementById('btn-left').addEventListener('click', () => movePlayers(-1, 0));
             document.getElementById('btn-right').addEventListener('click', () => movePlayers(1, 0));
             
-            // Hide clear message on click
             clearMessage.addEventListener('click', () => {
                 clearMessage.classList.remove('show');
                 shareContainer.classList.remove('show');
-                isCelebrationActive = false; // Allow celebration to happen again
+                isCelebrationActive = false;
             });
 
-            // Initial setup on window load and resize
             window.addEventListener('resize', resizeWrapper);
             resizeWrapper();
             setupGame();
@@ -596,4 +550,3 @@
     </script>
 </body>
 </html>
-
