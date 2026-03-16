@@ -15,20 +15,20 @@
         /* 各色の定義（テキスト用と背景用を分ける） */
         .color-1 { --c: #ff4d4d; } 
         .color-2 { --c: #3b82f6; } 
-        .color-3 { --c: #16a34a; } /* 緑を少し濃く調整 (#22c55e -> #16a34a) */
+        .color-3 { --c: #16a34a; } 
         .color-4 { --c: #eab308; } 
         .color-5 { --c: #a855f7; } 
-        .color-6 { --c: #f97316; } /* オレンジと水色を入れ替え (元: #06b6d4) */
-        .color-7 { --c: #06b6d4; } /* オレンジと水色を入れ替え (元: #f97316) */
+        .color-6 { --c: #f97316; } 
+        .color-7 { --c: #06b6d4; } 
         .color-8 { --c: #ec4899; } 
 
         .bg-color-1 { background-color: #ff4d4d; }
         .bg-color-2 { background-color: #3b82f6; }
-        .bg-color-3 { background-color: #16a34a; } /* 緑を少し濃く */
+        .bg-color-3 { background-color: #16a34a; } 
         .bg-color-4 { background-color: #eab308; }
         .bg-color-5 { background-color: #a855f7; }
-        .bg-color-6 { background-color: #f97316; } /* オレンジ */
-        .bg-color-7 { background-color: #06b6d4; } /* 水色 */
+        .bg-color-6 { background-color: #f97316; } 
+        .bg-color-7 { background-color: #06b6d4; } 
         .bg-color-8 { background-color: #ec4899; }
 
         body {
@@ -88,7 +88,6 @@
             text-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
 
-        /* 1になった時の強調 */
         .indicator.active {
             background: var(--c);
             box-shadow: 0 0 20px var(--c);
@@ -104,7 +103,7 @@
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             grid-template-rows: repeat(4, 1fr);
-            gap: 5px; /* マスの間隔を半分 (10px -> 5px) に変更 */
+            gap: 5px; 
             background-color: rgba(255,255,255,0.05);
             padding: 12px;
             border-radius: 16px;
@@ -172,6 +171,7 @@
             transform: translateY(20px);
             transition: transform 0.5s ease;
             max-width: 90%;
+            width: 320px;
         }
 
         .win-modal.visible .win-content {
@@ -188,39 +188,52 @@
 
         .share-container {
             margin-bottom: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
         }
 
-        .share-link {
+        .share-btn-main, .share-choice-btn {
             display: inline-block;
             color: #fff;
             text-decoration: none;
-            font-size: 1rem;
-            padding: 10px 20px;
+            font-size: 0.95rem;
+            padding: 12px 20px;
             border-radius: 30px;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.2);
             transition: all 0.3s ease;
+            cursor: pointer;
+            width: 100%;
+            box-sizing: border-box;
         }
 
-        .share-link:hover {
+        .share-btn-main:hover, .share-choice-btn:hover {
             background: #000;
             border-color: #555;
-            transform: scale(1.05);
+            transform: scale(1.02);
         }
 
-        .btn {
+        /* 選択肢の表示切り替え */
+        .choices-hidden {
+            display: none !important;
+        }
+
+        .btn-ok {
             background: #3b82f6;
             color: white;
             border: none;
-            padding: 15px 35px;
+            padding: 12px 35px;
             border-radius: 12px;
             cursor: pointer;
             font-size: 1.1rem;
             font-weight: bold;
             transition: all 0.2s;
+            width: 100%;
         }
 
-        .btn:hover {
+        .btn-ok:hover {
             background: #2563eb;
             transform: translateY(-2px);
         }
@@ -240,6 +253,9 @@
             }
             .indicator .count {
                 font-size: 16px;
+            }
+            .win-content {
+                padding: 30px;
             }
             .win-content h2 {
                 font-size: 2rem;
@@ -264,15 +280,21 @@
     <div id="winModal" class="win-modal">
         <div class="win-content">
             <h2>CLEAR!</h2>
+            
             <div class="share-container">
-                <a id="shareX" href="#" target="_blank" class="share-link">喜びをXで共有する</a>
+                <!-- 初期ボタン -->
+                <button id="mainShareBtn" class="share-btn-main" onclick="showShareChoices()">喜びをXで共有する</button>
+                
+                <!-- 選択肢ボタン（初期は非表示） -->
+                <a id="shareClear" href="#" target="_blank" class="share-choice-btn choices-hidden">クリア報告のポスト</a>
+                <a id="shareSupport" href="https://twitter.com/wondolphin/status/2033123604708360214" target="_blank" class="share-choice-btn choices-hidden">原ポストにいいね・リポスト</a>
             </div>
-            <button class="btn" onclick="closeModal()">OK</button>
+
+            <button class="btn-ok" onclick="closeModal()">OK</button>
         </div>
     </div>
 
     <script>
-        // 配置パターンの変更
         const targetPattern = [
             [2, 2, 2, 3, 3, 3, 7, 3],
             [1, 1, 2, 3, 7, 7, 7, 3],
@@ -286,15 +308,11 @@
 
         let currentGrid = [];
         const numColors = 8;
-        const boardSize = 4; // 4x4 tiles
+        const boardSize = 4;
 
         function initGame() {
             currentGrid = JSON.parse(JSON.stringify(targetPattern));
             renderStatus();
-            
-            // ゲーム開始時のシャッフルを無効化
-            // shuffleAtStart(); 
-            
             renderBoard();
             updateScores();
         }
@@ -398,16 +416,35 @@
             }
 
             if (allOne) {
-                // Xへの共有リンクをご指定の通りに設定
-                // クリアメッセージを先頭に付与
+                // Xへのクリア報告リンク生成
                 const clearMsg = "Split Colors をクリアしました！";
-                const shareUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(clearMsg) + "%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Fsplitcolors%2Findex.html";
-                document.getElementById('shareX').href = shareUrl;
+                const baseParams = "%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Fsplitcolors%2Findex.html";
+                const shareUrl = "https://twitter.com/intent/tweet?text=" + 
+                                 encodeURIComponent(clearMsg) + 
+                                 baseParams;
+                
+                document.getElementById('shareClear').href = shareUrl;
 
                 setTimeout(() => {
+                    // モーダルを開く前にボタンを初期状態に戻す
+                    resetShareUI();
                     document.getElementById('winModal').classList.add('visible');
                 }, 300);
             }
+        }
+
+        // 共有ボタンをクリックした時に選択肢を表示
+        function showShareChoices() {
+            document.getElementById('mainShareBtn').classList.add('choices-hidden');
+            document.getElementById('shareClear').classList.remove('choices-hidden');
+            document.getElementById('shareSupport').classList.remove('choices-hidden');
+        }
+
+        // UIを初期状態（共有ボタン1つ）に戻す
+        function resetShareUI() {
+            document.getElementById('mainShareBtn').classList.remove('choices-hidden');
+            document.getElementById('shareClear').classList.add('choices-hidden');
+            document.getElementById('shareSupport').classList.add('choices-hidden');
         }
 
         function closeModal() {
