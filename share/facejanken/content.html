@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expression Janken Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <style>
+        .mirror { transform: scaleX(-1); }
+        @keyframes pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop { animation: pop 0.3s forwards; }
+        #output-canvas { pointer-events: none; }
+
+        /* 全体を75%に縮小して中央に配置 */
+        .game-viewport {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            overflow-y: auto;
+            background-color: #020617;
+        }
+        
+        .game-scale-container {
+            transform: scale(0.75);
+            transform-origin: top center;
+            width: 1200px;
+            min-height: 100vh;
+            flex-shrink: 0;
+            padding-top: 1rem;
+        }
+
+        .main-content {
+            width: 896px; 
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans">
+
+    <div class="game-viewport">
+        <div class="game-scale-container">
+            <div class="main-content flex flex-col">
+                <header class="text-center mb-6">
+                    <h1 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">表情ジャンケン BATTLE</h1>
+                </header>
+
+                <!-- メインゲームエリア -->
+                <div class="relative aspect-video bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border-4 border-slate-800 mb-6">
+                    <div class="absolute inset-0 mirror">
+                        <video id="video" class="hidden"></video>
+                        <canvas id="output-canvas" class="w-full h-full object-cover"></canvas>
+                    </div>
+
+                    <!-- ゲームUI層 -->
+                    <div class="absolute inset-0 pointer-events-none p-6">
+                        <div id="ingame-stats" class="flex justify-between items-start opacity-0 transition-opacity">
+                            <div class="bg-black/60 backdrop-blur rounded-2xl px-6 py-2 border border-white/10">
+                                <div class="text-[10px] text-slate-400 font-bold uppercase">Time Left</div>
+                                <div id="game-timer" class="text-3xl font-black text-yellow-400">30.0</div>
+                            </div>
+                            <div class="bg-black/60 backdrop-blur rounded-2xl px-6 py-2 border border-white/10 text-right">
+                                <div class="text-[10px] text-slate-400 font-bold uppercase">Score</div>
+                                <div id="game-score" class="text-3xl font-black text-emerald-400">0</div>
+                            </div>
+                        </div>
+
+                        <div id="battle-area" class="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity">
+                            <div class="w-32 h-32 border-4 border-dashed border-white/20 rounded-full flex items-center justify-center">
+                                <div id="enemy-container" class="relative w-full h-full flex items-center justify-center"></div>
+                            </div>
+                            <div id="enemy-queue" class="absolute left-[50%] ml-20 flex gap-4 items-center overflow-visible"></div>
+                        </div>
+
+                        <div class="absolute bottom-6 left-6">
+                            <div id="current-player-hand" class="bg-emerald-500 text-black px-4 py-1 rounded-full text-sm font-black shadow-lg opacity-0 transition-opacity">
+                                YOU: <span id="player-hand-text">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- オーバーレイ -->
+                    <div id="game-overlay" class="absolute inset-0 z-50">
+                        <div class="absolute top-4 right-4 flex flex-col items-end gap-2 pointer-events-auto z-[60]">
+                            <div class="flex items-center gap-3 bg-black/40 backdrop-blur px-3 py-2 rounded-full border border-white/10">
+                                <span class="text-[10px] font-bold text-slate-300">AVATAR</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="avatar-toggle" class="sr-only peer">
+                                    <div class="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                                </label>
+                            </div>
+                            <button onclick="document.getElementById('face-upload').click()" class="text-[10px] bg-white/10 hover:bg-white/20 backdrop-blur px-3 py-1 rounded-full border border-white/10 transition-colors">
+                                顔画像(face.png)を選択
+                            </button>
+                            <input type="file" id="face-upload" accept="image/*" class="hidden">
+                        </div>
+
+                        <div id="reg-instructions" class="absolute top-6 w-full flex flex-col items-center transition-opacity duration-500 pointer-events-none">
+                            <p class="bg-black/60 backdrop-blur-md inline-block px-6 py-2 rounded-full border border-white/20 text-sm font-bold text-white shadow-xl text-center">
+                                「グー・チョキ・パー」を登録して勝負を開始しよう。
+                            </p>
+                        </div>
+
+                        <div id="start-btn-container" class="absolute bottom-10 w-full flex justify-center pointer-events-auto transition-opacity duration-500">
+                            <button id="start-btn" disabled class="px-12 py-4 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700/80 disabled:text-slate-500 text-slate-950 font-black rounded-2xl shadow-2xl transition-all transform active:scale-95">
+                                ゲームスタート
+                            </button>
+                        </div>
+
+                        <div id="result-screen" class="hidden absolute inset-0 bg-slate-950/90 flex items-center justify-center p-8 pointer-events-auto z-[60]">
+                            <div class="text-center p-10 bg-slate-800 rounded-3xl border border-white/10 shadow-2xl max-w-sm animate-pop">
+                                <h2 class="text-4xl font-black mb-4 text-yellow-400">FINISH!</h2>
+                                <div class="mb-8">
+                                    <div id="final-score" class="text-white text-6xl font-black">0</div>
+                                    <div class="text-slate-400 text-sm font-bold uppercase tracking-widest mt-2">Total Score</div>
+                                </div>
+                                <button id="ok-btn" class="w-full py-4 bg-emerald-500 text-slate-950 font-black rounded-2xl shadow-xl hover:bg-emerald-400 transition-all">
+                                    OK
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 登録スロット -->
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div id="slot-0" class="flex flex-col gap-2">
+                        <div id="slot-frame-0" class="aspect-square bg-slate-800 rounded-2xl overflow-hidden flex items-center justify-center border-2 border-slate-700 relative transition-all">
+                            <img id="preview-0" class="hidden w-full h-full object-cover mirror">
+                            <span class="absolute top-2 right-2 text-2xl z-10 drop-shadow-md">✊</span>
+                            <div id="placeholder-0" class="text-slate-600 text-[10px] font-bold text-center">未登録</div>
+                        </div>
+                        <button onclick="captureSlot(0)" class="py-2 bg-slate-700 hover:bg-emerald-600 rounded-xl text-xs font-black transition">グーを登録</button>
+                    </div>
+                    <div id="slot-1" class="flex flex-col gap-2">
+                        <div id="slot-frame-1" class="aspect-square bg-slate-800 rounded-2xl overflow-hidden flex items-center justify-center border-2 border-slate-700 relative transition-all">
+                            <img id="preview-1" class="hidden w-full h-full object-cover mirror">
+                            <span class="absolute top-2 right-2 text-2xl z-10 drop-shadow-md">✌️</span>
+                            <div id="placeholder-1" class="text-slate-600 text-[10px] font-bold text-center">未登録</div>
+                        </div>
+                        <button onclick="captureSlot(1)" class="py-2 bg-slate-700 hover:bg-emerald-600 rounded-xl text-xs font-black transition">チョキを登録</button>
+                    </div>
+                    <div id="slot-2" class="flex flex-col gap-2">
+                        <div id="slot-frame-2" class="aspect-square bg-slate-800 rounded-2xl overflow-hidden flex items-center justify-center border-2 border-slate-700 relative transition-all">
+                            <img id="preview-2" class="hidden w-full h-full object-cover mirror">
+                            <span class="absolute top-2 right-2 text-2xl z-10 drop-shadow-md">✋</span>
+                            <div id="placeholder-2" class="text-slate-600 text-[10px] font-bold text-center">未登録</div>
+                        </div>
+                        <button onclick="captureSlot(2)" class="py-2 bg-slate-700 hover:bg-emerald-600 rounded-xl text-xs font-black transition">パーを登録</button>
+                    </div>
+                </div>
+                
+                <div class="text-center pb-8">
+                    <button id="reset-btn" class="text-slate-600 hover:text-white text-xs underline">全データをクリア</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- キャプチャ用の隠しキャンバス -->
+    <canvas id="capture-canvas" class="hidden"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('output-canvas');
+        const ctx = canvas.getContext('2d');
+        const captureCanvas = document.getElementById('capture-canvas');
+        const captureCtx = captureCanvas.getContext('2d');
+
+        const startBtn = document.getElementById('start-btn');
+        const okBtn = document.getElementById('ok-btn');
+        const avatarToggle = document.getElementById('avatar-toggle');
+        const faceUpload = document.getElementById('face-upload');
+        const resultScreen = document.getElementById('result-screen');
+        const regInstructions = document.getElementById('reg-instructions');
+        const startBtnContainer = document.getElementById('start-btn-container');
+        const battleArea = document.getElementById('battle-area');
+        const ingameStats = document.getElementById('ingame-stats');
+        
+        const gameScoreDisplay = document.getElementById('game-score');
+        const gameTimerDisplay = document.getElementById('game-timer');
+        const enemyContainer = document.getElementById('enemy-container');
+        const enemyQueue = document.getElementById('enemy-queue');
+        const playerHandUI = document.getElementById('current-player-hand');
+        const playerHandText = document.getElementById('player-hand-text');
+
+        let faceBaseImage = new Image();
+        let isImageLoaded = false;
+
+        let faceMesh, camera;
+        let registeredFeatures = [null, null, null];
+        let currentFeatures = null;
+        let lastRawLandmarks = null; // 描画用に最新のランドマークを保持
+        let gameState = 'REGISTRATION'; 
+        let score = 0, timeLeft = 30.0, enemies = [], lastBeatTime = 0;
+        let isAvatarMode = false;
+
+        const HANDS = [
+            { id: 0, label: 'グー', icon: '✊', winBy: 2 }, 
+            { id: 1, label: 'チョキ', icon: '✌️', winBy: 0 }, 
+            { id: 2, label: 'パー', icon: '✋', winBy: 1 }  
+        ];
+
+        faceUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    faceBaseImage.onload = () => { isImageLoaded = true; };
+                    faceBaseImage.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        async function init() {
+            faceMesh = new FaceMesh({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+            });
+            faceMesh.setOptions({
+                maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5
+            });
+            faceMesh.onResults(onResults);
+            camera = new Camera(video, {
+                onFrame: async () => { await faceMesh.send({ image: video }); },
+                width: 640, height: 480
+            });
+            camera.start();
+        }
+
+        function onResults(results) {
+            if (canvas.width !== video.videoWidth) {
+                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            }
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (isAvatarMode) {
+                const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 50, canvas.width/2, canvas.height/2, canvas.width);
+                grad.addColorStop(0, '#1e293b'); grad.addColorStop(1, '#020617');
+                ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            }
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                const landmarks = results.multiFaceLandmarks[0];
+                lastRawLandmarks = landmarks;
+                currentFeatures = extractFeatures(landmarks);
+                if (isAvatarMode) drawAvatar(ctx, landmarks);
+                else drawFacePoints(ctx, landmarks);
+                const match = getMatch();
+                if (match !== null) {
+                    playerHandUI.style.opacity = "1";
+                    playerHandText.innerText = HANDS[match].label;
+                    if (gameState === 'PLAYING') checkWin(match);
+                } else { playerHandUI.style.opacity = "0"; }
+            } else { currentFeatures = null; playerHandUI.style.opacity = "0"; }
+            ctx.restore();
+        }
+
+        function extractFeatures(landmarks) {
+            const noseTip = landmarks[1], leftFace = landmarks[234], rightFace = landmarks[454];
+            const faceWidth = Math.sqrt(Math.pow(rightFace.x - leftFace.x, 2) + Math.pow(rightFace.y - leftFace.y, 2));
+            const features = [];
+            landmarks.forEach(p => {
+                features.push((p.x - noseTip.x) / faceWidth);
+                features.push((p.y - noseTip.y) / faceWidth);
+                features.push((p.z - noseTip.z) / faceWidth);
+            });
+            return features;
+        }
+
+        function getMatch() {
+            if (!currentFeatures) return null;
+            let minDistance = Infinity, bestMatch = -1;
+            registeredFeatures.forEach((reg, index) => {
+                if (!reg) return;
+                const dist = calculateEuclideanDistance(currentFeatures, reg);
+                if (dist < minDistance) { minDistance = dist; bestMatch = index; }
+            });
+            return (bestMatch !== -1 && minDistance < 0.8) ? bestMatch : null;
+        }
+
+        function calculateEuclideanDistance(v1, v2) {
+            let s = 0; for (let i = 0; i < v1.length; i++) s += Math.pow(v1[i] - v2[i], 2);
+            return Math.sqrt(s);
+        }
+
+        function drawAvatar(targetCtx, landmarks) {
+            const w = targetCtx.canvas.width, h = targetCtx.canvas.height;
+            const noseTip = landmarks[1], chin = landmarks[152], forehead = landmarks[10], leftJaw = landmarks[234], rightJaw = landmarks[454];
+            const headX = noseTip.x * w, headY = noseTip.y * h;
+            const faceScaleH = Math.abs(chin.y - forehead.y) * h;
+            const faceScaleW = Math.abs(rightJaw.x - leftJaw.x) * w;
+            const angle = Math.atan2((rightJaw.y - leftJaw.y) * h, (rightJaw.x - leftJaw.x) * w);
+
+            targetCtx.save();
+            targetCtx.translate(headX, headY);
+            targetCtx.rotate(angle);
+
+            if (isImageLoaded) {
+                const imgAspect = faceBaseImage.width / faceBaseImage.height;
+                const drawW = faceScaleW * 1.6;
+                const drawH = drawW / imgAspect;
+                targetCtx.drawImage(faceBaseImage, -drawW/2, -drawH/2, drawW, drawH);
+            } else {
+                targetCtx.fillStyle = "#ffccbb"; targetCtx.beginPath();
+                targetCtx.ellipse(-faceScaleW*0.6, 0, faceScaleW*0.2, faceScaleH*0.25, 0, 0, Math.PI*2);
+                targetCtx.ellipse(faceScaleW*0.6, 0, faceScaleW*0.2, faceScaleH*0.25, 0, 0, Math.PI*2); targetCtx.fill();
+                targetCtx.fillStyle = "#ffddcc"; targetCtx.strokeStyle = "#eebbaa"; targetCtx.lineWidth = 2; targetCtx.beginPath();
+                targetCtx.moveTo(0, -faceScaleH * 0.5);
+                targetCtx.bezierCurveTo(faceScaleW*0.8, -faceScaleH*0.5, faceScaleW*0.7, faceScaleH*0.6, 0, faceScaleH*0.6);
+                targetCtx.bezierCurveTo(-faceScaleW*0.7, faceScaleH*0.6, -faceScaleW*0.8, -faceScaleH*0.5, 0, -faceScaleH * 0.5);
+                targetCtx.fill(); targetCtx.stroke();
+            }
+
+            const drawEyebrow = (indices) => {
+                targetCtx.strokeStyle = "#443322"; targetCtx.lineWidth = 5; targetCtx.lineCap = "round"; targetCtx.beginPath();
+                indices.forEach((idx, i) => {
+                    const p = landmarks[idx];
+                    const lx = (p.x * w - headX), ly = (p.y * h - headY);
+                    const rx = lx * Math.cos(-angle) - ly * Math.sin(-angle), ry = lx * Math.sin(-angle) + ly * Math.cos(-angle) + 30;
+                    if (i === 0) targetCtx.moveTo(rx, ry); else targetCtx.lineTo(rx, ry);
+                });
+                targetCtx.stroke();
+            };
+            drawEyebrow([70, 63, 105, 66, 107]); drawEyebrow([336, 296, 334, 293, 300]);
+
+            targetCtx.strokeStyle = "rgba(180, 83, 9, 0.3)"; targetCtx.lineWidth = 2; targetCtx.beginPath();
+            [landmarks[168], landmarks[1], landmarks[2]].forEach((p, i) => {
+                const lx = (p.x * w - headX), ly = (p.y * h - headY);
+                const rx = lx * Math.cos(-angle) - ly * Math.sin(-angle), ry = lx * Math.sin(-angle) + ly * Math.cos(-angle) + 20;
+                if (i === 0) targetCtx.moveTo(rx, ry); else targetCtx.lineTo(rx, ry);
+            });
+            targetCtx.stroke();
+
+            const drawEye = (upperIdx, lowerIdx, irisIdx, sideOffset = 0) => {
+                const u = landmarks[upperIdx], l = landmarks[lowerIdx], iris = landmarks[irisIdx];
+                const lx = (iris.x * w - headX), ly = ((u.y + l.y) / 2 * h - headY);
+                let rx = lx * Math.cos(-angle) - ly * Math.sin(-angle);
+                let ry = lx * Math.sin(-angle) + ly * Math.cos(-angle) + 50;
+                rx += sideOffset;
+                const eyeOpening = Math.abs(l.y - u.y) * h;
+                const currentEyeH = Math.max(2, Math.min(faceScaleH * 0.35, eyeOpening * 2.5));
+                const eyeW = faceScaleH * 0.15;
+                targetCtx.fillStyle = "#fff"; targetCtx.beginPath(); targetCtx.ellipse(rx, ry, eyeW, currentEyeH / 1.1, 0, 0, Math.PI * 2); targetCtx.fill();
+                targetCtx.strokeStyle = "#000"; targetCtx.lineWidth = 1; targetCtx.stroke();
+                if (currentEyeH > 5) {
+                    targetCtx.fillStyle = "#000"; targetCtx.beginPath(); targetCtx.ellipse(rx, ry, eyeW*0.8, Math.min(currentEyeH/1.1, eyeW*0.8), 0, 0, Math.PI * 2); targetCtx.fill();
+                    targetCtx.fillStyle = "#fff"; targetCtx.beginPath(); targetCtx.arc(rx - 3, ry - 3, 2.5, 0, Math.PI * 2); targetCtx.fill();
+                } else {
+                    targetCtx.strokeStyle = "#000"; targetCtx.lineWidth = 4; targetCtx.beginPath(); targetCtx.moveTo(rx - eyeW, ry); targetCtx.lineTo(rx + eyeW, ry); targetCtx.stroke();
+                }
+            };
+            drawEye(159, 145, 468, -15); drawEye(386, 374, 473, 15);
+
+            const drawLip = (indices) => {
+                targetCtx.beginPath();
+                indices.forEach((idx, i) => {
+                    const p = landmarks[idx];
+                    const lx = (p.x * w - headX), ly = (p.y * h - headY);
+                    const rx = lx * Math.cos(-angle) - ly * Math.sin(-angle), ry = lx * Math.sin(-angle) + ly * Math.cos(-angle) + 20;
+                    if (i === 0) targetCtx.moveTo(rx, ry); else targetCtx.lineTo(rx, ry);
+                });
+                targetCtx.closePath(); targetCtx.fill(); targetCtx.stroke();
+            };
+            targetCtx.fillStyle = "#7f1d1d"; targetCtx.strokeStyle = "#451a03"; targetCtx.lineWidth = 1;
+            drawLip([61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185]);
+            targetCtx.fillStyle = "#450a0a"; drawLip([78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191]);
+            targetCtx.restore();
+        }
+
+        function drawFacePoints(targetCtx, landmarks) {
+            targetCtx.fillStyle = "#10b981";
+            [33, 263, 13, 14, 0, 234, 454].forEach(idx => {
+                const p = landmarks[idx];
+                targetCtx.beginPath(); targetCtx.arc(p.x * targetCtx.canvas.width, p.y * targetCtx.canvas.height, 4, 0, 2 * Math.PI); targetCtx.fill();
+            });
+        }
+
+        function startGame() {
+            gameState = 'PLAYING'; score = 0; timeLeft = 30.0; enemies = [];
+            for(let i=0; i<10; i++) addEnemy();
+            regInstructions.classList.add('opacity-0'); startBtnContainer.classList.add('opacity-0', 'pointer-events-none');
+            battleArea.classList.remove('opacity-0'); ingameStats.classList.remove('opacity-0');
+            gameScoreDisplay.innerText = score; updateUI(); gameLoop();
+        }
+
+        function addEnemy() {
+            let nextHand; const len = enemies.length;
+            do { nextHand = HANDS[Math.floor(Math.random() * 3)]; } 
+            while (len >= 2 && enemies[len-1].id === nextHand.id && enemies[len-2].id === nextHand.id);
+            enemies.push({ ...nextHand, key: Date.now() + Math.random() });
+        }
+
+        function checkWin(pHand) {
+            if (enemies.length === 0) return;
+            if (enemies[0].winBy === pHand) {
+                const now = Date.now();
+                if (now - lastBeatTime > 200) { lastBeatTime = now; beatEnemy(); }
+            }
+        }
+
+        function beatEnemy() {
+            score += 100; gameScoreDisplay.innerText = score;
+            const b = enemyContainer.firstElementChild; if(b) b.classList.add('scale-150', 'opacity-0');
+            enemies.shift(); addEnemy(); updateUI();
+        }
+
+        function updateUI() {
+            if (enemies.length > 0) enemyContainer.innerHTML = `<div class="text-6xl animate-pop">${enemies[0].icon}</div>`;
+            enemyQueue.innerHTML = enemies.slice(1, 6).map(en => `<div class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-2xl border border-white/10 opacity-60">${en.icon}</div>`).join('');
+        }
+
+        function gameLoop() {
+            if (gameState !== 'PLAYING') return;
+            timeLeft -= 0.016; if (timeLeft <= 0) { timeLeft = 0; endGame(); }
+            gameTimerDisplay.innerText = timeLeft.toFixed(1);
+            requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            gameState = 'RESULT'; resultScreen.classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+        }
+
+        function resetToStandby() {
+            gameState = 'REGISTRATION'; resultScreen.classList.add('hidden');
+            battleArea.classList.add('opacity-0'); ingameStats.classList.add('opacity-0');
+            regInstructions.classList.remove('opacity-0'); startBtnContainer.classList.remove('opacity-0', 'pointer-events-none');
+            score = 0; timeLeft = 30.0; enemies = [];
+        }
+
+        function captureSlot(idx) {
+            if (!currentFeatures || !lastRawLandmarks) return;
+            registeredFeatures[idx] = [...currentFeatures];
+            
+            captureCanvas.width = video.videoWidth; 
+            captureCanvas.height = video.videoHeight;
+            captureCtx.clearRect(0, 0, captureCanvas.width, captureCanvas.height);
+            
+            if (isAvatarMode) {
+                // アバターモードならアバターの見た目をキャプチャ用キャンバスに描画
+                const grad = captureCtx.createRadialGradient(captureCanvas.width/2, captureCanvas.height/2, 50, captureCanvas.width/2, captureCanvas.height/2, captureCanvas.width);
+                grad.addColorStop(0, '#1e293b'); grad.addColorStop(1, '#020617');
+                captureCtx.fillStyle = grad; captureCtx.fillRect(0, 0, captureCanvas.width, captureCanvas.height);
+                drawAvatar(captureCtx, lastRawLandmarks);
+            } else {
+                // 通常モードならビデオ＋特徴点を描画
+                captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+                drawFacePoints(captureCtx, lastRawLandmarks);
+            }
+            
+            const p = document.getElementById(`preview-${idx}`), ph = document.getElementById(`placeholder-${idx}`);
+            const slotFrame = document.getElementById(`slot-frame-${idx}`);
+            
+            try {
+                p.src = captureCanvas.toDataURL('image/jpeg', 0.8);
+                p.classList.remove('hidden'); ph.classList.add('hidden');
+                if (slotFrame) slotFrame.classList.add('border-emerald-500', 'ring-4', 'ring-emerald-500/50');
+                if (registeredFeatures.every(f => f !== null)) startBtn.disabled = false;
+            } catch (e) {
+                console.error("Capture Error:", e);
+                if (registeredFeatures.every(f => f !== null)) startBtn.disabled = false;
+            }
+        }
+
+        avatarToggle.onchange = (e) => isAvatarMode = e.target.checked;
+        document.getElementById('reset-btn').onclick = () => location.reload();
+        startBtn.onclick = startGame; okBtn.onclick = resetToStandby;
+        window.onload = init;
+    </script>
+</body>
+</html>
