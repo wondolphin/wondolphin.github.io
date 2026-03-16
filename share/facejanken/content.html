@@ -87,6 +87,7 @@
 
                     <!-- オーバーレイ -->
                     <div id="game-overlay" class="absolute inset-0 z-50">
+                        <!-- 右上のコントロール群 -->
                         <div class="absolute top-4 right-4 flex flex-col items-end gap-2 pointer-events-auto z-[60]">
                             <div class="flex items-center gap-3 bg-black/40 backdrop-blur px-3 py-2 rounded-full border border-white/10">
                                 <span class="text-[10px] font-bold text-slate-300">AVATAR</span>
@@ -190,13 +191,20 @@
         const playerHandUI = document.getElementById('current-player-hand');
         const playerHandText = document.getElementById('player-hand-text');
 
+        // アバター画像の初期化
         let faceBaseImage = new Image();
         let isImageLoaded = false;
+
+        // 初期状態でface.pngの自動読み込みを試みる
+        faceBaseImage.crossOrigin = "anonymous";
+        faceBaseImage.onload = () => { isImageLoaded = true; };
+        faceBaseImage.onerror = () => { console.log("face.png not found or CORS blocked. Manual selection available."); };
+        faceBaseImage.src = 'face.png';
 
         let faceMesh, camera;
         let registeredFeatures = [null, null, null];
         let currentFeatures = null;
-        let lastRawLandmarks = null; // 描画用に最新のランドマークを保持
+        let lastRawLandmarks = null;
         let gameState = 'REGISTRATION'; 
         let score = 0, timeLeft = 30.0, enemies = [], lastBeatTime = 0;
         let isAvatarMode = false;
@@ -445,13 +453,11 @@
             captureCtx.clearRect(0, 0, captureCanvas.width, captureCanvas.height);
             
             if (isAvatarMode) {
-                // アバターモードならアバターの見た目をキャプチャ用キャンバスに描画
                 const grad = captureCtx.createRadialGradient(captureCanvas.width/2, captureCanvas.height/2, 50, captureCanvas.width/2, captureCanvas.height/2, captureCanvas.width);
                 grad.addColorStop(0, '#1e293b'); grad.addColorStop(1, '#020617');
                 captureCtx.fillStyle = grad; captureCtx.fillRect(0, 0, captureCanvas.width, captureCanvas.height);
                 drawAvatar(captureCtx, lastRawLandmarks);
             } else {
-                // 通常モードならビデオ＋特徴点を描画
                 captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
                 drawFacePoints(captureCtx, lastRawLandmarks);
             }
