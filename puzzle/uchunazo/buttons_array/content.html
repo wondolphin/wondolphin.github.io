@@ -110,12 +110,12 @@
             max-width: 280px;
         }
 
-        .share-btn-main, .share-choice-btn {
+        .share-btn-main {
             display: inline-block;
             color: #fff;
             text-decoration: none;
-            font-size: 0.95rem;
-            padding: 12px 20px;
+            font-size: 1rem;
+            padding: 14px 24px;
             border-radius: 30px;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -124,15 +124,17 @@
             width: 100%;
             text-align: center;
             box-sizing: border-box;
+            font-weight: 600;
         }
 
-        .share-btn-main:hover, .share-choice-btn:hover {
+        .share-btn-main:hover {
             background: #000;
             border-color: #555;
             transform: scale(1.02);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
 
-        .choices-hidden {
+        .hidden {
             display: none !important;
         }
 
@@ -175,16 +177,11 @@
             <div id="status-container" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span id="status-msg" class="transition-all"></span>
                 
-                <!-- Share Section (Inside clear area) -->
-                <div id="shareSection" class="share-container choices-hidden pointer-events-auto">
-                    <button id="mainShareBtn" class="share-btn-main" onclick="showShareChoices()">喜びをXで共有する</button>
-                    <a id="shareClear" href="#" target="_blank" class="share-choice-btn choices-hidden">クリア報告のポスト</a>
-                    
-
-                    
-                    <a id="shareSupport" href="https://twitter.com/wondolphin/status/2033123604708360214" target="_blank" class="share-choice-btn choices-hidden">原ポストにいいね・リポスト</a>
-
-                    
+                <!-- Share Section (Direct link) -->
+                <div id="shareSection" class="share-container hidden pointer-events-auto">
+                    <a id="shareBtn" href="#" target="_blank" rel="noopener noreferrer" class="share-btn-main">
+                        喜びをXで共有する
+                    </a>
                 </div>
             </div>
         </div>
@@ -220,6 +217,7 @@
         const statusMsg = document.getElementById('status-msg');
         const resetBtn = document.getElementById('reset-btn');
         const shareSection = document.getElementById('shareSection');
+        const shareBtn = document.getElementById('shareBtn');
 
         function initGame() {
             currentGrid = INITIAL_GRID_DATA.map(row => [...row]);
@@ -227,8 +225,7 @@
             gameOver = false;
             statusMsg.textContent = "";
             statusMsg.className = "";
-            resetShareUI();
-            shareSection.classList.add('choices-hidden');
+            shareSection.classList.add('hidden');
             
             document.querySelectorAll('.confetti').forEach(el => el.remove());
             renderLamps();
@@ -318,15 +315,14 @@
                     renderLamps();
                     startConfetti();
                     
-                    // シェアボタンの準備
+                    // シェアリンクを直接ボタンにセット
                     const clearMsg = "Buttons' Array をクリアしました！";
-                    const baseParams = "%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Fsplitcolors%2Findex.html";
-                    const shareUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(clearMsg) + baseParams;
-                    document.getElementById('shareClear').href = shareUrl;
+                    const baseParams = "%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Fbuttons_array%2Findex.html";
+                    shareBtn.href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(clearMsg) + baseParams;
                     
-                    // 少し遅れてシェアボタンを表示
+                    // CLEAR!表示から少し遅れてシェアセクションを表示
                     setTimeout(() => {
-                        shareSection.classList.remove('choices-hidden');
+                        shareSection.classList.remove('hidden');
                     }, 1000);
                 } else {
                     statusMsg.textContent = "FAILED";
@@ -334,18 +330,6 @@
                 }
                 gameGrid.innerHTML = '';
             }
-        }
-
-        function showShareChoices() {
-            document.getElementById('mainShareBtn').classList.add('choices-hidden');
-            document.getElementById('shareClear').classList.remove('choices-hidden');
-            document.getElementById('shareSupport').classList.remove('choices-hidden');
-        }
-
-        function resetShareUI() {
-            document.getElementById('mainShareBtn').classList.remove('choices-hidden');
-            document.getElementById('shareClear').classList.add('choices-hidden');
-            document.getElementById('shareSupport').classList.add('choices-hidden');
         }
 
         function startConfetti() {
