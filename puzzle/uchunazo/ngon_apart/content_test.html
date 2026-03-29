@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>N-gon アパート</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --text-color: #2c3e50;
+            --empty-color: #ffffff;
+            --selected-color: #aaaaaa;
+            --color-1: #ec48b9; 
+            --color-2: #ff4d4d; 
+            --color-3: #f9a336; 
+            --color-4: #ead328; 
+            --color-5: #16a34a; 
+            --color-6: #06b6d4; 
+            --color-7: #3b82f6; 
+            --color-8: #a855f7; 
+            --border-color: #2c3e50;
+            --win-color: #4ade80;
+        }
+
+        /* タップ時のハイライトのみ除去し、基本的なタッチ動作は許可する */
+        * {
+            -webkit-tap-highlight-color: transparent !important;
+            outline: none !important;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+            /* スクロールやプルリフレッシュを許可 */
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 60vh;
+            /* 画面全体の縦スクロールを妨げない */
+        }
+
+        h1 {
+            margin: 10px 0;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: var(--border-color);
+            text-transform: uppercase;
+            font-size: 1.8rem;
+            pointer-events: none;
+        }
+
+        #game-container {
+            position: relative;
+            height: 60vh;
+            width: 60vh;
+            max-width: 90vw;
+            max-height: 90vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* 盤面内でのみブラウザのズームやスクロールを無効化 */
+            touch-action: none;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            border-radius: 50%;
+            pointer-events: auto;
+        }
+
+        .room {
+            cursor: pointer;
+            stroke: var(--border-color);
+            stroke-width: 1.5; 
+            will-change: fill;
+        }
+
+        .wall {
+            stroke: var(--border-color);
+            stroke-width: 1;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        .controls {
+            width: 100%;
+            display: flex;
+            justify-content: flex-end;
+            padding: 15px 0;
+            max-width: 90vw;
+            /* ボタン周りは標準的な操作を許可 */
+            touch-action: manipulation;
+        }
+
+        #undo-btn {
+            padding: 12px 28px;
+            background-color: var(--border-color);
+            color: white;
+            border: none;
+            border-radius: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-size: 0.9rem;
+        }
+
+        #undo-btn:active { opacity: 0.7; transform: scale(0.98); }
+        #undo-btn:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        #clear-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.1);
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        .clear-card {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            text-align: center;
+            border: 3px solid var(--win-color);
+            max-width: 80%;
+            animation: popIn 0.3s ease-out;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        #clear-message {
+            font-size: 3rem;
+            font-weight: 900;
+            margin-bottom: 20px;
+            background: linear-gradient(to right, #ff4d4d, #ffeb3b, #009688, #2196f3, #e91e63);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: pulseClear 1.2s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulseClear {
+            0% { transform: scale(0.95); }
+            100% { transform: scale(1.05); }
+        }
+
+        .share-container {
+            margin: 15px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .share-btn, .choice-link {
+            display: block;
+            background-color: #1da1f2;
+            color: white;
+            text-decoration: none;
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border: none;
+            text-align: center;
+        }
+
+        .btn-ok {
+            margin-top: 10px;
+            background: var(--border-color);
+            color: white;
+            border: none;
+            padding: 10px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 480px) {
+            #clear-message { font-size: 2.2rem; }
+            h1 { font-size: 1.4rem; }
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <div class="game-wrapper">
+        <h1>N-gon アパート</h1>
+
+        <div id="game-container">
+            <svg id="game-svg" viewBox="0 0 100 100" oncontextmenu="return false;">
+                <g id="rooms-group"></g>
+                <g id="walls-group"></g>
+            </svg>
+            <div id="clear-overlay">
+                <div class="clear-card">
+                    <div id="clear-message">CLEAR!</div>
+                    <div class="share-container" id="share-container"></div>
+                    <button class="btn-ok" onpointerdown="hideClear()">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="undo-btn" onpointerdown="undo()" disabled>一手戻る</button>
+        </div>
+    </div>
+
+    <script>
+        // 設定
+        const SHARE_CONFIG = {
+            MODE: 'CHOICE', 
+            TWEET_BODY: "宇宙謎「N-gon アパート」をクリアしました！\n#宇宙謎　#ルール発見型パズル　@wondolphin\nhttps://wondolphin.github.io/puzzle/uchunazo/ngon_apart/index.html",
+            SUPPORT_URL: "https://twitter.com/intent/like?tweet_id=XXXXX"
+        };
+
+        const svg = document.getElementById('game-svg');
+        const roomsGroup = document.getElementById('rooms-group');
+        const wallsGroup = document.getElementById('walls-group');
+        const clearOverlay = document.getElementById('clear-overlay');
+        const undoBtn = document.getElementById('undo-btn');
+        const shareContainer = document.getElementById('share-container');
+        
+        const centerX = 50, centerY = 50, radius = 46, numRooms = 16;
+        const distanceColors = {
+            1: 'var(--color-1)', 2: 'var(--color-2)', 3: 'var(--color-3)', 4: 'var(--color-4)',
+            5: 'var(--color-5)', 6: 'var(--color-6)', 7: 'var(--color-7)', 8: 'var(--color-8)'
+        };
+
+        let roomsState = [], history = [], selectedRoomIndex = null, isClearedState = false;
+
+        function init() {
+            roomsState = Array.from({ length: numRooms }, (_, i) => ({ id: i, colorId: 0, isSelected: false }));
+            history = [];
+            createElements();
+            updateUndoButton();
+            updateDraw();
+        }
+
+        function createElements() {
+            roomsGroup.innerHTML = '';
+            wallsGroup.innerHTML = '';
+            
+            const vertices = Array.from({ length: numRooms }, (_, i) => {
+                const angle = (i * 2 * Math.PI / numRooms) - (Math.PI / 2);
+                return { x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) };
+            });
+            
+            const midpoints = vertices.map((v, i) => ({
+                x: (v.x + vertices[(i + 1) % numRooms].x) / 2,
+                y: (v.y + vertices[(i + 1) % numRooms].y) / 2
+            }));
+
+            for (let i = 0; i < numRooms; i++) {
+                const pathData = `M ${centerX} ${centerY} L ${midpoints[(i + numRooms - 1) % numRooms].x} ${midpoints[(i + numRooms - 1) % numRooms].y} L ${vertices[i].x} ${vertices[i].y} L ${midpoints[i].x} ${midpoints[i].y} Z`;
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', pathData);
+                path.setAttribute('class', 'room');
+                path.setAttribute('id', `room-${i}`);
+                
+                // pointerdown で即応
+                path.onpointerdown = (e) => {
+                    // ここで preventDefault しないことで、必要に応じてブラウザがタップを解釈できる余裕を持たせる
+                    // (ただし盤面自体に touch-action: none があるためズームは抑制される)
+                    handleRoomClick(i);
+                };
+                roomsGroup.appendChild(path);
+            }
+
+            midpoints.forEach(m => {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', centerX);
+                line.setAttribute('y1', centerY);
+                line.setAttribute('x2', m.x);
+                line.setAttribute('y2', m.y);
+                line.setAttribute('class', 'wall');
+                wallsGroup.appendChild(line);
+            });
+        }
+
+        function updateDraw() {
+            for (let i = 0; i < numRooms; i++) {
+                const path = document.getElementById(`room-${i}`);
+                if (!path) continue;
+                const state = roomsState[i];
+                let fill = state.isSelected ? 'var(--selected-color)' : (state.colorId > 0 ? distanceColors[state.colorId] : 'var(--empty-color)');
+                if (path.getAttribute('fill') !== fill) {
+                    path.setAttribute('fill', fill);
+                }
+            }
+            checkWin();
+        }
+
+        function saveHistory() {
+            history.push(JSON.parse(JSON.stringify(roomsState)));
+            updateUndoButton();
+        }
+
+        function undo() {
+            if (history.length === 0) return;
+            roomsState = history.pop();
+            selectedRoomIndex = null;
+            roomsState.forEach(r => r.isSelected = false);
+            updateUndoButton();
+            updateDraw();
+        }
+
+        function updateUndoButton() {
+            undoBtn.disabled = history.length === 0;
+        }
+
+        function handleRoomClick(index) {
+            const clickedRoom = roomsState[index];
+            if (selectedRoomIndex !== null) {
+                if (selectedRoomIndex === index) {
+                    roomsState[index].isSelected = false;
+                    selectedRoomIndex = null;
+                } else {
+                    saveHistory();
+                    const first = selectedRoomIndex, second = index;
+                    const diff = Math.abs(first - second);
+                    const dist = Math.min(diff, numRooms - diff);
+                    roomsState[first].isSelected = false;
+                    selectedRoomIndex = null;
+                    const oldCol = roomsState[second].colorId;
+                    if (oldCol > 0) roomsState.forEach(r => { if (r.colorId === oldCol) r.colorId = 0; });
+                    const exists = roomsState.filter(r => r.colorId === dist).length > 0;
+                    if (exists) {
+                        roomsState.forEach(r => { if (r.colorId === dist) r.colorId = 0; });
+                        roomsState[first].colorId = 0; roomsState[second].colorId = 0;
+                    } else {
+                        roomsState[first].colorId = dist; roomsState[second].colorId = dist;
+                    }
+                }
+            } else {
+                if (clickedRoom.colorId > 0) {
+                    saveHistory();
+                    const col = clickedRoom.colorId;
+                    roomsState.forEach(r => { if (r.colorId === col) r.colorId = 0; });
+                } else {
+                    roomsState[index].isSelected = true;
+                    selectedRoomIndex = index;
+                }
+            }
+            updateDraw();
+        }
+
+        function checkWin() {
+            const coloredCount = roomsState.filter(r => r.colorId > 0).length;
+            if (coloredCount === numRooms && !isClearedState) {
+                isClearedState = true;
+                setupShareUI();
+                requestAnimationFrame(() => {
+                    clearOverlay.style.display = 'flex';
+                });
+            } else if (coloredCount < numRooms) {
+                isClearedState = false;
+            }
+        }
+
+        function setupShareUI() {
+            const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(SHARE_CONFIG.TWEET_BODY)}`;
+            shareContainer.innerHTML = '';
+            if (SHARE_CONFIG.MODE === 'DIRECT') {
+                const btn = document.createElement('a');
+                btn.className = 'share-btn';
+                btn.href = shareUrl;
+                btn.target = '_blank';
+                btn.innerText = '喜びをXで共有する';
+                shareContainer.appendChild(btn);
+            } else {
+                const mainBtn = document.createElement('button');
+                mainBtn.className = 'share-btn';
+                mainBtn.innerText = '喜びをXで共有する';
+                const choicesDiv = document.createElement('div');
+                choicesDiv.className = 'share-container choices-hidden';
+                choicesDiv.style.margin = '0';
+                const reportLink = document.createElement('a');
+                reportLink.className = 'choice-link';
+                reportLink.href = shareUrl;
+                reportLink.target = '_blank';
+                reportLink.innerText = 'クリア報告のポスト';
+                const supportLink = document.createElement('a');
+                supportLink.className = 'choice-link';
+                supportLink.href = SHARE_CONFIG.SUPPORT_URL;
+                supportLink.target = '_blank';
+                supportLink.innerText = '原ポストにいいね・リポスト';
+                mainBtn.onpointerdown = (e) => {
+                    e.preventDefault();
+                    mainBtn.classList.add('choices-hidden');
+                    choicesDiv.classList.remove('choices-hidden');
+                };
+                choicesDiv.appendChild(reportLink);
+                choicesDiv.appendChild(supportLink);
+                shareContainer.appendChild(mainBtn);
+                shareContainer.appendChild(choicesDiv);
+            }
+        }
+
+        function hideClear() { clearOverlay.style.display = 'none'; }
+
+        init();
+    </script>
+</body>
+</html>
