@@ -22,10 +22,9 @@
             --win-color: #4ade80;
         }
 
-        /* 根本的なハイライト除去 */
+        /* タップ時のハイライトのみ除去 */
         * {
             -webkit-tap-highlight-color: transparent !important;
-            -webkit-focus-ring-color: transparent !important;
             outline: none !important;
         }
 
@@ -40,11 +39,10 @@
             background-color: var(--bg-color);
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             color: var(--text-color);
-            overflow: hidden;
+            /* スクロールやプルリフレッシュを許可 */
+            touch-action: manipulation;
             user-select: none;
             -webkit-user-select: none;
-            -webkit-touch-callout: none;
-            touch-action: none;
         }
 
         .game-wrapper {
@@ -53,7 +51,6 @@
             align-items: center;
             width: 100%;
             max-width: 60vh;
-            transform: translateZ(0);
         }
 
         h1 {
@@ -75,6 +72,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            /* 盤面内でのみズームやスクロールを無効化 */
             touch-action: none;
         }
 
@@ -83,13 +81,11 @@
             height: 100%;
             background: transparent;
             border-radius: 50%;
-            touch-action: none;
             pointer-events: auto;
         }
 
         .room {
             cursor: pointer;
-            transition: none; 
             stroke: var(--border-color);
             stroke-width: 1.5; 
             will-change: fill;
@@ -108,6 +104,7 @@
             justify-content: flex-end;
             padding: 15px 0;
             max-width: 90vw;
+            touch-action: manipulation;
         }
 
         #undo-btn {
@@ -119,7 +116,6 @@
             font-weight: bold;
             cursor: pointer;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            touch-action: manipulation;
             font-size: 0.9rem;
         }
 
@@ -143,6 +139,7 @@
             z-index: 100;
             background: rgba(255, 255, 255, 0.1);
             pointer-events: auto;
+            touch-action: none;
         }
 
         .clear-card {
@@ -191,7 +188,7 @@
             padding: 12px 18px;
             border-radius: 12px;
             font-weight: bold;
-            font-size: 0.85rem; /* 少し小さく調整 */
+            font-size: 0.85rem;
             cursor: pointer;
             border: none;
             text-align: center;
@@ -244,10 +241,9 @@
 
     <script>
         const SHARE_CONFIG = {
-            // CHOICE モードで選択肢を表示するように設定
-            MODE: 'DIRECT', 
+            MODE: 'CHOICE', 
             TWEET_BODY: "宇宙謎「N-gon アパート」をクリアしました！\n#宇宙謎　#ルール発見型パズル　@wondolphin\nhttps://wondolphin.github.io/puzzle/uchunazo/ngon_apart/index.html",
-            SUPPORT_URL: "https://twitter.com/intent/like?tweet_id=XXXXX"
+            SUPPORT_URL: "https://twitter.com/wondolphin/status/2038197010109788468"
         };
 
         const svg = document.getElementById('game-svg');
@@ -295,8 +291,6 @@
                 path.setAttribute('id', `room-${i}`);
                 
                 path.onpointerdown = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
                     handleRoomClick(i);
                 };
                 roomsGroup.appendChild(path);
@@ -317,10 +311,8 @@
             for (let i = 0; i < numRooms; i++) {
                 const path = document.getElementById(`room-${i}`);
                 if (!path) continue;
-                
                 const state = roomsState[i];
                 let fill = state.isSelected ? 'var(--selected-color)' : (state.colorId > 0 ? distanceColors[state.colorId] : 'var(--empty-color)');
-                
                 if (path.getAttribute('fill') !== fill) {
                     path.setAttribute('fill', fill);
                 }
@@ -348,7 +340,6 @@
 
         function handleRoomClick(index) {
             const clickedRoom = roomsState[index];
-
             if (selectedRoomIndex !== null) {
                 if (selectedRoomIndex === index) {
                     roomsState[index].isSelected = false;
@@ -360,12 +351,8 @@
                     const dist = Math.min(diff, numRooms - diff);
                     roomsState[first].isSelected = false;
                     selectedRoomIndex = null;
-                    
                     const oldCol = roomsState[second].colorId;
-                    if (oldCol > 0) {
-                        roomsState.forEach(r => { if (r.colorId === oldCol) r.colorId = 0; });
-                    }
-                    
+                    if (oldCol > 0) roomsState.forEach(r => { if (r.colorId === oldCol) r.colorId = 0; });
                     const exists = roomsState.filter(r => r.colorId === dist).length > 0;
                     if (exists) {
                         roomsState.forEach(r => { if (r.colorId === dist) r.colorId = 0; });
@@ -403,48 +390,39 @@
         function setupShareUI() {
             const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(SHARE_CONFIG.TWEET_BODY)}`;
             shareContainer.innerHTML = '';
+            
+            // 初期表示ボタン
+            const mainBtn = document.createElement('button');
+            mainBtn.className = 'share-btn';
+            mainBtn.innerText = '喜びをXで共有する';
+            
+            // 選択肢コンテナ
+            const choicesDiv = document.createElement('div');
+            choicesDiv.className = 'share-container choices-hidden';
+            choicesDiv.style.margin = '0';
+            
+            const reportLink = document.createElement('a');
+            reportLink.className = 'choice-link';
+            reportLink.href = shareUrl;
+            reportLink.target = '_blank';
+            reportLink.innerText = 'クリア報告のポスト';
+            
+            const supportLink = document.createElement('a');
+            supportLink.className = 'choice-link';
+            supportLink.href = SHARE_CONFIG.SUPPORT_URL;
+            supportLink.target = '_blank';
+            supportLink.innerText = '原ポストにいいね・リポスト';
+            
+            mainBtn.onpointerdown = (e) => {
+                e.preventDefault();
+                mainBtn.classList.add('choices-hidden');
+                choicesDiv.classList.remove('choices-hidden');
+            };
 
-            if (SHARE_CONFIG.MODE === 'DIRECT') {
-                const btn = document.createElement('a');
-                btn.className = 'share-btn';
-                btn.href = shareUrl;
-                btn.target = '_blank';
-                btn.innerText = '喜びをXで共有する';
-                shareContainer.appendChild(btn);
-            } else {
-                // 初期表示ボタン
-                const mainBtn = document.createElement('button');
-                mainBtn.className = 'share-btn';
-                mainBtn.innerText = '喜びをXで共有する';
-                
-                // 選択肢コンテナ
-                const choicesDiv = document.createElement('div');
-                choicesDiv.className = 'share-container choices-hidden';
-                choicesDiv.style.margin = '0'; // 二重マージン防止
-                
-                const reportLink = document.createElement('a');
-                reportLink.className = 'choice-link';
-                reportLink.href = shareUrl;
-                reportLink.target = '_blank';
-                reportLink.innerText = 'クリア報告のポスト';
-                
-                const supportLink = document.createElement('a');
-                supportLink.className = 'choice-link';
-                supportLink.href = SHARE_CONFIG.SUPPORT_URL;
-                supportLink.target = '_blank';
-                supportLink.innerText = '原ポストにいいね・リポスト';
-                
-                mainBtn.onpointerdown = (e) => {
-                    e.preventDefault();
-                    mainBtn.classList.add('choices-hidden');
-                    choicesDiv.classList.remove('choices-hidden');
-                };
-
-                choicesDiv.appendChild(reportLink);
-                choicesDiv.appendChild(supportLink);
-                shareContainer.appendChild(mainBtn);
-                shareContainer.appendChild(choicesDiv);
-            }
+            choicesDiv.appendChild(reportLink);
+            choicesDiv.appendChild(supportLink);
+            shareContainer.appendChild(mainBtn);
+            shareContainer.appendChild(choicesDiv);
         }
 
         function hideClear() { clearOverlay.style.display = 'none'; }
