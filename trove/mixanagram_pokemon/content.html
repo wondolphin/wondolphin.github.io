@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポケモンごちゃまぜアナグラム</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <button id="record-button" class="header-button">クリア記録</button>
+    <h1>ポケモンごちゃまぜアナグラム</h1>
+
+    <!-- クリア記録モーダル -->
+    <div id="record-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-button" id="close-record-modal">&times;</span>
+            <h2>クリア記録</h2>
+            <div id="record-list"></div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button id="clear-all-records-button" class="subtle-button">記録全消去</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="list-selector-container">
+        <h3>範囲を選択 (複数可):</h3>
+        <div id="word-list-checkboxes">
+            </div>
+        <div style="text-align: right; margin-top: 10px;">
+            <button id="select-all-button" style="font-size: 0.8em; padding: 2px 8px;">全て選択</button>
+            <button id="deselect-all-button" style="font-size: 0.8em; padding: 2px 8px;">全て解除</button>
+        </div>
+    </div>
+
+
+    <div class="controls">
+        <label for="mix-count">混ぜる数：</label>
+        <select id="mix-count">
+            </select>
+        <button id="start-button">スタート</button>
+    </div>
+
+    <div class="seed-controls">
+        <input type="text" id="seed-input" placeholder="シード値を入力 (任意)">
+        <button id="generate-seed-button">ランダムシード生成</button>
+    </div>
+
+    <div id="share-link-area">
+        </div>
+
+    <div id="timer-area">Time: <span id="time-elapsed">0</span>s</div>
+
+    <div id="game-area">
+        <h2>問題</h2>
+        <div id="problem-area">
+            </div>
+
+        <h2>解答</h2>
+        <div class="answer-section">
+            <input type="text" id="answer-input" placeholder="単語を入力 (ひらがな/カタカナ)">
+            <button id="delete-char-button">1文字削除</button>
+            <button id="submit-button">解答する</button>
+        </div>
+        <button id="give-up-button">ギブアップ（１つ）</button>
+
+        <h2>正解した単語</h2>
+        <div id="correct-answers-area">
+            </div>
+
+        <div id="clear-message-area">
+            </div>
+        
+        <div id="x-share-area" style="text-align: center; margin-top: 15px; display: none;">
+            <button id="x-share-button" class="x-share-button">Xで問題を共有</button>
+        </div>
+    </div>
+
+    <div style="margin-top: 30px; margin-bottom: 20px; font-size: 0.85em; text-align: center;">
+        <a href="../../profile.html" target="_blank" class="footer-link">作者へのコンタクト</a>
+        <span style="margin: 0 10px; color: #ccc;">|</span>
+        <a href="https://example.com/dummy" target="_blank" class="footer-link x-like-link" id="x-like-repost-link" style="display: none;">Xでのいいね・リポスト</a>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
