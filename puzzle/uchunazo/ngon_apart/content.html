@@ -22,6 +22,7 @@
             --win-color: #4ade80;
         }
 
+        /* 根本的なハイライト除去 */
         * {
             -webkit-tap-highlight-color: transparent !important;
             -webkit-focus-ring-color: transparent !important;
@@ -90,7 +91,7 @@
             cursor: pointer;
             transition: none; 
             stroke: var(--border-color);
-            stroke-width: 1.5; /* 常に一定の太さ */
+            stroke-width: 1.5; 
             will-change: fill;
         }
 
@@ -119,6 +120,7 @@
             cursor: pointer;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             touch-action: manipulation;
+            font-size: 0.9rem;
         }
 
         #undo-btn:active { opacity: 0.7; transform: scale(0.98); }
@@ -175,7 +177,7 @@
         }
 
         .share-container {
-            margin: 20px 0;
+            margin: 15px 0;
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -186,22 +188,28 @@
             background-color: #1da1f2;
             color: white;
             text-decoration: none;
-            padding: 14px 20px;
-            border-radius: 14px;
+            padding: 12px 18px;
+            border-radius: 12px;
             font-weight: bold;
-            font-size: 1rem;
+            font-size: 0.85rem; /* 少し小さく調整 */
             cursor: pointer;
+            border: none;
+            text-align: center;
         }
+
+        .share-btn:hover, .choice-link:hover { opacity: 0.85; }
+        .choices-hidden { display: none !important; }
 
         .btn-ok {
             margin-top: 10px;
             background: var(--border-color);
             color: white;
             border: none;
-            padding: 12px 35px;
-            border-radius: 12px;
+            padding: 10px 30px;
+            border-radius: 10px;
             cursor: pointer;
             font-weight: bold;
+            font-size: 0.9rem;
         }
 
         @media (max-width: 480px) {
@@ -236,9 +244,9 @@
 
     <script>
         const SHARE_CONFIG = {
+            // CHOICE モードで選択肢を表示するように設定
             MODE: 'DIRECT', 
-            TEXT: "N-gon アパート をクリアしました！",
-            HASHTAGS: "Ngonアパート,パズルゲーム",
+            TWEET_BODY: "宇宙謎「N-gon アパート」をクリアしました！\n#宇宙謎　#ルール発見型パズル　@wondolphin\nhttps://wondolphin.github.io/puzzle/uchunazo/ngon_apart/index.html",
             SUPPORT_URL: "https://twitter.com/intent/like?tweet_id=XXXXX"
         };
 
@@ -393,7 +401,7 @@
         }
 
         function setupShareUI() {
-            const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(SHARE_CONFIG.TEXT)}&hashtags=${encodeURIComponent(SHARE_CONFIG.HASHTAGS)}&url=${encodeURIComponent(window.location.href)}`;
+            const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(SHARE_CONFIG.TWEET_BODY)}`;
             shareContainer.innerHTML = '';
 
             if (SHARE_CONFIG.MODE === 'DIRECT') {
@@ -404,25 +412,34 @@
                 btn.innerText = '喜びをXで共有する';
                 shareContainer.appendChild(btn);
             } else {
+                // 初期表示ボタン
                 const mainBtn = document.createElement('button');
                 mainBtn.className = 'share-btn';
                 mainBtn.innerText = '喜びをXで共有する';
+                
+                // 選択肢コンテナ
                 const choicesDiv = document.createElement('div');
                 choicesDiv.className = 'share-container choices-hidden';
+                choicesDiv.style.margin = '0'; // 二重マージン防止
+                
                 const reportLink = document.createElement('a');
                 reportLink.className = 'choice-link';
                 reportLink.href = shareUrl;
                 reportLink.target = '_blank';
                 reportLink.innerText = 'クリア報告のポスト';
+                
                 const supportLink = document.createElement('a');
                 supportLink.className = 'choice-link';
                 supportLink.href = SHARE_CONFIG.SUPPORT_URL;
                 supportLink.target = '_blank';
                 supportLink.innerText = '原ポストにいいね・リポスト';
-                mainBtn.onpointerdown = () => {
+                
+                mainBtn.onpointerdown = (e) => {
+                    e.preventDefault();
                     mainBtn.classList.add('choices-hidden');
                     choicesDiv.classList.remove('choices-hidden');
                 };
+
                 choicesDiv.appendChild(reportLink);
                 choicesDiv.appendChild(supportLink);
                 shareContainer.appendChild(mainBtn);
