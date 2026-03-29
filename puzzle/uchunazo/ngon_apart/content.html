@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N-gon アパート</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --text-color: #2c3e50;
+            --empty-color: #ffffff;
+            --selected-color: #cccccc;
+            /* 8色の設定 */
+                        --color-1: #ec48b9; /* ピンク */
+            --color-2: #ff4d4d; /* 赤 */
+                        --color-3: #f9a336; 
+                                   --color-4: #ead328;
+
+            --color-5: #16a34a; 
+            --color-6: #06b6d4; 
+                        --color-7: #3b82f6;
+
+            --color-8: #a855f7; 
+            --border-color: #2c3e50;
+            --win-color: #4ade80;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+            overflow: hidden;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* 盤面とボタンをまとめるラッパー */
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 60vh; /* 盤面の高さに合わせる */
+        }
+
+        h1 {
+            margin: 10px 0;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: var(--border-color);
+            text-transform: uppercase;
+            font-size: 1.8rem;
+        }
+
+        #game-container {
+            position: relative;
+            height: 60vh;
+            width: 60vh;
+            max-width: 90vw;
+            max-height: 90vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.15));
+        }
+
+        .room {
+            cursor: pointer;
+            transition: fill 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            stroke: var(--border-color);
+            stroke-width: 1.2;
+        }
+
+        .room:hover {
+            opacity: 0.85;
+        }
+
+        .wall {
+            stroke: var(--border-color);
+            stroke-width: 1;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        /* Undo Button Layout */
+        .controls {
+            width: 100%;
+            display: flex;
+            justify-content: flex-end;
+            padding: 10px 0;
+            max-width: 90vw;
+        }
+
+        #undo-btn {
+            padding: 10px 20px;
+            background-color: var(--border-color);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+
+        #undo-btn:active { transform: scale(0.95); }
+        #undo-btn:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        /* CLEAR! Message Styling */
+        #clear-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.1); /* 盤面を隠さない程度の遮蔽 */
+        }
+
+        .clear-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            text-align: center;
+            border: 2px solid var(--win-color);
+            max-width: 80%;
+        }
+
+        #clear-message {
+            font-size: 3rem;
+            font-weight: 900;
+            margin-bottom: 20px;
+            background: linear-gradient(to right, #ff4d4d, #ffeb3b, #009688, #2196f3, #e91e63);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: pulseClear 1.2s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulseClear {
+            0% { transform: scale(0.95); }
+            100% { transform: scale(1.05); }
+        }
+
+        /* Share Buttons */
+        .share-container {
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .share-btn, .choice-link {
+            display: block;
+            background-color: #1da1f2; /* X color */
+            color: white;
+            text-decoration: none;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: opacity 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .share-btn:hover, .choice-link:hover { opacity: 0.85; }
+        .choices-hidden { display: none !important; }
+
+        .btn-ok {
+            margin-top: 10px;
+            background: var(--border-color);
+            color: white;
+            border: none;
+            padding: 10px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        @media (max-width: 480px) {
+            #clear-message { font-size: 2.2rem; }
+            h1 { font-size: 1.4rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-wrapper">
+        <h1>N-gon アパート</h1>
+
+        <div id="game-container">
+            <svg id="game-svg" viewBox="0 0 100 100">
+                <defs>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+            </svg>
+            <div id="clear-overlay">
+                <div class="clear-card">
+                    <div id="clear-message">CLEAR!</div>
+                    
+                    <div class="share-container" id="share-container">
+                        <!-- ボタンの構造はJSで制御されます -->
+                    </div>
+
+                    <button class="btn-ok" onclick="hideClear()">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="undo-btn" onclick="undo()" disabled>一手戻る</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 設定項目 ---
+        const SHARE_CONFIG = {
+            // 'DIRECT' : 共有ボタンを押すと即座にXの投稿画面へ
+            // 'CHOICE' : 共有ボタンを押すと「クリア報告」と「いいね・リポスト」の選択肢を表示
+            MODE: 'DIRECT', 
+            TEXT: "N-gon アパート をクリアしました！",
+            HASHTAGS: "Ngonアパート,パズルゲーム",
+            SUPPORT_URL: "https://twitter.com/intent/like?tweet_id=XXXXX" // ここに原ポストのURLやIDを入れる
+        };
+
+        const svg = document.getElementById('game-svg');
+        const clearOverlay = document.getElementById('clear-overlay');
+        const undoBtn = document.getElementById('undo-btn');
+        const shareContainer = document.getElementById('share-container');
+        
+        const centerX = 50, centerY = 50, radius = 46, numRooms = 16;
+        const distanceColors = {
+            1: 'var(--color-1)', 2: 'var(--color-2)', 3: 'var(--color-3)', 4: 'var(--color-4)',
+            5: 'var(--color-5)', 6: 'var(--color-6)', 7: 'var(--color-7)', 8: 'var(--color-8)'
+        };
+
+        let roomsState = [], history = [], selectedRoomIndex = null, isClearedState = false;
+
+        function init() {
+            roomsState = Array.from({ length: numRooms }, (_, i) => ({ id: i, colorId: 0, isSelected: false }));
+            history = [];
+            updateUndoButton();
+            draw();
+        }
+
+        function saveHistory() {
+            history.push(JSON.parse(JSON.stringify(roomsState)));
+            updateUndoButton();
+        }
+
+        function undo() {
+            if (history.length === 0) return;
+            roomsState = history.pop();
+            selectedRoomIndex = null;
+            roomsState.forEach(r => r.isSelected = false);
+            updateUndoButton();
+            draw();
+        }
+
+        function updateUndoButton() {
+            undoBtn.disabled = history.length === 0;
+        }
+
+        function getPoints() {
+            return Array.from({ length: numRooms }, (_, i) => {
+                const angle = (i * 2 * Math.PI / numRooms) - (Math.PI / 2);
+                return { x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) };
+            });
+        }
+
+        function getMidpoints() {
+            const vertices = getPoints();
+            return vertices.map((v, i) => ({
+                x: (v.x + vertices[(i + 1) % numRooms].x) / 2,
+                y: (v.y + vertices[(i + 1) % numRooms].y) / 2
+            }));
+        }
+
+        function draw() {
+            const defs = svg.querySelector('defs');
+            svg.innerHTML = '';
+            svg.appendChild(defs);
+            const vertices = getPoints(), midpoints = getMidpoints();
+
+            for (let i = 0; i < numRooms; i++) {
+                const pathData = `M ${centerX} ${centerY} L ${midpoints[(i + numRooms - 1) % numRooms].x} ${midpoints[(i + numRooms - 1) % numRooms].y} L ${vertices[i].x} ${vertices[i].y} L ${midpoints[i].x} ${midpoints[i].y} Z`;
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', pathData);
+                path.setAttribute('class', 'room');
+                let fill = roomsState[i].isSelected ? 'var(--selected-color)' : (roomsState[i].colorId > 0 ? distanceColors[roomsState[i].colorId] : 'var(--empty-color)');
+                path.setAttribute('fill', fill);
+                if (roomsState[i].colorId > 0) path.setAttribute('filter', 'url(#glow)');
+                path.onclick = (e) => { e.stopPropagation(); handleRoomClick(i); };
+                svg.appendChild(path);
+            }
+
+            midpoints.forEach(m => {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                Object.entries({x1: centerX, y1: centerY, x2: m.x, y2: m.y}).forEach(([k, v]) => line.setAttribute(k, v));
+                line.setAttribute('class', 'wall');
+                svg.appendChild(line);
+            });
+            checkWin();
+        }
+
+        function handleRoomClick(index) {
+            if (selectedRoomIndex !== null) {
+                if (selectedRoomIndex === index) {
+                    roomsState[index].isSelected = false;
+                    selectedRoomIndex = null;
+                } else {
+                    saveHistory();
+                    const first = selectedRoomIndex, second = index;
+                    const diff = Math.abs(first - second);
+                    const dist = Math.min(diff, numRooms - diff);
+                    roomsState[first].isSelected = false;
+                    selectedRoomIndex = null;
+                    const oldCol = roomsState[second].colorId;
+                    if (oldCol > 0) roomsState.forEach(r => { if (r.colorId === oldCol) r.colorId = 0; });
+                    const exists = roomsState.filter(r => r.colorId === dist).length > 0;
+                    if (exists) {
+                        roomsState.forEach(r => { if (r.colorId === dist) r.colorId = 0; });
+                        roomsState[first].colorId = 0; roomsState[second].colorId = 0;
+                    } else {
+                        roomsState[first].colorId = dist; roomsState[second].colorId = dist;
+                    }
+                }
+            } else {
+                if (roomsState[index].colorId > 0) {
+                    saveHistory();
+                    const col = roomsState[index].colorId;
+                    roomsState.forEach(r => { if (r.colorId === col) r.colorId = 0; });
+                } else {
+                    roomsState[index].isSelected = true;
+                    selectedRoomIndex = index;
+                }
+            }
+            draw();
+        }
+
+        function checkWin() {
+            if (roomsState.filter(r => r.colorId > 0).length === numRooms && !isClearedState) {
+                isClearedState = true;
+                setupShareUI();
+                clearOverlay.style.display = 'flex';
+            } else if (roomsState.filter(r => r.colorId > 0).length < numRooms) {
+                isClearedState = false;
+            }
+        }
+
+        function setupShareUI() {
+            const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(SHARE_CONFIG.TEXT)}&hashtags=${encodeURIComponent(SHARE_CONFIG.HASHTAGS)}&url=${encodeURIComponent(window.location.href)}`;
+            shareContainer.innerHTML = '';
+
+            if (SHARE_CONFIG.MODE === 'DIRECT') {
+                const btn = document.createElement('a');
+                btn.className = 'share-btn';
+                btn.href = shareUrl;
+                btn.target = '_blank';
+                btn.innerText = '喜びをXで共有する';
+                shareContainer.appendChild(btn);
+            } else {
+                // Choice Mode
+                const mainBtn = document.createElement('button');
+                mainBtn.className = 'share-btn';
+                mainBtn.innerText = '喜びをXで共有する';
+                
+                const choicesDiv = document.createElement('div');
+                choicesDiv.className = 'share-container choices-hidden';
+                
+                const reportLink = document.createElement('a');
+                reportLink.className = 'choice-link';
+                reportLink.href = shareUrl;
+                reportLink.target = '_blank';
+                reportLink.innerText = 'クリア報告のポスト';
+                
+                const supportLink = document.createElement('a');
+                supportLink.className = 'choice-link';
+                supportLink.href = SHARE_CONFIG.SUPPORT_URL;
+                supportLink.target = '_blank';
+                supportLink.innerText = '原ポストにいいね・リポスト';
+                
+                mainBtn.onclick = () => {
+                    mainBtn.classList.add('choices-hidden');
+                    choicesDiv.classList.remove('choices-hidden');
+                };
+
+                choicesDiv.appendChild(reportLink);
+                choicesDiv.appendChild(supportLink);
+                shareContainer.appendChild(mainBtn);
+                shareContainer.appendChild(choicesDiv);
+            }
+        }
+
+        function hideClear() { clearOverlay.style.display = 'none'; }
+
+        init();
+    </script>
+</body>
+</html>
