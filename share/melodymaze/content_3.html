@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Melody Maze - 音楽パズル</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #818cf8;
+            --accent: #f472b6;
+            --bg-grad-start: #0f172a;
+            --bg-grad-end: #1e293b;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at top left, var(--bg-grad-start), var(--bg-grad-end));
+            color: #e2e8f0;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .grid-wrapper {
+            position: relative;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: inline-block;
+        }
+
+        .grid-container {
+            display: grid;
+            gap: 8px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .route-layer {
+            position: absolute;
+            top: 16px; left: 16px; right: 16px; bottom: 16px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .cell {
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            position: relative;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            color: #94a3b8;
+        }
+
+        .note-label {
+            font-size: 1.25rem;
+            color: white;
+            z-index: 20;
+        }
+
+        .cell:hover:not(.no-cell) {
+            border-color: var(--primary-light);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .cell.filled {
+            background: rgba(99, 102, 241, 0.3);
+            border-color: #818cf8;
+            box-shadow: inset 0 0 10px rgba(99, 102, 241, 0.2);
+        }
+
+        .cell.chord-check {
+            border-color: rgba(244, 114, 182, 0.6);
+            background: rgba(244, 114, 182, 0.1);
+            box-shadow: inset 0 0 10px rgba(244, 114, 182, 0.2);
+        }
+        
+        .cell.chord-check::after {
+            content: '';
+            position: absolute;
+            top: 4px; right: 4px;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #f472b6;
+            box-shadow: 0 0 5px #f472b6;
+        }
+
+        .cell.no-cell {
+            border: none !important;
+            background: transparent !important;
+            cursor: default;
+            color: transparent !important;
+            pointer-events: none;
+        }
+
+        /* 再生時のハイライト */
+        .cell.playing {
+            transform: scale(1.1);
+            z-index: 30;
+            border-color: #fff !important;
+            background: #fff !important;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+
+        .cell.playing .note-label {
+            color: #0f172a;
+        }
+
+        /* OK / NG ハイライト */
+        .cell.ok {
+            background: #22c55e !important;
+            border-color: #4ade80 !important;
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.6);
+            transform: scale(1.1);
+            z-index: 30;
+        }
+
+        .cell.ok .note-label {
+            color: white;
+        }
+
+        .cell.ng {
+            background: #ef4444 !important;
+            border-color: #f87171 !important;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+            transform: scale(1.1);
+            z-index: 30;
+            animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+        }
+
+        .cell.ng .note-label {
+            color: white;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* ブロックパレット */
+        .palette-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 16px;
+        }
+
+        .block-item {
+            display: grid;
+            gap: 4px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .block-item.selected {
+            border-color: #f472b6;
+            box-shadow: 0 0 15px rgba(244, 114, 182, 0.4);
+            transform: translateY(-4px);
+        }
+
+        .block-item.used {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .block-item:hover:not(.used):not(.selected) {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .block-cell {
+            width: 40px;
+            height: 40px;
+            background: rgba(99, 102, 241, 0.8);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .block-cell.empty {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+        }
+
+        /* タイムライン（伴奏） */
+        .timeline-container {
+            display: flex;
+            gap: 4px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            overflow-x: auto;
+            position: relative;
+            scrollbar-width: thin;
+        }
+
+        .timeline-slot {
+            min-width: 40px;
+            height: 50px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #64748b;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.1s;
+        }
+
+        .timeline-slot.active-slot {
+            background: rgba(244, 114, 182, 0.2);
+            border-color: #f472b6;
+            color: white;
+            box-shadow: 0 0 10px rgba(244, 114, 182, 0.3);
+        }
+
+        /* UIパーツ */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5, #4338ca);
+            color: white;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #4338ca, #3730a3);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.4);
+        }
+
+        .stage-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .stage-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: scale(1.02);
+        }
+
+        .screen {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .screen.active {
+            display: flex;
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- タイトル/ステージ選択画面 -->
+    <div id="start-screen" class="screen active flex-col items-center w-full max-w-4xl">
+        <h1 class="text-6xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">
+            Melody Maze</h1>
+        <p class="text-slate-400 mb-12 text-xl">音のかたまりを繋いで、メロディを奏でよう</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full px-4">
+            <div id="stage-list" class="col-span-full grid grid-cols-1 md:grid-cols-3 gap-6 w-full"></div>
+        </div>
+    </div>
+
+    <!-- ゲームプレイ画面 -->
+    <div id="game-screen" class="screen flex-col items-center w-full max-w-3xl space-y-4">
+        <header class="w-full flex justify-between items-center glass-panel p-4">
+            <div>
+                <h2 id="level-title" class="text-xl font-bold text-white">Level 1</h2>
+                <p class="text-xs text-slate-400">下のかたまりを配置しよう。ルートに沿って常に音が流れます。</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <button id="back-btn" class="text-sm text-slate-400 hover:text-white transition-colors">Exit</button>
+            </div>
+        </header>
+
+        <!-- タイムライン表示エリア -->
+        <div class="w-full glass-panel p-3">
+            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Accompaniment</div>
+            <div id="timeline" class="timeline-container"></div>
+        </div>
+
+        <div class="relative group mt-2">
+            <div
+                class="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000">
+            </div>
+            <!-- 盤面グリッド -->
+            <div class="grid-wrapper">
+                <svg id="route-svg" class="route-layer"></svg>
+                <div id="grid" class="grid-container"></div>
+            </div>
+        </div>
+        
+        <div id="status-message" class="text-lg font-medium text-pink-400 h-6 text-center"></div>
+
+        <!-- かたまりパレット -->
+        <div class="w-full glass-panel p-4">
+            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Blocks</div>
+            <div id="palette" class="palette-container"></div>
+            
+            <div class="flex justify-between items-center pt-4 mt-4 border-t border-slate-700/50">
+                <button id="reset-btn" class="text-xs px-3 py-1 rounded border border-slate-600 hover:bg-slate-700 text-slate-400 transition-colors">全て戻す</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- クリアモーダル -->
+    <div id="result-modal"
+        class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-panel p-8 text-center max-w-sm w-full mx-4 transform scale-90 transition-transform duration-300"
+            id="result-content">
+            <h3 class="text-3xl font-bold text-white mb-2">Perfect Harmony!</h3>
+            <p class="text-slate-300 mb-8">すべての条件をクリアしました！</p>
+            <div class="space-y-3">
+                <button id="next-level-btn"
+                    class="btn-primary w-full py-3">Select Level</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Level Data ---
+        const LEVELS = [
+            {
+                id: 1,
+                title: "Ex.1 パズルの基本",
+                desc: "1拍ごとに進む光。4の倍数で鳴る伴奏に合わせよう。",
+                difficulty: "Easy",
+                // 13ステップ。4の倍数のみ和音を鳴らす
+                accompaniment: ["C,E,G", ".", ".", ".", "F,A,C5", ".", ".", ".", "G,B,D5", ".",".", ".", "C,E,G"],
+                grid: [
+                    "7,8,9q,10",
+                    "6,1q,2,11",
+                    "5q,4,3,12",
+                    "x,x,x,13q"
+                ],
+                blocks: [
+                    [["G", "G"],
+                     ["A", "G"]],
+                    [["F", "G"],
+                     ["E", "B"]],
+                    [["F", "A", "B", "A"]],
+                    [["C4"]]
+                ]
+            },
+            {
+                id: 2,
+                title: "Ex.2 和音の響き",
+                desc: "ルートに沿ってブロックを配置しよう",
+                difficulty: "Medium",
+                // 9ステップ。伴奏は適当に配置（ここでは一部のみ）。
+                accompaniment: [".", "C,E,G", ".", ".", "G,B,D", ".", ".", "F,A,C", "C,E,G"],
+                grid: [
+                    "x,x,1q",
+                    "x,2,3",
+                    "4q,5,x",
+                    "x,6,7",
+                    "8,9q,x"
+                ],
+                blocks: [
+                    [["C", "D"],
+                     ["E", "x"]],
+                    [["F", "G", "A"]],
+                    [["B"],
+                     ["C5"]]
+                ]
+            }
+        ];
+
+        // --- Audio System ---
+        const AudioSys = {
+            ctx: null,
+            init: function () {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+
+            freqs: {
+                'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13, 'E': 329.63,
+                'F': 349.23, 'F#': 369.99, 'G': 392.00, 'G#': 415.30, 'A': 440.00,
+                'A#': 466.16, 'B': 493.88
+            },
+
+            getFreq: function (noteStr) {
+                if (!noteStr || ['S', '.', 'x', ''].includes(noteStr)) return null;
+                const match = noteStr.match(/([A-G]#?)/);
+                if (!match) return null;
+                const note = match[1];
+
+                let octave = 4;
+                if (noteStr.includes('5')) octave = 5;
+                if (noteStr.includes('3')) octave = 3;
+
+                return this.freqs[note] * Math.pow(2, octave - 4);
+            },
+
+            playTone: function (freq, type = 'sine', duration = 0.5, volume = 0.2, startTime = 0) {
+                if (!freq || !this.ctx) return;
+                const t = startTime || this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, t);
+
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(volume, t + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(t);
+                osc.stop(t + duration);
+            },
+
+            playChord: function (chordStr) {
+                if (!chordStr || chordStr === '.' || chordStr === 'x') return;
+                const notes = chordStr.match(/[A-G]#?5?/g);
+                if (notes) {
+                    notes.forEach(n => this.playTone(this.getFreq(n), 'triangle', 1.0, 0.08));
+                }
+            }
+        };
+
+        // --- Game State ---
+        let currentLevel = null;
+        let gridSteps = []; 
+        let gridPlaced = []; 
+        let usedBlocks = []; 
+        let selectedBlockIdx = null;
+        let isCleared = false;
+        let maxStepNumber = 0;
+        let stepPositions = [];
+
+        // Looping Background
+        let loopTimer = null;
+        let currentPlayingStep = 0; // 1 to maxStepNumber
+        const TEMPO_MS = 600;
+
+        // --- DOM Elements ---
+        const els = {
+            screens: {
+                start: document.getElementById('start-screen'),
+                game: document.getElementById('game-screen')
+            },
+            stageList: document.getElementById('stage-list'),
+            grid: document.getElementById('grid'),
+            svg: document.getElementById('route-svg'),
+            timeline: document.getElementById('timeline'),
+            palette: document.getElementById('palette'),
+            status: document.getElementById('status-message'),
+            levelTitle: document.getElementById('level-title'),
+            modal: {
+                self: document.getElementById('result-modal'),
+                content: document.getElementById('result-content'),
+                next: document.getElementById('next-level-btn')
+            },
+            resetBtn: document.getElementById('reset-btn'),
+            backBtn: document.getElementById('back-btn')
+        };
+
+        // --- Core Functions ---
+
+        function init() {
+            renderStageList();
+            setupEvents();
+        }
+
+        function renderStageList() {
+            els.stageList.innerHTML = LEVELS.map(lvl => `
+                <div class="stage-card" onclick="startGame(${lvl.id})">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-bold text-indigo-400 bg-indigo-400/10 px-2 py-1 rounded">${lvl.difficulty}</span>
+                        <span class="text-xs text-slate-500">Ex.${lvl.id}</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-1">${lvl.title.replace(/^Ex\.\d+\s/, '')}</h3>
+                    <p class="text-sm text-slate-400 mb-4">${lvl.desc}</p>
+                </div>
+            `).join('');
+        }
+
+        function startGame(levelId) {
+            currentLevel = LEVELS.find(l => l.id === levelId);
+            if (!currentLevel) return;
+
+            stopLoop();
+
+            gridSteps = currentLevel.grid.map(row => row.split(','));
+            maxStepNumber = 0;
+            gridPlaced = [];
+            stepPositions = [];
+
+            for (let r = 0; r < gridSteps.length; r++) {
+                gridPlaced[r] = [];
+                for (let c = 0; c < gridSteps[r].length; c++) {
+                    gridPlaced[r][c] = null;
+                    const v = gridSteps[r][c];
+                    if (v !== 'x') {
+                        const num = parseInt(v.replace('q', ''));
+                        if (num > maxStepNumber) maxStepNumber = num;
+                    }
+                }
+            }
+
+            for (let i = 1; i <= maxStepNumber; i++) {
+                for (let r = 0; r < gridSteps.length; r++) {
+                    for (let c = 0; c < gridSteps[r].length; c++) {
+                        if (gridSteps[r][c] !== 'x') {
+                            const num = parseInt(gridSteps[r][c].replace('q', ''));
+                            if (num === i) {
+                                stepPositions.push({ step: i, r, c });
+                            }
+                        }
+                    }
+                }
+            }
+
+            usedBlocks = new Array(currentLevel.blocks.length).fill(false);
+            selectedBlockIdx = null;
+            isCleared = false;
+            currentPlayingStep = 0;
+            setStatus("");
+
+            els.screens.start.classList.remove('active');
+            setTimeout(() => {
+                els.screens.start.style.display = 'none';
+                els.screens.game.style.display = 'flex';
+                void els.screens.game.offsetWidth;
+                els.screens.game.classList.add('active');
+                
+                renderGrid();
+                renderPalette();
+                renderTimeline();
+                drawRoute();
+
+                startLoop();
+            }, 400);
+
+            els.levelTitle.innerText = currentLevel.title;
+            AudioSys.init();
+        }
+
+        function returnToMenu() {
+            stopLoop();
+            els.screens.game.classList.remove('active');
+            els.modal.self.classList.add('hidden');
+            setTimeout(() => {
+                els.screens.game.style.display = 'none';
+                els.screens.start.style.display = 'flex';
+                void els.screens.start.offsetWidth;
+                els.screens.start.classList.add('active');
+            }, 400);
+        }
+
+        function setStatus(msg) {
+            els.status.innerText = msg;
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // --- Render ---
+
+        function renderGrid() {
+            els.grid.innerHTML = '';
+            els.grid.style.gridTemplateColumns = `repeat(${gridSteps[0].length}, 64px)`;
+
+            gridSteps.forEach((row, r) => {
+                row.forEach((cellStr, c) => {
+                    const div = document.createElement('div');
+                    div.className = 'cell';
+                    div.dataset.r = r;
+                    div.dataset.c = c;
+
+                    if (cellStr === 'x') {
+                        div.classList.add('no-cell');
+                    } else {
+                        const isChordCheck = cellStr.includes('q');
+                        if (isChordCheck) div.classList.add('chord-check');
+                        
+                        const noteSpan = document.createElement('span');
+                        noteSpan.className = 'note-label';
+                        noteSpan.id = `note-${r}-${c}`;
+                        if (gridPlaced[r][c]) {
+                            noteSpan.innerText = gridPlaced[r][c].note;
+                            div.classList.add('filled');
+                        }
+
+                        div.appendChild(noteSpan);
+                        div.onclick = () => handleGridClick(r, c);
+                    }
+                    els.grid.appendChild(div);
+                });
+            });
+        }
+
+        function drawRoute() {
+            els.svg.innerHTML = '';
+            const cellSize = 64;
+            const gap = 8;
+            
+            let pts = stepPositions.map(pos => {
+                const x = pos.c * (cellSize + gap) + (cellSize / 2);
+                const y = pos.r * (cellSize + gap) + (cellSize / 2);
+                return `${x},${y}`;
+            }).join(' ');
+
+            const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+            polyline.setAttribute("points", pts);
+            polyline.setAttribute("fill", "none");
+            polyline.setAttribute("stroke", "rgba(255, 255, 255, 0.2)");
+            polyline.setAttribute("stroke-width", "4");
+            polyline.setAttribute("stroke-linejoin", "round");
+            polyline.setAttribute("stroke-linecap", "round");
+
+            els.svg.appendChild(polyline);
+        }
+
+        function renderTimeline() {
+            els.timeline.innerHTML = '';
+            currentLevel.accompaniment.forEach((chord, i) => {
+                const slot = document.createElement('div');
+                slot.className = 'timeline-slot';
+                slot.id = `timeline-slot-${i + 1}`;
+                slot.innerHTML = `
+                    <span class="font-bold ${chord !== '.' ? 'text-indigo-300 text-xs' : 'text-slate-600'}">${chord === '.' ? '•' : chord}</span>
+                `;
+                els.timeline.appendChild(slot);
+            });
+        }
+
+        function renderPalette() {
+            els.palette.innerHTML = '';
+            
+            currentLevel.blocks.forEach((block, idx) => {
+                const bDiv = document.createElement('div');
+                bDiv.className = 'block-item';
+                if (usedBlocks[idx]) bDiv.classList.add('used');
+                if (selectedBlockIdx === idx) bDiv.classList.add('selected');
+                
+                bDiv.style.gridTemplateColumns = `repeat(${block[0].length}, 40px)`;
+                
+                block.forEach(row => {
+                    row.forEach(note => {
+                        const cDiv = document.createElement('div');
+                        cDiv.className = 'block-cell';
+                        if(note === 'x') {
+                            cDiv.classList.add('empty');
+                        } else {
+                            cDiv.innerText = note;
+                        }
+                        bDiv.appendChild(cDiv);
+                    });
+                });
+
+                bDiv.onclick = () => handlePaletteClick(idx);
+                els.palette.appendChild(bDiv);
+            });
+        }
+
+        // --- Interaction ---
+
+        function handlePaletteClick(idx) {
+            if (isCleared || usedBlocks[idx]) return;
+            
+            AudioSys.init(); 
+            
+            if (selectedBlockIdx === idx) {
+                selectedBlockIdx = null; 
+            } else {
+                selectedBlockIdx = idx;
+            }
+            renderPalette();
+            setStatus("");
+        }
+
+        function handleGridClick(r, c) {
+            if (isCleared) return;
+
+            if (gridPlaced[r][c]) {
+                const bIdx = gridPlaced[r][c].blockIdx;
+                removeBlockFromGrid(bIdx);
+                selectedBlockIdx = bIdx; 
+                renderGrid();
+                renderPalette();
+                setStatus("");
+                return;
+            }
+
+            if (selectedBlockIdx === null) return;
+
+            const block = currentLevel.blocks[selectedBlockIdx];
+            if (canPlaceBlock(block, r, c)) {
+                placeBlock(selectedBlockIdx, block, r, c);
+                selectedBlockIdx = null;
+                renderGrid();
+                renderPalette();
+                checkClearCondition();
+            } else {
+                setStatus("そこには配置できません");
+                setTimeout(()=> setStatus(""), 2000);
+            }
+        }
+
+        function canPlaceBlock(block, startR, startC) {
+            for (let br = 0; br < block.length; br++) {
+                for (let bc = 0; bc < block[br].length; bc++) {
+                    const note = block[br][bc];
+                    if (note === 'x') continue;
+
+                    const targetR = startR + br;
+                    const targetC = startC + bc;
+
+                    if (targetR < 0 || targetR >= gridSteps.length || 
+                        targetC < 0 || targetC >= gridSteps[0].length) {
+                        return false;
+                    }
+
+                    if (gridSteps[targetR][targetC] === 'x') {
+                        return false;
+                    }
+
+                    if (gridPlaced[targetR][targetC] !== null) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function placeBlock(idx, block, startR, startC) {
+            for (let br = 0; br < block.length; br++) {
+                for (let bc = 0; bc < block[br].length; bc++) {
+                    const note = block[br][bc];
+                    if (note !== 'x') {
+                        const targetR = startR + br;
+                        const targetC = startC + bc;
+                        gridPlaced[targetR][targetC] = {
+                            blockIdx: idx,
+                            note: note
+                        };
+                    }
+                }
+            }
+            usedBlocks[idx] = true;
+        }
+
+        function removeBlockFromGrid(bIdx) {
+            for (let r = 0; r < gridSteps.length; r++) {
+                for (let c = 0; c < gridSteps[r].length; c++) {
+                    if (gridPlaced[r][c] && gridPlaced[r][c].blockIdx === bIdx) {
+                        gridPlaced[r][c] = null;
+                    }
+                }
+            }
+            usedBlocks[bIdx] = false;
+        }
+
+        function resetAllBlocks() {
+            if (isCleared) return;
+            for (let r = 0; r < gridSteps.length; r++) {
+                for (let c = 0; c < gridSteps[r].length; c++) {
+                    gridPlaced[r][c] = null;
+                }
+            }
+            usedBlocks.fill(false);
+            selectedBlockIdx = null;
+            setStatus("リセットしました");
+            renderGrid();
+            renderPalette();
+        }
+
+        // --- Loop Playback ---
+        
+        function startLoop() {
+            if (loopTimer) clearTimeout(loopTimer);
+            currentPlayingStep = 0;
+            loopTimer = setTimeout(playLoopStep, TEMPO_MS);
+        }
+
+        function stopLoop() {
+            if (loopTimer) {
+                clearTimeout(loopTimer);
+                loopTimer = null;
+            }
+            document.querySelectorAll('.cell.playing, .cell.ok, .cell.ng').forEach(el => {
+                el.classList.remove('playing', 'ok', 'ng');
+            });
+            document.querySelectorAll('.timeline-slot.active-slot').forEach(el => el.classList.remove('active-slot'));
+        }
+
+        function playLoopStep() {
+            // Unhighlight previous
+            document.querySelectorAll('.cell.playing, .cell.ok, .cell.ng').forEach(el => {
+                el.classList.remove('playing', 'ok', 'ng');
+            });
+            document.querySelectorAll('.timeline-slot.active-slot').forEach(el => el.classList.remove('active-slot'));
+
+            currentPlayingStep++;
+            if (currentPlayingStep > maxStepNumber) {
+                currentPlayingStep = 1;
+            }
+
+            // Highlight and play
+            const pos = stepPositions.find(p => p.step === currentPlayingStep);
+            const accStr = currentLevel.accompaniment[currentPlayingStep - 1] || ".";
+            
+            if (accStr !== '.') {
+                AudioSys.playChord(accStr);
+            }
+            
+            const slot = document.getElementById(`timeline-slot-${currentPlayingStep}`);
+            if (slot) slot.classList.add('active-slot');
+
+            if (pos) {
+                const cell = getCellElement(pos.r, pos.c);
+                const stepStr = gridSteps[pos.r][pos.c];
+                const isChordCheck = stepStr.includes('q');
+                
+                if (cell) {
+                    if (isChordCheck && gridPlaced[pos.r][pos.c]) {
+                        const noteStr = gridPlaced[pos.r][pos.c].note;
+                        let isOk = false;
+                        if (accStr !== '.') {
+                            const noteBase = noteStr.match(/([A-G]#?)/)[1];
+                            if (accStr.includes(noteBase)) {
+                                isOk = true;
+                            }
+                        }
+                        if (isOk) {
+                            cell.classList.add('ok');
+                        } else {
+                            cell.classList.add('ng');
+                        }
+                    } else {
+                        cell.classList.add('playing');
+                    }
+                }
+
+                if (gridPlaced[pos.r][pos.c]) {
+                    const noteStr = gridPlaced[pos.r][pos.c].note;
+                    const freq = AudioSys.getFreq(noteStr);
+                    if (freq) AudioSys.playTone(freq, 'sine', 0.6, 0.2);
+                }
+            }
+
+            // Continue loop if not stopped by clear condition
+            if (loopTimer !== null) {
+                if (currentPlayingStep === maxStepNumber) {
+                    loopTimer = setTimeout(() => {
+                        if(loopTimer === null) return; // check again if stopped
+                        document.querySelectorAll('.cell.playing, .cell.ok, .cell.ng').forEach(el => {
+                            el.classList.remove('playing', 'ok', 'ng');
+                        });
+                        document.querySelectorAll('.timeline-slot.active-slot').forEach(el => el.classList.remove('active-slot'));
+                        
+                        loopTimer = setTimeout(playLoopStep, 1500); 
+                    }, TEMPO_MS);
+                } else {
+                    loopTimer = setTimeout(playLoopStep, TEMPO_MS);
+                }
+            }
+        }
+
+        function getCellElement(r, c) {
+            return document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+        }
+
+        // --- Validation ---
+
+        function checkClearCondition() {
+            let isFull = true;
+            for (let r = 0; r < gridSteps.length; r++) {
+                for (let c = 0; c < gridSteps[r].length; c++) {
+                    if (gridSteps[r][c] !== 'x' && !gridPlaced[r][c]) {
+                        isFull = false;
+                        break;
+                    }
+                }
+            }
+
+            if (!isFull) return;
+
+            let allOk = true;
+            for (let r = 0; r < gridSteps.length; r++) {
+                for (let c = 0; c < gridSteps[r].length; c++) {
+                    const str = gridSteps[r][c];
+                    if (str.includes('q')) {
+                        const stepNum = parseInt(str.replace('q',''), 10);
+                        const note = gridPlaced[r][c].note;
+                        const accStr = currentLevel.accompaniment[stepNum - 1] || ".";
+                        
+                        if (accStr !== '.') {
+                            const noteBase = note.match(/([A-G]#?)/)[1];
+                            if (!accStr.includes(noteBase)) {
+                                allOk = false;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (allOk) {
+                isCleared = true; // Lock interactions
+                setStatus("条件クリア！ 再生中...");
+                selectedBlockIdx = null;
+                renderPalette();
+                
+                stopLoop(); // Stop background loop
+                playClearPerformance(); // Start linear playback
+            } else {
+                setStatus("和音がどこか合っていないようです...");
+            }
+        }
+
+        async function playClearPerformance() {
+            await wait(1000); // Wait a bit before starting playback
+
+            for (let i = 1; i <= maxStepNumber; i++) {
+                // Clear previous
+                document.querySelectorAll('.cell.playing, .cell.ok, .cell.ng').forEach(el => {
+                    el.classList.remove('playing', 'ok', 'ng');
+                });
+                document.querySelectorAll('.timeline-slot.active-slot').forEach(el => el.classList.remove('active-slot'));
+
+                const pos = stepPositions.find(p => p.step === i);
+                const accStr = currentLevel.accompaniment[i - 1] || ".";
+                
+                if (accStr !== '.') {
+                    AudioSys.playChord(accStr);
+                }
+                
+                const slot = document.getElementById(`timeline-slot-${i}`);
+                if (slot) slot.classList.add('active-slot');
+
+                if (pos) {
+                    const cell = getCellElement(pos.r, pos.c);
+                    const stepStr = gridSteps[pos.r][pos.c];
+                    const isChordCheck = stepStr.includes('q');
+                    
+                    if (cell) {
+                        if (isChordCheck) {
+                            cell.classList.add('ok'); // Always OK since it's cleared
+                        } else {
+                            cell.classList.add('playing');
+                        }
+                    }
+
+                    if (gridPlaced[pos.r][pos.c]) {
+                        const noteStr = gridPlaced[pos.r][pos.c].note;
+                        const freq = AudioSys.getFreq(noteStr);
+                        if (freq) AudioSys.playTone(freq, 'sine', 0.6, 0.2);
+                    }
+                }
+
+                await wait(TEMPO_MS);
+            }
+
+            // Unhighlight all
+            document.querySelectorAll('.cell.playing, .cell.ok, .cell.ng').forEach(el => {
+                el.classList.remove('playing', 'ok', 'ng');
+            });
+            document.querySelectorAll('.timeline-slot.active-slot').forEach(el => el.classList.remove('active-slot'));
+
+            // Show result modal
+            showClearModal();
+        }
+
+        function showClearModal() {
+            els.modal.self.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                els.modal.self.classList.remove('opacity-0');
+                els.modal.content.classList.remove('scale-90');
+            });
+        }
+
+        // --- Event Listeners ---
+        function setupEvents() {
+            els.backBtn.onclick = returnToMenu;
+            els.resetBtn.onclick = resetAllBlocks;
+            els.modal.next.onclick = returnToMenu;
+            
+            document.body.addEventListener('mousedown', () => AudioSys.init(), { once: true });
+        }
+
+        // --- Boot ---
+        window.onload = init;
+
+    </script>
+</body>
+
+</html>
