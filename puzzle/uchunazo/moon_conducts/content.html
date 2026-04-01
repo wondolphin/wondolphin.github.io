@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>月は導く</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
+
+        body {
+            background: radial-gradient(circle at center, #2e1065 0%, #1e1b4b 100%);
+            color: #f1f5f9;
+            font-family: 'Noto Sans JP', sans-serif;
+            overflow: hidden;
+            user-select: none;
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        .game-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 1.5vh 1rem;
+            box-sizing: border-box;
+            gap: 2vh;
+        }
+
+        .title-text {
+            font-weight: 900;
+            letter-spacing: 0.1em;
+            text-shadow: 0 0 30px rgba(251, 191, 36, 0.3);
+            line-height: 1.2;
+            font-size: clamp(2rem, 7vh, 3.5rem);
+            color: #ffffff;
+            margin: 0;
+        }
+
+        /* メーターエリア: ランプを端に設置 */
+        .meter-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: min(90vw, 55vh);
+        }
+
+        .meter-container {
+            flex: 1;
+            height: 12px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(74, 222, 128, 0.2);
+        }
+
+        .meter-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #166534 0%, #4ade80 100%);
+            transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 0 15px rgba(74, 222, 128, 0.4);
+        }
+
+        /* メーター専用ランプ */
+        .meter-lamp-base {
+            width: 24px;
+            height: 24px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .meter-lamp-core {
+            width: 12px;
+            height: 12px;
+            background-color: #334155;
+            border-radius: 50%;
+            transition: all 0.5s ease;
+        }
+
+        .meter-lamp-core.active {
+            background-color: #4ade80;
+            box-shadow: 0 0 15px #4ade80;
+            transform: scale(1.1);
+        }
+
+        /* 盤面エリア */
+        .stage-area {
+            position: relative;
+            width: min(90vw, 60vh);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ランプドック */
+        .lamp-dock {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 1.5%;
+            padding: 0 3%;
+            height: 40px;
+            margin-bottom: -20px;
+            position: relative;
+            z-index: 30;
+            width: 100%;
+        }
+
+        .lamp-spot {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .lamp-base {
+            background: #1e1b4b;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            width: 8vmin;
+            height: 8vmin;
+            max-width: 44px;
+            max-height: 44px;
+        }
+
+        .target-base {
+            border: 2px dashed #fbbf24;
+        }
+
+        .lamp-core {
+            border-radius: 50%;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 50%;
+            height: 50%;
+        }
+
+        .source-core {
+            background-color: #fbbf24;
+            box-shadow: 0 0 15px #fbbf24, 0 0 30px #f59e0b;
+            animation: pulse-glow 2.5s infinite ease-in-out;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 15px #fbbf24, 0 0 30px #f59e0b; }
+            50% { transform: scale(1.2); box-shadow: 0 0 25px #fbbf24, 0 0 60px #f59e0b; }
+        }
+
+        .target-core {
+            background-color: #334155;
+        }
+
+        .target-core.active {
+            background-color: #fbbf24;
+            box-shadow: 0 0 30px 10px #fbbf24;
+            transform: scale(1.15);
+        }
+
+        /* 盤面コンテナ */
+        .board-container {
+            background: rgba(30, 27, 75, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6);
+            position: relative;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+            width: 100%;
+        }
+
+        .tile-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            gap: 1.5%;
+            padding: 3%;
+            border-radius: 20px;
+            position: relative;
+        }
+
+        .tile {
+            aspect-ratio: 1 / 1;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 15%;
+            z-index: 5;
+            overflow: hidden;
+        }
+
+        .tile-empty {
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tile-panel {
+            background: rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tile-selected {
+            box-shadow: 0 0 0 4px #fbbf24;
+            background: rgba(251, 191, 36, 0.1);
+            transform: scale(1.05);
+            z-index: 20;
+        }
+
+        .tile-fixed {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: not-allowed;
+        }
+
+        .tile-cleared {
+            background-color: rgba(74, 222, 128, 0.4) !important;
+            box-shadow: inset 0 0 15px rgba(74, 222, 128, 0.6) !important;
+            border-color: #4ade80 !important;
+        }
+
+        .panel-image {
+            width: 90%;
+            height: 90%;
+            object-fit: contain;
+            filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
+        }
+
+        .global-path-svg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 25;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+        }
+
+        .global-path-svg.visible {
+            opacity: 1;
+        }
+
+        .beam-line {
+            stroke: #fbbf24;
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            filter: drop-shadow(0 0 12px #f59e0b);
+        }
+
+        /* クリア画面 */
+        #clear-modal {
+            background-color: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .modal-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-wrapper">
+        <h1 class="title-text">月は導く</h1>
+
+        <!-- メーター + ランプ -->
+        <div class="meter-area">
+            <div class="meter-container">
+                <div id="meter-bar" class="meter-bar" style="width: 0%"></div>
+            </div>
+            <div class="meter-lamp-base">
+                <div id="meter-lamp-core" class="meter-lamp-core"></div>
+            </div>
+        </div>
+
+        <div class="stage-area">
+            <div class="lamp-dock">
+                <div class="col-start-2 lamp-spot">
+                    <div id="source-lamp" class="lamp-base">
+                        <div class="source-core lamp-core"></div>
+                    </div>
+                </div>
+                <div class="col-start-4 lamp-spot">
+                    <div id="target-lamp-container" class="lamp-base target-base">
+                        <div id="target-lamp" class="target-core lamp-core"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="board-container">
+                <div id="board-root" class="relative w-full">
+                    <div id="board" class="tile-grid"></div>
+                    <svg id="path-overlay" class="global-path-svg">
+                        <polyline id="path-line" class="beam-line" points="" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- クリア画面 -->
+    <div id="clear-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6" onclick="closeModal()">
+        <div class="modal-content space-y-8 sm:space-y-12 pointer-events-none">
+            <h2 class="text-6xl sm:text-8xl font-black text-amber-400 animate-bounce tracking-tighter drop-shadow-2xl">CLEAR!</h2>
+            <button id="share-btn" class="pointer-events-auto bg-green-500 hover:bg-green-400 text-indigo-950 font-black py-4 px-10 sm:py-5 sm:px-14 rounded-2xl shadow-2xl transition transform hover:scale-105 active:scale-95 flex items-center justify-center">
+                <span class="text-xl sm:text-2xl whitespace-nowrap font-bold">Xで喜びを共有する</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const GRID_SIZE = 6;
+        const boardElement = document.getElementById('board');
+        const meterBar = document.getElementById('meter-bar');
+        const meterLampCore = document.getElementById('meter-lamp-core');
+        const targetLamp = document.getElementById('target-lamp');
+        const clearModal = document.getElementById('clear-modal');
+        const pathOverlay = document.getElementById('path-overlay');
+        const pathLine = document.getElementById('path-line');
+        const boardRoot = document.getElementById('board-root');
+
+        let boardState = [];
+        let selected = null;
+        let isLocked = false;
+        let showClearVisuals = false;
+
+        function initGame() {
+            for (let r = 0; r < GRID_SIZE; r++) {
+                boardState[r] = [];
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    boardState[r][c] = null;
+                }
+            }
+            // 指定の初期配置
+            boardState[1][0] = { type: 1, fixed: false };
+            boardState[1][1] = { type: 1, fixed: false };
+            boardState[3][4] = { type: 4, fixed: false };
+            boardState[3][5] = { type: 4, fixed: false };
+            boardState[1][4] = { type: 3, fixed: false };
+            boardState[1][5] = { type: 3, fixed: false };
+            boardState[3][0] = { type: 2, fixed: false };
+            boardState[3][1] = { type: 2, fixed: false };
+            boardState[5][2] = { type: 2, fixed: true };
+            boardState[5][3] = { type: 1, fixed: true };
+            render();
+        }
+
+        function getRotation(type) {
+            if (type === 1) return 0;
+            if (type === 2) return -90;
+            if (type === 3) return 180;
+            if (type === 4) return 90;
+            return 0;
+        }
+
+        function render() {
+            boardElement.innerHTML = '';
+            const { pathData, reachedTarget, uniqueCount } = calculatePath();
+            const isPerfect = (reachedTarget && uniqueCount === 36);
+            
+            if (!isPerfect) {
+                showClearVisuals = false;
+                pathOverlay.classList.remove('visible');
+            }
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const tile = boardState[r][c];
+                    const tileDiv = document.createElement('div');
+                    const isSelected = selected && selected.r === r && selected.c === c;
+                    
+                    tileDiv.className = `tile ${tile ? 'tile-panel' : 'tile-empty'} ${tile?.fixed ? 'tile-fixed' : ''} ${isSelected ? 'tile-selected' : ''}`;
+                    
+                    if (showClearVisuals) {
+                        tileDiv.classList.add('tile-cleared');
+                    }
+
+                    if (tile) {
+                        const img = document.createElement('img');
+                        img.src = tile.fixed ? 'panel_locked.png' : 'panel.png';
+                        img.className = 'panel-image';
+                        img.style.transform = `rotate(${getRotation(tile.type)}deg)`;
+                        img.onerror = () => {
+                            img.style.display = 'none';
+                            tileDiv.innerHTML = `<div class="w-3/4 h-3/4 bg-indigo-500/30 rounded-full border border-indigo-400/30"></div>`;
+                        };
+                        tileDiv.appendChild(img);
+                    }
+                    tileDiv.onclick = () => handleTileClick(r, c);
+                    boardElement.appendChild(tileDiv);
+                }
+            }
+
+            // メーターの更新
+            const percentage = (uniqueCount / 36) * 100;
+            meterBar.style.width = `${percentage}%`;
+
+            // メーターランプの点灯判定
+            if (uniqueCount === 36) {
+                meterLampCore.classList.add('active');
+            } else {
+                meterLampCore.classList.remove('active');
+            }
+
+            // ターゲットランプの更新
+            if (reachedTarget) {
+                targetLamp.classList.add('active');
+            } else {
+                targetLamp.classList.remove('active');
+            }
+
+            // クリア演出の開始
+            if (isPerfect && !showClearVisuals && !isLocked) {
+                setTimeout(() => {
+                    showClearVisuals = true;
+                    drawPath(pathData);
+                    const tiles = boardElement.querySelectorAll('.tile');
+                    tiles.forEach(t => t.classList.add('tile-cleared'));
+                    pathOverlay.classList.add('visible');
+                    triggerClearSequence();
+                }, 50);
+            }
+        }
+
+        function drawPath(pathData) {
+            const tiles = boardElement.children;
+            if (tiles.length === 0) return;
+            const rootRect = boardRoot.getBoundingClientRect();
+            let points = [];
+
+            const sourceLamp = document.getElementById('source-lamp');
+            const sourceRect = sourceLamp.getBoundingClientRect();
+            points.push(`${(sourceRect.left + sourceRect.width / 2) - rootRect.left}, ${(sourceRect.top + sourceRect.height / 2) - rootRect.top}`);
+
+            pathData.forEach(step => {
+                const tile = tiles[step.r * GRID_SIZE + step.c];
+                const tileRect = tile.getBoundingClientRect();
+                points.push(`${(tileRect.left + tileRect.width / 2) - rootRect.left}, ${(tileRect.top + tileRect.height / 2) - rootRect.top}`);
+            });
+
+            const targetLampBase = document.getElementById('target-lamp-container');
+            const targetRect = targetLampBase.getBoundingClientRect();
+            points.push(`${(targetRect.left + targetRect.width / 2) - rootRect.left}, ${(targetRect.top + targetRect.height / 2) - rootRect.top}`);
+
+            pathLine.setAttribute('points', points.join(' '));
+        }
+
+        function triggerClearSequence() {
+            isLocked = true;
+            setTimeout(() => {
+                if (showClearVisuals) clearModal.classList.remove('hidden');
+            }, 3000);
+        }
+
+        function closeModal() {
+            clearModal.classList.add('hidden');
+            isLocked = false;
+        }
+
+        function handleTileClick(r, c) {
+            if (isLocked) return;
+            const tile = boardState[r][c];
+            if (selected) {
+                if (selected.r === r && selected.c === c) {
+                    selected = null;
+                } else if (!tile || !tile.fixed) {
+                    const temp = boardState[r][c];
+                    boardState[r][c] = boardState[selected.r][selected.c];
+                    boardState[selected.r][selected.c] = temp;
+                    selected = null;
+                } else {
+                    selected = null;
+                }
+            } else if (tile && !tile.fixed) {
+                selected = { r, c };
+            }
+            render();
+        }
+
+        function calculatePath() {
+            let pathData = [];
+            let currR = 0, currC = 1, dir = 'DOWN', steps = 0;
+            while (currR >= 0 && currR < GRID_SIZE && currC >= 0 && currC < GRID_SIZE && steps < 500) {
+                let inDir = dir, exitDir = dir;
+                const tile = boardState[currR][currC];
+                if (tile) {
+                    let nextDir = null;
+                    if (dir === 'DOWN') { if (tile.type === 1) nextDir = 'RIGHT'; else if (tile.type === 2) nextDir = 'LEFT'; }
+                    else if (dir === 'UP') { if (tile.type === 3) nextDir = 'LEFT'; else if (tile.type === 4) nextDir = 'RIGHT'; }
+                    else if (dir === 'LEFT') { if (tile.type === 1) nextDir = 'UP'; else if (tile.type === 4) nextDir = 'DOWN'; }
+                    else if (dir === 'RIGHT') { if (tile.type === 2) nextDir = 'UP'; else if (tile.type === 3) nextDir = 'DOWN'; }
+                    if (nextDir) { exitDir = nextDir; dir = nextDir; } else { pathData.push({ r: currR, c: currC, in: inDir, out: null }); break; }
+                }
+                pathData.push({ r: currR, c: currC, in: inDir, out: exitDir });
+                steps++;
+                if (dir === 'DOWN') currR++; else if (dir === 'UP') currR--; else if (dir === 'LEFT') currC--; else if (dir === 'RIGHT') currC++;
+            }
+            return { pathData, reachedTarget: (currR === -1 && currC === 3 && dir === 'UP'), uniqueCount: new Set(pathData.map(p => `${p.r},${p.c}`)).size };
+        }
+
+        document.getElementById('share-btn').onclick = (e) => {
+            e.stopPropagation();
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent("パズルゲーム「月は導く」をクリア！ 36マス全制覇！ #月は導く")}`, '_blank');
+        };
+
+        window.onload = initGame;
+        window.addEventListener('resize', () => { 
+            if (showClearVisuals) {
+                const { pathData } = calculatePath();
+                drawPath(pathData); 
+            }
+        });
+    </script>
+</body>
+</html>
