@@ -424,20 +424,9 @@
         },
         {
             "name": "飛ぶか落とすか",
-            "layout": "1:305:282:30:30:black;G:25:30:50:50:black;r:511:104:50:50:black:{\"id\":\"t-1775107552785\",\"type\":\"reverse\",\"target\":null,\"changeable\":true,\"options\":[\"wall\",\"red-wall\",\"blue-wall\",\"green-wall\",\"goal\",\"block\"],\"placedElId\":\"el-0.803426983844275\"};W:109:361:126:36:black:{\"angle\":\"0\"};W:299:319:254:46:black:{\"angle\":\"0\"};f:341:267:50:50:black:{\"id\":\"t-1775107470635\",\"type\":\"gravitize\",\"target\":\"block\",\"changeable\":true,\"options\":[\"goal\",\"block\"],\"placedElId\":null};f:108:303:50:50:black:{\"id\":\"t-1775107470635\",\"type\":\"gravitize\",\"target\":\"goal\",\"changeable\":true,\"options\":[\"goal\",\"block\"],\"placedElId\":null}",
+            "layout": "1:305:282:30:30:black;G:25:30:50:50:black;r:511:104:50:50:black:{\"id\":\"t-1775107552785\",\"type\":\"reverse\",\"target\":null,\"changeable\":true,\"options\":[\"wall\",\"red-wall\",\"blue-wall\",\"green-wall\",\"goal\",\"block\"],\"placedElId\":\"el-0.803426983844275\"};W:109:361:126:36:black:{\"angle\":\"0\"};W:299:319:254:46:black:{\"angle\":\"0\"}",
             "totalLimit": 2,
             "toolboxConfig": [
-                {
-                    "id": "t-1775107470635",
-                    "type": "gravitize",
-                    "target": "wall",
-                    "changeable": true,
-                    "options": [
-                        "goal",
-                        "block"
-                    ],
-                    "placedElId": null
-                },
                 {
                     "id": "t-1775107574768",
                     "type": "jump",
@@ -448,6 +437,17 @@
                         "red-wall",
                         "blue-wall",
                         "green-wall",
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                },
+                {
+                    "id": "t-1775117264113",
+                    "type": "gravitize",
+                    "target": "wall",
+                    "changeable": true,
+                    "options": [
                         "goal",
                         "block"
                     ],
