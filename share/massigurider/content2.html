@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>まっしぐライダー - 物理安定修正版</title>
+    <!-- Matter.js ライブラリ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --secondary-color: #607D8B;
+            --accent-color: #ffc107;
+            --bg-color: #f0f8ff;
+            --panel-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: var(--bg-color);
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        h1 { color: #333; margin: 10px 0; }
+
+        #tab-menu { display: flex; gap: 5px; z-index: 20; }
+        .tab-button {
+            padding: 8px 25px; font-size: 16px; font-weight: bold; cursor: pointer;
+            border: 2px solid #ccc; border-bottom: none; border-radius: 8px 8px 0 0;
+            background-color: #ddd;
+        }
+        .tab-button.active {
+            background-color: var(--panel-bg); border-color: #333;
+            border-bottom: 2px solid var(--panel-bg); margin-bottom: -2px;
+        }
+
+        #game-container {
+            display: flex; gap: 10px; padding: 10px; background-color: var(--panel-bg);
+            border: 2px solid #333; border-radius: 0 0 10px 10px;
+            transform: scale(0.9); transform-origin: top center;
+        }
+
+        #game-world {
+            width: 600px; height: 600px; border: 2px solid #333;
+            position: relative; overflow: hidden; background-color: #e0f7fa;
+        }
+        #game-world.drawing-mode { cursor: crosshair; }
+
+        #toolbox {
+            width: 220px; height: 600px; border: 2px solid #333;
+            background-color: #f1f1f1; display: flex; flex-direction: column; border-radius: 4px;
+        }
+        .toolbox-header { padding: 10px; background: #e0e0e0; border-bottom: 1px solid #ccc; font-size: 12px; }
+        #toolbox-scroll-area {
+            flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column;
+            align-items: center; padding: 10px 0; gap: 12px;
+        }
+        .toolbox-footer { padding: 10px; background: #e0e0e0; border-top: 1px solid #ccc; display: flex; flex-direction: column; gap: 5px; }
+
+        .toolbox-item {
+            cursor: grab; display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 24px; font-weight: bold; position: relative;
+            flex-shrink: 0; width: 50px; height: 50px; border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: opacity 0.3s;
+        }
+
+        .placed-block {
+            position: absolute;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 24px; font-weight: bold;
+            width: 50px; height: 50px; border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 5;
+            transition: opacity 0.3s;
+        }
+        
+        .color-jump { background-color: #4CAF50; }
+        .color-reverse { background-color: #9C27B0; }
+        .color-ghost { background-color: #9E9E9E; }
+        .color-warp { background-color: #E91E63; }
+        .color-destroyer { background-color: #FF4500; }
+        .color-manipulate { background-color: #5C6BC0; }
+        .color-goal { background-color: var(--accent-color); color: #333; }
+
+        .placed-block.consumed {
+            opacity: 0.3 !important;
+            box-shadow: none;
+            cursor: default !important;
+        }
+
+        .rider {
+            position: absolute; width: 30px; height: 30px; border-radius: 50%;
+            box-sizing: border-box; cursor: move; z-index: 10;
+        }
+        .rider[data-type="rider1"] { background-color: #0077c2; }
+        .rider[data-type="rider2"] { background-color: #e53935; }
+        .rider[data-type="rider3"] { background-color: #4caf50; }
+        .rider[data-type="rider4"] { background-color: #ff9800; }
+        .rider[data-type="rider5"] { background-color: #9c27b0; }
+
+        #goal {
+            position: absolute; font-size: 40px; color: var(--accent-color);
+            cursor: move; width: 50px; height: 50px; display: flex;
+            align-items: center; justify-content: center; z-index: 5;
+        }
+        .wall { position: absolute; background-color: #333; cursor: move; min-width: 5px; min-height: 5px; border-radius: 2px; }
+        .wall.selected { outline: 3px solid var(--accent-color); z-index: 20; }
+        
+        .resize-handle {
+            position: absolute; right: 0; bottom: 0; width: 12px; height: 12px;
+            background: var(--accent-color); cursor: nwse-resize; display: none;
+            clip-path: polygon(100% 0, 100% 100%, 0 100%);
+        }
+        .wall.selected .resize-handle { display: block; }
+
+        button { width: 100%; font-size: 15px; padding: 10px; cursor: pointer; border-radius: 4px; border: none; color: white; font-weight: bold; }
+        #play-button { background-color: var(--primary-color); }
+        #play-button.playing { background-color: #ff9800; }
+        #reset-button { background-color: #f44336; }
+
+        .modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 20px; border: 2px solid #333;
+            border-radius: 8px; z-index: 2000; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            text-align: center; width: 400px;
+        }
+        .block-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 15px; }
+        .block-choice { 
+            width: 50px; height: 50px; border-radius: 8px; display: flex; align-items: center; 
+            justify-content: center; font-size: 24px; cursor: pointer; border: 2px solid transparent;
+        }
+        .block-choice:hover { border-color: #333; }
+
+        textarea { width: 95%; font-size: 10px; font-family: monospace; resize: vertical; margin-bottom: 10px; padding: 5px; }
+        .modal-buttons { display: flex; gap: 10px; justify-content: center; }
+
+        #drag-ghost { position: fixed; pointer-events: none; z-index: 9999; opacity: 0.8; border-radius: 8px; width: 50px; height: 50px; }
+        .hidden { display: none !important; }
+        .limit-badge { background: #333; color: white; padding: 2px 10px; border-radius: 12px; font-weight: bold; font-size: 16px; margin-bottom: 5px; }
+        .active-mode { outline: 3px solid #ffc107; box-shadow: 0 0 10px #ffc107; }
+
+        #prop-menu {
+            position: fixed; background: white; border: 2px solid #333; padding: 12px;
+            border-radius: 8px; z-index: 5000; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            display: none; min-width: 220px;
+        }
+        .prop-text { font-size: 14px; margin-bottom: 10px; line-height: 1.6; color: #333; text-align: left; }
+        .prop-clickable { color: #2196F3; font-weight: bold; text-decoration: underline; cursor: pointer; padding: 0 4px; border-radius: 4px; }
+        .prop-section { border-top: 1px solid #eee; padding-top: 10px; margin-top: 5px; text-align: left; }
+        .prop-section-title { font-size: 10px; font-weight: bold; color: #888; margin-bottom: 5px; display: block; }
+        .prop-options-box { display: flex; flex-direction: column; gap: 4px; border: 1px solid #eee; padding: 5px; border-radius: 4px; background: #fafafa; }
+        .prop-option { padding: 6px; font-size: 12px; cursor: pointer; border-radius: 4px; background: #f5f5f5; margin-bottom: 2px; text-align: left; }
+        .prop-option:hover { background: #eeeeee; }
+        .prop-option.active { background: var(--primary-color); color: white; }
+
+        .color-chip-container { display: flex; gap: 8px; margin-bottom: 10px; }
+        .color-chip { width: 30px; height: 30px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; }
+        .color-chip.active { border-color: #000; }
+
+        #clear-message {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95); padding: 40px; border: 4px solid var(--accent-color);
+            border-radius: 20px; text-align: center; z-index: 10000;
+        }
+        #clear-ok-btn {
+            background-color: var(--primary-color);
+            padding: 10px 40px;
+            font-size: 20px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <h1>まっしぐライダー</h1>
+
+    <div id="tab-menu">
+        <div class="tab-button active" data-tab="solve">解く</div>
+        <div class="tab-button" data-tab="create">作る</div>
+    </div>
+
+    <div id="game-container">
+        <div id="game-world"></div>
+
+        <div id="toolbox">
+            <div id="solve-header" class="toolbox-header">
+                <div class="setting-group" style="margin-bottom:8px; text-align:left;">
+                    <label style="font-size:10px; font-weight:bold; color:#666;">問題を選択</label>
+                    <select id="puzzle-select" style="width:100%"></select>
+                </div>
+                <div style="text-align: center;">
+                    <label style="font-size:10px; font-weight:bold; color:#666;">残りパネル</label>
+                    <span id="solve-limit-display" class="limit-badge">0</span>
+                </div>
+            </div>
+
+            <div id="create-header" class="toolbox-header hidden">
+                <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                    <div style="flex: 1;">
+                        <label style="font-size:9px; font-weight:bold;">プレイヤー数</label>
+                        <input type="number" id="player-count-input" value="1" min="1" max="5" style="width: 100%;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size:9px; font-weight:bold;">制限数</label>
+                        <input type="number" id="limit-count-input" value="5" min="0" style="width: 100%;">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 5px;">
+                    <button id="add-block-btn" style="background:#4caf50; font-size:12px; padding:5px; flex: 3;">＋ パネル追加</button>
+                    <button id="draw-mode-btn" style="background:#ff9800; font-size:16px; padding:5px; flex: 1;" title="壁作成・編集モード">🖋️</button>
+                </div>
+            </div>
+
+            <div id="toolbox-scroll-area"></div>
+
+            <div class="toolbox-footer">
+                <button id="play-button">▶️ 再生</button>
+                <button id="reset-button">🔄 リセット</button>
+                <button id="data-panel-button" style="background:#607D8B; font-size:12px; margin-top:5px;">📂 データ(読込/出力)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="add-modal" class="modal hidden">
+        <p style="font-weight:bold;">追加するパネルを選んでください</p>
+        <div class="block-grid" id="block-grid-container"></div>
+        <div class="modal-buttons" style="margin-top:20px;">
+            <button id="cancel-add-btn" style="background:#555;">キャンセル</button>
+        </div>
+    </div>
+
+    <div id="prop-menu">
+        <div id="prop-content"></div>
+    </div>
+
+    <div id="data-modal" class="modal hidden">
+        <p style="font-weight:bold;">パズルデータの読込・出力</p>
+        <textarea id="data-input" rows="12"></textarea>
+        <div class="modal-buttons">
+            <button id="import-button" style="background:#4caf50;">読み込む</button>
+            <button id="close-data-modal" style="background:#f44336;">閉じる</button>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="modal hidden">
+        <p id="confirm-text">ステージを消去して良いですか？</p>
+        <div class="modal-buttons">
+            <button id="confirm-yes" style="background:#f44336;">はい</button>
+            <button id="confirm-no" style="background:#ccc; color:#333;">いいえ</button>
+        </div>
+    </div>
+
+    <div id="clear-message" class="hidden">
+        <h1>CLEAR!</h1>
+        <button id="clear-ok-btn">OK</button>
+    </div>
+
+    <div id="drag-ghost" class="hidden"></div>
+
+    <script>
+    // --- Global Constants ---
+    const ALL_EFFECTS = [
+        { type: 'jump', icon: '🥾', color: 'color-jump', desc: '触れると高くジャンプします' },
+        { type: 'reverse', icon: '⟷', color: 'color-reverse', desc: '進行方向を反転させます' },
+        { type: 'ghost', icon: '👻', color: 'color-ghost', desc: '一定時間、壁をすり抜けられます' },
+        { type: 'warp', icon: '🌀', color: 'color-warp', desc: '対になるワープパネルへ瞬時に移動します' },
+        { type: 'destroyer', icon: '💣', color: 'color-destroyer', desc: '触れると即座に失敗となります' },
+        { type: 'erase', icon: '🧹', color: 'color-manipulate', isManip: true, desc: 'を消す' },
+        { type: 'move-up', icon: '⬆️', color: 'color-manipulate', isManip: true, desc: 'を上に動かす' },
+        { type: 'rotate', icon: '↪️', color: 'color-manipulate', isManip: true, desc: 'を90度回転させる' },
+        { type: 'spin', icon: '🎡', color: 'color-manipulate', isManip: true, desc: 'を回す' },
+        { type: 'gravitize', icon: '🍏', color: 'color-manipulate', isManip: true, desc: 'を重力に従わせる' }
+    ];
+    const TYPE_MAP = { jump:'j', reverse:'r', ghost:'g', warp:'w', destroyer:'d', erase:'e', 'move-up':'u', rotate:'o', spin:'s', gravitize:'f', 'custom-wall':'W', rider1:'1', rider2:'2', rider3:'3', rider4:'4', rider5:'5', goal:'G' };
+    const TARGET_MAP = { 'wall': '全ての壁', 'red-wall': '赤い壁', 'blue-wall': '青い壁', 'green-wall': '緑の壁', 'goal': 'ゴール', 'block': 'パネル' }; 
+    const PUZZLES = [
+        {
+            "name": "はじめてのジャンプ",
+            "layout": "1:43:472:30:30:black;G:474:409:50:50:black;W:0:530:600:20:black;W:330:454:265:73:black",
+            "totalLimit": 1,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775106788401",
+                    "type": "jump",
+                    "target": null,
+                    "changeable": true,
+                    "options": [
+                        "wall",
+                        "red-wall",
+                        "blue-wall",
+                        "green-wall",
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+        {
+            "name": "赤か青か？",
+            "layout": "1:69:83:30:30:black;G:442:444:50:50:black;W:42:134:131:29:blue:{\"angle\":\"0\"};W:185:135:116:27:red:{\"angle\":\"0\"};W:316:138:107:27:blue:{\"angle\":\"0\"};W:441:140:111:27:red:{\"angle\":\"0\"}",
+            "totalLimit": 1,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775052692325",
+                    "type": "erase",
+                    "target": "goal",
+                    "changeable": true,
+                    "options": [
+                        "red-wall",
+                        "blue-wall"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+
+{
+            "name": "届かないゴール",
+            "layout": "1:159:147:30:30:black;G:446:109:50:50:black;W:153:475:274:19:black:{\"angle\":\"0\"}",
+            "totalLimit": 2,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775102746297",
+                    "type": "jump",
+                    "target": null,
+                    "changeable": true,
+                    "options": [
+                        "wall",
+                        "red-wall",
+                        "blue-wall",
+                        "green-wall",
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                },
+                {
+                    "id": "t-1775102753347",
+                    "type": "move-up",
+                    "target": "wall",
+                    "changeable": true,
+                    "options": [
+                        "wall",
+                        "red-wall",
+                        "blue-wall",
+                        "green-wall",
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+        
+        {
+            "name": "運ぶ",
+            "layout": "1:77:177:30:30:black;G:516:150:50:50:black;W:53:394:82:27:black:{\"angle\":\"0\"};W:261:437:159:28:blue:{\"angle\":\"0\"};W:434:121:12:343:black:{\"angle\":\"0\"};W:458:200:132:14:black:{\"angle\":\"0\"};W:185:371:22:123:red:{\"angle\":\"0\"}",
+            "totalLimit": 2,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775106941718",
+                    "type": "move-up",
+                    "target": "wall",
+                    "changeable": true,
+                    "options": [
+                        "blue-wall",
+                        "wall",
+                        "red-wall"
+                    ],
+                    "placedElId": null
+                },
+                {
+                    "id": "t-1775106946017",
+                    "type": "rotate",
+                    "target": "wall",
+                    "changeable": true,
+                    "options": [
+                        "wall",
+                        "red-wall",
+                        "blue-wall"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+        {
+            "name": "重力を与える",
+            "layout": "1:87:54:30:30:black;G:416:540:50:50:black;W:68:238:513:24:black:{\"angle\":\"0\"};W:453:9:89:85:blue:{\"angle\":\"0\"};W:561:190:21:48:black:{\"angle\":\"0\"}",
+            "totalLimit": 2,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775107105351",
+                    "type": "gravitize",
+                    "target": "wall",
+                    "changeable": true,
+                    "options": [
+                        "blue-wall",
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                },
+                {
+                    "id": "t-1775107174317",
+                    "type": "move-up",
+                    "target": "wall",
+                    "changeable": true,
+                    "options": [
+                        "blue-wall",
+                        "goal",
+                        "wall"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+        {
+            "name": "飛ぶか落とすか",
+            "layout": "1:305:282:30:30:black;G:25:30:50:50:black;r:511:104:50:50:black:{\"id\":\"t-1775107552785\",\"type\":\"reverse\",\"target\":null,\"changeable\":true,\"options\":[\"wall\",\"red-wall\",\"blue-wall\",\"green-wall\",\"goal\",\"block\"],\"placedElId\":\"el-0.803426983844275\"};W:109:361:126:36:black:{\"angle\":\"0\"};W:299:319:254:46:black:{\"angle\":\"0\"};f:341:267:50:50:black:{\"id\":\"t-1775107470635\",\"type\":\"gravitize\",\"target\":\"block\",\"changeable\":true,\"options\":[\"goal\",\"block\"],\"placedElId\":null};f:108:303:50:50:black:{\"id\":\"t-1775107470635\",\"type\":\"gravitize\",\"target\":\"goal\",\"changeable\":true,\"options\":[\"goal\",\"block\"],\"placedElId\":null}",
+            "totalLimit": 2,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775107470635",
+                    "type": "gravitize",
+                    "target": "wall",
+                    "changeable": true,
+                    "options": [
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                },
+                {
+                    "id": "t-1775107574768",
+                    "type": "jump",
+                    "target": null,
+                    "changeable": true,
+                    "options": [
+                        "wall",
+                        "red-wall",
+                        "blue-wall",
+                        "green-wall",
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+
+{
+            "name": "カスタムパズル",
+            "layout": "1:132:152:30:30:black;G:380:16:50:50:black;f:249:317:50:50:black:{\"id\":\"t-1775025730717\",\"type\":\"gravitize\",\"target\":\"red-wall\",\"changeable\":true,\"options\":[\"goal\",\"block\",\"red-wall\",\"wall\"],\"placedElId\":\"el-0.28077206549584954\"};W:74:227:129:76:red:{\"angle\":\"21\"};W:183:449:276:61:black:{\"angle\":\"0\"};g:509:35:50:50:black:{\"id\":\"t-1775025764833\",\"type\":\"ghost\",\"target\":null,\"changeable\":true,\"options\":[\"wall\",\"red-wall\",\"blue-wall\",\"green-wall\",\"goal\",\"block\",\"rider\"],\"placedElId\":\"el-0.6088683632300346\"};W:440:187:29:257:black:{\"angle\":\"0\"};W:12:510:136:77:black:{\"angle\":\"0\"};f:318:394:50:50:black:{\"id\":\"t-1775029545666\",\"type\":\"gravitize\",\"target\":\"red-wall\",\"changeable\":true,\"options\":[\"goal\",\"block\",\"red-wall\",\"wall\"],\"placedElId\":\"el-0.36517030021667585\"};f:360:185:50:50:black:{\"id\":\"t-1775029549916\",\"type\":\"gravitize\",\"target\":\"wall\",\"changeable\":true,\"options\":[\"goal\",\"block\",\"red-wall\"],\"placedElId\":\"el-0.9785977654508463\"};W:381:168:157:17:red:{\"angle\":\"0\"};W:569:131:13:69:black:{\"angle\":\"0\"}",
+            "totalLimit": 0,
+            "toolboxConfig": []
+        }
+        
+    ];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- Matter.js Aliases ---
+        const { Engine, Runner, Bodies, Composite, Body, Events, Query } = Matter;
+
+        // --- Elements ---
+        const gameWorld = document.getElementById('game-world');
+        const toolboxScroll = document.getElementById('toolbox-scroll-area');
+        const playButton = document.getElementById('play-button');
+        const resetButton = document.getElementById('reset-button');
+        const clearMessage = document.getElementById('clear-message');
+        const clearOkBtn = document.getElementById('clear-ok-btn');
+        const dragGhost = document.getElementById('drag-ghost');
+        const puzzleSelect = document.getElementById('puzzle-select');
+        const playerCountInput = document.getElementById('player-count-input');
+        const limitCountInput = document.getElementById('limit-count-input');
+        const solveLimitDisplay = document.getElementById('solve-limit-display');
+        const propMenu = document.getElementById('prop-menu');
+        const dataModal = document.getElementById('data-modal');
+        const dataInput = document.getElementById('data-input');
+        const confirmModal = document.getElementById('confirm-modal');
+        const addModal = document.getElementById('add-modal');
+        const blockGrid = document.getElementById('block-grid-container');
+        const drawModeBtn = document.getElementById('draw-mode-btn');
+
+        // --- Physics Config ---
+        const SCALE = 0.9, TORQUE_FORCE = 0.0008;
+        const CAT_WALL = 0x0001;
+        const CAT_RIDER = 0x0002;
+        const CAT_BLOCK = 0x0004;
+
+        // --- State ---
+        let engine = Engine.create();
+        let runner = Runner.create();
+        let isPlaying = false, activeTab = 'solve', isResetting = false;
+        let solveLayoutBase = [], solveTotalLimit = 0, currentPlacedCount = 0;
+        let createToolboxTemplates = [], activePuzzleTemplates = []; 
+        let isDrawMode = false, drawingAction = null, startX, startY, currentElement = null, selectedWall = null;
+        let bodiesMap = new Map();
+        
+        // リセット用に初期状態を保持するためのキャッシュ
+        let currentStageInitialData = null;
+
+        function init() {
+            PUZZLES.forEach((p, i) => {
+                const opt = document.createElement('option');
+                opt.value = i; opt.textContent = p.name;
+                puzzleSelect.appendChild(opt);
+            });
+            initBlockGrid();
+            
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (isPlaying || !clearMessage.classList.contains('hidden')) return;
+                    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active'); activeTab = btn.dataset.tab;
+                    toggleDrawMode(false);
+                    document.getElementById('solve-header').classList.toggle('hidden', activeTab !== 'solve');
+                    document.getElementById('create-header').classList.toggle('hidden', activeTab !== 'create');
+                    if (activeTab === 'create') {
+                        if (createToolboxTemplates.length === 0) loadWorld("1:50:500;G:500:500");
+                    } else {
+                        loadPuzzle(puzzleSelect.value);
+                    }
+                    renderToolbox();
+                });
+            });
+
+            document.getElementById('add-block-btn').onclick = () => {
+                if (!clearMessage.classList.contains('hidden')) return;
+                addModal.classList.remove('hidden');
+            };
+            document.getElementById('cancel-add-btn').onclick = () => addModal.classList.add('hidden');
+            document.getElementById('data-panel-button').onclick = () => {
+                if (!clearMessage.classList.contains('hidden')) return;
+                openDataModal();
+            };
+            document.getElementById('import-button').onclick = importPuzzle;
+            document.getElementById('close-data-modal').onclick = () => dataModal.classList.add('hidden');
+            
+            // クリアメッセージのOKボタン：次に行かず、再生前の状態に戻す
+            clearOkBtn.onclick = () => { 
+                clearMessage.classList.add('hidden');
+                resetSim(); 
+            };
+            
+            document.onclick = () => { propMenu.style.display = 'none'; };
+            propMenu.onclick = e => e.stopPropagation();
+            playerCountInput.onchange = updateRiders;
+            playButton.onclick = togglePlay;
+            resetButton.onclick = handleReset;
+            drawModeBtn.onclick = () => {
+                if (!clearMessage.classList.contains('hidden')) return;
+                toggleDrawMode(!isDrawMode);
+            };
+            gameWorld.addEventListener('mousedown', onWorldMouseDown);
+            window.addEventListener('mousemove', onWorldMouseMove);
+            window.addEventListener('mouseup', onWorldMouseUp);
+            
+            // ドラッグ中のゴースト表示
+            window.addEventListener('dragover', e => {
+                e.preventDefault();
+                if (!dragGhost.classList.contains('hidden')) {
+                    dragGhost.style.left = (e.clientX - 25) + 'px';
+                    dragGhost.style.top = (e.clientY - 25) + 'px';
+                }
+            });
+
+            puzzleSelect.onchange = (e) => loadPuzzle(e.target.value);
+            loadPuzzle(0);
+        }
+
+        function loadPuzzle(idx) {
+            const p = PUZZLES[idx];
+            if(!p) return;
+            
+            // リセット用に初期データをキャッシュ
+            currentStageInitialData = JSON.parse(JSON.stringify(p));
+
+            solveLayoutBase = p.layout.split(';');
+            solveTotalLimit = p.totalLimit;
+            activePuzzleTemplates = JSON.parse(JSON.stringify(p.toolboxConfig || []));
+            loadWorld(p.layout);
+            renderToolbox();
+            updateLimitDisplay();
+        }
+
+        function initBlockGrid() {
+            ALL_EFFECTS.forEach(eff => {
+                const div = document.createElement('div');
+                div.className = "block-choice " + eff.color;
+                div.textContent = eff.icon;
+                div.onclick = () => { 
+                    createToolboxTemplates.push({ id: 't-' + Date.now(), type: eff.type, target: eff.isManip ? 'wall' : null, changeable: true, options: Object.keys(TARGET_MAP).filter(o => o !== 'rider'), placedElId: null }); 
+                    addModal.classList.add('hidden'); 
+                    renderToolbox(); 
+                };
+                blockGrid.appendChild(div);
+            });
+        }
+
+        function renderToolbox() {
+            toolboxScroll.innerHTML = '';
+            const list = activeTab === 'solve' ? activePuzzleTemplates : createToolboxTemplates.filter(t => !t.placedElId);
+            
+            list.forEach(t => {
+                const eff = ALL_EFFECTS.find(e => e.type === t.type);
+                if (!eff) return;
+                const item = document.createElement('div');
+                item.className = "toolbox-item " + eff.color;
+                item.textContent = eff.icon;
+                item.dataset.id = t.id;
+                item.draggable = true;
+                item.oncontextmenu = (e) => openPropMenu(e, t);
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', () => dragGhost.classList.add('hidden'));
+                toolboxScroll.appendChild(item);
+            });
+        }
+
+        function toggleDrawMode(on) {
+            isDrawMode = on;
+            drawModeBtn.classList.toggle('active-mode', on);
+            gameWorld.classList.toggle('drawing-mode', on);
+            if (!on && selectedWall) { selectedWall.classList.remove('selected'); selectedWall = null; }
+        }
+
+        function onWorldMouseDown(e) {
+            if (!isDrawMode || activeTab !== 'create' || isPlaying || !clearMessage.classList.contains('hidden')) return;
+            const rect = gameWorld.getBoundingClientRect();
+            const clickX = (e.clientX - rect.left) / SCALE, clickY = (e.clientY - rect.top) / SCALE;
+            if (e.target.classList.contains('resize-handle')) { drawingAction = 'resize'; currentElement = e.target.parentElement; return; }
+            if (e.target.classList.contains('wall')) {
+                if (selectedWall) selectedWall.classList.remove('selected');
+                selectedWall = e.target; selectedWall.classList.add('selected');
+                drawingAction = 'move'; currentElement = e.target;
+                startX = clickX - parseFloat(currentElement.style.left); startY = clickY - parseFloat(currentElement.style.top);
+                return;
+            }
+            if (selectedWall) selectedWall.classList.remove('selected'); selectedWall = null;
+            drawingAction = 'create'; startX = clickX; startY = clickY;
+            currentElement = document.createElement('div'); currentElement.className = 'wall custom-wall'; currentElement.dataset.type = 'custom-wall';
+            currentElement.style.left = startX + 'px'; currentElement.style.top = startY + 'px'; currentElement.style.width = '0px'; currentElement.style.height = '0px';
+            currentElement.dataset.color = 'black'; currentElement.dataset.angle = "0";
+            const handle = document.createElement('div'); handle.className = 'resize-handle'; currentElement.appendChild(handle);
+            gameWorld.appendChild(currentElement);
+        }
+
+        function onWorldMouseMove(e) {
+            if (!drawingAction) return;
+            const rect = gameWorld.getBoundingClientRect();
+            const mouseX = (e.clientX - rect.left) / SCALE, mouseY = (e.clientY - rect.top) / SCALE;
+            if (drawingAction === 'create') {
+                const w = mouseX - startX, h = mouseY - startY;
+                currentElement.style.left = (w < 0 ? mouseX : startX) + 'px'; currentElement.style.top = (h < 0 ? mouseY : startY) + 'px';
+                currentElement.style.width = Math.abs(w) + 'px'; currentElement.style.height = Math.abs(h) + 'px';
+            } else if (drawingAction === 'move') {
+                currentElement.style.left = (mouseX - startX) + 'px'; currentElement.style.top = (mouseY - startY) + 'px';
+            } else if (drawingAction === 'resize') {
+                const wLeft = parseFloat(currentElement.style.left), wTop = parseFloat(currentElement.style.top);
+                currentElement.style.width = Math.max(5, mouseX - wLeft) + 'px'; currentElement.style.height = Math.max(5, mouseY - wTop) + 'px';
+            }
+        }
+
+        function onWorldMouseUp() {
+            if (drawingAction === 'create' && currentElement) {
+                if (parseFloat(currentElement.style.width) < 5 && parseFloat(currentElement.style.height) < 5) currentElement.remove();
+                else { makeDraggable(currentElement); selectedWall = currentElement; selectedWall.classList.add('selected'); }
+            }
+            drawingAction = null; currentElement = null;
+        }
+
+        function openPropMenu(e, template, isPlaced = false, el = null) {
+            if (!clearMessage.classList.contains('hidden')) return;
+            e.preventDefault();
+            const content = document.getElementById('prop-content');
+            content.innerHTML = '';
+            const isCreate = activeTab === 'create';
+
+            if (el && el.classList.contains('wall')) {
+                if (!isCreate) return;
+                const title = document.createElement('div'); title.className = 'prop-section-title'; title.textContent = '壁の設定'; content.appendChild(title);
+                const colors = ['black', 'red', 'blue', 'green'];
+                const chipCont = document.createElement('div'); chipCont.className = 'color-chip-container';
+                colors.forEach(c => {
+                    const chip = document.createElement('div'); chip.className = "color-chip " + (el.dataset.color === c ? 'active' : '');
+                    chip.style.backgroundColor = c; chip.onclick = () => { el.dataset.color = c; el.style.backgroundColor = c; openPropMenu(e, template, isPlaced, el); };
+                    chipCont.appendChild(chip);
+                });
+                content.appendChild(chipCont);
+                const angleSection = document.createElement('div'); angleSection.className = 'prop-section';
+                const curAngle = el.dataset.angle || "0";
+                angleSection.innerHTML = '<span class="prop-section-title">角度: <span id="angle-val">' + curAngle + '</span>°</span><input type="range" id="angle-slider" min="-180" max="180" step="1" value="' + curAngle + '" style="width:100%;">';
+                content.appendChild(angleSection);
+                const slider = angleSection.querySelector('#angle-slider');
+                slider.oninput = (ev) => { const val = ev.target.value; el.dataset.angle = val; el.style.transform = 'rotate(' + val + 'deg)'; angleSection.querySelector('#angle-val').textContent = val; };
+                const delBtn = document.createElement('button'); delBtn.textContent = '🗑️ 削除'; delBtn.style.background = '#f44336'; delBtn.style.marginTop = '10px';
+                delBtn.onclick = () => { el.remove(); propMenu.style.display = 'none'; };
+                content.appendChild(delBtn);
+            } else if (template) {
+                const eff = ALL_EFFECTS.find(f => f.type === template.type);
+                if (!eff) return;
+                
+                if (eff.isManip) {
+                    const descDiv = document.createElement('div'); descDiv.className = 'prop-text';
+                    const changeable = isCreate || template.changeable;
+                    if (changeable) {
+                        descDiv.innerHTML = '<span class="prop-clickable">『' + TARGET_MAP[template.target] + '』</span>' + eff.desc;
+                        const selectorBox = document.createElement('div'); selectorBox.className = 'prop-options-box hidden';
+                        const opts = isCreate ? Object.keys(TARGET_MAP).filter(o => o !== 'rider') : template.options;
+                        opts.forEach(opt => {
+                            if (opt === 'rider') return;
+                            const d = document.createElement('div'); d.className = "prop-option " + (template.target === opt ? 'active' : ''); d.textContent = TARGET_MAP[opt];
+                            d.onclick = () => { template.target = opt; if(el) el.dataset.config = JSON.stringify(template); openPropMenu(e, template, isPlaced, el); renderToolbox(); };
+                            selectorBox.appendChild(d);
+                        });
+                        content.appendChild(descDiv); content.appendChild(selectorBox);
+                        descDiv.querySelector('span').onclick = () => selectorBox.classList.toggle('hidden');
+                    } else { descDiv.innerHTML = '『' + TARGET_MAP[template.target] + '』' + eff.desc; content.appendChild(descDiv); }
+                } else {
+                    const descDiv = document.createElement('div'); descDiv.className = 'prop-text';
+                    descDiv.innerHTML = `<strong>【${eff.icon} 効果】</strong><br>${eff.desc}`;
+                    content.appendChild(descDiv);
+                }
+
+                if (isCreate) {
+                    const section = document.createElement('div'); section.className = 'prop-section';
+                    section.innerHTML = '<span class="prop-section-title">解答者の設定</span><label style="font-size:11px;"><input type="checkbox" id="prop-changeable-check"> 対象の変更を許可</label>';
+                    content.appendChild(section);
+                    const check = section.querySelector('input'); check.checked = template.changeable;
+                    check.onchange = ev => { template.changeable = ev.target.checked; if(el) el.dataset.config = JSON.stringify(template); };
+
+                    if (eff.isManip) {
+                        const optSection = document.createElement('div'); optSection.className = 'prop-section';
+                        optSection.innerHTML = '<span class="prop-section-title">許可する対象候補</span><div id="prop-allowed-options" style="display:grid; grid-template-columns: 1fr 1fr; font-size:10px; gap:2px;"></div>';
+                        content.appendChild(optSection);
+                        const optCont = optSection.querySelector('#prop-allowed-options');
+                        Object.keys(TARGET_MAP).forEach(opt => {
+                            if (opt === 'rider') return;
+                            const lbl = document.createElement('label'); const cb = document.createElement('input'); cb.type = 'checkbox';
+                            if (!template.options) template.options = Object.keys(TARGET_MAP).filter(o => o !== 'rider');
+                            cb.checked = template.options.includes(opt);
+                            cb.onchange = () => {
+                                if (cb.checked) { if (!template.options.includes(opt)) template.options.push(opt); }
+                                else { template.options = template.options.filter(o => o !== opt); }
+                                if(el) el.dataset.config = JSON.stringify(template);
+                            };
+                            lbl.appendChild(cb); lbl.append(' ' + TARGET_MAP[opt]); optCont.appendChild(lbl);
+                        });
+                    }
+                }
+
+                // 配置済みの要素に対する削除ボタン
+                if (isPlaced && el) {
+                    const canDelete = isCreate || el.classList.contains('user-placed');
+                    if (canDelete) {
+                        const delBtn = document.createElement('button');
+                        delBtn.textContent = '🗑️ 配置を削除';
+                        delBtn.style.background = '#f44336';
+                        delBtn.style.marginTop = '15px';
+                        delBtn.onclick = () => {
+                            if (isCreate) {
+                                const tid = el.dataset.templateId;
+                                const t = createToolboxTemplates.find(x => x.id === tid);
+                                if (t) t.placedElId = null;
+                            }
+                            if (el.classList.contains('user-placed')) {
+                                currentPlacedCount--;
+                            }
+                            el.remove();
+                            renderToolbox();
+                            updateLimitDisplay();
+                            propMenu.style.display = 'none';
+                        };
+                        content.appendChild(delBtn);
+                    }
+                }
+
+                // 作るモード時の「ツール（テンプレート）自体」の削除
+                if (isCreate && !isPlaced) {
+                    const delBtn = document.createElement('button'); delBtn.textContent = '🗑️ ツールから削除'; delBtn.style.background = '#f44336'; delBtn.style.marginTop = '10px';
+                    delBtn.onclick = () => { createToolboxTemplates = createToolboxTemplates.filter(x => x.id !== template.id); renderToolbox(); propMenu.style.display = 'none'; };
+                    content.appendChild(delBtn);
+                }
+            }
+            propMenu.style.display = 'block';
+            propMenu.style.left = Math.min(e.clientX, window.innerWidth - 240) + 'px';
+            propMenu.style.top = Math.min(e.clientY, window.innerHeight - 300) + 'px';
+        }
+
+        function loadWorld(layoutStr) {
+            gameWorld.innerHTML = ''; currentPlacedCount = 0;
+            if (!layoutStr) return;
+            layoutStr.split(';').forEach(part => {
+                const match = part.match(/^([^:]+):(-?\d+):(-?\d+)(?::(-?\d+):(-?\d+):?([^:]+)?)?(?::(.*))?$/);
+                if (!match) return;
+                const [, code, x, y, w, h, col, extra] = match;
+                const type = Object.keys(TYPE_MAP).find(k => TYPE_MAP[k] === code);
+                if (!type) return;
+                const el = document.createElement('div'); el.style.left = x + 'px'; el.style.top = y + 'px'; el.dataset.type = type;
+                if (type.startsWith('rider')) { el.classList.add('rider'); el.id = type; }
+                else if (type === 'goal') { el.id = 'goal'; el.textContent = '☆'; }
+                else if (type === 'custom-wall') { 
+                    el.classList.add('wall'); if (w && h) { el.style.width = w + 'px'; el.style.height = h + 'px'; }
+                    el.dataset.color = col || 'black'; el.style.backgroundColor = el.dataset.color;
+                    if (extra) {
+                        try {
+                            const config = JSON.parse(extra);
+                            if (config.angle) { el.dataset.angle = config.angle; el.style.transform = 'rotate(' + config.angle + 'deg)'; }
+                        } catch(e) {}
+                    }
+                    const handle = document.createElement('div'); handle.className = 'resize-handle'; el.appendChild(handle);
+                } else {
+                    const eff = ALL_EFFECTS.find(e => e.type === type);
+                    el.classList.add('placed-block', eff.color); el.textContent = eff.icon;
+                    if (extra) {
+                        try { 
+                            const conf = JSON.parse(extra); el.dataset.config = extra;
+                            if (activeTab === 'create') {
+                                let existing = createToolboxTemplates.find(t => t.id === conf.id);
+                                if (!existing) { conf.placedElId = 'el-' + Math.random(); el.id = conf.placedElId; createToolboxTemplates.push(conf); }
+                                else { existing.placedElId = 'el-' + Math.random(); el.id = existing.placedElId; }
+                            }
+                        } catch(e){}
+                    }
+                    el.dataset.originalPart = part;
+                    // 「解く」モード時、layoutBaseに含まれないものはユーザー配置
+                    if (activeTab === 'solve' && !solveLayoutBase.some(sb => sb === part)) { el.classList.add('user-placed'); currentPlacedCount++; }
+                }
+                gameWorld.appendChild(el); makeDraggable(el);
+            });
+            updateLimitDisplay();
+        }
+
+        function makeDraggable(el) {
+            el.draggable = true;
+            el.addEventListener('dragstart', e => {
+                if (isPlaying || isDrawMode || !clearMessage.classList.contains('hidden')) { e.preventDefault(); return; }
+                
+                // 「解く」画面ではプレイヤー、壁、ゴールはドラッグ不可
+                if (activeTab === 'solve') {
+                    const type = el.dataset.type;
+                    if (type.startsWith('rider') || type === 'custom-wall' || type === 'goal') {
+                        e.preventDefault(); return;
+                    }
+                    // ステージ初期配置のブロックもドラッグ不可
+                    if (el.dataset.originalPart && solveLayoutBase.includes(el.dataset.originalPart)) {
+                        e.preventDefault(); return;
+                    }
+                }
+
+                e.dataTransfer.setData('mode', 'move'); e.dataTransfer.setData('elId', el.id || (el.id = 'el-'+Math.random()));
+                dragGhost.className = el.className; dragGhost.textContent = el.textContent || '';
+                const s = window.getComputedStyle(el);
+                Object.assign(dragGhost.style, { backgroundColor: s.backgroundColor, color: s.color, width: s.width, height: s.height, display: 'flex', alignItems: 'center', justifyContent: 'center' });
+                dragGhost.classList.remove('hidden');
+                setTimeout(() => el.style.opacity = '0.2', 0);
+            });
+            el.addEventListener('dragend', e => {
+                el.style.opacity = '1'; dragGhost.classList.add('hidden');
+                // ドラッグによる削除機能を廃止 (右クリックメニューに統合)
+            });
+            el.addEventListener('contextmenu', e => { const config = el.dataset.config ? JSON.parse(el.dataset.config) : null; openPropMenu(e, config, true, el); });
+        }
+
+        function handleDragStart(e) {
+            if (isPlaying || isDrawMode || !clearMessage.classList.contains('hidden')) { e.preventDefault(); return; }
+            const id = e.target.dataset.id, list = activeTab === 'solve' ? activePuzzleTemplates : createToolboxTemplates;
+            const t = list.find(x => x.id === id);
+            
+            if (activeTab === 'solve') {
+                if (currentPlacedCount >= solveTotalLimit) { e.preventDefault(); return; }
+            } else if (t.placedElId) {
+                e.preventDefault(); return;
+            }
+
+            e.dataTransfer.setData('templateId', id); 
+            e.dataTransfer.setDragImage(new Image(), 0, 0); 
+            dragGhost.className = e.target.className.replace('toolbox-item', '').trim();
+            dragGhost.textContent = e.target.textContent;
+            const s = window.getComputedStyle(e.target);
+            Object.assign(dragGhost.style, { backgroundColor: s.backgroundColor, color: s.color, width: s.width, height: s.height, display: 'flex', alignItems: 'center', justifyContent: 'center', left: (e.clientX - 25) + 'px', top: (e.clientY - 25) + 'px' });
+            dragGhost.classList.remove('hidden');
+        }
+
+        gameWorld.addEventListener('dragover', e => e.preventDefault());
+        gameWorld.addEventListener('drop', e => {
+            if (!clearMessage.classList.contains('hidden')) return;
+            e.preventDefault(); const rect = gameWorld.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / SCALE, y = (e.clientY - rect.top) / SCALE;
+            
+            if (e.dataTransfer.getData('mode') === 'move') {
+                const el = document.getElementById(e.dataTransfer.getData('elId'));
+                if (el) { 
+                    el.style.left = (x - el.offsetWidth/2) + 'px'; 
+                    el.style.top = (y - el.offsetHeight/2) + 'px'; 
+                }
+                return;
+            }
+            
+            const tid = e.dataTransfer.getData('templateId'), list = activeTab === 'solve' ? activePuzzleTemplates : createToolboxTemplates;
+            const template = list.find(t => t.id === tid); if (!template) return;
+            
+            const el = document.createElement('div'); el.id = 'el-' + Math.random(); el.style.left = (x - 25) + 'px'; el.style.top = (y - 25) + 'px';
+            el.dataset.type = template.type; el.dataset.templateId = template.id; 
+            
+            if (activeTab !== 'solve') {
+                template.placedElId = el.id;
+            }
+            
+            const eff = ALL_EFFECTS.find(f => f.type === template.type);
+            el.classList.add('placed-block', eff.color); el.textContent = eff.icon; el.dataset.config = JSON.stringify(template);
+            
+            if (activeTab === 'solve') { 
+                el.classList.add('user-placed'); 
+                currentPlacedCount++; 
+            }
+            gameWorld.appendChild(el); makeDraggable(el); renderToolbox(); updateLimitDisplay();
+        });
+
+        // ==========================================
+        // --- Matter.js Physics Logic ---
+        // ==========================================
+
+        function startSim() {
+            isPlaying = true;
+            isResetting = false;
+            playButton.dataset.pre = generateLayoutExport();
+            playButton.textContent = '⏹️ 停止';
+            playButton.classList.add('playing');
+
+            Events.off(engine);
+            Engine.clear(engine);
+            Composite.clear(engine.world);
+            bodiesMap.clear();
+
+            const allElements = Array.from(gameWorld.children);
+            allElements.forEach(el => {
+                let body;
+                const w = el.classList.contains('rider') ? 30 : (el.classList.contains('wall') ? parseFloat(el.style.width) : 50);
+                const h = el.classList.contains('rider') ? 30 : (el.classList.contains('wall') ? parseFloat(el.style.height) : 50);
+                const centerX = parseFloat(el.style.left) + w / 2;
+                const centerY = parseFloat(el.style.top) + h / 2;
+                const angle = parseFloat(el.dataset.angle || 0) * (Math.PI / 180);
+
+                if (el.classList.contains('rider')) {
+                    body = Bodies.circle(centerX, centerY, 15, {
+                        restitution: 0.5, friction: 0.1, frictionAir: 0.01, density: 0.001, slop: 0.05, label: 'rider',
+                        collisionFilter: { category: CAT_RIDER, mask: CAT_WALL | CAT_BLOCK }
+                    });
+                    body.grounded = false;
+                    body.warpCooldown = 0;
+                    body.torqueDir = 1;
+                } else if (el.classList.contains('wall')) {
+                    body = Bodies.rectangle(centerX, centerY, w, h, {
+                        isStatic: true, angle: angle, slop: 0.05, label: 'wall',
+                        collisionFilter: { category: CAT_WALL, mask: CAT_RIDER | CAT_BLOCK | CAT_WALL }
+                    });
+                } else if (el.id === 'goal') {
+                    body = Bodies.rectangle(centerX, centerY, 50, 50, {
+                        isStatic: true, angle: angle, label: 'goal',
+                        collisionFilter: { category: CAT_BLOCK, mask: CAT_WALL | CAT_BLOCK | CAT_RIDER }
+                    });
+                } else if (el.classList.contains('placed-block')) {
+                    body = Bodies.rectangle(centerX, centerY, 50, 50, {
+                        isStatic: true, angle: angle, label: 'block',
+                        collisionFilter: { category: CAT_BLOCK, mask: 0 } 
+                    });
+                }
+
+                if (body) {
+                    body.myWidth = w;
+                    body.myHeight = h;
+                    body.isMovingUp = false; 
+                    body.targetAngle = null;
+                    body.spinSpeed = 0; 
+                    bodiesMap.set(el, body);
+                    body.sourceElement = el;
+                    Composite.add(engine.world, body);
+                }
+            });
+
+            Events.on(engine, 'collisionActive', (event) => {
+                event.pairs.forEach(pair => {
+                    const { bodyA, bodyB } = pair;
+                    const riderBody = bodyA.label === 'rider' ? bodyA : (bodyB.label === 'rider' ? bodyB : null);
+                    const otherBody = riderBody === bodyA ? bodyB : bodyA;
+                    if (riderBody && (otherBody.label === 'wall' || (otherBody.label === 'block' && otherBody.collisionFilter.mask & CAT_RIDER))) {
+                        riderBody.grounded = true;
+                    }
+                });
+            });
+
+            Events.on(engine, 'beforeUpdate', (event) => {
+                bodiesMap.forEach((body) => {
+                    if (body.label === 'rider') return;
+                    if (body.isMovingUp) {
+                        const velY = -1.5;
+                        const newPos = { x: body.position.x, y: body.position.y + velY };
+                        Body.setPosition(body, newPos);
+                        body.velocity.y = velY;
+                    }
+                    if (body.targetAngle !== null) {
+                        const diff = body.targetAngle - body.angle;
+                        if (Math.abs(diff) > 0.05) {
+                            const step = diff > 0 ? 0.05 : -0.05;
+                            Body.setAngle(body, body.angle + step);
+                            body.angularVelocity = step;
+                        } else {
+                            Body.setAngle(body, body.targetAngle);
+                            body.angularVelocity = 0;
+                            body.targetAngle = null;
+                        }
+                    } else if (body.spinSpeed !== 0) {
+                        Body.setAngle(body, body.angle + body.spinSpeed);
+                        body.angularVelocity = body.spinSpeed;
+                    }
+                });
+            });
+
+            Runner.run(runner, engine);
+            requestAnimationFrame(updateLoop);
+        }
+
+        function handleEffect(riderBody, blockBody) {
+            const el = blockBody.sourceElement;
+            const config = JSON.parse(el.dataset.config || '{}');
+            const type = el.dataset.type;
+
+            switch(type) {
+                case 'jump':
+                    Body.setVelocity(riderBody, { x: riderBody.velocity.x, y: -12 });
+                    break;
+                case 'reverse':
+                    riderBody.torqueDir *= -1;
+                    Body.setVelocity(riderBody, { x: -riderBody.velocity.x * 1.1, y: riderBody.velocity.y });
+                    break;
+                case 'ghost':
+                    riderBody.collisionFilter.mask = 0;
+                    setTimeout(() => { if(riderBody && isPlaying) riderBody.collisionFilter.mask = CAT_WALL | CAT_BLOCK; }, 3000);
+                    break;
+                case 'warp':
+                    if (riderBody.warpCooldown > 0) return;
+                    const others = Array.from(bodiesMap.values()).filter(b => b.label === 'block' && b.sourceElement.dataset.type === 'warp' && b !== blockBody);
+                    if (others.length > 0) {
+                        const target = others[0];
+                        Body.setPosition(riderBody, { x: target.position.x, y: target.position.y });
+                        riderBody.warpCooldown = 60;
+                    }
+                    break;
+                case 'destroyer':
+                    resetSim();
+                    return;
+            }
+
+            if (config.target) {
+                applyManipulator(config.type, config.target);
+            }
+
+            el.classList.add('consumed');
+            blockBody.collisionFilter.mask = 0;
+            blockBody.collisionFilter.category = 0;
+            Body.setStatic(blockBody, true);
+        }
+
+        function applyManipulator(effType, targetType) {
+            const targets = Array.from(bodiesMap.values()).filter(b => {
+                const el = b.sourceElement;
+                if (!el || el.classList.contains('consumed')) return false;
+                if (b.label === 'rider') return false; 
+                if (targetType === 'wall') return b.label === 'wall';
+                if (targetType === 'red-wall') return b.label === 'wall' && el.dataset.color === 'red';
+                if (targetType === 'blue-wall') return b.label === 'wall' && el.dataset.color === 'blue';
+                if (targetType === 'green-wall') return b.label === 'wall' && el.dataset.color === 'green';
+                if (targetType === 'goal') return b.label === 'goal';
+                if (targetType === 'block') return b.label === 'block';
+                return false;
+            });
+
+            targets.forEach(t => {
+                t.collisionFilter.mask = CAT_RIDER | CAT_WALL | CAT_BLOCK;
+                switch(effType) {
+                    case 'erase':
+                        t.sourceElement.style.display = 'none';
+                        Composite.remove(engine.world, t);
+                        break;
+                    case 'move-up':
+                        t.isMovingUp = true;
+                        Body.setStatic(t, true); 
+                        break;
+                    case 'rotate':
+                        t.targetAngle = (t.targetAngle !== null ? t.targetAngle : t.angle) + Math.PI / 2;
+                        Body.setStatic(t, true);
+                        break;
+                    case 'spin':
+                        t.spinSpeed = 0.05; 
+                        Body.setStatic(t, true);
+                        break;
+                    case 'gravitize':
+                        Body.setStatic(t, false);
+                        t.isMovingUp = false; 
+                        t.spinSpeed = 0; 
+                        Body.setMass(t, 1);
+                        Body.setInertia(t, 1000);
+                        break;
+                }
+            });
+        }
+
+        function updateLoop() {
+            if (!isPlaying) return;
+
+            const blocks = Array.from(bodiesMap.values()).filter(b => b.label === 'block' || b.label === 'goal');
+            
+            bodiesMap.forEach((body, el) => {
+                if (body.label === 'rider') {
+                    if (body.warpCooldown > 0) body.warpCooldown--;
+                    blocks.forEach(b => {
+                        if (b.sourceElement.classList.contains('consumed')) return;
+                        if (Query.collides(body, [b])[0]) {
+                            if (b.label === 'goal') {
+                                isPlaying = false;
+                                clearMessage.classList.remove('hidden');
+                            } else {
+                                handleEffect(body, b);
+                            }
+                        }
+                    });
+
+                    if (body.grounded) {
+                        const dir = body.torqueDir;
+                        Body.applyForce(body, body.position, { x: TORQUE_FORCE * dir, y: 0 });
+                    }
+                    body.grounded = false;
+
+                    if (body.position.y > 800 && !isResetting) {
+                        isResetting = true;
+                        setTimeout(() => { if (isPlaying) resetSim(); }, 1000);
+                        return;
+                    }
+                }
+
+                el.style.left = (body.position.x - body.myWidth / 2) + 'px';
+                el.style.top = (body.position.y - body.myHeight / 2) + 'px';
+                
+                if (body.label === 'rider') {
+                    const rotAngle = body.position.x * 0.1;
+                    el.style.transform = 'rotate(' + (rotAngle * 180 / Math.PI) + 'deg)';
+                } else {
+                    el.style.transform = 'rotate(' + (body.angle * 180 / Math.PI) + 'deg)';
+                }
+            });
+
+            if (isPlaying) requestAnimationFrame(updateLoop);
+        }
+
+        function togglePlay() { 
+            if (!clearMessage.classList.contains('hidden')) return; 
+            if (isPlaying) resetSim(); 
+            else startSim(); 
+        }
+
+        function resetSim() { 
+            isPlaying = false;
+            isResetting = false;
+            playButton.textContent = '▶️ 再生';
+            playButton.classList.remove('playing');
+            Runner.stop(runner);
+            loadWorld(playButton.dataset.pre || ""); 
+            clearMessage.classList.add('hidden'); renderToolbox(); 
+        }
+
+        function handleReset() { 
+            if (!clearMessage.classList.contains('hidden')) return; 
+            
+            if (isPlaying) { 
+                resetSim(); 
+            } 
+            
+            if (activeTab === 'create') { 
+                showConfirm("ステージを消去して良いですか？", () => { 
+                    createToolboxTemplates = []; 
+                    loadWorld("1:50:500;G:500:500"); 
+                    playerCountInput.value = 1; 
+                    renderToolbox(); 
+                }); 
+            } else { 
+                if (currentStageInitialData) {
+                    const p = currentStageInitialData;
+                    solveLayoutBase = p.layout.split(';');
+                    solveTotalLimit = p.totalLimit;
+                    activePuzzleTemplates = JSON.parse(JSON.stringify(p.toolboxConfig || []));
+                    loadWorld(p.layout);
+                    renderToolbox();
+                    updateLimitDisplay();
+                    clearMessage.classList.add('hidden');
+                }
+            } 
+        }
+
+        function updateLimitDisplay() { if (activeTab === 'solve') solveLimitDisplay.textContent = Math.max(0, solveTotalLimit - currentPlacedCount); }
+        
+        function generateLayoutExport() { 
+            return Array.from(gameWorld.children).map(el => { 
+                const code = TYPE_MAP[el.dataset.type], x = Math.round(parseFloat(el.style.left)), y = Math.round(parseFloat(el.style.top)), w = Math.round(parseFloat(el.style.width) || el.offsetWidth), h = Math.round(parseFloat(el.style.height) || el.offsetHeight), col = el.dataset.color || 'black'; 
+                let extra = el.dataset.config || ''; 
+                if (el.classList.contains('wall') && el.dataset.angle) {
+                    try {
+                        const existingConfig = extra ? JSON.parse(extra) : {};
+                        existingConfig.angle = el.dataset.angle;
+                        extra = JSON.stringify(existingConfig);
+                    } catch(e) {
+                        extra = JSON.stringify({ angle: el.dataset.angle });
+                    }
+                }
+                return code + ':' + x + ':' + y + ':' + w + ':' + h + ':' + col + (extra ? ':' + extra : ''); 
+            }).join(';'); 
+        }
+
+        function openDataModal() { 
+            const data = { 
+                name: "カスタムパズル", 
+                layout: generateLayoutExport(), 
+                totalLimit: parseInt(limitCountInput.value) || 0, 
+                toolboxConfig: (activeTab === 'solve' ? activePuzzleTemplates : createToolboxTemplates).filter(t => !t.placedElId) 
+            }; 
+            dataInput.value = JSON.stringify(data, null, 2); 
+            dataModal.classList.remove('hidden'); 
+        }
+
+        function importPuzzle() { 
+            try { 
+                const data = JSON.parse(dataInput.value); 
+                currentStageInitialData = JSON.parse(JSON.stringify(data));
+                if (activeTab === 'create') { 
+                    createToolboxTemplates = data.toolboxConfig || []; 
+                    limitCountInput.value = data.totalLimit; 
+                } else { 
+                    activePuzzleTemplates = data.toolboxConfig || []; 
+                    solveTotalLimit = data.totalLimit; 
+                    solveLayoutBase = data.layout.split(';'); 
+                } 
+                loadWorld(data.layout); 
+                renderToolbox(); 
+                updateLimitDisplay(); 
+                dataModal.classList.add('hidden'); 
+            } catch(e) { 
+                dataInput.value = "形式エラー"; 
+            } 
+        }
+
+        function showConfirm(text, cb) { confirmModal.classList.remove('hidden'); document.getElementById('confirm-text').textContent = text; const yes = document.getElementById('confirm-yes'), no = document.getElementById('confirm-no'); const y = () => { confirmModal.classList.add('hidden'); cleanup(); cb(); }; const n = () => { confirmModal.classList.add('hidden'); cleanup(); }; const cleanup = () => { yes.removeEventListener('click', y); no.removeEventListener('click', n); }; yes.addEventListener('click', y); no.addEventListener('click', n); }
+        
+        function updateRiders() { if (activeTab !== 'create' || isPlaying) return; const count = parseInt(playerCountInput.value); const current = Array.from(gameWorld.querySelectorAll('.rider')); if (current.length < count) { for(let i = current.length + 1; i <= count; i++) { const r = document.createElement('div'); r.dataset.type = "rider" + i; r.className = 'rider'; r.style.left = (40 * i) + 'px'; r.style.top = '100px'; r.id = "rider" + i; gameWorld.appendChild(r); makeDraggable(r); } } else { for(let i = current.length; i > count; i--) { current[i-1].remove(); } } }
+        
+        init();
+    });
+    </script>
+</body>
+</html>
