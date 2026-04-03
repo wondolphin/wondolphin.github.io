@@ -3,89 +3,113 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local AI Chat - Stability Mode</title>
+    <title>Local AI Chat - GitHub Pages Compatible</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
-        .chat-container { height: calc(100vh - 260px); }
+        .chat-container { height: calc(100vh - 300px); min-height: 350px; }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-900">
+<body class="bg-slate-50 text-slate-900">
 
-    <div class="max-w-3xl mx-auto px-4 py-8">
-        <header class="mb-6 text-center">
-            <h1 class="text-2xl font-bold text-slate-800">Local Browser AI (Stability)</h1>
-            <p class="text-slate-500 text-xs mt-1">プレビュー環境では制限により動かない場合があります。その場合はローカル保存して実行してください。</p>
+    <div class="max-w-4xl mx-auto px-4 py-6">
+        <header class="mb-6 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">Local Browser AI</h1>
+                <p id="env-badge" class="text-[10px] text-slate-400 font-mono mt-1 uppercase tracking-widest">Checking Environment...</p>
+            </div>
+            <div class="text-right">
+                <span id="status-tag" class="text-xs font-bold px-3 py-1 rounded-full bg-slate-200 text-slate-500">OFFLINE</span>
+            </div>
         </header>
 
-        <!-- Status Card -->
-        <div class="bg-white border border-slate-200 rounded-2xl p-5 mb-4 shadow-sm">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div id="status-dot" class="w-3 h-3 rounded-full bg-slate-300"></div>
-                    <span id="status-text" class="font-medium text-slate-700">未ロード</span>
+        <!-- Loading / Setup UI -->
+        <div id="setup-card" class="bg-white border border-slate-200 rounded-3xl p-6 mb-6 shadow-sm">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex-1">
+                    <h2 class="font-bold text-slate-700">AIモデルの準備</h2>
+                    <p class="text-sm text-slate-500">このチャットはあなたのブラウザ内（WebGPU/WASM）で直接動作します。</p>
                 </div>
-                <button id="load-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl transition-all text-sm font-bold">
-                    AIを起動する
+                <button id="load-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl transition-all font-bold shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-50">
+                    モデルをロード
                 </button>
             </div>
             
-            <div id="progress-container" class="hidden mt-4">
+            <div id="progress-container" class="hidden mt-6 border-t border-slate-50 pt-4">
+                <div class="flex justify-between mb-2">
+                    <span id="progress-file" class="text-[10px] text-slate-400 font-mono">Connecting...</span>
+                    <span id="progress-percent" class="text-[10px] font-bold text-blue-600">0%</span>
+                </div>
                 <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                     <div id="progress-bar" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
                 </div>
-                <div id="log-text" class="text-[10px] text-slate-400 mt-2 font-mono h-4 overflow-hidden"></div>
             </div>
         </div>
 
-        <!-- Chat Area -->
-        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
-            <div id="chat-history" class="chat-container overflow-y-auto p-5 space-y-4">
+        <!-- Chat UI -->
+        <div class="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col">
+            <div id="chat-history" class="chat-container overflow-y-auto p-6 space-y-4 bg-slate-50/20">
                 <div class="flex justify-start">
-                    <div class="bg-slate-100 rounded-2xl px-4 py-2 max-w-[85%] text-sm">
-                        AIモデル（約200MB）をロードします。よろしいですか？
+                    <div class="bg-white border border-slate-100 rounded-2xl px-5 py-3 max-w-[85%] text-sm shadow-sm leading-relaxed">
+                        こんにちは！上のボタンを押してAIモデルをロードしてください。<br>
+                        GitHub Pagesで実行する場合、初回のみダウンロードが必要です。
                     </div>
                 </div>
             </div>
 
-            <div class="p-4 border-t border-slate-50">
+            <div class="p-4 bg-white border-t border-slate-100">
                 <form id="chat-form" class="flex gap-2">
                     <input type="text" id="user-input" disabled placeholder="メッセージを入力..." 
-                           class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
-                    <button type="submit" id="send-btn" disabled class="bg-blue-600 text-white p-3 rounded-xl disabled:opacity-50">
+                           class="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 text-sm transition-all">
+                    <button type="submit" id="send-btn" disabled class="bg-blue-600 text-white px-6 rounded-2xl disabled:opacity-50 font-bold hover:bg-blue-700 transition-all shadow-md">
                         送信
                     </button>
                 </form>
             </div>
         </div>
+        
+        <footer class="mt-6 text-center">
+            <p class="text-[10px] text-slate-400 uppercase tracking-tighter">Running on <span id="runtime-info">...</span></p>
+        </footer>
     </div>
 
     <script type="module">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
 
-        // ブラウザ環境向けの最適化設定
+        // GitHub Pagesなどのリモート環境向け設定
         env.allowLocalModels = false;
         env.useBrowserCache = true;
+        // 特定の環境で401が出るのを防ぐため、明示的にリモートパスを指定
+        env.remoteHost = 'https://huggingface.co/';
+        env.remotePathTemplate = '{model}/resolve/{revision}/';
 
         const loadBtn = document.getElementById('load-btn');
-        const statusText = document.getElementById('status-text');
-        const statusDot = document.getElementById('status-dot');
-        const logText = document.getElementById('log-text');
+        const statusTag = document.getElementById('status-tag');
+        const envBadge = document.getElementById('env-badge');
+        const logText = document.getElementById('progress-file');
         const progressBar = document.getElementById('progress-bar');
+        const progressPercent = document.getElementById('progress-percent');
         const progressContainer = document.getElementById('progress-container');
         const chatHistory = document.getElementById('chat-history');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
+        const runtimeInfo = document.getElementById('runtime-info');
 
+        // 環境チェック
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const isGitHub = window.location.hostname.includes('github.io');
+        envBadge.innerText = isGitHub ? 'GitHub Pages Environment' : (isLocal ? 'Local Environment' : 'Web Environment');
+        
         let generator = null;
 
         function addMessage(role, text) {
             const wrapper = document.createElement('div');
-            wrapper.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            wrapper.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} fade-in`;
             const div = document.createElement('div');
-            div.className = `${role === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800'} rounded-2xl px-4 py-2 max-w-[85%] text-sm shadow-sm`;
+            div.className = `${role === 'user' ? 'bg-blue-600 text-white shadow-blue-100' : 'bg-white border border-slate-200 text-slate-800 shadow-slate-100'} rounded-2xl px-5 py-3 max-w-[85%] text-sm shadow-md whitespace-pre-wrap leading-relaxed`;
             div.innerText = text;
             wrapper.appendChild(div);
             chatHistory.appendChild(wrapper);
@@ -94,49 +118,54 @@
 
         loadBtn.addEventListener('click', async () => {
             loadBtn.disabled = true;
-            statusText.innerText = "初期化中...";
+            statusTag.innerText = "LOADING";
+            statusTag.classList.replace('bg-slate-200', 'bg-yellow-100');
+            statusTag.classList.replace('text-slate-500', 'text-yellow-600');
             progressContainer.classList.remove('hidden');
 
             try {
-                // モデルID
-                const modelId = 'onnx-community/SmolLM2-135M-Instruct';
-                
-                // デバイスの判定
+                // モデル: 安定性の高いQwen1.5-0.5B
+                const modelId = 'Xenova/Qwen1.5-0.5B-Chat';
                 const device = navigator.gpu ? 'webgpu' : 'cpu';
-                logText.innerText = `Device: ${device} | Loading model...`;
+                runtimeInfo.innerText = device.toUpperCase();
 
                 generator = await pipeline('text-generation', modelId, {
                     device: device,
-                    dtype: 'q8', // 8ビット量子化版を指定してメモリ消費を抑える
                     progress_callback: (data) => {
                         if (data.status === 'progress') {
-                            progressBar.style.width = `${data.progress}%`;
-                            logText.innerText = `Downloading: ${Math.round(data.progress)}% (${data.file})`;
-                        }
-                        if (data.status === 'ready') {
-                            logText.innerText = "Model ready!";
+                            const p = Math.round(data.progress);
+                            progressBar.style.width = `${p}%`;
+                            progressPercent.innerText = `${p}%`;
+                            logText.innerText = `Fetching: ${data.file.split('/').pop()}`;
                         }
                     }
                 });
 
-                statusText.innerText = `稼働中 (${device})`;
-                statusDot.className = "w-3 h-3 rounded-full bg-green-500";
+                statusTag.innerText = "ONLINE";
+                statusTag.classList.replace('bg-yellow-100', 'bg-green-100');
+                statusTag.classList.replace('text-yellow-600', 'text-green-600');
+                
                 userInput.disabled = false;
                 sendBtn.disabled = false;
-                addMessage('ai', '準備ができました！何でも聞いてください。');
+                document.getElementById('setup-card').classList.add('hidden');
+                addMessage('ai', 'AIモデルの展開が完了しました。この会話はインターネットに送信されず、あなたのデバイス上だけで処理されています。');
 
             } catch (err) {
-                console.error("Critical Error:", err);
-                statusText.innerText = "ロード失敗";
-                statusDot.className = "w-3 h-3 rounded-full bg-red-500";
+                console.error(err);
+                statusTag.innerText = "ERROR";
+                statusTag.classList.replace('bg-yellow-100', 'bg-red-100');
+                statusTag.classList.replace('text-yellow-600', 'text-red-600');
                 
-                let errorMsg = "エラーが発生しました。";
+                let msg = "ロード中にエラーが発生しました。\n";
                 if (window.location.protocol === 'file:') {
-                    errorMsg += "HTMLファイルを直接ダブルクリックで開いているようです。ローカルサーバー経由で開いてください。";
+                    msg += "【重要】HTMLファイルを直接開いています。GitHub Pagesか、ローカルサーバーをご利用ください。";
+                } else if (err.message.includes('401')) {
+                    msg += "【401エラー】GitHubのRaw表示ページから開いている可能性があります。GitHub Pagesを有効にして、そちらのURL（xxx.github.io/...）からアクセスしてください。";
                 } else {
-                    errorMsg += "ブラウザのセキュリティ制限、またはメモリ不足の可能性があります。";
+                    msg += "ネットワークまたはブラウザの制限を確認してください。";
                 }
-                addMessage('ai', errorMsg + "\n\n詳細: " + err.message);
+                addMessage('ai', msg + "\n\nError Detail: " + err.message);
+                loadBtn.disabled = false;
             }
         });
 
@@ -148,23 +177,24 @@
             addMessage('user', text);
             userInput.value = '';
             userInput.disabled = true;
+            sendBtn.disabled = true;
 
             try {
                 const prompt = `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
                 const output = await generator(prompt, {
-                    max_new_tokens: 100,
+                    max_new_tokens: 200,
                     temperature: 0.7,
                     do_sample: true,
-                    stop: ['<|im_end|>']
+                    stop: ['<|im_end|>', '<|im_start|>']
                 });
 
-                const fullText = output[0].generated_text;
-                const response = fullText.split('assistant\n').pop().replace('<|im_end|>', '').trim();
+                const response = output[0].generated_text.split('assistant\n').pop().replace('<|im_end|>', '').trim();
                 addMessage('ai', response || "...");
             } catch (err) {
-                addMessage('ai', "生成エラー: " + err.message);
+                addMessage('ai', "生成エラーが発生しました: " + err.message);
             } finally {
                 userInput.disabled = false;
+                sendBtn.disabled = false;
                 userInput.focus();
             }
         });
