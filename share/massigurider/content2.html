@@ -624,6 +624,50 @@
             ]
         },
         {
+            "name": "ジャンプマスター",
+            "layout": "1:21:164:30:30:black;G:423:174:50:50:black;W:9:203:136:66:black:{\"angle\":\"0\"};W:344:355:54:179:black:{\"angle\":\"0\"};W:343:7:53:199:black:{\"angle\":\"0\"}",
+            "totalLimit": 2,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775126047129",
+                    "type": "jump",
+                    "target": null,
+                    "changeable": true,
+                    "options": [
+                        "wall",
+                        "red-wall",
+                        "blue-wall",
+                        "green-wall",
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+        {
+            "name": "すり抜けパネル",
+            "layout": "1:99:131:30:30:black;G:405:270:50:50:black;W:74:445:468:114:black:{\"angle\":\"0\"};W:271:320:271:18:black:{\"angle\":\"0\"};j:276:390:50:50:black:{\"id\":\"t-1775111574035\",\"type\":\"jump\",\"target\":null,\"changeable\":true,\"options\":[\"wall\",\"red-wall\",\"blue-wall\",\"green-wall\",\"goal\",\"block\"],\"placedElId\":\"el-0.09292420700303428\"}",
+            "totalLimit": 1,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775111690587",
+                    "type": "ghost",
+                    "target": null,
+                    "changeable": true,
+                    "options": [
+                        "wall",
+                        "red-wall",
+                        "blue-wall",
+                        "green-wall",
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+        {
             "name": "赤か青か？",
             "layout": "1:69:83:30:30:black;G:442:444:50:50:black;W:42:134:131:29:blue:{\"angle\":\"0\"};W:185:135:116:27:red:{\"angle\":\"0\"};W:316:138:107:27:blue:{\"angle\":\"0\"};W:441:140:111:27:red:{\"angle\":\"0\"}",
             "totalLimit": 1,
@@ -712,7 +756,51 @@
             ]
         },
         {
+            "name": "回転力",
+            "layout": "1:209:220:30:30:black;G:500:500:50:50:black;W:193:407:286:26:black:{\"angle\":\"0\"}",
+            "totalLimit": 1,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775125570875",
+                    "type": "rotate",
+                    "target": "wall",
+                    "changeable": false,
+                    "options": [
+                        "wall",
+                        "red-wall",
+                        "blue-wall",
+                        "green-wall",
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+        {
             "name": "重力を与える",
+            "layout": "1:200:126:30:30:black;G:29:332:50:50:black;W:46:387:112:43:black:{\"angle\":\"0\"};W:371:317:167:38:black:{\"angle\":\"0\"};W:166:158:186:47:blue:{\"angle\":\"0\"};W:189:373:32:44:black:{\"angle\":\"0\"};r:505:263:50:50:black:{\"id\":\"t-1775175815041\",\"type\":\"reverse\",\"target\":null,\"changeable\":true,\"options\":[\"wall\",\"red-wall\",\"blue-wall\",\"green-wall\",\"goal\",\"block\"],\"placedElId\":\"el-0.5785837503937099\"};W:310:372:33:45:black:{\"angle\":\"0\"}",
+            "totalLimit": 1,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775175817326",
+                    "type": "gravitize",
+                    "target": "blue-wall",
+                    "changeable": false,
+                    "options": [
+                        "wall",
+                        "red-wall",
+                        "blue-wall",
+                        "green-wall",
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+        {
+            "name": "重力を与える2",
             "layout": "1:87:54:30:30:black;G:416:540:50:50:black;W:68:238:513:24:black:{\"angle\":\"0\"};W:453:9:89:85:blue:{\"angle\":\"0\"};W:561:190:21:48:black:{\"angle\":\"0\"}",
             "totalLimit": 2,
             "toolboxConfig": [
@@ -737,6 +825,25 @@
                         "blue-wall",
                         "goal",
                         "wall"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+        {
+            "name": "向かってくるゴール",
+            "layout": "1:87:335:30:30:black;G:487:31:50:50:black;W:44:536:538:33:black:{\"angle\":\"0\"};W:327:152:282:26:black:{\"angle\":\"-38\"};W:474:302:79:70:red:{\"angle\":\"0\"};W:127:321:298:32:black:{\"angle\":\"37\"}",
+            "totalLimit": 2,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775129663562",
+                    "type": "gravitize",
+                    "target": "wall",
+                    "changeable": true,
+                    "options": [
+                        "red-wall",
+                        "blue-wall",
+                        "goal"
                     ],
                     "placedElId": null
                 }
@@ -777,11 +884,228 @@
         },
 
         {
-            "name": "カスタムパズル",
+            "name": "落下パレード",
             "layout": "1:132:152:30:30:black;G:380:16:50:50:black;f:249:317:50:50:black:{\"id\":\"t-1775025730717\",\"type\":\"gravitize\",\"target\":\"red-wall\",\"changeable\":true,\"options\":[\"goal\",\"block\",\"red-wall\",\"wall\"],\"placedElId\":\"el-0.28077206549584954\"};W:74:227:129:76:red:{\"angle\":\"21\"};W:183:449:276:61:black:{\"angle\":\"0\"};g:509:35:50:50:black:{\"id\":\"t-1775025764833\",\"type\":\"ghost\",\"target\":null,\"changeable\":true,\"options\":[\"wall\",\"red-wall\",\"blue-wall\",\"green-wall\",\"goal\",\"block\",\"rider\"],\"placedElId\":\"el-0.6088683632300346\"};W:440:187:29:257:black:{\"angle\":\"0\"};W:12:510:136:77:black:{\"angle\":\"0\"};f:318:394:50:50:black:{\"id\":\"t-1775029545666\",\"type\":\"gravitize\",\"target\":\"red-wall\",\"changeable\":true,\"options\":[\"goal\",\"block\",\"red-wall\",\"wall\"],\"placedElId\":\"el-0.36517030021667585\"};f:360:185:50:50:black:{\"id\":\"t-1775029549916\",\"type\":\"gravitize\",\"target\":\"wall\",\"changeable\":true,\"options\":[\"goal\",\"block\",\"red-wall\"],\"placedElId\":\"el-0.9785977654508463\"};W:381:168:157:17:red:{\"angle\":\"0\"};W:569:131:13:69:black:{\"angle\":\"0\"}",
             "totalLimit": 0,
             "toolboxConfig": []
-        }
+        },
+        
+            {
+            "name": "------以下は未調整------",
+            "layout": "1:50:500:30:30:black;G:500:500:50:50:black",
+            "totalLimit": 5,
+            "toolboxConfig": []
+        },
+                
+                {
+                    "name": "回転させよう",
+                    "layout": "1:324:143:30:30:black;G:172:396:50:50:black;W:138:185:411:7:black:{\"angle\":\"0\"};W:13:237:41:137:blue:{\"angle\":\"0\"};W:40:338:186:59:blue:{\"angle\":\"0\"}",
+                    "totalLimit": 3,
+                    "toolboxConfig": [
+                        {
+                            "id": "t-1775126270097",
+                            "type": "reverse",
+                            "target": null,
+                            "changeable": true,
+                            "options": [
+                                "wall",
+                                "red-wall",
+                                "blue-wall",
+                                "green-wall",
+                                "goal",
+                                "block"
+                            ],
+                            "placedElId": null
+                        },
+                        {
+                            "id": "t-1775126272196",
+                            "type": "reverse",
+                            "target": null,
+                            "changeable": true,
+                            "options": [
+                                "wall",
+                                "red-wall",
+                                "blue-wall",
+                                "green-wall",
+                                "goal",
+                                "block"
+                            ],
+                            "placedElId": null
+                        },
+                        {
+                            "id": "t-1775126276581",
+                            "type": "spin",
+                            "target": "wall",
+                            "changeable": true,
+                            "options": [
+                                "blue-wall",
+                                "goal"
+                            ],
+                            "placedElId": null
+                        }
+                    ]
+                },
+                {
+            "name": "回転2",
+            "layout": "1:68:107:30:30:black;G:455:435:50:50:black;W:46:369:525:22:black:{\"angle\":\"0\"};s:138:291:50:50:black:{\"id\":\"t-1775126002202\",\"type\":\"spin\",\"target\":\"wall\",\"changeable\":false,\"options\":[\"wall\",\"red-wall\",\"blue-wall\",\"green-wall\",\"goal\",\"block\"],\"placedElId\":null}",
+            "totalLimit": 5,
+            "toolboxConfig": [
+                {
+                    "id": "t-1775126002202",
+                    "type": "spin",
+                    "target": "wall",
+                    "changeable": false,
+                    "options": [
+                        "wall",
+                        "red-wall",
+                        "blue-wall",
+                        "green-wall",
+                        "goal",
+                        "block"
+                    ],
+                    "placedElId": null
+                }
+            ]
+        },
+
+            {
+                "name": "2つ同時回転",
+                    "layout": "1:84:164:30:30:black;G:338:449:50:50:black;W:276:38:79:167:blue:{\"angle\":\"0\"};W:45:206:359:17:black:{\"angle\":\"0\"};W:340:318:240:2:black:{\"angle\":\"-31\"};W:210:358:181:41:blue:{\"angle\":\"0\"}",
+                        "totalLimit": 2,
+                            "toolboxConfig": [
+                                {
+                                    "id": "t-1775130777969",
+                                    "type": "rotate",
+                                    "target": "blue-wall",
+                                    "changeable": false,
+                                    "options": [
+                                        "blue-wall"
+                                    ],
+                                    "placedElId": null
+                                },
+                                {
+                                    "id": "t-1775130959103",
+                                    "type": "reverse",
+                                    "target": null,
+                                    "changeable": true,
+                                    "options": [
+                                        "wall",
+                                        "red-wall",
+                                        "blue-wall",
+                                        "green-wall",
+                                        "goal",
+                                        "block"
+                                    ],
+                                    "placedElId": null
+                                }
+                            ]
+            },
+            {
+                "name": "回転の色と順番",
+                    "layout": "1:66:96:30:30:black;G:137:357:50:50:black;W:27:159:202:10:black:{\"angle\":\"0\"};W:318:100:18:159:red:{\"angle\":\"0\"};W:419:197:173:16:red:{\"angle\":\"0\"};W:246:395:303:12:black:{\"angle\":\"0\"};W:111:306:18:239:blue:{\"angle\":\"0\"}",
+                        "totalLimit": 2,
+                            "toolboxConfig": [
+                                {
+                                    "id": "t-1775131826924",
+                                    "type": "rotate",
+                                    "target": "red-wall",
+                                    "changeable": true,
+                                    "options": [
+                                        "wall",
+                                        "red-wall",
+                                        "blue-wall"
+                                    ],
+                                    "placedElId": null
+                                },
+                                {
+                                    "id": "t-1775131889389",
+                                    "type": "reverse",
+                                    "target": null,
+                                    "changeable": true,
+                                    "options": [
+                                        "wall",
+                                        "red-wall",
+                                        "blue-wall",
+                                        "green-wall",
+                                        "goal",
+                                        "block"
+                                    ],
+                                    "placedElId": null
+                                },
+                                {
+                                    "id": "t-1775131892256",
+                                    "type": "rotate",
+                                    "target": "blue-wall",
+                                    "changeable": true,
+                                    "options": [
+                                        "wall",
+                                        "red-wall",
+                                        "blue-wall"
+                                    ],
+                                    "placedElId": null
+                                }
+                            ]
+            },
+            {
+                "name": "同じ色を2回回転させる",
+                    "layout": "1:61:117:30:30:black;G:151:431:50:50:black;W:25:158:410:6:red:{\"angle\":\"0\"};W:256:39:40:116:blue:{\"angle\":\"0\"};W:141:224:138:44:blue:{\"angle\":\"0\"};W:115:318:476:13:red:{\"angle\":\"0\"};W:-13:435:218:12:black:{\"angle\":\"31\"}",
+                        "totalLimit": 4,
+                            "toolboxConfig": [
+                                {
+                                    "id": "t-1775131263621",
+                                    "type": "reverse",
+                                    "target": null,
+                                    "changeable": true,
+                                    "options": [
+                                        "wall",
+                                        "red-wall",
+                                        "blue-wall",
+                                        "green-wall",
+                                        "goal",
+                                        "block"
+                                    ],
+                                    "placedElId": null
+                                },
+                                {
+                                    "id": "t-1775131265721",
+                                    "type": "rotate",
+                                    "target": "blue-wall",
+                                    "changeable": true,
+                                    "options": [
+                                        "red-wall",
+                                        "blue-wall",
+                                        "wall"
+                                    ],
+                                    "placedElId": null
+                                },
+                                {
+                                    "id": "t-1775131267787",
+                                    "type": "rotate",
+                                    "target": "red-wall",
+                                    "changeable": true,
+                                    "options": [
+                                        "red-wall",
+                                        "blue-wall"
+                                    ],
+                                    "placedElId": null
+                                },
+                                {
+                                    "id": "t-1775131347906",
+                                    "type": "reverse",
+                                    "target": null,
+                                    "changeable": true,
+                                    "options": [
+                                        "wall",
+                                        "red-wall",
+                                        "blue-wall",
+                                        "green-wall",
+                                        "goal",
+                                        "block"
+                                    ],
+                                    "placedElId": null
+                                }
+                            ]
+            }
 
     ];
 
