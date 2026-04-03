@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local AI Chat - GitHub Pages Compatible</title>
+    <title>Local AI Chat - Final Stability</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
@@ -19,28 +19,28 @@
         <header class="mb-6 flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold text-slate-800">Local Browser AI</h1>
-                <p id="env-badge" class="text-[10px] text-slate-400 font-mono mt-1 uppercase tracking-widest">Checking Environment...</p>
+                <p id="env-badge" class="text-[10px] text-slate-400 font-mono mt-1 uppercase tracking-widest">Environment: Checking...</p>
             </div>
             <div class="text-right">
                 <span id="status-tag" class="text-xs font-bold px-3 py-1 rounded-full bg-slate-200 text-slate-500">OFFLINE</span>
             </div>
         </header>
 
-        <!-- Loading / Setup UI -->
+        <!-- Setup UI -->
         <div id="setup-card" class="bg-white border border-slate-200 rounded-3xl p-6 mb-6 shadow-sm">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex-1">
-                    <h2 class="font-bold text-slate-700">AIモデルの準備</h2>
-                    <p class="text-sm text-slate-500">このチャットはあなたのブラウザ内（WebGPU/WASM）で直接動作します。</p>
+                    <h2 class="font-bold text-slate-700">AIモデルのロード</h2>
+                    <p class="text-sm text-slate-500">超軽量モデル（約200MB）を使用します。GitHub Pagesでも動作しやすい設定です。</p>
                 </div>
-                <button id="load-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl transition-all font-bold shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-50">
-                    モデルをロード
+                <button id="load-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl transition-all font-bold shadow-lg active:scale-95 disabled:opacity-50">
+                    開始する
                 </button>
             </div>
             
             <div id="progress-container" class="hidden mt-6 border-t border-slate-50 pt-4">
                 <div class="flex justify-between mb-2">
-                    <span id="progress-file" class="text-[10px] text-slate-400 font-mono">Connecting...</span>
+                    <span id="progress-file" class="text-[10px] text-slate-400 font-mono">準備中...</span>
                     <span id="progress-percent" class="text-[10px] font-bold text-blue-600">0%</span>
                 </div>
                 <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
@@ -54,8 +54,7 @@
             <div id="chat-history" class="chat-container overflow-y-auto p-6 space-y-4 bg-slate-50/20">
                 <div class="flex justify-start">
                     <div class="bg-white border border-slate-100 rounded-2xl px-5 py-3 max-w-[85%] text-sm shadow-sm leading-relaxed">
-                        こんにちは！上のボタンを押してAIモデルをロードしてください。<br>
-                        GitHub Pagesで実行する場合、初回のみダウンロードが必要です。
+                        準備ができたら上のボタンを押してください。ブラウザ内のみで動作し、外部へ会話データが送信されることはありません。
                     </div>
                 </div>
             </div>
@@ -72,24 +71,23 @@
         </div>
         
         <footer class="mt-6 text-center">
-            <p class="text-[10px] text-slate-400 uppercase tracking-tighter">Running on <span id="runtime-info">...</span></p>
+            <p class="text-[10px] text-slate-400 uppercase tracking-tighter italic">Mode: <span id="runtime-info">Checking...</span></p>
         </footer>
     </div>
 
     <script type="module">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
 
-        // GitHub Pagesなどのリモート環境向け設定
+        // 互換性設定
         env.allowLocalModels = false;
         env.useBrowserCache = true;
-        // 特定の環境で401が出るのを防ぐため、明示的にリモートパスを指定
         env.remoteHost = 'https://huggingface.co/';
         env.remotePathTemplate = '{model}/resolve/{revision}/';
 
         const loadBtn = document.getElementById('load-btn');
         const statusTag = document.getElementById('status-tag');
         const envBadge = document.getElementById('env-badge');
-        const logText = document.getElementById('progress-file');
+        const progressFile = document.getElementById('progress-file');
         const progressBar = document.getElementById('progress-bar');
         const progressPercent = document.getElementById('progress-percent');
         const progressContainer = document.getElementById('progress-container');
@@ -98,10 +96,8 @@
         const sendBtn = document.getElementById('send-btn');
         const runtimeInfo = document.getElementById('runtime-info');
 
-        // 環境チェック
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const isGitHub = window.location.hostname.includes('github.io');
-        envBadge.innerText = isGitHub ? 'GitHub Pages Environment' : (isLocal ? 'Local Environment' : 'Web Environment');
+        envBadge.innerText = isGitHub ? 'GitHub Pages' : 'Web/Local';
         
         let generator = null;
 
@@ -124,19 +120,20 @@
             progressContainer.classList.remove('hidden');
 
             try {
-                // モデル: 安定性の高いQwen1.5-0.5B
-                const modelId = 'Xenova/Qwen1.5-0.5B-Chat';
+                // 最も軽量でGitHub Pagesでも動きやすいモデル
+                const modelId = 'onnx-community/SmolLM2-135M-Instruct';
                 const device = navigator.gpu ? 'webgpu' : 'cpu';
                 runtimeInfo.innerText = device.toUpperCase();
 
                 generator = await pipeline('text-generation', modelId, {
                     device: device,
+                    dtype: 'q4', // 4bit量子化版を強制的に使用（メモリ節約）
                     progress_callback: (data) => {
                         if (data.status === 'progress') {
                             const p = Math.round(data.progress);
                             progressBar.style.width = `${p}%`;
                             progressPercent.innerText = `${p}%`;
-                            logText.innerText = `Fetching: ${data.file.split('/').pop()}`;
+                            progressFile.innerText = `読み込み中: ${data.file.split('/').pop()}`;
                         }
                     }
                 });
@@ -148,23 +145,27 @@
                 userInput.disabled = false;
                 sendBtn.disabled = false;
                 document.getElementById('setup-card').classList.add('hidden');
-                addMessage('ai', 'AIモデルの展開が完了しました。この会話はインターネットに送信されず、あなたのデバイス上だけで処理されています。');
+                addMessage('ai', 'ロード完了！何でも聞いてください。');
 
             } catch (err) {
-                console.error(err);
+                console.error("Critical Load Error:", err);
                 statusTag.innerText = "ERROR";
                 statusTag.classList.replace('bg-yellow-100', 'bg-red-100');
                 statusTag.classList.replace('text-yellow-600', 'text-red-600');
                 
-                let msg = "ロード中にエラーが発生しました。\n";
-                if (window.location.protocol === 'file:') {
-                    msg += "【重要】HTMLファイルを直接開いています。GitHub Pagesか、ローカルサーバーをご利用ください。";
-                } else if (err.message.includes('401')) {
-                    msg += "【401エラー】GitHubのRaw表示ページから開いている可能性があります。GitHub Pagesを有効にして、そちらのURL（xxx.github.io/...）からアクセスしてください。";
+                // 安全なエラーメッセージの取得
+                const errorMsg = err?.message || JSON.stringify(err) || "Unknown Error";
+                
+                let userFriendlyMsg = "エラーが発生しました。\n";
+                if (errorMsg.includes('401')) {
+                    userFriendlyMsg += "GitHubのRaw表示ではなく、GitHub PagesのURLからアクセスしてください。";
+                } else if (errorMsg.includes('memory') || errorMsg.includes('allocation')) {
+                    userFriendlyMsg += "ブラウザのメモリが不足しています。タブを減らして再試行してください。";
                 } else {
-                    msg += "ネットワークまたはブラウザの制限を確認してください。";
+                    userFriendlyMsg += "環境制限または一時的な通信エラーです。";
                 }
-                addMessage('ai', msg + "\n\nError Detail: " + err.message);
+                
+                addMessage('ai', userFriendlyMsg + "\n\n(Error: " + errorMsg + ")");
                 loadBtn.disabled = false;
             }
         });
@@ -182,7 +183,7 @@
             try {
                 const prompt = `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
                 const output = await generator(prompt, {
-                    max_new_tokens: 200,
+                    max_new_tokens: 128,
                     temperature: 0.7,
                     do_sample: true,
                     stop: ['<|im_end|>', '<|im_start|>']
@@ -191,7 +192,7 @@
                 const response = output[0].generated_text.split('assistant\n').pop().replace('<|im_end|>', '').trim();
                 addMessage('ai', response || "...");
             } catch (err) {
-                addMessage('ai', "生成エラーが発生しました: " + err.message);
+                addMessage('ai', "生成エラー: " + (err?.message || "エラーが発生しました。"));
             } finally {
                 userInput.disabled = false;
                 sendBtn.disabled = false;
