@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Browser AI Chat (Auto Fallback)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .chat-container { height: calc(100vh - 240px); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+    <div class="max-w-3xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-slate-800 mb-2">Local Browser AI</h1>
+            <p class="text-slate-500 text-sm">ブラウザ完結型チャット（WebGPU / WASM 自動切替）</p>
+        </header>
+
+        <!-- Status & Loading Card -->
+        <div id="setup-card" class="glass border border-slate-200 rounded-2xl p-6 mb-6 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <div id="status-dot" class="w-3 h-3 rounded-full bg-slate-300"></div>
+                    <span id="status-text" class="font-semibold text-slate-700">準備中...</span>
+                </div>
+                <button id="load-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl transition-all font-medium disabled:opacity-50">
+                    AIモデルをロード
+                </button>
+            </div>
+            
+            <div id="progress-container" class="hidden">
+                <div class="flex justify-between text-xs text-slate-500 mb-1">
+                    <span id="progress-file">モデルをロード中...</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+                <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                    <div id="progress-bar" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
+                </div>
+                <div id="device-info" class="text-[10px] text-slate-400 mt-2 italic">判定中...</div>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="glass border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+            <div id="chat-history" class="chat-container overflow-y-auto p-6 space-y-4 bg-white/50">
+                <div class="flex justify-start">
+                    <div class="bg-slate-100 rounded-2xl px-4 py-2 max-w-[80%] text-sm">
+                        こんにちは！「AIモデルをロード」ボタンを押すと開始します。<br>
+                        WebGPUが使えない環境ではCPUで動作するため、ロードと応答に時間がかかる場合があります。
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="p-4 border-t border-slate-100 bg-white">
+                <form id="chat-form" class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="user-input" 
+                        disabled
+                        placeholder="AIにメッセージを送る..." 
+                        class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:opacity-50"
+                    >
+                    <button 
+                        type="submit" 
+                        id="send-btn"
+                        disabled
+                        class="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl transition-all disabled:opacity-50"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- UI Modal -->
+    <div id="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 class="text-lg font-bold text-red-600 mb-2">情報</h3>
+            <p id="modal-message" class="text-slate-600 mb-4 text-sm"></p>
+            <button onclick="document.getElementById('modal').classList.add('hidden')" class="w-full bg-slate-100 hover:bg-slate-200 py-2 rounded-xl transition-all">閉じる</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
+
+        // 初期設定
+        env.allowLocalModels = false;
+
+        const loadBtn = document.getElementById('load-btn');
+        const statusText = document.getElementById('status-text');
+        const statusDot = document.getElementById('status-dot');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercent = document.getElementById('progress-percent');
+        const progressFile = document.getElementById('progress-file');
+        const deviceInfo = document.getElementById('device-info');
+        const chatHistory = document.getElementById('chat-history');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const modal = document.getElementById('modal');
+        const modalMessage = document.getElementById('modal-message');
+
+        let generator = null;
+
+        function addMessage(role, text) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            const div = document.createElement('div');
+            div.className = `${role === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800'} rounded-2xl px-4 py-2 max-w-[80%] text-sm shadow-sm whitespace-pre-wrap`;
+            div.innerText = text;
+            wrapper.appendChild(div);
+            chatHistory.appendChild(wrapper);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        function showModal(msg) {
+            modalMessage.innerText = msg;
+            modal.classList.remove('hidden');
+        }
+
+        loadBtn.addEventListener('click', async () => {
+            loadBtn.disabled = true;
+            statusText.innerText = "ロード中...";
+            statusDot.className = "w-3 h-3 rounded-full bg-yellow-400 animate-pulse";
+            progressContainer.classList.remove('hidden');
+
+            const modelId = 'onnx-community/SmolLM2-135M-Instruct';
+            
+            // デバイスの判定
+            let device = 'webgpu';
+            if (!navigator.gpu) {
+                console.warn("WebGPU not supported, falling back to CPU.");
+                device = 'cpu';
+            }
+
+            deviceInfo.innerText = `使用デバイス: ${device.toUpperCase()}`;
+
+            const loadModel = async (targetDevice) => {
+                return await pipeline('text-generation', modelId, {
+                    device: targetDevice,
+                    progress_callback: (data) => {
+                        if (data.status === 'progress') {
+                            const percent = Math.round(data.progress);
+                            progressBar.style.width = `${percent}%`;
+                            progressPercent.innerText = `${percent}%`;
+                            progressFile.innerText = `読み込み中: ${data.file.split('/').pop()}`;
+                        }
+                    }
+                });
+            };
+
+            try {
+                // 第一希望のデバイス（WebGPU）で試行
+                generator = await loadModel(device);
+            } catch (error) {
+                console.error("Primary device load failed:", error);
+                
+                if (device === 'webgpu') {
+                    // WebGPUで失敗した場合はCPUで再試行
+                    try {
+                        deviceInfo.innerText = "WebGPU失敗。CPUモードに切り替えています...";
+                        device = 'cpu';
+                        generator = await loadModel(device);
+                    } catch (cpuError) {
+                        console.error("CPU load failed too:", cpuError);
+                        statusText.innerText = "ロード失敗";
+                        statusDot.className = "w-3 h-3 rounded-full bg-red-500";
+                        showModal("モデルのロードに完全に失敗しました。メモリ不足か、ネットワーク接続を確認してください。");
+                        return;
+                    }
+                }
+            }
+
+            statusText.innerText = `準備完了 (${device.toUpperCase()})`;
+            statusDot.className = "w-3 h-3 rounded-full bg-green-500";
+            loadBtn.innerText = "ロード済み";
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            progressContainer.classList.add('hidden');
+            
+            addMessage('ai', `${device.toUpperCase()}モードで起動しました。日本語も少し話せます！`);
+        });
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = userInput.value.trim();
+            if (!text || !generator) return;
+
+            userInput.value = '';
+            addMessage('user', text);
+            
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = "flex justify-start animate-pulse";
+            loadingDiv.innerHTML = `<div class="bg-slate-100 rounded-2xl px-4 py-2 text-sm text-slate-400">考え中...</div>`;
+            chatHistory.appendChild(loadingDiv);
+
+            try {
+                const chatPrompt = `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
+                
+                const output = await generator(chatPrompt, {
+                    max_new_tokens: 128,
+                    temperature: 0.7,
+                    repetition_penalty: 1.2,
+                    do_sample: true,
+                    // ストップトークンの設定
+                    stop: ['<|im_end|>', '<|im_start|>']
+                });
+
+                chatHistory.removeChild(loadingDiv);
+
+                let responseText = output[0].generated_text.split('<|im_start|>assistant\n').pop();
+                // 不要なタグを除去
+                responseText = responseText.replace(/<\|im_end\|>/g, '').replace(/<\|im_start\|>/g, '').trim();
+                
+                addMessage('ai', responseText || "(返答が空でした。もう一度試してください)");
+
+            } catch (error) {
+                console.error(error);
+                if (loadingDiv.parentNode) chatHistory.removeChild(loadingDiv);
+                addMessage('ai', 'エラーが発生しました。ページをリロードしてみてください。');
+            } finally {
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+                userInput.focus();
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html>
