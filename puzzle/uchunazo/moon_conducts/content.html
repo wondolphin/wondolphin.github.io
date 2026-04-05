@@ -45,58 +45,68 @@
             margin: 0;
         }
 
-        /* メーターエリア: ランプを端に設置 */
+        /* メーターエリア: ランプを極限まで近づける */
         .meter-area {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 4px; /* 隙間をほとんどなくす */
             width: min(90vw, 55vh);
         }
 
         .meter-container {
             flex: 1;
-            height: 12px;
+            height: 16px;
+            display: flex;
+            gap: 2px;
             background-color: rgba(0, 0, 0, 0.3);
-            border-radius: 6px;
-            overflow: hidden;
-            border: 1px solid rgba(74, 222, 128, 0.2);
+            padding: 2px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .meter-bar {
+        .meter-segment {
+            flex: 1;
             height: 100%;
-            background: linear-gradient(90deg, #166534 0%, #4ade80 100%);
-            transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-            box-shadow: 0 0 15px rgba(74, 222, 128, 0.4);
+            background-color: rgba(255, 255, 255, 0.05);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
         }
 
-        /* メーター専用ランプ */
-        .meter-lamp-base {
-            width: 24px;
-            height: 24px;
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(74, 222, 128, 0.3);
+        .meter-segment.active {
+            background-color: #4ade80;
+            box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+        }
+
+        /* 共通ランプベースサイズ */
+        .lamp-base {
+            background: #1e1b4b;
+            border: 2px solid rgba(255, 255, 255, 0.2);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            width: 9vmin;
+            height: 9vmin;
+            max-width: 44px;
+            max-height: 44px;
             flex-shrink: 0;
         }
 
-        .meter-lamp-core {
-            width: 12px;
-            height: 12px;
-            background-color: #334155;
+        .lamp-core {
             border-radius: 50%;
-            transition: all 0.5s ease;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 50%;
+            height: 50%;
+            background-color: #334155;
         }
 
         .meter-lamp-core.active {
             background-color: #4ade80;
-            box-shadow: 0 0 15px #4ade80;
+            box-shadow: 0 0 20px #4ade80;
             transform: scale(1.1);
         }
 
-        /* 盤面エリア */
+        /* ステージエリア */
         .stage-area {
             position: relative;
             width: min(90vw, 60vh);
@@ -105,14 +115,13 @@
             align-items: center;
         }
 
-        /* ランプドック */
         .lamp-dock {
             display: grid;
             grid-template-columns: repeat(6, 1fr);
             gap: 1.5%;
             padding: 0 3%;
-            height: 40px;
-            margin-bottom: -20px;
+            height: 44px;
+            margin-bottom: -22px;
             position: relative;
             z-index: 30;
             width: 100%;
@@ -124,53 +133,32 @@
             justify-content: center;
         }
 
-        .lamp-base {
-            background: #1e1b4b;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-            width: 8vmin;
-            height: 8vmin;
-            max-width: 44px;
-            max-height: 44px;
+        .source-triangle {
+            width: 0;
+            height: 0;
+            border-left: 12px solid transparent;
+            border-right: 12px solid transparent;
+            border-top: 20px solid #4ade80;
+            filter: drop-shadow(0 0 10px #4ade80);
+            animation: pulse-source 2.5s infinite ease-in-out;
+        }
+
+        @keyframes pulse-source {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px #4ade80); }
+            50% { transform: scale(1.2); filter: drop-shadow(0 0 20px #4ade80); }
         }
 
         .target-base {
-            border: 2px dashed #fbbf24;
-        }
-
-        .lamp-core {
-            border-radius: 50%;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            width: 50%;
-            height: 50%;
-        }
-
-        .source-core {
-            background-color: #fbbf24;
-            box-shadow: 0 0 15px #fbbf24, 0 0 30px #f59e0b;
-            animation: pulse-glow 2.5s infinite ease-in-out;
-        }
-
-        @keyframes pulse-glow {
-            0%, 100% { transform: scale(1); box-shadow: 0 0 15px #fbbf24, 0 0 30px #f59e0b; }
-            50% { transform: scale(1.2); box-shadow: 0 0 25px #fbbf24, 0 0 60px #f59e0b; }
-        }
-
-        .target-core {
-            background-color: #334155;
+            border: 2px dashed #4ade80;
         }
 
         .target-core.active {
-            background-color: #fbbf24;
-            box-shadow: 0 0 30px 10px #fbbf24;
+            background-color: #4ade80;
+            box-shadow: 0 0 30px 10px #4ade80;
             transform: scale(1.15);
         }
 
-        /* 盤面コンテナ */
+        /* 盤面コンテナ: content.html参照の色味 */
         .board-container {
             background: rgba(30, 27, 75, 0.6);
             border: 2px solid rgba(255, 255, 255, 0.1);
@@ -180,6 +168,7 @@
             z-index: 10;
             backdrop-filter: blur(10px);
             width: 100%;
+            aspect-ratio: 1 / 1;
         }
 
         .tile-grid {
@@ -188,6 +177,8 @@
             grid-template-rows: repeat(6, 1fr);
             gap: 1.5%;
             padding: 3%;
+            width: 100%;
+            height: 100%;
             border-radius: 20px;
             position: relative;
         }
@@ -204,27 +195,28 @@
             overflow: hidden;
         }
 
+        /* content.htmlの色味を反映 */
         .tile-empty {
-            background-color: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            background-color: rgba(5, 5, 5, 0.13);
+            border: 1px solid rgba(5, 5, 5, 0.05);
         }
 
         .tile-panel {
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.03);
             cursor: pointer;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .tile-selected {
             box-shadow: 0 0 0 4px #fbbf24;
-            background: rgba(251, 191, 36, 0.1);
+            background: rgba(251, 191, 36, 0.15);
             transform: scale(1.05);
             z-index: 20;
         }
 
         .tile-fixed {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(5, 5, 5, 0.13);
+            border: 1px solid rgba(5, 5, 5, 0.05);
             cursor: not-allowed;
         }
 
@@ -241,6 +233,7 @@
             filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
         }
 
+        /* 光のルート */
         .global-path-svg {
             position: absolute;
             top: 0; left: 0;
@@ -256,18 +249,18 @@
         }
 
         .beam-line {
-            stroke: #fbbf24;
-            stroke-width: 4;
+            stroke: #4ade80;
+            stroke-width: 5;
             stroke-linecap: round;
-            stroke-linejoin: round;
+            stroke-linejoin: bevel; /* content.html準拠 */
             fill: none;
-            filter: drop-shadow(0 0 12px #f59e0b);
+            filter: drop-shadow(0 0 12px #22c55e);
         }
 
-        /* クリア画面 */
+        /* クリア画面: 背景の透過率を上げて盤面を見せる */
         #clear-modal {
-            background-color: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(20px);
+            background-color: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
             cursor: pointer;
             width: 100%;
             height: 100%;
@@ -282,6 +275,29 @@
             width: 100%;
             height: 100%;
         }
+
+        /* シェアボタンのコンテナ */
+        .btn-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            width: 100%;
+            max-width: 320px;
+        }
+
+        .share-option-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            padding: 1rem;
+            border-radius: 12px;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+
+        .share-option-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
     </style>
 </head>
 <body>
@@ -289,21 +305,20 @@
     <div class="game-wrapper">
         <h1 class="title-text">月は導く</h1>
 
-        <!-- メーター + ランプ -->
         <div class="meter-area">
-            <div class="meter-container">
-                <div id="meter-bar" class="meter-bar" style="width: 0%"></div>
+            <div id="meter-container" class="meter-container">
+                <!-- JSで36セグメント生成 -->
             </div>
-            <div class="meter-lamp-base">
-                <div id="meter-lamp-core" class="meter-lamp-core"></div>
+            <div class="lamp-base">
+                <div id="meter-lamp-core" class="meter-lamp-core lamp-core"></div>
             </div>
         </div>
 
         <div class="stage-area">
             <div class="lamp-dock">
                 <div class="col-start-2 lamp-spot">
-                    <div id="source-lamp" class="lamp-base">
-                        <div class="source-core lamp-core"></div>
+                    <div id="source-lamp">
+                        <div class="source-triangle"></div>
                     </div>
                 </div>
                 <div class="col-start-4 lamp-spot">
@@ -314,7 +329,7 @@
             </div>
 
             <div class="board-container">
-                <div id="board-root" class="relative w-full">
+                <div id="board-root" class="relative w-full h-full">
                     <div id="board" class="tile-grid"></div>
                     <svg id="path-overlay" class="global-path-svg">
                         <polyline id="path-line" class="beam-line" points="" />
@@ -325,19 +340,44 @@
     </div>
 
     <!-- クリア画面 -->
-    <div id="clear-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6" onclick="closeModal()">
-        <div class="modal-content space-y-8 sm:space-y-12 pointer-events-none">
-            <h2 class="text-6xl sm:text-8xl font-black text-amber-400 animate-bounce tracking-tighter drop-shadow-2xl">CLEAR!</h2>
-            <button id="share-btn" class="pointer-events-auto bg-green-500 hover:bg-green-400 text-indigo-950 font-black py-4 px-10 sm:py-5 sm:px-14 rounded-2xl shadow-2xl transition transform hover:scale-105 active:scale-95 flex items-center justify-center">
-                <span class="text-xl sm:text-2xl whitespace-nowrap font-bold">Xで喜びを共有する</span>
-            </button>
+    <div id="clear-modal" class="hidden fixed inset-0 z-50 p-6" onclick="closeModal()">
+        <div class="modal-content space-y-12 pointer-events-none">
+            <h2 id="clear-title" class="text-6xl sm:text-8xl font-black text-amber-400 animate-bounce tracking-tighter drop-shadow-2xl">CLEAR!</h2>
+            
+            <div class="btn-container pointer-events-auto">
+                <!-- デフォルトのシェアボタン -->
+                <button id="share-btn" class="w-full bg-green-500 hover:bg-green-400 text-indigo-950 font-black py-4 px-6 rounded-2xl shadow-2xl transition transform hover:scale-105 active:scale-95">
+                    <span id="share-btn-text" class="text-xl whitespace-nowrap font-bold">Xで喜びを共有する</span>
+                </button>
+                
+                <!-- 選択肢メニュー (最初は隠れている) -->
+                <div id="share-choices" class="hidden flex flex-col gap-3">
+                    <button id="post-report-btn" class="w-full bg-white text-indigo-950 font-black py-4 rounded-xl shadow-lg hover:bg-gray-100 transition">
+                        クリア報告のポスト
+                    </button>
+                    <button id="like-original-btn" class="w-full bg-indigo-600 text-white font-black py-4 rounded-xl shadow-lg hover:bg-indigo-500 transition">
+                        原ポストにいいね・リポスト
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
+        /**
+         * シェアモードの設定
+         * true: 「喜びを共有する」を押した後に選択肢を表示する
+         * false: 「喜びを共有する」を押すと直接ポスト投稿画面を開く
+         */
+        const SHARE_MODE_CHOICE = false; // ★ここを書き換えて切り替え可能
+
+        // 原ポストのURL (必要に応じて設定)
+        const ORIGINAL_POST_URL = "https://x.com/"; 
+
         const GRID_SIZE = 6;
+        const SEGMENTS = 36;
         const boardElement = document.getElementById('board');
-        const meterBar = document.getElementById('meter-bar');
+        const meterContainer = document.getElementById('meter-container');
         const meterLampCore = document.getElementById('meter-lamp-core');
         const targetLamp = document.getElementById('target-lamp');
         const clearModal = document.getElementById('clear-modal');
@@ -350,6 +390,12 @@
         let isLocked = false;
         let showClearVisuals = false;
 
+        for (let i = 0; i < SEGMENTS; i++) {
+            const seg = document.createElement('div');
+            seg.className = 'meter-segment';
+            meterContainer.appendChild(seg);
+        }
+
         function initGame() {
             for (let r = 0; r < GRID_SIZE; r++) {
                 boardState[r] = [];
@@ -357,7 +403,6 @@
                     boardState[r][c] = null;
                 }
             }
-            // 指定の初期配置
             boardState[1][0] = { type: 1, fixed: false };
             boardState[1][1] = { type: 1, fixed: false };
             boardState[3][4] = { type: 4, fixed: false };
@@ -408,7 +453,7 @@
                         img.style.transform = `rotate(${getRotation(tile.type)}deg)`;
                         img.onerror = () => {
                             img.style.display = 'none';
-                            tileDiv.innerHTML = `<div class="w-3/4 h-3/4 bg-indigo-500/30 rounded-full border border-indigo-400/30"></div>`;
+                            tileDiv.innerHTML = `<div class="w-3/4 h-3/4 bg-indigo-500/20 rounded-full border border-indigo-400/20 shadow-inner"></div>`;
                         };
                         tileDiv.appendChild(img);
                     }
@@ -417,25 +462,27 @@
                 }
             }
 
-            // メーターの更新
-            const percentage = (uniqueCount / 36) * 100;
-            meterBar.style.width = `${percentage}%`;
+            const segments = meterContainer.children;
+            for (let i = 0; i < SEGMENTS; i++) {
+                if (i < uniqueCount) {
+                    segments[i].classList.add('active');
+                } else {
+                    segments[i].classList.remove('active');
+                }
+            }
 
-            // メーターランプの点灯判定
-            if (uniqueCount === 36) {
+            if (uniqueCount === SEGMENTS) {
                 meterLampCore.classList.add('active');
             } else {
                 meterLampCore.classList.remove('active');
             }
 
-            // ターゲットランプの更新
             if (reachedTarget) {
                 targetLamp.classList.add('active');
             } else {
                 targetLamp.classList.remove('active');
             }
 
-            // クリア演出の開始
             if (isPerfect && !showClearVisuals && !isLocked) {
                 setTimeout(() => {
                     showClearVisuals = true;
@@ -473,6 +520,10 @@
 
         function triggerClearSequence() {
             isLocked = true;
+            // 状態をリセット
+            document.getElementById('share-btn').classList.remove('hidden');
+            document.getElementById('share-choices').classList.add('hidden');
+            
             setTimeout(() => {
                 if (showClearVisuals) clearModal.classList.remove('hidden');
             }, 3000);
@@ -524,9 +575,34 @@
             return { pathData, reachedTarget: (currR === -1 && currC === 3 && dir === 'UP'), uniqueCount: new Set(pathData.map(p => `${p.r},${p.c}`)).size };
         }
 
+        // ポスト投稿画面を開く関数
+        function openTweetWindow() {
+            const text = encodeURIComponent("宇宙謎「月は導く」をクリアしました！\n#宇宙謎　#ルール発見型パズル　@wondolphin\nhttps://wondolphin.github.io/puzzle/uchunazo/moon_conducts/index.html");
+            window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
+        }
+
+        // シェアボタンのクリックイベント
         document.getElementById('share-btn').onclick = (e) => {
             e.stopPropagation();
-            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent("パズルゲーム「月は導く」をクリア！ 36マス全制覇！ #月は導く")}`, '_blank');
+            if (SHARE_MODE_CHOICE) {
+                // 選択肢メニューを表示
+                document.getElementById('share-btn').classList.add('hidden');
+                document.getElementById('share-choices').classList.remove('hidden');
+            } else {
+                // 直接ポスト画面へ
+                openTweetWindow();
+            }
+        };
+
+        // 各選択ボタンのイベント
+        document.getElementById('post-report-btn').onclick = (e) => {
+            e.stopPropagation();
+            openTweetWindow();
+        };
+
+        document.getElementById('like-original-btn').onclick = (e) => {
+            e.stopPropagation();
+            window.open(ORIGINAL_POST_URL, '_blank');
         };
 
         window.onload = initGame;
