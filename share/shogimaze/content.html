@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>将棋めいず</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --board-color: #edcb8d;
+            --cell-border: #444;
+            --primary-btn: #4a90e2;
+            --danger-btn: #e94e77;
+            --safe-color: rgba(144, 238, 144, 0.7);
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 36px;
+            color: #2c3e50;
+            letter-spacing: 4px;
+        }
+
+        nav {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            background: white;
+            padding: 8px 25px;
+            border-radius: 50px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        select {
+            padding: 6px 12px;
+            font-size: 14px;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+            outline: none;
+        }
+
+        .retry-btn {
+            background: var(--danger-btn);
+            color: white;
+            padding: 6px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        main {
+            display: flex;
+            flex-direction: row;
+            gap: 40px;
+            align-items: center;
+            justify-content: center;
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        @media (max-width: 850px) {
+            main { flex-direction: column; gap: 20px; }
+        }
+
+        #board {
+            display: grid;
+            background-color: var(--board-color);
+            border: 5px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+
+        .cell {
+            width: 70px;
+            height: 70px;
+            border: 1px solid var(--cell-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        /* 安全地帯（スタートとゴール）のマーカー */
+        .safe-marker {
+            position: absolute;
+            width: 85%;
+            height: 85%;
+            background-color: var(--safe-color);
+            border-radius: 50%;
+            z-index: 1;
+        }
+
+        .piece {
+            width: 85%;
+            height: 85%;
+            object-fit: contain;
+            z-index: 3;
+            position: relative;
+        }
+
+        .piece.enemy {
+            transform: rotate(180deg);
+            z-index: 2;
+        }
+
+        /* プレイヤー昇天アニメーション */
+        .player-captured {
+            animation: floatHigh 1.2s forwards ease-in;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        @keyframes floatHigh {
+            0% { opacity: 0.4; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-800px); }
+        }
+
+        #side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.06);
+            min-width: 220px;
+            align-items: center;
+        }
+
+        .status-section { text-align: center; }
+        .status-label { font-size: 12px; color: #999; letter-spacing: 1px; margin-bottom: 5px; display: block; }
+        .lives-display { font-size: 28px; color: var(--danger-btn); letter-spacing: 3px; }
+
+        #controls-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 55px);
+            grid-template-rows: repeat(3, 55px);
+            gap: 10px;
+        }
+
+        .ctrl-btn {
+            background: var(--primary-btn);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px #2a6dbd;
+            transition: background 0.1s;
+        }
+
+        .ctrl-btn:active { box-shadow: 0 1px #2a6dbd; transform: translateY(3px); }
+        .ctrl-btn.center { background: #f8f9fa; box-shadow: none; cursor: default; }
+
+        #clear-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: transparent;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .clear-text {
+            font-size: 48px;
+            font-weight: 900;
+            color: #f1c40f;
+            text-shadow: 3px 3px 0px rgba(0,0,0,0.8), 0 0 20px rgba(241, 196, 15, 0.4);
+            margin-bottom: 10px;
+            animation: bounce 0.6s infinite alternate;
+        }
+
+        @keyframes bounce {
+            from { transform: scale(1); }
+            to { transform: scale(1.05); }
+        }
+
+        .clear-subtext { 
+            font-size: 18px; 
+            color: white; 
+            background: rgba(0,0,0,0.6); 
+            padding: 5px 15px; 
+            border-radius: 20px;
+        }
+
+        .piece-placeholder { font-size: 14px; font-weight: bold; z-index: 3; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>将棋めいず</h1>
+</header>
+
+<nav>
+    <select id="level-select" onchange="changeLevel()"></select>
+    <button class="retry-btn" onclick="resetStage()">リセット</button>
+</nav>
+
+<main>
+    <div id="board"></div>
+
+    <div id="side-panel">
+        <div class="status-section">
+            <span class="status-label">LIVES</span>
+            <div id="lives-display" class="lives-display"></div>
+        </div>
+
+        <div id="controls-grid">
+            <button class="ctrl-btn" onclick="movePlayer(-1, -1)">↖</button>
+            <button class="ctrl-btn" onclick="movePlayer(-1, 0)">↑</button>
+            <button class="ctrl-btn" onclick="movePlayer(-1, 1)">↗</button>
+            <button class="ctrl-btn" onclick="movePlayer(0, -1)">←</button>
+            <div class="ctrl-btn center"></div>
+            <button class="ctrl-btn" onclick="movePlayer(0, 1)">→</button>
+            <button class="ctrl-btn" onclick="movePlayer(1, -1)">↙</button>
+            <button class="ctrl-btn" onclick="movePlayer(1, 0)">↓</button>
+            <button class="ctrl-btn" onclick="movePlayer(1, 1)">↘</button>
+        </div>
+    </div>
+</main>
+
+<div id="clear-overlay" onclick="closeClearOverlay()">
+    <div class="clear-text">ステージクリア！</div>
+    <div class="clear-subtext">画面をタップして次へ</div>
+</div>
+
+<script>
+    const levels = [
+        {
+            name: "ステージ 1",
+            maxLives: 1,
+            grid: [
+                ["gyoku_c", ".", ".", ".", "g"],
+                [".", "kei_c", ".", ".", "gin_c"],
+                [".", ".", ".", ".", "."],
+                ["s", ".", ".", ".", "kaku_c"]
+            ]
+        },
+        {
+            name: "ステージ 2",
+            maxLives: 1,
+            grid: [
+[".",".","g",".",".","fu_c"],
+[".",".",".","gin_c",".","."],
+[".","hisha_c",".",".","kaku_c","."],
+[".","fu",".","kaku_c",".","."],
+["s",".",".",".",".","."]
+
+
+            ]
+        },
+        {
+            name: "ステージ 3",
+            maxLives: 2,
+            grid: [
+                [".", ".", "fu_c", "."],
+                ["fu_c", ".", ".", "g"],
+                [".", ".", "uma_c", "."],
+                [".", ".", ".", "."],
+                ["s", ".", ".", "."]
+            ]
+        },
+        {
+            name: "ステージ 4",
+            maxLives: 3,
+            grid: [
+                ["g", ".", ".", ".", "."],
+                [".", "gin_c", ".", "gin_c", "."],
+                [".", ".", "uma_c", ".", "."],
+                [".", ".", ".", ".", "."],
+                [".", ".", ".", ".", "s"]
+            ]
+        }
+    ];
+
+    let currentLevelIndex = 0;
+    let boardState = [];
+    let initialGrid = [];
+    let playerPos = { r: 0, c: 0 };
+    let startPos = { r: 0, c: 0 };
+    let goalPos = { r: 0, c: 0 };
+    let lives = 1;
+    
+    let isGameOver = false;
+    let isTransitioning = false;
+    let isCapturing = false;
+    let rows = 0;
+    let cols = 0;
+
+    const boardEl = document.getElementById('board');
+    const levelSelect = document.getElementById('level-select');
+    const livesDisplay = document.getElementById('lives-display');
+    const clearOverlay = document.getElementById('clear-overlay');
+
+    function setupLevelSelector() {
+        levelSelect.innerHTML = "";
+        levels.forEach((lvl, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.innerText = lvl.name;
+            levelSelect.appendChild(opt);
+        });
+    }
+
+    function changeLevel() {
+        currentLevelIndex = parseInt(levelSelect.value);
+        resetStage();
+    }
+
+    function resetStage() {
+        lives = levels[currentLevelIndex].maxLives;
+        initGame();
+    }
+
+    function initGame() {
+        initialGrid = levels[currentLevelIndex].grid;
+        boardState = JSON.parse(JSON.stringify(initialGrid));
+        rows = boardState.length;
+        cols = boardState[0].length;
+        isGameOver = false;
+        isTransitioning = false;
+        isCapturing = false;
+        
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (boardState[r][c] === 's') {
+                    startPos = { r, c };
+                    playerPos = { r, c };
+                    boardState[r][c] = '.'; 
+                } else if (boardState[r][c] === 'g') {
+                    goalPos = { r, c };
+                }
+            }
+        }
+        updateLivesUI();
+        render();
+    }
+
+    function updateLivesUI() {
+        const max = levels[currentLevelIndex].maxLives;
+        livesDisplay.innerHTML = "●".repeat(lives) + "<span style='color:#eee'>" + "●".repeat(max - lives) + "</span>";
+    }
+
+    function render() {
+        boardEl.innerHTML = "";
+        boardEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        boardEl.style.width = `${cols * 70}px`;
+
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                
+                // スタートまたはゴールなら安全地帯マーカーを表示
+                if (initialGrid[r][c] === 's' || initialGrid[r][c] === 'g') {
+                    const marker = document.createElement('div');
+                    marker.className = 'safe-marker';
+                    cell.appendChild(marker);
+                }
+
+                const content = boardState[r][c];
+                const isPlayerCell = (r === playerPos.r && c === playerPos.c);
+
+                if (content === 'g') {
+                    cell.appendChild(createPieceImg('goal', 'G'));
+                } else if (content !== '.' && content !== 's') {
+                    const isEnemy = content.endsWith('_c');
+                    const pieceId = isEnemy ? content.replace('_c', '') : content;
+                    cell.appendChild(createPieceImg(pieceId, pieceId, isEnemy));
+                }
+
+                // プレイヤーの表示：
+                // 生存中かつ(移動中ではない OR キャプチャアニメ中)
+                if (isPlayerCell && (isCapturing || (!isTransitioning && lives > 0))) {
+                    const img = createPieceImg('player', 'P');
+                    img.id = 'player-img';
+                    if (isCapturing) img.classList.add('player-captured');
+                    cell.appendChild(img);
+                }
+                boardEl.appendChild(cell);
+            }
+        }
+    }
+
+    function createPieceImg(id, alt, isEnemy = false) {
+        const img = document.createElement('img');
+        img.src = `images/${id}.png`;
+        img.alt = alt;
+        img.className = `piece ${isEnemy ? 'enemy' : ''}`;
+        img.onerror = () => handleImageError(img, alt);
+        return img;
+    }
+
+    function handleImageError(img, id) {
+        const span = document.createElement('span');
+        span.className = 'piece-placeholder';
+        span.innerText = id;
+        if (img.parentNode) img.parentNode.replaceChild(span, img);
+    }
+
+    function movePlayer(dr, dc) {
+        if (isGameOver || isTransitioning) return;
+        const nr = playerPos.r + dr;
+        const nc = playerPos.c + dc;
+        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) return;
+        playerPos = { r: nr, c: nc };
+        
+        if (playerPos.r === goalPos.r && playerPos.c === goalPos.c) {
+            render();
+            showClearOverlay();
+            isGameOver = true;
+            return;
+        }
+        render();
+        checkCapture();
+    }
+
+    function checkCapture() {
+        // スタート地点は安全地帯なので、チェックをスキップ
+        if (playerPos.r === startPos.r && playerPos.c === startPos.c) return;
+
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const piece = boardState[r][c];
+                if (piece.endsWith('_c')) {
+                    if (canReach(piece, r, c, playerPos.r, playerPos.c)) {
+                        triggerCapture(r, c);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    function canReach(piece, startR, startC, targetR, targetC) {
+        const dr = targetR - startR;
+        const dc = targetC - startC;
+        const id = piece.replace('_c', '');
+        const isSlide = (rDir, cDir) => {
+            let currR = startR + rDir;
+            let currC = startC + cDir;
+            while (currR >= 0 && currR < rows && currC >= 0 && currC < cols) {
+                if (currR === targetR && currC === targetC) return true;
+                const cellContent = boardState[currR][currC];
+                if (cellContent !== '.' && cellContent !== 'g') break;
+                currR += rDir; currC += cDir;
+            }
+            return false;
+        };
+
+        switch (id) {
+            case 'fu': return dr === 1 && dc === 0;
+            case 'kyou': return dc === 0 && dr > 0 && isSlide(1, 0);
+            case 'kei': return dr === 2 && Math.abs(dc) === 1;
+            case 'gin': return (dr === 1 && Math.abs(dc) <= 1) || (dr === -1 && Math.abs(dc) === 1);
+            case 'kin': return (dr === 1 && Math.abs(dc) <= 1) || (dr === 0 && Math.abs(dc) === 1) || (dr === -1 && dc === 0);
+            case 'kaku': return Math.abs(dr) === Math.abs(dc) && isSlide(Math.sign(dr), Math.sign(dc));
+            case 'hisha': return (dr === 0 || dc === 0) && isSlide(Math.sign(dr), Math.sign(dc));
+            case 'gyoku': return Math.abs(dr) <= 1 && Math.abs(dc) <= 1;
+            case 'uma': return (Math.abs(dr) <= 1 && Math.abs(dc) <= 1) || (Math.abs(dr) === Math.abs(dc) && isSlide(Math.sign(dr), Math.sign(dc)));
+            case 'ryuu': return (Math.abs(dr) <= 1 && Math.abs(dc) <= 1) || ((dr === 0 || dc === 0) && isSlide(Math.sign(dr), Math.sign(dc)));
+            default: return false;
+        }
+    }
+
+    function triggerCapture(enemyR, enemyC) {
+        isTransitioning = true;
+        const enemyPiece = boardState[enemyR][enemyC];
+        boardState[enemyR][enemyC] = '.';
+        boardState[playerPos.r][playerPos.c] = enemyPiece;
+        isCapturing = true;
+        render(); 
+
+        setTimeout(() => {
+            lives--;
+            updateLivesUI();
+            isCapturing = false;
+            if (lives > 0) {
+                playerPos = { ...startPos };
+                isTransitioning = false;
+                render();
+            } else {
+                isGameOver = true;
+                isTransitioning = false;
+                render(); // 残機0なので、プレイヤーが消えた状態で再描画される
+            }
+        }, 1200);
+    }
+
+    function showClearOverlay() {
+        clearOverlay.style.display = 'flex';
+    }
+
+    function closeClearOverlay() {
+        clearOverlay.style.display = 'none';
+        if (currentLevelIndex < levels.length - 1) {
+            currentLevelIndex++;
+            levelSelect.value = currentLevelIndex;
+            resetStage();
+        }
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (isGameOver || isTransitioning) return;
+        switch(e.key) {
+            case 'ArrowUp': movePlayer(-1, 0); break;
+            case 'ArrowDown': movePlayer(1, 0); break;
+            case 'ArrowLeft': movePlayer(0, -1); break;
+            case 'ArrowRight': movePlayer(0, 1); break;
+            case '7': case 'Home': movePlayer(-1, -1); break;
+            case '9': case 'PageUp': movePlayer(-1, 1); break;
+            case '1': case 'End': movePlayer(1, -1); break;
+            case '3': case 'PageDown': movePlayer(1, 1); break;
+        }
+    });
+
+    window.onload = () => {
+        setupLevelSelector();
+        currentLevelIndex = 0;
+        levelSelect.value = currentLevelIndex;
+        resetStage();
+    };
+</script>
+
+</body>
+</html>
