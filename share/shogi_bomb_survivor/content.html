@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>将棋ボム・サバイバー</title>
+    <style>
+        :root {
+            --board-color: #e3c16f;
+            --line-color: #333;
+            --player-color: #3498db;
+            --danger-color: rgba(231, 76, 60, 0.85);
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #2c3e50;
+            color: white;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #ui-layer {
+            text-align: center;
+            z-index: 100;
+        }
+
+        .menu-btn {
+            background: #f1c40f;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #2c3e50;
+            cursor: pointer;
+            border-radius: 8px;
+            margin: 10px;
+            transition: transform 0.1s;
+        }
+
+        .menu-btn:hover {
+            transform: scale(1.05);
+            background: #f39c12;
+        }
+
+        #game-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #stats {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 10px;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        #board {
+            display: grid;
+            background-color: var(--board-color);
+            border: 4px solid var(--line-color);
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .cell {
+            border: 1px solid var(--line-color);
+            box-sizing: border-box;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .player {
+            width: 70%;
+            height: 70%;
+            background-color: var(--player-color);
+            border-radius: 50%;
+            z-index: 20;
+            transition: all 0.1s ease-out;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            border: 3px solid white;
+        }
+
+        /* 将棋の駒コンテナ */
+        .piece-container {
+            position: absolute;
+            width: 90%;
+            height: 90%;
+            z-index: 10;
+            transform: rotate(180deg); /* 相手方の向きに回転 */
+        }
+
+        .piece-img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .piece-overlay {
+            opacity: 0;
+            transition: opacity 6s linear; /* 6秒かけて徐々に濃くなる */
+        }
+
+        /* 爆発0.5秒前の点滅アニメーション */
+        @keyframes blinkEffect {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        .blink-pre-explosion {
+            animation: blinkEffect 0.25s linear 2; /* 0.5秒間で2回明滅 */
+        }
+
+        .explosion-zone {
+            background-color: var(--danger-color) !important;
+            transition: background-color 0.1s;
+            z-index: 5;
+        }
+
+        #game-over {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        #timer-display {
+            font-family: 'Courier New', Courier, monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <h1>将棋ボム・サバイバー</h1>
+        <p>爆発する駒の範囲から逃げ続けろ！</p>
+        <button class="menu-btn" onclick="startGame(6)">6 × 6 盤面</button>
+        <button class="menu-btn" onclick="startGame(9)">9 × 9 盤面</button>
+    </div>
+
+    <div id="game-container">
+        <div id="stats">
+            <div>LIFE: <span id="life-display"></span></div>
+            <div>TIME: <span id="timer-display">0.00</span>s</div>
+        </div>
+        <div id="board"></div>
+    </div>
+
+    <div id="game-over">
+        <h1>GAME OVER</h1>
+        <p id="final-score"></p>
+        <button class="menu-btn" onclick="location.reload()">もう一度プレイ</button>
+    </div>
+
+    <script>
+        const boardElement = document.getElementById('board');
+        const lifeDisplay = document.getElementById('life-display');
+        const timerDisplay = document.getElementById('timer-display');
+        const gameContainer = document.getElementById('game-container');
+        const uiLayer = document.getElementById('ui-layer');
+        const gameOverScreen = document.getElementById('game-over');
+        const finalScoreText = document.getElementById('final-score');
+
+        let boardSize = 6;
+        let playerPos = { x: 0, y: 0 };
+        let lives = 3;
+        let startTime = 0;
+        let gameActive = false;
+        let spawnInterval = 4000; // 初期値を4秒に変更
+        const minInterval = 1000;
+        const intervalDecrease = 200;
+        let bombs = [];
+        let scoreInterval;
+        let spawnTimeout;
+
+        const PIECES = [
+            { type: 'pawn', img: 'fu.png', img_r: 'fu_r.png' },
+            { type: 'lance', img: 'kyou.png', img_r: 'kyou_r.png' },
+            { type: 'knight', img: 'kei.png', img_r: 'kei_r.png' },
+            { type: 'silver', img: 'gin.png', img_r: 'gin_r.png' },
+            { type: 'gold', img: 'kin.png', img_r: 'kin_r.png' },
+            { type: 'bishop', img: 'kaku.png', img_r: 'kaku_r.png' },
+            { type: 'rook', img: 'hisha.png', img_r: 'hisha_r.png' },
+            { type: 'king', img: 'gyoku.png', img_r: 'gyoku_r.png' },
+            { type: 'horse', img: 'uma.png', img_r: 'uma_r.png' },
+            { type: 'dragon', img: 'ryuu.png', img_r: 'ryuu_r.png' }
+        ];
+
+        function startGame(size) {
+            boardSize = size;
+            uiLayer.style.display = 'none';
+            gameContainer.style.display = 'flex';
+            
+            initBoard();
+            resetGame();
+            
+            window.addEventListener('keydown', handleKeyDown);
+            gameActive = true;
+            startTime = Date.now();
+            
+            scoreInterval = setInterval(updateScore, 50);
+            
+            // 開始1秒で最初の駒を置く
+            setTimeout(() => {
+                if(gameActive) {
+                    spawnBomb();
+                    planNextSpawn();
+                }
+            }, 1000);
+        }
+
+        function initBoard() {
+            boardElement.innerHTML = '';
+            const cellSize = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.7) / boardSize;
+            boardElement.style.gridTemplateColumns = `repeat(${boardSize}, ${cellSize}px)`;
+            boardElement.style.gridTemplateRows = `repeat(${boardSize}, ${cellSize}px)`;
+
+            for (let y = 0; y < boardSize; y++) {
+                for (let x = 0; x < boardSize; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.id = `cell-${x}-${y}`;
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        function resetGame() {
+            playerPos = { x: Math.floor(boardSize/2), y: Math.floor(boardSize/2) };
+            lives = 3;
+            spawnInterval = 4000;
+            updateLivesUI();
+            updatePlayerUI();
+        }
+
+        function updateLivesUI() {
+            lifeDisplay.innerHTML = '❤️'.repeat(lives);
+        }
+
+        function updatePlayerUI() {
+            const oldPlayer = document.querySelector('.player');
+            if (oldPlayer) oldPlayer.remove();
+
+            const cell = document.getElementById(`cell-${playerPos.x}-${playerPos.y}`);
+            if (cell) {
+                const player = document.createElement('div');
+                player.className = 'player';
+                cell.appendChild(player);
+            }
+        }
+
+        function handleKeyDown(e) {
+            if (!gameActive) return;
+
+            let { x, y } = playerPos;
+            if (e.key === 'ArrowUp' && y > 0) y--;
+            else if (e.key === 'ArrowDown' && y < boardSize - 1) y++;
+            else if (e.key === 'ArrowLeft' && x > 0) x--;
+            else if (e.key === 'ArrowRight' && x < boardSize - 1) x++;
+
+            if (x !== playerPos.x || y !== playerPos.y) {
+                playerPos = { x, y };
+                updatePlayerUI();
+            }
+        }
+
+        function updateScore() {
+            const now = Date.now();
+            const elapsed = (now - startTime) / 1000;
+            timerDisplay.textContent = elapsed.toFixed(2);
+        }
+
+        function planNextSpawn() {
+            if (!gameActive) return;
+            spawnTimeout = setTimeout(() => {
+                spawnBomb();
+                spawnInterval = Math.max(minInterval, spawnInterval - intervalDecrease);
+                planNextSpawn();
+            }, spawnInterval);
+        }
+
+        function spawnBomb() {
+            const pieceInfo = PIECES[Math.floor(Math.random() * PIECES.length)];
+            
+            let x, y;
+            let attempts = 0;
+            let valid = false;
+
+            // 配置制限を考慮したランダム位置決定
+            while (!valid && attempts < 100) {
+                x = Math.floor(Math.random() * boardSize);
+                y = Math.floor(Math.random() * boardSize);
+                attempts++;
+
+                // 既に駒があるマスは避ける
+                if (isBombAt(x, y)) continue;
+
+                // 歩と香車は一番下の列（y = boardSize - 1）には置かない
+                if ((pieceInfo.type === 'pawn' || pieceInfo.type === 'lance') && y === boardSize - 1) continue;
+
+                // 桂馬は下2列（y >= boardSize - 2）には置かない
+                if (pieceInfo.type === 'knight' && y >= boardSize - 2) continue;
+
+                valid = true;
+            }
+
+            const bomb = {
+                id: Date.now() + Math.random(),
+                x, y,
+                type: pieceInfo.type,
+                img: pieceInfo.img,
+                img_r: pieceInfo.img_r,
+                createdAt: Date.now()
+            };
+
+            bombs.push(bomb);
+            renderBomb(bomb);
+
+            // 5.5秒後に点滅エフェクト
+            setTimeout(() => {
+                const overlay = document.getElementById(`overlay-${bomb.id}`);
+                if (overlay) {
+                    overlay.classList.add('blink-pre-explosion');
+                }
+            }, 5500);
+
+            // 6秒後に爆発
+            setTimeout(() => {
+                explode(bomb);
+            }, 6000);
+        }
+
+        function isBombAt(x, y) {
+            return bombs.some(b => b.x === x && b.y === y);
+        }
+
+        function renderBomb(bomb) {
+            const cell = document.getElementById(`cell-${bomb.x}-${bomb.y}`);
+            if (!cell) return;
+
+            const container = document.createElement('div');
+            container.className = 'piece-container';
+            container.id = `bomb-${bomb.id}`;
+
+            const baseImg = document.createElement('img');
+            baseImg.src = `images/${bomb.img}`;
+            baseImg.className = 'piece-img';
+            baseImg.onerror = () => baseImg.style.display = 'none';
+
+            const overlayImg = document.createElement('img');
+            overlayImg.src = `images/${bomb.img_r}`;
+            overlayImg.className = 'piece-img piece-overlay';
+            overlayImg.id = `overlay-${bomb.id}`;
+            overlayImg.onerror = () => overlayImg.style.display = 'none';
+
+            container.appendChild(baseImg);
+            container.appendChild(overlayImg);
+            cell.appendChild(container);
+
+            requestAnimationFrame(() => {
+                const overlay = document.getElementById(`overlay-${bomb.id}`);
+                if (overlay) overlay.style.opacity = '1';
+            });
+        }
+
+        function explode(bomb) {
+            if (!gameActive) return;
+
+            const el = document.getElementById(`bomb-${bomb.id}`);
+            if (el) el.remove();
+            bombs = bombs.filter(b => b.id !== bomb.id);
+
+            const range = getAttackRange(bomb);
+            
+            let hitsPlayer = false;
+            range.forEach(pos => {
+                const cell = document.getElementById(`cell-${pos.x}-${pos.y}`);
+                if (cell) {
+                    cell.classList.add('explosion-zone');
+                    if (pos.x === playerPos.x && pos.y === playerPos.y) {
+                        hitsPlayer = true;
+                    }
+                    setTimeout(() => {
+                        cell.classList.remove('explosion-zone');
+                    }, 500);
+                }
+            });
+
+            if (hitsPlayer) {
+                takeDamage();
+            }
+        }
+
+        function takeDamage() {
+            lives--;
+            updateLivesUI();
+            
+            gameContainer.style.transform = 'translateX(10px)';
+            setTimeout(() => gameContainer.style.transform = 'translateX(-10px)', 50);
+            setTimeout(() => gameContainer.style.transform = 'translateX(0)', 100);
+
+            if (lives <= 0) {
+                endGame();
+            }
+        }
+
+        function getAttackRange(bomb) {
+            const { x, y, type } = bomb;
+            const range = [];
+            
+            // 爆発した駒自身の位置も赤くする
+            addRange(range, x, y);
+
+            // 相手方の向き（下向き y+）としての動き
+            switch(type) {
+                case 'pawn':
+                    addRange(range, x, y + 1);
+                    break;
+                case 'lance':
+                    for (let i = y + 1; i < boardSize; i++) addRange(range, x, i);
+                    break;
+                case 'knight':
+                    addRange(range, x - 1, y + 2);
+                    addRange(range, x + 1, y + 2);
+                    break;
+                case 'silver':
+                    addRange(range, x, y + 1);
+                    addRange(range, x - 1, y + 1);
+                    addRange(range, x + 1, y + 1);
+                    addRange(range, x - 1, y - 1);
+                    addRange(range, x + 1, y - 1);
+                    break;
+                case 'gold':
+                    addRange(range, x, y + 1);
+                    addRange(range, x - 1, y + 1);
+                    addRange(range, x + 1, y + 1);
+                    addRange(range, x - 1, y);
+                    addRange(range, x + 1, y);
+                    addRange(range, x, y - 1);
+                    break;
+                case 'bishop':
+                    for (let i = 1; i < boardSize; i++) {
+                        addRange(range, x + i, y + i);
+                        addRange(range, x - i, y + i);
+                        addRange(range, x + i, y - i);
+                        addRange(range, x - i, y - i);
+                    }
+                    break;
+                case 'rook':
+                    for (let i = 0; i < boardSize; i++) {
+                        if (i !== x) addRange(range, i, y);
+                        if (i !== y) addRange(range, x, i);
+                    }
+                    break;
+                case 'king':
+                    for (let dx = -1; dx <= 1; dx++) {
+                        for (let dy = -1; dy <= 1; dy++) {
+                            if (dx !== 0 || dy !== 0) addRange(range, x + dx, y + dy);
+                        }
+                    }
+                    break;
+                case 'horse':
+                    for (let i = 1; i < boardSize; i++) {
+                        addRange(range, x + i, y + i); addRange(range, x - i, y + i);
+                        addRange(range, x + i, y - i); addRange(range, x - i, y - i);
+                    }
+                    addRange(range, x + 1, y); addRange(range, x - 1, y);
+                    addRange(range, x, y + 1); addRange(range, x, y - 1);
+                    break;
+                case 'dragon':
+                    for (let i = 0; i < boardSize; i++) {
+                        if (i !== x) addRange(range, i, y);
+                        if (i !== y) addRange(range, x, i);
+                    }
+                    addRange(range, x + 1, y + 1); addRange(range, x - 1, y + 1);
+                    addRange(range, x + 1, y - 1); addRange(range, x - 1, y - 1);
+                    break;
+            }
+            return range;
+        }
+
+        function addRange(range, x, y) {
+            if (x >= 0 && x < boardSize && y >= 0 && y < boardSize) {
+                if (!range.some(p => p.x === x && p.y === y)) {
+                    range.push({ x, y });
+                }
+            }
+        }
+
+        function endGame() {
+            gameActive = false;
+            clearInterval(scoreInterval);
+            clearTimeout(spawnTimeout);
+            const score = timerDisplay.textContent;
+            finalScoreText.textContent = `記録: ${score} 秒生き残った！`;
+            gameOverScreen.style.display = 'flex';
+        }
+
+    </script>
+</body>
+</html>
