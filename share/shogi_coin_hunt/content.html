@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>将棋コインハント</title>
+    <style>
+        :root {
+            --board-color: #edcb86;
+            --grid-color: #333;
+            --cell-size: 60px;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+            user-select: none;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            color: #443322;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        #game-container {
+            display: flex;
+            gap: 30px;
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            max-width: 95vw;
+            flex-wrap: wrap;
+            justify-content: center;
+            /* 修正ポイント: サイドバーの高さに合わせて盤面が伸びないように設定 */
+            align-items: flex-start;
+        }
+
+        /* 盤面 */
+        #board {
+            display: grid;
+            grid-template-columns: repeat(7, var(--cell-size));
+            grid-template-rows: repeat(7, var(--cell-size));
+            background-color: var(--board-color);
+            border: 2px solid var(--grid-color);
+            position: relative;
+            /* 念のため高さが自動で広がらないよう固定 */
+            height: calc(var(--cell-size) * 7);
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            border: 0.5px solid rgba(0,0,0,0.2);
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .cell.target-area {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* コインのデザイン */
+        .coin {
+            width: 40px;
+            height: 40px;
+            z-index: 5;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .coin.collected {
+            transform: scale(2) rotate(20deg);
+            opacity: 0;
+        }
+
+        /* 駒の表示 */
+        .piece {
+            width: 85%;
+            height: 85%;
+            object-fit: contain;
+            z-index: 10;
+            transition: transform 0.1s, opacity 0.3s;
+        }
+
+        .piece.selected-on-board {
+            filter: drop-shadow(0 0 5px #ff4500);
+            transform: scale(1.1);
+            z-index: 15;
+        }
+
+        .piece.ghost {
+            opacity: 0.3;
+            pointer-events: none;
+            position: absolute;
+            z-index: 20;
+        }
+
+        /* サイドバー */
+        #sidebar {
+            width: 240px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .info-panel {
+            background: #fdfdfd;
+            border: 1px solid #ddd;
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+            background: white;
+        }
+
+        /* 手駒エリア */
+        #hand {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-height: 60px;
+            padding: 10px;
+            background: #f9f9f9;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+        }
+
+        .hand-piece {
+            width: 45px;
+            height: 45px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            position: relative;
+        }
+
+        .hand-piece.selected {
+            border-color: #ff4500;
+            background-color: #fff0eb;
+            box-shadow: 0 0 8px rgba(255, 69, 0, 0.4);
+            transform: scale(1.1);
+        }
+
+        .hand-piece img {
+            width: 90%;
+            height: 90%;
+            object-fit: contain;
+        }
+
+        /* ボタン */
+        .btn {
+            border: none;
+            padding: 12px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        #go-btn {
+            background-color: #4CAF50;
+            color: white;
+            box-shadow: 0 4px #2e7d32;
+        }
+
+        #go-btn:hover:not(:disabled) { background-color: #45a049; }
+        #go-btn:active:not(:disabled) {
+            transform: translateY(2px);
+            box-shadow: 0 2px #2e7d32;
+        }
+
+        #go-btn:disabled {
+            background-color: #ccc;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        #reset-btn {
+            background: #f44336;
+            color: white;
+            padding: 8px;
+            font-size: 0.9rem;
+        }
+
+        /* メッセージ */
+        #message-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 30px;
+            border-radius: 30px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            font-weight: bold;
+            z-index: 100;
+            display: none;
+            pointer-events: none;
+        }
+
+        .piece-text {
+            font-size: 20px;
+            font-weight: bold;
+            color: #332211;
+        }
+
+        @media (max-width: 600px) {
+            :root {
+                --cell-size: 45px;
+            }
+            #game-container { padding: 10px; gap: 15px; align-items: center; }
+            #sidebar { width: 100%; }
+            #board { height: calc(var(--cell-size) * 7); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>将棋コインハント</h1>
+
+    <div id="message-box"></div>
+
+    <div id="game-container">
+        <!-- 将棋盤 -->
+        <div id="board"></div>
+
+        <!-- サイドバー -->
+        <div id="sidebar">
+            <div class="info-panel">
+                <div class="stat-label">ステージ選択</div>
+                <select id="level-select"></select>
+            </div>
+
+            <div class="info-panel">
+                <div class="stat-label">残手数（未配置の駒）</div>
+                <div id="moves-left" class="stat-value">0</div>
+            </div>
+
+            <div class="info-panel">
+                <div class="stat-label">手駒（クリックで選択）</div>
+                <div id="hand"></div>
+            </div>
+
+            <button id="go-btn" class="btn">GO!</button>
+            <button id="reset-btn" class="btn">全駒を手駒に戻す</button>
+        </div>
+    </div>
+
+    <script>
+        const BOARD_SIZE = 7;
+        const PIECE_NAMES = {
+            fu: '歩', kyou: '香', kei: '桂', gin: '銀', kin: '金',
+            kaku: '角', hisha: '飛', gyoku: '玉', uma: '馬', ryuu: '龍'
+        };
+
+        const LEVELS = [
+             {
+                name: "ステージ 1",
+                coins: [[1, 5], [2, 5], [3, 5], [2, 2], [4, 1], [4, 3]],
+                hand: ['gyoku', 'kyou']
+            },
+            {
+                name: "ステージ 2",
+                coins: [[1, 2], [1, 4], [2, 1], [2, 5], [4, 1], [4, 3], [4, 5]],
+                hand: ['kin', 'gin', 'kei']
+            },
+            {
+                name: "ステージ 3",
+                coins: [[1, 5], [2, 5], [3, 2], [4, 1], [4, 6], [5, 4]],
+                hand: ['hisha', 'kaku']
+            },
+            {
+                name: "ステージ 4",
+                coins: [[0, 0], [0, 5], [1, 2], [2, 0], [2, 6], [3, 3], [4, 6], [5, 0], [6, 2], [6, 4]],
+                hand: ['kin', 'gin','hisha','kaku']
+            }
+        ];
+
+        let currentLevelIndex = 0;
+        let gameState = {
+            coins: [],
+            hand: [],
+            placedPieces: []
+        };
+
+        let selectedHandIndex = null;
+        let selectedBoardPieceIndex = null;
+        let isAnimating = false;
+
+        const boardEl = document.getElementById('board');
+        const handEl = document.getElementById('hand');
+        const movesLeftEl = document.getElementById('moves-left');
+        const goBtn = document.getElementById('go-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const levelSelect = document.getElementById('level-select');
+        const messageBox = document.getElementById('message-box');
+
+        function initApp() {
+            LEVELS.forEach((lvl, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.textContent = lvl.name;
+                levelSelect.appendChild(opt);
+            });
+
+            levelSelect.addEventListener('change', (e) => {
+                loadLevel(parseInt(e.target.value));
+            });
+
+            loadLevel(0);
+        }
+
+        function loadLevel(index) {
+            currentLevelIndex = index;
+            const levelData = LEVELS[index];
+            
+            gameState.coins = levelData.coins.map(pos => ({ r: pos[0], c: pos[1], collected: false }));
+            gameState.hand = [...levelData.hand];
+            gameState.placedPieces = [];
+            selectedHandIndex = null;
+            selectedBoardPieceIndex = null;
+            isAnimating = false;
+
+            createBoard();
+            renderHand();
+            updateStatus();
+        }
+
+        function createBoard() {
+            boardEl.innerHTML = '';
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+                    cell.addEventListener('click', () => onCellClick(r, c));
+                    
+                    const coin = gameState.coins.find(cn => cn.r === r && cn.c === c);
+                    if (coin && !coin.collected) {
+                        const coinEl = document.createElement('div');
+                        coinEl.className = 'coin';
+                        coinEl.style.backgroundImage = "url('images/coin.png')";
+                        coinEl.style.backgroundColor = "#ffd700";
+                        coinEl.style.borderRadius = "50%";
+                        coinEl.id = `coin-${r}-${c}`;
+                        cell.appendChild(coinEl);
+                    }
+
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function renderHand() {
+            handEl.innerHTML = '';
+            gameState.hand.forEach((pieceId, index) => {
+                const item = document.createElement('div');
+                item.className = 'hand-piece' + (selectedHandIndex === index ? ' selected' : '');
+                item.innerHTML = `<img src="images/${pieceId}.png" alt="${PIECE_NAMES[pieceId]}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                  <span class="piece-text" style="display:none;">${PIECE_NAMES[pieceId]}</span>`;
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    if (isAnimating) return;
+                    
+                    selectedBoardPieceIndex = null;
+                    selectedHandIndex = (selectedHandIndex === index) ? null : index;
+                    
+                    refreshBoardDisplay();
+                    renderHand();
+                };
+                handEl.appendChild(item);
+            });
+        }
+
+        function updateStatus() {
+            movesLeftEl.textContent = gameState.hand.length;
+            goBtn.disabled = gameState.hand.length > 0 || isAnimating;
+        }
+
+        function onCellClick(r, c) {
+            if (isAnimating) return;
+
+            const existingIdx = gameState.placedPieces.findIndex(p => p.r === r && p.c === c);
+            
+            if (existingIdx !== -1) {
+                if (selectedBoardPieceIndex === existingIdx) {
+                    const removed = gameState.placedPieces.splice(existingIdx, 1)[0];
+                    gameState.hand.push(removed.id);
+                    selectedBoardPieceIndex = null;
+                } else {
+                    selectedBoardPieceIndex = existingIdx;
+                    selectedHandIndex = null;
+                }
+                refreshBoardDisplay();
+                renderHand();
+                updateStatus();
+                return;
+            }
+
+            const hasCoin = gameState.coins.some(cn => cn.r === r && cn.c === c && !cn.collected);
+            if (hasCoin) {
+                showMessage("コインがあるマスには駒を置けません");
+                return;
+            }
+
+            if (selectedBoardPieceIndex !== null) {
+                gameState.placedPieces[selectedBoardPieceIndex].r = r;
+                gameState.placedPieces[selectedBoardPieceIndex].c = c;
+                selectedBoardPieceIndex = null;
+                refreshBoardDisplay();
+                updateStatus();
+                return;
+            }
+
+            if (selectedHandIndex !== null) {
+                const pieceId = gameState.hand[selectedHandIndex];
+                gameState.placedPieces.push({ r, c, id: pieceId });
+                gameState.hand.splice(selectedHandIndex, 1);
+                selectedHandIndex = null;
+                refreshBoardDisplay();
+                renderHand();
+                updateStatus();
+            }
+        }
+
+        function refreshBoardDisplay() {
+            const allPieces = boardEl.querySelectorAll('.piece:not(.ghost)');
+            allPieces.forEach(p => p.remove());
+
+            gameState.placedPieces.forEach((p, idx) => {
+                const cell = boardEl.children[p.r * BOARD_SIZE + p.c];
+                const img = document.createElement('img');
+                img.src = `images/${p.id}.png`;
+                img.className = 'piece' + (selectedBoardPieceIndex === idx ? ' selected-on-board' : '');
+                img.alt = PIECE_NAMES[p.id];
+                img.onerror = function() {
+                    this.style.display = 'none';
+                    const span = document.createElement('span');
+                    span.className = 'piece-text';
+                    span.textContent = PIECE_NAMES[p.id];
+                    cell.appendChild(span);
+                };
+                cell.appendChild(img);
+            });
+        }
+
+        function getPieceActions(pieceId, r, c) {
+            const actions = { slides: [], steps: [] };
+            const ray = (dr, dc) => {
+                let nr = r + dr, nc = c + dc;
+                const path = [];
+                while (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                    path.push({ r: nr, c: nc });
+                    nr += dr;
+                    nc += dc;
+                }
+                return path;
+            };
+            const addSteps = (coords) => {
+                coords.forEach(coord => {
+                    if (coord.r >= 0 && coord.r < BOARD_SIZE && coord.c >= 0 && coord.c < BOARD_SIZE) {
+                        actions.steps.push(coord);
+                    }
+                });
+            };
+
+            switch (pieceId) {
+                case 'fu': addSteps([{r: r-1, c: c}]); break;
+                case 'kyou': actions.slides.push(ray(-1, 0)); break;
+                case 'kei': addSteps([{r: r-2, c: c-1}, {r: r-2, c: c+1}]); break;
+                case 'gin': addSteps([{r: r-1, c: c-1}, {r: r-1, c: c}, {r: r-1, c: c+1}, {r: r+1, c: c-1}, {r: r+1, c: c+1}]); break;
+                case 'kin': addSteps([{r: r-1, c: c-1}, {r: r-1, c: c}, {r: r-1, c: c+1}, {r: r, c: c-1}, {r: r, c: c+1}, {r: r+1, c: c}]); break;
+                case 'hisha': [[1,0], [-1,0], [0,1], [0,-1]].forEach(d => actions.slides.push(ray(d[0], d[1]))); break;
+                case 'kaku': [[1,1], [1,-1], [-1,1], [-1,-1]].forEach(d => actions.slides.push(ray(d[0], d[1]))); break;
+                case 'gyoku': for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++) if(dr!==0 || dc!==0) addSteps([{r: r+dr, c: c+dc}]); break;
+                case 'uma':
+                    [[1,1], [1,-1], [-1,1], [-1,-1]].forEach(d => actions.slides.push(ray(d[0], d[1])));
+                    addSteps([{r: r+1, c: c}, {r: r-1, c: c}, {r: r, c: c+1}, {r: r, c: c-1}]);
+                    break;
+                case 'ryuu':
+                    [[1,0], [-1,0], [0,1], [0,-1]].forEach(d => actions.slides.push(ray(d[0], d[1])));
+                    addSteps([{r: r+1, c: c+1}, {r: r+1, c: c-1}, {r: r-1, c: c+1}, {r: r-1, c: c-1}]);
+                    break;
+            }
+            return actions;
+        }
+
+        async function runSimulation() {
+            if (isAnimating) return;
+            isAnimating = true;
+            goBtn.disabled = true;
+            selectedBoardPieceIndex = null;
+            refreshBoardDisplay();
+
+            const collectedCoinsIdx = new Set();
+
+            for (const p of gameState.placedPieces) {
+                const actions = getPieceActions(p.id, p.r, p.c);
+                
+                actions.slides.flat().concat(actions.steps).forEach(sq => {
+                    const coinIdx = gameState.coins.findIndex(c => c.r === sq.r && c.c === sq.c && !c.collected);
+                    if (coinIdx !== -1) {
+                        collectedCoinsIdx.add(coinIdx);
+                        setTimeout(() => {
+                            const coin = gameState.coins[coinIdx];
+                            const coinEl = document.getElementById(`coin-${coin.r}-${coin.c}`);
+                            if (coinEl) coinEl.classList.add('collected');
+                        }, 400);
+                    }
+                });
+
+                await animatePiece(p, actions);
+            }
+
+            const allCollected = gameState.coins.every((c, idx) => c.collected || collectedCoinsIdx.has(idx));
+
+            if (allCollected) {
+                showMessage("CLEAR!! 全てのコインを回収しました！");
+                setTimeout(() => {
+                    const nextIdx = (currentLevelIndex + 1) % LEVELS.length;
+                    levelSelect.value = nextIdx;
+                    loadLevel(nextIdx);
+                }, 3000);
+            } else {
+                showMessage("失敗... 届かないコインがあります。");
+                setTimeout(() => {
+                    resetAnimationView();
+                    isAnimating = false;
+                    updateStatus();
+                }, 1500);
+            }
+        }
+
+        function animatePiece(piece, actions) {
+            return new Promise(resolve => {
+                const promises = [];
+                const startCell = boardEl.children[piece.r * BOARD_SIZE + piece.c];
+                const rect = startCell.getBoundingClientRect();
+                const boardRect = boardEl.getBoundingClientRect();
+
+                const originalPieceImg = startCell.querySelector('.piece');
+                if (originalPieceImg) {
+                    originalPieceImg.style.opacity = '0.3';
+                }
+
+                actions.slides.forEach(path => {
+                    if (path.length === 0) return;
+                    promises.push(createGhostAnim(piece.id, rect, boardRect, path[path.length - 1]));
+                });
+                actions.steps.forEach(target => {
+                    promises.push(createGhostAnim(piece.id, rect, boardRect, target));
+                });
+
+                if (promises.length === 0) {
+                    setTimeout(() => {
+                        if (originalPieceImg) originalPieceImg.style.visibility = 'hidden';
+                        resolve();
+                    }, 500);
+                    return;
+                }
+                
+                Promise.all(promises).then(() => {
+                    if (originalPieceImg) {
+                        originalPieceImg.style.visibility = 'hidden';
+                    }
+                    resolve();
+                });
+            });
+        }
+
+        function createGhostAnim(id, startRect, boardRect, target) {
+            return new Promise(resolve => {
+                const ghost = document.createElement('img');
+                ghost.className = 'piece ghost';
+                ghost.src = `images/${id}.png`;
+                ghost.onerror = function() { this.style.display='none'; };
+                
+                ghost.style.left = (startRect.left - boardRect.left) + 'px';
+                ghost.style.top = (startRect.top - boardRect.top) + 'px';
+                ghost.style.width = varToPx('--cell-size') + 'px';
+                ghost.style.height = varToPx('--cell-size') + 'px';
+                boardEl.appendChild(ghost);
+
+                const targetCell = boardEl.children[target.r * BOARD_SIZE + target.c];
+                const targetRect = targetCell.getBoundingClientRect();
+
+                const anim = ghost.animate([
+                    { left: (startRect.left - boardRect.left) + 'px', top: (startRect.top - boardRect.top) + 'px', opacity: 0.3 },
+                    { left: (targetRect.left - boardRect.left) + 'px', top: (targetRect.top - boardRect.top) + 'px', opacity: 0.3, offset: 0.8 },
+                    { left: (targetRect.left - boardRect.left) + 'px', top: (targetRect.top - boardRect.top) + 'px', opacity: 0 }
+                ], {
+                    duration: 800,
+                    easing: 'ease-out'
+                });
+
+                anim.onfinish = () => {
+                    ghost.remove();
+                    resolve();
+                };
+            });
+        }
+
+        function varToPx(varName) {
+            return parseInt(getComputedStyle(document.documentElement).getPropertyValue(varName));
+        }
+
+        function showMessage(text) {
+            messageBox.textContent = text;
+            messageBox.style.display = 'block';
+            setTimeout(() => messageBox.style.display = 'none', 3000);
+        }
+
+        function resetAnimationView() {
+            gameState.coins.forEach(coin => {
+                const coinEl = document.getElementById(`coin-${coin.r}-${coin.c}`);
+                if (coinEl) coinEl.classList.remove('collected');
+            });
+            const allPieces = boardEl.querySelectorAll('.piece');
+            allPieces.forEach(p => {
+                p.style.visibility = 'visible';
+                p.style.opacity = '1';
+            });
+        }
+
+        function resetAllToHand() {
+            if (isAnimating) return;
+            gameState.placedPieces.forEach(p => gameState.hand.push(p.id));
+            gameState.placedPieces = [];
+            selectedHandIndex = null;
+            selectedBoardPieceIndex = null;
+            createBoard();
+            refreshBoardDisplay();
+            renderHand();
+            updateStatus();
+        }
+
+        goBtn.addEventListener('click', runSimulation);
+        resetBtn.addEventListener('click', resetAllToHand);
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>

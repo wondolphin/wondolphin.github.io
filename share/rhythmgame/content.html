@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>将棋deリズム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@700;900&display=swap');
+
+        body {
+            font-family: 'Noto Serif JP', serif;
+            background-color: #0d0d0d;
+            color: #f3f4f6;
+        }
+
+        /* 80%に縮小するためのスケーリングコンテナ */
+        .game-scale-wrapper {
+            transform: scale(0.8);
+            transform-origin: center top;
+        }
+
+        .shogi-board {
+            background-color: #e3c08d;
+            background-image: radial-gradient(circle at 20% 20%, #ebcd9f 0%, #d4a76a 100%);
+            border: 6px solid #8b5a2b;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.7);
+        }
+
+        /* セルサイズ定義 */
+        .cell-base {
+            width: 5rem;
+            height: 5rem;
+        }
+
+        .rhythm-cell-height {
+            height: 7rem;
+        }
+
+        .grid-cell {
+            transition: all 0.1s;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: 900;
+            z-index: 10;
+            border: 1px solid rgba(0,0,0,0.15);
+        }
+
+        .active-target {
+            border-color: #fff !important;
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.9);
+            transform: scale(1.1);
+            z-index: 20;
+            background-color: rgba(255, 255, 255, 0.2) !important;
+        }
+
+        /* 判定色 */
+        .cell-success { background-color: #22c55e !important; border-color: #4ade80 !important; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .cell-missed { background-color: #1e3a8a !important; border-color: #3b82f6 !important; color: #60a5fa; }
+        .cell-wrong { background-color: #b91c1c !important; border-color: #ef4444 !important; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        /* 叩くべきでないマスを正しくスルーした時の色（濃い緑） */
+        .cell-correct-skip { background-color: #166534 !important; border-color: #15803d !important; color: rgba(255,255,255,0.2); }
+
+        .shogi-piece-img {
+            width: 85%;
+            height: 85%;
+            object-fit: contain;
+            transform: rotate(180deg);
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
+        }
+
+        .countdown-text {
+            animation: pulse-text 0.5s infinite;
+        }
+        @keyframes pulse-text {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        #guide-line {
+            width: 4px;
+            background: linear-gradient(to bottom, transparent, #fff, transparent);
+            box-shadow: 0 0 15px #fff;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start overflow-hidden pt-4">
+
+    <!-- スタート画面 -->
+    <div id="start-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-black/95 z-50 transition-opacity duration-700 text-center">
+        <h1 class="text-8xl font-black mb-10 tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 drop-shadow-2xl">
+            将棋deリズム
+        </h1>
+        <button id="start-button" class="group relative px-16 py-6 bg-red-800 hover:bg-red-700 text-white text-4xl rounded-sm transition-all transform hover:scale-105 active:scale-95 shadow-[0_10px_0_#5a1010] font-bold">
+            対局開始
+        </button>
+        <p class="mt-12 text-yellow-100/60 text-xl tracking-widest leading-relaxed">
+            駒の利きを読み、リズムを刻め
+        </p>
+    </div>
+
+    <!-- ゲーム本体 (スケーリング用ラッパー) -->
+    <div id="game-container" class="hidden flex flex-col items-center w-full game-scale-wrapper">
+        
+        <div id="countdown" class="text-9xl font-black h-32 mb-4 flex items-center justify-center text-yellow-500 drop-shadow-[0_0_30px_rgba(234,179,8,0.6)] countdown-text">
+        </div>
+
+        <div class="shogi-board p-4 rounded-sm flex flex-col gap-1 relative w-fit">
+            <!-- 盤の目印 -->
+            <div class="absolute inset-0 pointer-events-none opacity-10">
+                <div class="absolute top-1/4 left-1/4 w-2.5 h-2.5 bg-black rounded-full"></div>
+                <div class="absolute top-1/4 right-1/4 w-2.5 h-2.5 bg-black rounded-full"></div>
+                <div class="absolute bottom-1/4 left-1/4 w-2.5 h-2.5 bg-black rounded-full"></div>
+                <div class="absolute bottom-1/4 right-1/4 w-2.5 h-2.5 bg-black rounded-full"></div>
+            </div>
+
+            <!-- 駒エリア -->
+            <div id="shogi-row-0" class="flex gap-1"></div>
+            <div id="shogi-row-1" class="flex gap-1"></div>
+
+            <!-- リズムエリア -->
+            <div id="grid-container" class="flex gap-1 relative py-2 border-y-2 border-black/20">
+                <div class="grid-cell cell-base rhythm-cell-height bg-black/5 rounded-sm" data-index="0"></div>
+                <div class="grid-cell cell-base rhythm-cell-height bg-black/5 rounded-sm" data-index="1"></div>
+                <div class="grid-cell cell-base rhythm-cell-height bg-black/5 rounded-sm" data-index="2"></div>
+                <div class="grid-cell cell-base rhythm-cell-height bg-black/5 rounded-sm" data-index="3"></div>
+                <div class="grid-cell cell-base rhythm-cell-height bg-black/5 rounded-sm" data-index="4"></div>
+                <div class="grid-cell cell-base rhythm-cell-height bg-black/5 rounded-sm" data-index="5"></div>
+                <div class="grid-cell cell-base rhythm-cell-height bg-black/5 rounded-sm" data-index="6"></div>
+                <div class="grid-cell cell-base rhythm-cell-height bg-black/5 rounded-sm" data-index="7"></div>
+                <div class="grid-cell cell-base rhythm-cell-height bg-black/5 rounded-sm" data-index="8"></div>
+                <div id="guide-line" class="absolute top-0 bottom-0 z-40 opacity-0 pointer-events-none"></div>
+            </div>
+
+            <!-- 下部駒エリア -->
+            <div id="shogi-row-3" class="flex gap-1"></div>
+            <div id="shogi-row-4" class="flex gap-1"></div>
+        </div>
+
+        <div class="mt-12 flex flex-col items-center">
+            <div id="feedback" class="text-6xl font-black h-20 text-white drop-shadow-lg tracking-widest italic"></div>
+            <div class="mt-8 px-10 py-2 bg-black/60 rounded-full text-yellow-500 font-mono text-2xl border border-yellow-900/40">
+                BPM: 80 | 常に次の一手を思え
+            </div>
+        </div>
+    </div>
+
+    <audio id="bgm" src="171_dr_bpm080_4-4_4_pop.wav" loop></audio>
+    <audio id="sfx-hit" src="wadaiko.mp3"></audio>
+
+    <script>
+        const BPM = 80;
+        const BEAT_DURATION = 60 / BPM; 
+        const JUDGE_WINDOW_BEATS = 0.15 / BEAT_DURATION; 
+        const CYCLE_BEATS = 8;
+
+        const PIECE_IDS = ['fu', 'kyou', 'kei', 'gin', 'kin', 'kaku', 'hisha', 'gyoku', 'uma', 'ryuu'];
+        
+        const PIECE_MOVES = {
+            'fu': [[0, 1]],
+            'kyou': [[0, 1], [0, 2], [0, 3], [0, 4]],
+            'kei': [[-1, 2], [1, 2]],
+            'gin': [[0, 1], [-1, 1], [1, 1], [-1, -1], [1, -1]],
+            'kin': [[0, 1], [-1, 1], [1, 1], [-1, 0], [1, 0], [0, -1]],
+            'gyoku': [[0, 1], [0, -1], [-1, 0], [1, 0], [-1, 1], [1, 1], [-1, -1], [1, -1]],
+            'kaku': 'diag',
+            'hisha': 'cross',
+            'uma': 'diag+king',
+            'ryuu': 'cross+king'
+        };
+
+        const startScreen = document.getElementById('start-screen');
+        const startButton = document.getElementById('start-button');
+        const gameContainer = document.getElementById('game-container');
+        const countdownLabel = document.getElementById('countdown');
+        const guideLine = document.getElementById('guide-line');
+        const cells = document.querySelectorAll('.grid-cell');
+        const feedback = document.getElementById('feedback');
+        const bgm = document.getElementById('bgm');
+        const sfxHit = document.getElementById('sfx-hit');
+        const gridContainer = document.getElementById('grid-container');
+
+        let isStarted = false;
+        let lastGlobalBeat = -1;
+        let cycleCount = 0;
+        let hasResetThisCycle = false;
+        let targetTypes = Array(9).fill(true);
+        let hitStates = Array(9).fill(false);
+        let cellCenters = [];
+        let isPerfect = true; // 今サイクルのパーフェクトフラグ
+
+        function init() {
+            startButton.addEventListener('click', startGame);
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('resize', updateCellPositions);
+            setupShogiBoardLayout();
+        }
+
+        function setupShogiBoardLayout() {
+            [0, 1, 3, 4].forEach(rowIdx => {
+                const row = document.getElementById(`shogi-row-${rowIdx}`);
+                row.innerHTML = '';
+                for (let i = 0; i < 9; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell-base border border-black/5 flex items-center justify-center';
+                    cell.id = `piece-${rowIdx}-${i}`;
+                    row.appendChild(cell);
+                }
+            });
+        }
+
+        async function startGame() {
+            if (isStarted) return;
+            startScreen.classList.add('opacity-0');
+            setTimeout(() => {
+                startScreen.style.display = 'none';
+                gameContainer.classList.remove('hidden');
+                updateCellPositions();
+                isStarted = true;
+                bgm.currentTime = 0;
+                bgm.play().catch(e => console.error(e));
+                requestAnimationFrame(gameLoop);
+            }, 500);
+        }
+
+        function updateCellPositions() {
+            const containerRect = gridContainer.getBoundingClientRect();
+            cellCenters = Array.from(cells).map(cell => {
+                const rect = cell.getBoundingClientRect();
+                return (rect.left + rect.width / 2 - containerRect.left) / 0.8;
+            });
+        }
+
+        function performReset() {
+            hitStates.fill(false);
+            isPerfect = true;
+            randomizeShogiTargets();
+            cells.forEach(cell => {
+                cell.classList.remove('cell-success', 'cell-missed', 'cell-wrong', 'active-target', 'cell-correct-skip');
+                cell.innerHTML = "";
+            });
+            feedback.innerText = "";
+            feedback.className = "text-6xl font-black h-20 text-yellow-500 uppercase tracking-widest italic";
+            hasResetThisCycle = true;
+        }
+
+        function randomizeShogiTargets() {
+            [0, 1, 3, 4].forEach(r => {
+                for (let c = 0; c < 9; c++) {
+                    const el = document.getElementById(`piece-${r}-${c}`);
+                    if(el) el.innerHTML = '';
+                }
+            });
+
+            let boardReady = false;
+            let currentTargets = Array(9).fill(true);
+
+            while (!boardReady) {
+                currentTargets.fill(true);
+                const pieceCount = 2 + Math.floor(Math.random() * 2);
+                const placed = [];
+
+                for (let i = 0; i < pieceCount; i++) {
+                    let attempts = 0;
+                    let foundMeaningfulPosition = false;
+
+                    while (attempts < 50 && !foundMeaningfulPosition) {
+                        const r = [0, 1, 3, 4][Math.floor(Math.random() * 4)];
+                        const c = Math.floor(Math.random() * 9);
+                        const type = PIECE_IDS[Math.floor(Math.random() * PIECE_IDS.length)];
+                        
+                        const attacks = getAttackOnMainRow(r, c, type);
+                        if (attacks.length > 0) {
+                            placed.push({ r, c, type, attacks });
+                            attacks.forEach(targetC => currentTargets[targetC] = false);
+                            foundMeaningfulPosition = true;
+                        }
+                        attempts++;
+                    }
+                }
+
+                if (currentTargets.includes(true)) {
+                    boardReady = true;
+                    targetTypes = [...currentTargets];
+                    placed.forEach(p => {
+                        const cell = document.getElementById(`piece-${p.r}-${p.c}`);
+                        if(cell) {
+                            cell.innerHTML = `<img src="images/${p.type}.png" class="shogi-piece-img" onerror="this.style.display='none'; this.parentNode.innerHTML='<span class=\'text-xs font-bold text-black/50\'>${p.type.slice(0,1).toUpperCase()}</span>'">`;
+                        }
+                    });
+                }
+            }
+        }
+
+        function getAttackOnMainRow(r, c, type) {
+            const targets = [];
+            const mainRowY = 2;
+            const moves = PIECE_MOVES[type];
+            if (Array.isArray(moves)) {
+                moves.forEach(([dx, dy]) => {
+                    if (r + dy === mainRowY) {
+                        const targetC = c + dx;
+                        if (targetC >= 0 && targetC < 9) targets.push(targetC);
+                    }
+                });
+            } else {
+                const distY = mainRowY - r;
+                if (moves.includes('cross')) targets.push(c);
+                if (moves.includes('diag')) {
+                    if (c + Math.abs(distY) < 9) targets.push(c + Math.abs(distY));
+                    if (c - Math.abs(distY) >= 0) targets.push(c - Math.abs(distY));
+                }
+                if (moves.includes('king') && Math.abs(distY) === 1) {
+                    targets.push(c);
+                    if (c + 1 < 9) targets.push(c + 1);
+                    if (c - 1 >= 0) targets.push(c - 1);
+                }
+            }
+            return [...new Set(targets)];
+        }
+
+        function handleKeyDown(e) {
+            if (!isStarted || e.code !== 'Space') return;
+            e.preventDefault();
+            sfxHit.currentTime = 0;
+            sfxHit.play().catch(() => {});
+
+            const currentGlobalBeat = bgm.currentTime * (BPM / 60);
+            let bestIdx = -1;
+            let minDiff = Infinity;
+
+            for (let i = 0; i < 9; i++) {
+                const targetRelBeat = 4 + (i * 0.5);
+                const cycleBase = Math.floor(currentGlobalBeat / CYCLE_BEATS) * CYCLE_BEATS;
+                const possibleCycles = [cycleBase, cycleBase - CYCLE_BEATS, cycleBase + CYCLE_BEATS];
+                
+                possibleCycles.forEach(cStart => {
+                    const targetGlobalBeat = cStart + targetRelBeat;
+                    const diff = Math.abs(currentGlobalBeat - targetGlobalBeat);
+                    if (diff < minDiff && diff < JUDGE_WINDOW_BEATS) {
+                        minDiff = diff;
+                        bestIdx = i;
+                    }
+                });
+            }
+
+            if (bestIdx !== -1 && !hitStates[bestIdx]) {
+                hitStates[bestIdx] = true;
+                processHit(bestIdx);
+            }
+        }
+
+        function processHit(index) {
+            const cell = cells[index];
+            cell.classList.remove('active-target');
+            if (targetTypes[index]) {
+                cell.classList.add('cell-success');
+                feedback.innerText = "天晴！";
+                feedback.className = "text-6xl font-black h-20 text-green-500 tracking-widest italic";
+            } else {
+                cell.innerHTML = "<span class='text-white'>✕</span>";
+                cell.classList.add('cell-wrong');
+                feedback.innerText = "無念！";
+                feedback.className = "text-6xl font-black h-20 text-red-600 tracking-widest italic";
+                isPerfect = false; 
+            }
+        }
+
+        function gameLoop() {
+            if (!isStarted) return;
+
+            const currentGlobalBeat = bgm.currentTime * (BPM / 60);
+            
+            if (currentGlobalBeat < lastGlobalBeat - 1) {
+                cycleCount = 0;
+                hasResetThisCycle = false;
+                performReset();
+            }
+            lastGlobalBeat = currentGlobalBeat;
+
+            const inCycleBeat = currentGlobalBeat % CYCLE_BEATS;
+            const currentCycleCount = Math.floor(currentGlobalBeat / CYCLE_BEATS);
+
+            if (currentCycleCount > cycleCount) {
+                cycleCount = currentCycleCount;
+                hasResetThisCycle = false;
+            }
+
+            if (!hasResetThisCycle && (cycleCount === 0 || inCycleBeat >= 1.0)) {
+                performReset();
+            }
+
+            if (cycleCount === 0) {
+                if (inCycleBeat < 1) countdownLabel.innerText = "一";
+                else if (inCycleBeat < 2) countdownLabel.innerText = "二";
+                else if (inCycleBeat < 3) countdownLabel.innerText = "三";
+                else if (inCycleBeat < 4) countdownLabel.innerText = "いざ！";
+                else countdownLabel.innerText = "";
+            } else {
+                if (inCycleBeat >= 1 && inCycleBeat < 2) countdownLabel.innerText = "二";
+                else if (inCycleBeat >= 2 && inCycleBeat < 3) countdownLabel.innerText = "三";
+                else if (inCycleBeat >= 3 && inCycleBeat < 4) countdownLabel.innerText = "いざ！";
+                else countdownLabel.innerText = "";
+            }
+
+            const playStart = 4.0;
+            const playEnd = 8.0;
+
+            if (inCycleBeat >= playStart && inCycleBeat <= playEnd + 0.1) {
+                guideLine.style.opacity = '1';
+                const progress = Math.min(1, (inCycleBeat - playStart) / 4.0);
+                const currentX = cellCenters[0] + (cellCenters[8] - cellCenters[0]) * progress;
+                guideLine.style.left = `${currentX - 2}px`;
+
+                for (let i = 0; i < 9; i++) {
+                    const cell = cells[i];
+                    const targetBeat = 4 + (i * 0.5);
+                    const dist = inCycleBeat - targetBeat;
+
+                    if (Math.abs(dist) < 0.12 && !hitStates[i] && hasResetThisCycle) cell.classList.add('active-target');
+                    else cell.classList.remove('active-target');
+
+                    if (!hitStates[i] && dist > JUDGE_WINDOW_BEATS && hasResetThisCycle) {
+                        hitStates[i] = true;
+                        if (targetTypes[i]) {
+                            cell.classList.add('cell-missed');
+                            feedback.innerText = "失策";
+                            feedback.className = "text-6xl font-black h-20 text-blue-800 tracking-widest italic";
+                            isPerfect = false;
+                        } else {
+                            cell.classList.add('cell-correct-skip');
+                        }
+                    }
+
+                    // 9枚目（index 8）の判定が完了した瞬間に Perfect 判定
+                    if (i === 8 && hitStates[8] && isPerfect && feedback.innerText !== "PERFECT!!") {
+                        console.log("DEBUG: PERFECT ACHIEVED!");
+                        feedback.innerText = "PERFECT!!";
+                        feedback.className = "text-6xl font-black h-20 text-yellow-400 tracking-widest italic drop-shadow-[0_0_10px_rgba(250,204,21,0.8)]";
+                    }
+                }
+            } else {
+                guideLine.style.opacity = '0';
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        init();
+    </script>
+</body>
+</html>
