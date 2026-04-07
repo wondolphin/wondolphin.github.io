@@ -56,10 +56,8 @@
             <p class="text-7xl sm:text-8xl md:text-9xl font-black text-white fade-in" style="text-shadow: 0 0 20px #fff, 0 0 40px #0ea5e9, 0 0 60px #0ea5e9;">CLEAR!</p>
         </div>
         <!-- Xでシェアするボタンのコンテナ -->
-        <div id="share-container" class="hidden absolute bottom-12 left-0 right-0 text-center">
-            <a href="https://twitter.com/intent/tweet?text=%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Fall9%2Findex.html" target="_blank" rel="noopener noreferrer" class="inline-block bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 text-lg shadow-lg">
-                喜びをXでシェアする
-            </a>
+        <div id="share-container" class="hidden absolute bottom-12 left-0 right-0 flex flex-col items-center gap-4">
+            <!-- JSで動的に生成 -->
         </div>
     </div>
 
@@ -76,6 +74,13 @@
             let variableValues = [6, 7, 8, 4, 0, 3, 2, 5, 1];
             
             const cells = []; // 各マスのHTML要素を格納する配列
+
+            // シェア用設定
+            const SHARE_CONFIG = {
+                TWEET_TEXT: "ルールを推測するパズル「オール９」をクリアしました！\n#宇宙謎 #ルール発見型パズル @wondolphin",
+                TWEET_URL: "https://wondolphin.github.io/puzzle/uchunazo/all9/index.html",
+                SUPPORT_URL: "https://twitter.com/wondolphin/status/1974458928298959153"
+            };
 
             // --- ゲームの初期化 ---
             function initializeGame() {
@@ -164,6 +169,7 @@
                 if (isClear) {
                     // 0.5秒待ってからクリアメッセージを表示
                     setTimeout(() => {
+                        setupShareUI();
                         clearMessage.classList.remove('hidden');
                         
                         // さらに1.5秒待ってからシェアボタンを表示
@@ -174,6 +180,10 @@
 
                         // クリアメッセージの背景をクリックしたら閉じる
                         clearMessage.addEventListener('click', (event) => {
+                            // シェアコンテナ内がクリックされた場合は、メッセージを閉じないようにする
+                            if (shareContainer.contains(event.target)) {
+                                return;
+                            }
                             // クリックされたのが背景自体の場合のみ閉じる
                             if (event.target === clearMessage) {
                                 clearMessage.classList.add('hidden');
@@ -184,6 +194,42 @@
                     }, 500); // 500ミリ秒 = 0.5秒
                 }
             }
+
+            // シェアUIの動的構築
+            function setupShareUI() {
+                const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(SHARE_CONFIG.TWEET_TEXT)}&url=${encodeURIComponent(SHARE_CONFIG.TWEET_URL)}`;
+                shareContainer.innerHTML = '';
+
+                const mainBtn = document.createElement('button');
+                mainBtn.className = 'inline-block bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 text-lg shadow-lg';
+                mainBtn.innerText = '喜びをXでシェアする';
+                
+                const choicesDiv = document.createElement('div');
+                choicesDiv.className = 'hidden flex flex-col gap-3 items-center';
+                
+                const reportLink = document.createElement('a');
+                reportLink.className = 'inline-block bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 text-lg shadow-lg text-center min-w-[240px]';
+                reportLink.href = tweetUrl;
+                reportLink.target = '_blank';
+                reportLink.innerText = 'クリア報告のポスト';
+                
+                const supportLink = document.createElement('a');
+                supportLink.className = 'inline-block bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 text-lg shadow-lg text-center min-w-[240px]';
+                supportLink.href = SHARE_CONFIG.SUPPORT_URL;
+                supportLink.target = '_blank';
+                supportLink.innerText = '原ポストにいいね・リポスト';
+                
+                mainBtn.onclick = (e) => {
+                    e.stopPropagation(); // 背景のクリックイベントを伝播させない
+                    mainBtn.classList.add('hidden');
+                    choicesDiv.classList.remove('hidden');
+                };
+
+                choicesDiv.appendChild(reportLink);
+                choicesDiv.appendChild(supportLink);
+                shareContainer.appendChild(mainBtn);
+                shareContainer.appendChild(choicesDiv);
+            }
             
             // ゲーム開始
             initializeGame();
@@ -191,4 +237,3 @@
     </script>
 </body>
 </html>
-
