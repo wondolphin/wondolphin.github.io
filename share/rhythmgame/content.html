@@ -83,7 +83,7 @@
         #guide-line {
             width: 4px;
             background: linear-gradient(to bottom, transparent, #fff, transparent);
-            box-shadow: 0 0 15px #fff;
+            box-shadow: 0 0 15px #fff, 0 0 30px rgba(255,255,255,0.5);
         }
     </style>
 </head>
@@ -153,8 +153,9 @@
 
     <script>
         const BPM = 80;
-        const BEAT_DURATION = 60 / BPM; 
+        const BEAT_DURATION = 60 / BPM; // 0.75s
         const JUDGE_WINDOW_BEATS = 0.15 / BEAT_DURATION; 
+        const MISS_THRESHOLD_BEATS = 0.20 / BEAT_DURATION; 
         const CYCLE_BEATS = 8;
 
         const PIECE_IDS = ['fu', 'kyou', 'kei', 'gin', 'kin', 'kaku', 'hisha', 'gyoku', 'uma', 'ryuu'];
@@ -190,7 +191,8 @@
         let targetTypes = Array(9).fill(true);
         let hitStates = Array(9).fill(false);
         let cellCenters = [];
-        let isPerfect = true; // 今サイクルのパーフェクトフラグ
+        let isPerfect = true;
+        let currentBoardTargetBeatBase = 0; 
 
         function init() {
             startButton.addEventListener('click', startGame);
@@ -243,11 +245,11 @@
                 cell.innerHTML = "";
             });
             feedback.innerText = "";
-            feedback.className = "text-6xl font-black h-20 text-yellow-500 uppercase tracking-widest italic";
             hasResetThisCycle = true;
         }
 
         function randomizeShogiTargets() {
+            const occupiedCells = new Set();
             [0, 1, 3, 4].forEach(r => {
                 for (let c = 0; c < 9; c++) {
                     const el = document.getElementById(`piece-${r}-${c}`);
@@ -262,6 +264,7 @@
                 currentTargets.fill(true);
                 const pieceCount = 2 + Math.floor(Math.random() * 2);
                 const placed = [];
+                occupiedCells.clear();
 
                 for (let i = 0; i < pieceCount; i++) {
                     let attempts = 0;
@@ -270,12 +273,20 @@
                     while (attempts < 50 && !foundMeaningfulPosition) {
                         const r = [0, 1, 3, 4][Math.floor(Math.random() * 4)];
                         const c = Math.floor(Math.random() * 9);
-                        const type = PIECE_IDS[Math.floor(Math.random() * PIECE_IDS.length)];
+                        const cellId = `${r}-${c}`;
                         
+                        if (occupiedCells.has(cellId)) {
+                            attempts++;
+                            continue;
+                        }
+
+                        const type = PIECE_IDS[Math.floor(Math.random() * PIECE_IDS.length)];
                         const attacks = getAttackOnMainRow(r, c, type);
+                        
                         if (attacks.length > 0) {
                             placed.push({ r, c, type, attacks });
                             attacks.forEach(targetC => currentTargets[targetC] = false);
+                            occupiedCells.add(cellId);
                             foundMeaningfulPosition = true;
                         }
                         attempts++;
@@ -334,8 +345,7 @@
 
             for (let i = 0; i < 9; i++) {
                 const targetRelBeat = 4 + (i * 0.5);
-                const cycleBase = Math.floor(currentGlobalBeat / CYCLE_BEATS) * CYCLE_BEATS;
-                const possibleCycles = [cycleBase, cycleBase - CYCLE_BEATS, cycleBase + CYCLE_BEATS];
+                const possibleCycles = [currentBoardTargetBeatBase, currentBoardTargetBeatBase - CYCLE_BEATS, currentBoardTargetBeatBase + CYCLE_BEATS];
                 
                 possibleCycles.forEach(cStart => {
                     const targetGlobalBeat = cStart + targetRelBeat;
@@ -367,6 +377,17 @@
                 feedback.className = "text-6xl font-black h-20 text-red-600 tracking-widest italic";
                 isPerfect = false; 
             }
+            checkCycleCompletion();
+        }
+
+        function checkCycleCompletion() {
+             if (hitStates.every(s => s)) {
+                if (isPerfect) {
+                    console.log("DEBUG: PERFECT ACHIEVED!");
+                    feedback.innerText = "PERFECT!!";
+                    feedback.className = "text-6xl font-black h-20 text-yellow-400 tracking-widest italic drop-shadow-[0_0_15px_rgba(250,204,21,0.8)]";
+                }
+             }
         }
 
         function gameLoop() {
@@ -378,6 +399,7 @@
                 cycleCount = 0;
                 hasResetThisCycle = false;
                 performReset();
+                currentBoardTargetBeatBase = 0;
             }
             lastGlobalBeat = currentGlobalBeat;
 
@@ -389,10 +411,13 @@
                 hasResetThisCycle = false;
             }
 
+            // 次のサイクルの 1.0 拍目でリセット
             if (!hasResetThisCycle && (cycleCount === 0 || inCycleBeat >= 1.0)) {
                 performReset();
+                currentBoardTargetBeatBase = cycleCount * CYCLE_BEATS;
             }
 
+            // カウントダウン
             if (cycleCount === 0) {
                 if (inCycleBeat < 1) countdownLabel.innerText = "一";
                 else if (inCycleBeat < 2) countdownLabel.innerText = "二";
@@ -406,42 +431,50 @@
                 else countdownLabel.innerText = "";
             }
 
-            const playStart = 4.0;
-            const playEnd = 8.0;
-
-            if (inCycleBeat >= playStart && inCycleBeat <= playEnd + 0.1) {
-                guideLine.style.opacity = '1';
-                const progress = Math.min(1, (inCycleBeat - playStart) / 4.0);
-                const currentX = cellCenters[0] + (cellCenters[8] - cellCenters[0]) * progress;
-                guideLine.style.left = `${currentX - 2}px`;
-
+            // 判定処理：hasResetThisCycleに関わらず、リセット前（inCycleBeat < 1.0）までは判定を継続
+            const isJudgingVisibleBoard = (inCycleBeat >= 4.0 || inCycleBeat < 1.0);
+            if (isJudgingVisibleBoard) {
                 for (let i = 0; i < 9; i++) {
-                    const cell = cells[i];
-                    const targetBeat = 4 + (i * 0.5);
-                    const dist = inCycleBeat - targetBeat;
+                    const targetRelBeat = 4 + (i * 0.5);
+                    const targetGlobalBeat = currentBoardTargetBeatBase + targetRelBeat;
+                    const dist = currentGlobalBeat - targetGlobalBeat;
 
-                    if (Math.abs(dist) < 0.12 && !hitStates[i] && hasResetThisCycle) cell.classList.add('active-target');
-                    else cell.classList.remove('active-target');
+                    if (Math.abs(dist) < 0.12 && !hitStates[i]) {
+                        cells[i].classList.add('active-target');
+                    } else {
+                        cells[i].classList.remove('active-target');
+                    }
 
-                    if (!hitStates[i] && dist > JUDGE_WINDOW_BEATS && hasResetThisCycle) {
+                    if (!hitStates[i] && dist > MISS_THRESHOLD_BEATS) {
                         hitStates[i] = true;
                         if (targetTypes[i]) {
-                            cell.classList.add('cell-missed');
+                            cells[i].classList.add('cell-missed');
                             feedback.innerText = "失策";
                             feedback.className = "text-6xl font-black h-20 text-blue-800 tracking-widest italic";
                             isPerfect = false;
                         } else {
-                            cell.classList.add('cell-correct-skip');
+                            cells[i].classList.add('cell-correct-skip');
+                            feedback.innerText = "天晴！";
+                            feedback.className = "text-6xl font-black h-20 text-green-500 tracking-widest italic";
                         }
-                    }
-
-                    // 9枚目（index 8）の判定が完了した瞬間に Perfect 判定
-                    if (i === 8 && hitStates[8] && isPerfect && feedback.innerText !== "PERFECT!!") {
-                        console.log("DEBUG: PERFECT ACHIEVED!");
-                        feedback.innerText = "PERFECT!!";
-                        feedback.className = "text-6xl font-black h-20 text-yellow-400 tracking-widest italic drop-shadow-[0_0_10px_rgba(250,204,21,0.8)]";
+                        if (i === 8) console.log("DEBUG: 9th cell judged as MISS or SKIP. isPerfect:", isPerfect);
+                        checkCycleCompletion();
                     }
                 }
+            }
+
+            // ガイドライン表示
+            if (inCycleBeat >= 4.0 || inCycleBeat < 1.0) {
+                guideLine.style.opacity = '1';
+                let progress = 0;
+                if (inCycleBeat >= 4.0) {
+                    progress = (inCycleBeat - 4.0) / 4.0;
+                } else {
+                    // サイクルを跨いだ直後の処理
+                    progress = 1.0; 
+                }
+                const currentX = cellCenters[0] + (cellCenters[8] - cellCenters[0]) * Math.min(1, progress);
+                guideLine.style.left = `${currentX - 2}px`;
             } else {
                 guideLine.style.opacity = '0';
             }
