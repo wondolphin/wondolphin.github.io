@@ -168,6 +168,7 @@
             height: 100%;
             background-color: rgba(0, 0, 0, 0.7);
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             cursor: pointer;
@@ -186,34 +187,51 @@
             font-size: clamp(40px, 10vw, 80px);
             color: var(--star-matched);
             text-shadow: 0 0 15px var(--star-matched);
+            margin-bottom: 20px;
         }
 
-        #share-button {
+        #share-container {
             position: absolute;
             bottom: 10vh;
             left: 50%;
             transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+            transition: opacity 0.5s, visibility 0.5s, transform 0.5s ease-in-out;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        #share-container.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .share-btn, .choice-link {
             display: inline-block;
             padding: 12px 24px;
             background-color: #000;
             color: white;
             text-decoration: none;
-            font-size: clamp(16px, 3vw, 20px);
+            font-size: clamp(14px, 2.5vw, 18px);
             border-radius: 50px;
             font-weight: bold;
-            transition: opacity 0.5s, visibility 0.5s, transform 0.2s ease-in-out;
-            opacity: 0;
-            visibility: hidden;
+            transition: transform 0.2s ease, opacity 0.2s;
             cursor: pointer;
-        }
-
-        #share-button.show {
-            opacity: 1;
-            visibility: visible;
+            border: 1px solid #333;
+            text-align: center;
+            min-width: 220px;
         }
         
-        #share-button:hover {
-            transform: translateX(-50%) scale(1.05);
+        .share-btn:hover, .choice-link:hover {
+            transform: scale(1.05);
+            background-color: #111;
+        }
+
+        .hidden {
+            display: none !important;
         }
 
     </style>
@@ -233,7 +251,9 @@
     
     <div id="clear-message">
         <span>CLEAR!</span>
-        <a href="https://twitter.com/intent/tweet?text=%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Fstar_feast%2Findex.html" target="_blank" rel="noopener noreferrer" id="share-button">喜びをXでシェアする</a>
+        <div id="share-container">
+            <!-- JSで動的に生成 -->
+        </div>
     </div>
 
     <script>
@@ -241,7 +261,14 @@
             const BOARD_SIZE = 5;
             const board = document.getElementById('board');
             const clearMessage = document.getElementById('clear-message');
-            const shareButton = document.getElementById('share-button');
+            const shareContainer = document.getElementById('share-container');
+
+            // シェア用設定
+            const SHARE_CONFIG = {
+                TWEET_TEXT: "ルールを推測するパズル「星たちの饗宴」をクリアしました！\n#宇宙謎 #ルール発見型パズル @wondolphin",
+                TWEET_URL: "https://wondolphin.github.io/puzzle/uchunazo/star_feast/index.html",
+                SUPPORT_URL: "https://twitter.com/wondolphin/status/1974699298593063250"
+            };
             
             const targetPositions = [
                 { r: 0, c: 0 }, { r: 0, c: 2 }, { r: 0, c: 4 },
@@ -362,17 +389,56 @@
                         star.classList.add('cleared-star');
                     });
 
+                    // シェアUI準備
+                    setupShareUI();
+
                     // 1.5秒後にメッセージ表示
                     setTimeout(() => {
                         clearMessage.classList.add('show');
-                        // さらに1.5秒後にシェアボタン表示
+                        // さらに1.5秒後にシェアコンテナ表示
                         setTimeout(() => {
-                            if (shareButton) {
-                                shareButton.classList.add('show');
-                            }
+                            shareContainer.classList.add('show');
                         }, 1500);
                     }, 1500);
                 }
+            }
+
+            function setupShareUI() {
+                const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(SHARE_CONFIG.TWEET_TEXT)}&url=${encodeURIComponent(SHARE_CONFIG.TWEET_URL)}`;
+                shareContainer.innerHTML = '';
+
+                const mainBtn = document.createElement('button');
+                mainBtn.className = 'share-btn';
+                mainBtn.innerText = '喜びをXで共有する';
+                
+                const choicesDiv = document.createElement('div');
+                choicesDiv.className = 'hidden';
+                choicesDiv.style.display = 'flex';
+                choicesDiv.style.flexDirection = 'column';
+                choicesDiv.style.gap = '12px';
+                
+                const reportLink = document.createElement('a');
+                reportLink.className = 'choice-link';
+                reportLink.href = tweetUrl;
+                reportLink.target = '_blank';
+                reportLink.innerText = 'クリア報告のポスト';
+                
+                const supportLink = document.createElement('a');
+                supportLink.className = 'choice-link';
+                supportLink.href = SHARE_CONFIG.SUPPORT_URL;
+                supportLink.target = '_blank';
+                supportLink.innerText = '原ポストにいいね・リポスト';
+                
+                mainBtn.onclick = (e) => {
+                    e.stopPropagation(); // 背景の閉じるイベントを阻止
+                    mainBtn.classList.add('hidden');
+                    choicesDiv.classList.remove('hidden');
+                };
+
+                choicesDiv.appendChild(reportLink);
+                choicesDiv.appendChild(supportLink);
+                shareContainer.appendChild(mainBtn);
+                shareContainer.appendChild(choicesDiv);
             }
 
             function updateButtonStates() {
@@ -410,14 +476,12 @@
                 document.addEventListener('keydown', handleKeyDown);
 
                 clearMessage.addEventListener('click', (e) => {
-                    // シェアボタン自体をクリックした場合は閉じない
-                    if (e.target.closest('#share-button')) {
+                    // シェアコンテナ内をクリックした場合は閉じない
+                    if (shareContainer.contains(e.target)) {
                         return;
                     }
                     clearMessage.classList.remove('show');
-                    if (shareButton) {
-                        shareButton.classList.remove('show');
-                    }
+                    shareContainer.classList.remove('show');
                 });
             }
 
@@ -426,4 +490,3 @@
     </script>
 </body>
 </html>
-
