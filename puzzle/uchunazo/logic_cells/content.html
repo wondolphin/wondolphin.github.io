@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ロジックセルズ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --board-color: #00e5ff;
+            --lamp-color: #ffab00;
+            --bg-color: #0a0a0a;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #e0e0e0;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        #main-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-around;
+            height: 80vh; 
+            width: 100%;
+            max-width: 600px;
+            position: relative;
+        }
+
+        #monitor-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #monitor {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            background-color: #1a1a1a;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: inset 0 0 20px #000;
+            border: 2px solid #333;
+        }
+
+        .cell {
+            width: 40px;
+            height: 40px;
+            background-color: #222;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            border: 1px solid #111;
+        }
+
+        .cell.active {
+            background-color: var(--board-color);
+            box-shadow: 0 0 15px var(--board-color), inset 0 0 5px #fff;
+            border-color: #fff;
+        }
+
+        #button-panel {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            background: #151515;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .btn-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .num-btn {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(145deg, #444, #222);
+            color: #fff;
+            border: 1px solid #555;
+            border-bottom: 4px solid #000;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        .num-btn:active:not(:disabled) {
+            transform: translateY(2px);
+            border-bottom-width: 2px;
+            background: var(--board-color);
+            color: #000;
+        }
+
+        .num-btn:disabled {
+            opacity: 0.1;
+            cursor: not-allowed;
+            border-bottom-width: 1px;
+            transform: translateY(2px);
+        }
+
+        .lamp {
+            width: 10px;
+            height: 10px;
+            background-color: #050505;
+            border-radius: 50%;
+            border: 1px solid #222;
+            transition: all 0.3s;
+        }
+
+        .lamp.active {
+            background-color: var(--lamp-color);
+            box-shadow: 0 0 10px var(--lamp-color), inset 0 0 3px #fff;
+        }
+
+        /* リセットボタンの強調アニメーション */
+        @keyframes pulse-soft {
+            0% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.4); border-color: #444; }
+            50% { box-shadow: 0 0 0 10px rgba(0, 229, 255, 0); border-color: #00e5ff; color: #fff; }
+            100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); border-color: #444; }
+        }
+
+        #reset-btn {
+            background: #222;
+            border: 1px solid #444;
+            color: #666;
+            padding: 6px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #reset-btn.emphasized {
+            animation: pulse-soft 2s infinite ease-in-out;
+        }
+
+        #reset-btn:hover {
+            background: #333;
+            color: #ccc;
+        }
+
+        /* クリアオーバーレイ */
+        #clear-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            border-radius: 20px;
+        }
+
+        .clear-card {
+            background: #1a1a1a;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            text-align: center;
+            border: 2px solid var(--lamp-color);
+            max-width: 90%;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        #clear-title {
+            font-size: 3rem;
+            font-weight: 900;
+            margin-bottom: 24px;
+            color: var(--lamp-color);
+            text-shadow: 0 0 20px rgba(255, 171, 0, 0.5);
+            letter-spacing: 0.5rem;
+        }
+
+        .share-container {
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .share-btn, .choice-link {
+            display: block;
+            background-color: #1da1f2;
+            color: white;
+            text-decoration: none;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border: none;
+            text-align: center;
+            transition: opacity 0.2s;
+        }
+
+        .share-btn:hover, .choice-link:hover { opacity: 0.85; }
+        .hidden { display: none !important; }
+
+        .btn-ok {
+            margin-top: 10px;
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            letter-spacing: 0.6rem;
+            font-weight: 300;
+            margin: 0;
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="main-wrapper">
+        <div id="clear-overlay">
+            <div class="clear-card">
+                <div id="clear-title">CLEAR!</div>
+                <div class="share-container" id="share-container">
+                    <!-- JSで生成 -->
+                </div>
+                <button class="btn-ok" onclick="hideClear()">閉じる</button>
+            </div>
+        </div>
+
+        <h1>ロジックセルズ</h1>
+
+        <div id="monitor-area">
+            <div id="monitor"></div>
+            <button id="reset-btn">Reset System</button>
+        </div>
+
+        <div id="button-panel"></div>
+    </div>
+
+    <script>
+        // --- 設定 ---
+        const SHARE_CONFIG = {
+            MODE: 'DIRECT', 
+            TWEET_TEXT: "パズル「ロジックセルズ」をクリアしました！\n#ロジックセルズ #ルール発見型パズル\n",
+            TWEET_URL: window.location.href,
+            SUPPORT_URL: "https://twitter.com/wondolphin"
+        };
+
+        const SIZE = 7;
+        const monitor = document.getElementById('monitor');
+        const clearOverlay = document.getElementById('clear-overlay');
+        const resetBtn = document.getElementById('reset-btn');
+        const buttonPanel = document.getElementById('button-panel');
+        const shareContainer = document.getElementById('share-container');
+
+        let grid = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
+        let maxUnlocked = 1;
+        let pressedButtons = new Set();
+        let gameCleared = false;
+
+        function createMonitor() {
+            monitor.innerHTML = '';
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.id = `cell-${r}-${c}`;
+                    monitor.appendChild(cell);
+                }
+            }
+        }
+
+        function createButtons() {
+            buttonPanel.innerHTML = '';
+            for (let i = 1; i <= 8; i++) {
+                const wrapper = document.createElement('div');
+                wrapper.classList.add('btn-wrapper');
+                const btn = document.createElement('button');
+                btn.classList.add('num-btn');
+                btn.id = `btn-${i}`;
+                btn.textContent = i;
+                btn.onclick = () => handleButtonClick(i);
+                const lamp = document.createElement('div');
+                lamp.classList.add('lamp');
+                lamp.id = `lamp-${i}`;
+                wrapper.appendChild(btn);
+                wrapper.appendChild(lamp);
+                buttonPanel.appendChild(wrapper);
+            }
+        }
+
+        function updateDisplay() {
+            let activeCount = 0;
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    const el = document.getElementById(`cell-${r}-${c}`);
+                    if (grid[r][c]) {
+                        el.classList.add('active');
+                        activeCount++;
+                    } else {
+                        el.classList.remove('active');
+                    }
+                }
+            }
+
+            // 全消灯（信号途絶）チェック
+            const allOff = activeCount === 0;
+            
+            if (allOff) {
+                resetBtn.classList.add('emphasized');
+            } else {
+                resetBtn.classList.remove('emphasized');
+            }
+
+            for (let i = 1; i <= 8; i++) {
+                const btn = document.getElementById(`btn-${i}`);
+                const lamp = document.getElementById(`lamp-${i}`);
+                
+                // クリア後は全てのボタンをアクティブにする。ただし全消灯時は無効。
+                if (gameCleared) {
+                    btn.disabled = allOff;
+                } else {
+                    btn.disabled = (i > maxUnlocked) || allOff;
+                }
+
+                if (pressedButtons.has(i)) lamp.classList.add('active');
+                else lamp.classList.remove('active');
+            }
+        }
+
+        function resetGame() {
+            grid = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
+            grid[1][2] = true; // 初期値(1,2) に変更
+            maxUnlocked = 1;
+            pressedButtons.clear();
+            gameCleared = false;
+            clearOverlay.style.display = 'none';
+            updateDisplay();
+        }
+
+        function handleButtonClick(n) {
+            // クリア後、または未解放ボタンのガード
+            if (!gameCleared && n > maxUnlocked) return;
+            
+            const allOff = grid.flat().every(v => !v);
+            if (allOff) return;
+
+            const nextGrid = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    let count = 0;
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            if (dr === 0 && dc === 0) continue;
+                            const nr = r + dr, nc = c + dc;
+                            if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && grid[nr][nc]) count++;
+                        }
+                    }
+                    if (count === n) nextGrid[r][c] = true;
+                }
+            }
+            grid = nextGrid;
+            pressedButtons.add(n);
+            
+            if (!gameCleared && n === maxUnlocked && maxUnlocked < 8) maxUnlocked++;
+            if (n === 8 && !gameCleared) showClear();
+            
+            updateDisplay();
+        }
+
+        function showClear() {
+            gameCleared = true;
+            setupShareUI();
+            clearOverlay.style.display = 'flex';
+        }
+
+        function setupShareUI() {
+            const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(SHARE_CONFIG.TWEET_TEXT)}&url=${encodeURIComponent(SHARE_CONFIG.TWEET_URL)}`;
+            shareContainer.innerHTML = '';
+
+            if (SHARE_CONFIG.MODE === 'DIRECT') {
+                const link = document.createElement('a');
+                link.className = 'share-btn';
+                link.href = tweetUrl;
+                link.target = '_blank';
+                link.innerText = '喜びをXで共有する';
+                shareContainer.appendChild(link);
+            } else {
+                const mainBtn = document.createElement('button');
+                mainBtn.className = 'share-btn';
+                mainBtn.innerText = '喜びをXで共有する';
+                
+                const choicesDiv = document.createElement('div');
+                choicesDiv.className = 'share-container hidden';
+                choicesDiv.style.margin = '0';
+                
+                const reportLink = document.createElement('a');
+                reportLink.className = 'choice-link';
+                reportLink.href = tweetUrl;
+                reportLink.target = '_blank';
+                reportLink.innerText = 'クリア報告のポスト';
+                
+                const supportLink = document.createElement('a');
+                supportLink.className = 'choice-link';
+                supportLink.href = SHARE_CONFIG.SUPPORT_URL;
+                supportLink.target = '_blank';
+                supportLink.innerText = '原ポストにいいね・リポスト';
+                
+                mainBtn.onclick = () => {
+                    mainBtn.classList.add('hidden');
+                    choicesDiv.classList.remove('hidden');
+                };
+
+                choicesDiv.appendChild(reportLink);
+                choicesDiv.appendChild(supportLink);
+                shareContainer.appendChild(mainBtn);
+                shareContainer.appendChild(choicesDiv);
+            }
+        }
+
+        function hideClear() {
+            clearOverlay.style.display = 'none';
+            // クリアフラグは維持したまま表示更新
+            updateDisplay();
+        }
+
+        resetBtn.onclick = resetGame;
+        window.onload = () => {
+            createMonitor();
+            createButtons();
+            resetGame();
+        };
+    </script>
+</body>
+</html>
