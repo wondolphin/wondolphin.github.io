@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chaos Map Builder Pro v18 - Custom Structure Integration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #f1f5f9;
+        }
+
+        .category-node { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .category-node:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .data-item { font-size: 0.7rem; transition: all 0.2s; }
+        .data-item:hover { background-color: white; transform: translateX(5px); }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        .checkbox-custom:checked + label {
+            background-color: #dbeafe;
+            border-color: #3b82f6;
+            color: #1e40af;
+        }
+
+        .status-badge {
+            font-size: 9px;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6">
+    <div class="max-w-[1600px] mx-auto">
+        <!-- Header -->
+        <header class="flex flex-col xl:flex-row xl:items-center justify-between mb-6 gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center">
+                    <span class="bg-indigo-600 text-white p-2 rounded-lg mr-3 italic shadow-lg">CB</span>
+                    Chaos Map <span class="text-indigo-600 ml-2 text-lg font-bold">Pro v18 (Custom)</span>
+                </h1>
+                <div class="flex items-center gap-3 mt-1">
+                    <p class="text-slate-500 text-[10px] font-medium italic">Selective Export & Persistent Explorer</p>
+                    <div id="load-status-container" class="flex gap-1">
+                        <span id="status-categories" class="status-badge bg-slate-200 text-slate-400">構造: 未</span>
+                        <span id="status-baseOrder" class="status-badge bg-slate-200 text-slate-400">順序: 未</span>
+                        <span id="status-rawData" class="status-badge bg-slate-200 text-slate-400">データ: 未</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="triggerUniversalImport()" class="bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-md transition flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    JSONを読込
+                </button>
+                <input type="file" id="universal-import-input" class="hidden" accept=".json" onchange="handleUniversalImport(event)">
+                
+                <button onclick="openExportModal()" class="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 shadow-sm transition flex items-center">
+                    <svg class="w-4 h-4 mr-1.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    JSONを出力
+                </button>
+
+                <div class="h-6 w-[1px] bg-slate-200 mx-1"></div>
+
+                <button onclick="openDataModal()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 shadow-md transition">
+                    新規データ
+                </button>
+            </div>
+        </header>
+
+        <!-- Tool Bar -->
+        <div class="flex flex-wrap items-center gap-2 mb-6">
+            <button onclick="toggleHierarchyModal()" class="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition">階層順序を管理</button>
+            <button onclick="toggleEditor()" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 transition">分類構造エディタ</button>
+            <button onclick="generateSampleData()" class="bg-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-300 transition ml-auto">サンプルを再生成</button>
+        </div>
+
+        <!-- Explorer View -->
+        <div id="explorer-view">
+            <nav id="breadcrumb" class="flex items-center space-x-2 mb-6 text-sm font-medium sticky top-4 z-40 bg-white/80 backdrop-blur-md p-3 rounded-2xl shadow-sm border border-white">
+                <button onclick="zoomToLevel(0)" class="text-indigo-600 hover:bg-indigo-50 px-3 py-1 rounded-lg transition flex items-center shrink-0 font-bold">
+                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path></svg>
+                    ホーム
+                </button>
+                <div id="breadcrumb-items" class="flex items-center space-x-1 overflow-x-auto no-scrollbar"></div>
+            </nav>
+
+            <div class="mb-4 flex flex-col md:flex-row md:items-center justify-between px-2 gap-4">
+                <div class="flex flex-col">
+                    <div id="current-level-name" class="text-xs font-black text-slate-400 uppercase tracking-widest"></div>
+                    <div id="stats" class="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-tight"></div>
+                </div>
+                <div id="explore-actions" class="flex items-center gap-2">
+                    <div id="recall-area" class="hidden flex items-center gap-2">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">スキップ済み:</span>
+                        <div id="recall-buttons" class="flex gap-1"></div>
+                    </div>
+                    <button id="skip-btn" onclick="skipCurrent()" class="bg-amber-100 text-amber-700 px-4 py-2 rounded-xl text-xs font-black hover:bg-amber-200 transition hidden shadow-sm">
+                        スキップ
+                    </button>
+                </div>
+            </div>
+
+            <main id="map-root" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 min-h-[500px]"></main>
+        </div>
+
+        <!-- Export Modal -->
+        <div id="export-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] p-4 flex items-center justify-center">
+            <div class="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl flex flex-col">
+                <div class="flex justify-between items-start mb-6 shrink-0">
+                    <div>
+                        <h3 class="text-2xl font-black text-slate-900">エクスポート設定</h3>
+                        <p class="text-xs text-slate-500 mt-1">出力する情報を選択してください。</p>
+                    </div>
+                    <button onclick="closeExportModal()" class="text-slate-400 hover:text-slate-600 transition text-2xl">&times;</button>
+                </div>
+                <div class="space-y-3 mb-8">
+                    <label class="flex items-center p-4 bg-slate-50 rounded-2xl border-2 border-transparent cursor-pointer hover:border-blue-300 transition">
+                        <input type="checkbox" id="export-check-categories" checked class="w-5 h-5 rounded text-blue-600">
+                        <div class="ml-3">
+                            <div class="font-bold text-slate-800">分類構造 (categories)</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-4 bg-slate-50 rounded-2xl border-2 border-transparent cursor-pointer hover:border-blue-300 transition">
+                        <input type="checkbox" id="export-check-order" checked class="w-5 h-5 rounded text-blue-600">
+                        <div class="ml-3">
+                            <div class="font-bold text-slate-800">表示順序 (baseOrder)</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-4 bg-slate-50 rounded-2xl border-2 border-transparent cursor-pointer hover:border-blue-300 transition">
+                        <input type="checkbox" id="export-check-data" checked class="w-5 h-5 rounded text-blue-600">
+                        <div class="ml-3">
+                            <div class="font-bold text-slate-800">アイテムデータ (rawData)</div>
+                        </div>
+                    </label>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="closeExportModal()" class="flex-grow py-3 bg-slate-100 text-slate-500 rounded-2xl font-bold">キャンセル</button>
+                    <button onclick="executeExport()" class="flex-grow py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg transition">JSONを生成</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Modal (New / Edit) -->
+        <div id="data-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] p-4 flex items-center justify-center">
+            <div class="bg-white rounded-3xl max-w-2xl w-full p-8 shadow-2xl flex flex-col max-h-[90vh]">
+                <div class="flex justify-between items-start mb-6 shrink-0">
+                    <div>
+                        <h3 id="data-modal-title" class="text-2xl font-black text-slate-900">データ登録</h3>
+                    </div>
+                    <button onclick="closeDataModal()" class="text-slate-400 hover:text-slate-600 transition text-2xl">&times;</button>
+                </div>
+                <div class="flex-grow overflow-y-auto pr-2 custom-scroll space-y-6">
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <label class="text-xs font-black text-slate-400 uppercase tracking-widest">アイテム名</label>
+                            <button id="adopt-filters-btn" onclick="adoptCurrentFilters()" class="text-[10px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition font-black">現在の分類を採用</button>
+                        </div>
+                        <input type="text" id="data-item-name" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div id="data-tags-container" class="space-y-4 border-t border-slate-100 pt-6"></div>
+                </div>
+                <div class="shrink-0 mt-8 pt-6 border-t border-slate-100 flex gap-3">
+                    <button onclick="closeDataModal()" class="flex-grow py-3 bg-slate-100 text-slate-500 rounded-2xl font-bold">キャンセル</button>
+                    <button onclick="saveItem()" class="flex-grow py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg transition">保存する</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hierarchy Modal -->
+        <div id="hierarchy-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] p-4 flex items-center justify-center">
+            <div class="bg-white rounded-3xl max-w-2xl w-full h-[85vh] p-8 shadow-2xl flex flex-col overflow-hidden">
+                <div class="shrink-0 mb-6 text-center">
+                    <h3 class="text-xl font-bold text-slate-900 tracking-tight">階層構造マネージャー</h3>
+                </div>
+                <div id="hierarchy-tree-container" class="flex-grow overflow-y-auto pr-2 custom-scroll space-y-4"></div>
+                <div class="shrink-0 mt-8 flex justify-center pt-6 border-t"><button onclick="toggleHierarchyModal()" class="px-10 py-3 bg-indigo-600 text-white rounded-2xl font-bold">設定終了</button></div>
+            </div>
+        </div>
+
+        <!-- Structure Editor -->
+        <div id="editor-view" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[120] p-4 md:p-10 flex items-center justify-center">
+            <div class="bg-white w-full h-full max-w-6xl rounded-[40px] shadow-2xl flex flex-col overflow-hidden">
+                <div class="p-8 border-b flex justify-between items-center">
+                    <h2 class="text-2xl font-black text-slate-900">分類構造エディタ</h2>
+                    <div class="flex gap-3">
+                        <button onclick="addCategory()" class="bg-indigo-50 text-indigo-600 px-6 py-2 rounded-xl text-xs font-bold flex items-center">分類追加</button>
+                        <button onclick="toggleEditor()" class="bg-slate-900 text-white px-8 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 transition">閉じる</button>
+                    </div>
+                </div>
+                <div id="editor-container" class="flex-grow overflow-y-auto p-8 custom-scroll bg-slate-50/50"></div>
+            </div>
+        </div>
+
+        <!-- Item Detail Modal -->
+        <div id="item-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden items-center justify-center z-[130] p-4">
+            <div class="bg-white rounded-[32px] max-w-xl w-full p-10 shadow-2xl flex flex-col max-h-[90vh]">
+                <div class="flex justify-between items-start mb-8 shrink-0">
+                    <div class="flex-grow">
+                        <h2 id="modal-title" class="text-3xl font-black text-slate-900 leading-tight"></h2>
+                    </div>
+                    <button onclick="closeModal()" class="bg-slate-100 text-slate-400 p-2 rounded-full hover:text-slate-600">&times;</button>
+                </div>
+                <div id="modal-tags" class="flex-grow space-y-4 mb-10 overflow-y-auto pr-2 custom-scroll"></div>
+                <div class="shrink-0 flex gap-2 border-t pt-6">
+                    <button id="detail-delete-btn" class="bg-rose-50 text-rose-600 px-6 py-3 rounded-2xl font-bold hover:bg-rose-100 transition">削除</button>
+                    <button id="detail-edit-btn" class="bg-indigo-600 text-white px-10 py-3 rounded-2xl font-bold hover:bg-indigo-700 shadow-lg flex-grow transition">編集</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. 状態管理 ---
+        let categories = {};
+        let baseOrder = [];
+        let rawData = [];
+        let currentPath = []; 
+        let skippedItems = [];
+        let expandedTagIds = new Set();
+        
+        let editingItemId = null; 
+        let tempItemTags = {}; 
+        let isSampleActive = true; 
+
+        let loadStatus = { categories: false, baseOrder: false, rawData: false };
+
+        // --- 2. インポート ---
+        function triggerUniversalImport() { document.getElementById('universal-import-input').click(); }
+        function handleUniversalImport(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const json = JSON.parse(event.target.result);
+                    processImportedJson(json);
+                } catch (err) { alert("JSONの解析に失敗しました。"); }
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function processImportedJson(json) {
+            if (isSampleActive) {
+                categories = {}; baseOrder = []; rawData = [];
+                isSampleActive = false;
+                loadStatus = { categories: false, baseOrder: false, rawData: false };
+            }
+            let found = false;
+            if (json.categories) { categories = json.categories; loadStatus.categories = true; found = true; }
+            if (json.baseOrder) { baseOrder = json.baseOrder; loadStatus.baseOrder = true; found = true; }
+            if (json.rawData) { rawData = json.rawData; loadStatus.rawData = true; found = true; }
+            
+            if (!json.categories && !json.baseOrder && !json.rawData) {
+                if (typeof json === 'object' && !Array.isArray(json)) {
+                    categories = json; loadStatus.categories = true; found = true;
+                }
+            }
+
+            if (loadStatus.rawData && !loadStatus.categories) {
+                const auto = {};
+                rawData.forEach(item => {
+                    Object.entries(item.tags).forEach(([catId, tagIds]) => {
+                        if (!auto[catId]) auto[catId] = { name: `分類:${catId}`, isRoot: true, tags: [] };
+                        tagIds.forEach(tid => { if (!auto[catId].tags.find(t => t.id === tid)) auto[catId].tags.push({ id: tid, name: `タグ:${tid}`, subCategories: [] }); });
+                    });
+                });
+                categories = auto; loadStatus.categories = true;
+            }
+            if (loadStatus.categories && !loadStatus.baseOrder) {
+                baseOrder = Object.keys(categories).filter(cid => categories[cid].isRoot);
+                loadStatus.baseOrder = true;
+            }
+            updateStatusUI(); zoomToLevel(0);
+        }
+
+        function updateStatusUI() {
+            const updateBadge = (id, active, label) => {
+                const el = document.getElementById(id);
+                el.textContent = `${label}: ${active ? '読込済' : '未'}`;
+                el.className = `status-badge ${active ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-200 text-slate-400'}`;
+            };
+            updateBadge('status-categories', loadStatus.categories, '構造');
+            updateBadge('status-baseOrder', loadStatus.baseOrder, '順序');
+            updateBadge('status-rawData', loadStatus.rawData, 'データ');
+        }
+
+        // --- 3. エクスポート ---
+        function openExportModal() { document.getElementById('export-modal').classList.remove('hidden'); document.getElementById('export-modal').classList.add('flex'); }
+        function closeExportModal() { document.getElementById('export-modal').classList.add('hidden'); }
+        function executeExport() {
+            const out = {};
+            if (document.getElementById('export-check-categories').checked) out.categories = categories;
+            if (document.getElementById('export-check-order').checked) out.baseOrder = baseOrder;
+            if (document.getElementById('export-check-data').checked) out.rawData = rawData;
+            if (Object.keys(out).length === 0) return alert("1つ以上選択してください。");
+            const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `chaos_map_export_${Date.now()}.json`; a.click();
+            closeExportModal();
+        }
+
+        // --- 4. デフォルトデータ生成 (提供されたJSON構造 + 500件生成) ---
+        function generateSampleData() {
+            isSampleActive = true;
+            loadStatus = { categories: false, baseOrder: false, rawData: false };
+
+            // 提供された構造
+            categories = {
+                "cat_A": { "name": "ジャンル", "isRoot": true, "tags": [
+                    { "id": "t_A1", "name": "エンタメ・コメディ", "subCategories": [] },
+                    { "id": "t_A2", "name": "ゲーム", "subCategories": ["cat_1775719575663", "cat_1775719657062"] },
+                    { "id": "t_A3", "name": "教育・ビジネス・教養", "subCategories": [] },
+                    { "id": "t_A4", "name": "キッズ・ファミリー", "subCategories": [] },
+                    { "id": "t_A5", "name": "音楽・アート", "subCategories": [] },
+                    { "id": "t_A6", "name": "ライフスタイル・料理", "subCategories": [] },
+                    { "id": "t_A7", "name": "テクノロジー・専門技術", "subCategories": [] },
+                    { "id": "t_A8", "name": "ニュース・メディア", "subCategories": [] }
+                ]},
+                "cat_B": { "name": "配信戦略/形式", "isRoot": true, "tags": [
+                    { "id": "t_B1", "name": "ショート動画主導", "subCategories": [] },
+                    { "id": "t_B2", "name": "長尺企画・Vlog", "subCategories": [] },
+                    { "id": "t_B3", "name": "ライブ配信主導", "subCategories": [] }
+                ]},
+                "cat_C": { "name": "到達圏", "isRoot": true, "tags": [
+                    { "id": "t_C1", "name": "国内市場特化", "subCategories": [] },
+                    { "id": "t_C2", "name": "グローバル展開", "subCategories": [] }
+                ]},
+                "cat_D": { "name": "運営主体", "isRoot": true, "tags": [
+                    { "id": "t_D1", "name": "個人・グループ", "subCategories": [] },
+                    { "id": "t_D2", "name": "企業・法人・組織", "subCategories": [] }
+                ]},
+                "cat_1775718607159": { "name": "ニーズ", "isRoot": true, "tags": [
+                    { "id": "t_1775718623659", "name": "学びたい", "subCategories": [] },
+                    { "id": "t_1775718680792", "name": "笑いたい", "subCategories": [] },
+                    { "id": "t_1775718684575", "name": "知りたい", "subCategories": [] },
+                    { "id": "t_1775718968042", "name": "癒されたい", "subCategories": ["cat_1775719082959"] },
+                    { "id": "t_1775718973709", "name": "アクティブになりたい", "subCategories": [] },
+                    { "id": "t_1775718993427", "name": "遊びたい", "subCategories": [] },
+                    { "id": "t_1775719245193", "name": "感銘を受けたい", "subCategories": [] }
+                ]},
+                "cat_1775719082959": { "name": "なにで癒されたいか", "isRoot": false, "tags": [
+                    { "id": "t_1775719114743", "name": "音楽", "subCategories": [] },
+                    { "id": "t_1775719119513", "name": "赤ちゃん", "subCategories": [] },
+                    { "id": "t_1775719148644", "name": "動物", "subCategories": [] },
+                    { "id": "t_1775719367427", "name": "自然", "subCategories": [] },
+                    { "id": "t_1775719370662", "name": "ASMR", "subCategories": [] },
+                    { "id": "t_1775719373746", "name": "映像美", "subCategories": [] },
+                    { "id": "t_1775719390214", "name": "人の声", "subCategories": [] }
+                ]},
+                "cat_1775719575663": { "name": "ゲームジャンル", "isRoot": false, "tags": [
+                    { "id": "t_1775719582631", "name": "シューティング", "subCategories": [] },
+                    { "id": "t_1775719592464", "name": "RPG", "subCategories": [] },
+                    { "id": "t_1775719595831", "name": "シミュレーション", "subCategories": [] },
+                    { "id": "t_1775719609132", "name": "パズル", "subCategories": [] },
+                    { "id": "t_1775719615265", "name": "アドベンチャー", "subCategories": [] },
+                    { "id": "t_1775719635548", "name": "ホラー", "subCategories": [] }
+                ]},
+                "cat_1775719657062": { "name": "内容（ゲーム）", "isRoot": false, "tags": [
+                    { "id": "t_1775719683798", "name": "実況", "subCategories": [] },
+                    { "id": "t_1775719688265", "name": "解説・考察", "subCategories": [] },
+                    { "id": "t_1775719695831", "name": "紹介", "subCategories": [] }
+                ]}
+            };
+            baseOrder = ["cat_A", "cat_B", "cat_C", "cat_D", "cat_1775718607159"];
+
+            const prefixes = ["Neo", "Tech", "Global", "Creative", "Smart", "Life", "Master", "Elite", "Pro", "Ultra", "Future", "Digital", "Deep", "Pure", "Open"];
+            const suffixes = ["Explorer", "Insight", "Channel", "Hub", "Network", "Log", "Vibe", "Flow", "Station", "Direct", "Lab", "Vision", "Edge", "Scope", "Box"];
+
+            rawData = [];
+            for (let i = 0; i < 500; i++) {
+                const name = `${prefixes[Math.floor(Math.random() * prefixes.length)]} ${suffixes[Math.floor(Math.random() * suffixes.length)]} #${100 + i}`;
+                const item = { id: Date.now() + i, name, tags: {} };
+                
+                function pickTags(cid) {
+                    const def = categories[cid]; if (!def || !def.tags.length) return;
+                    const num = Math.random() > 0.85 ? 2 : 1;
+                    const shuffled = [...def.tags].sort(() => 0.5 - Math.random());
+                    const picked = shuffled.slice(0, num).map(t => t.id);
+                    item.tags[cid] = picked;
+                    shuffled.slice(0, num).forEach(t => { if (t.subCategories) t.subCategories.forEach(sid => pickTags(sid)); });
+                }
+                
+                baseOrder.forEach(rid => pickTags(rid));
+                rawData.push(item);
+            }
+            
+            updateStatusUI(); zoomToLevel(0);
+        }
+
+        // --- 5. 探索エンジン ---
+        function getAvailableCategories() {
+            const used = currentPath.map(p => p.catId);
+            let avail = [];
+            currentPath.forEach(step => {
+                const def = categories[step.catId]; if (!def) return;
+                const tag = def.tags.find(t => t.id === step.tagId);
+                if (tag && tag.subCategories) tag.subCategories.forEach(sid => { if (!used.includes(sid)) avail.push(sid); });
+            });
+            baseOrder.forEach(id => { if (!used.includes(id)) avail.push(id); });
+            return [...new Set(avail)];
+        }
+
+        function getNextKey() {
+            const avail = getAvailableCategories();
+            const skipped = skippedItems.map(s => s.key);
+            return avail.find(k => !skipped.includes(k));
+        }
+
+        function renderExplorer() {
+            const root = document.getElementById('map-root');
+            const breadItems = document.getElementById('breadcrumb-items');
+            const levelDisp = document.getElementById('current-level-name');
+            const statsDisp = document.getElementById('stats');
+            const skipBtn = document.getElementById('skip-btn');
+            const recallArea = document.getElementById('recall-area');
+            const recallBtns = document.getElementById('recall-buttons');
+
+            root.innerHTML = ''; breadItems.innerHTML = ''; recallBtns.innerHTML = '';
+
+            currentPath.forEach((step, idx) => {
+                const sep = document.createElement('span'); sep.innerHTML = '<svg class="w-3 h-3 text-slate-300 mx-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>';
+                breadItems.appendChild(sep);
+                const btn = document.createElement('button');
+                const tagName = categories[step.catId]?.tags.find(t => t.id === step.tagId)?.name || step.tagId;
+                btn.textContent = tagName; btn.className = "px-2 py-1 rounded-lg text-slate-500 hover:text-indigo-600 transition font-bold whitespace-nowrap";
+                btn.onclick = () => zoomToLevel(idx + 1); breadItems.appendChild(btn);
+            });
+
+            const nextKey = getNextKey();
+            const avail = getAvailableCategories();
+            const skipped = skippedItems.map(s => s.key);
+
+            const recallable = avail.filter(k => skipped.includes(k));
+            if (recallable.length > 0) {
+                recallArea.classList.remove('hidden');
+                recallable.forEach(k => {
+                    const b = document.createElement('button');
+                    b.className = "px-2 py-1 bg-white border border-slate-200 rounded-lg text-[8px] font-bold text-slate-500 hover:text-indigo-600 transition";
+                    b.textContent = categories[k]?.name || k;
+                    b.onclick = () => { skippedItems = skippedItems.filter(s => s.key !== k); renderExplorer(); };
+                    recallBtns.appendChild(b);
+                });
+            } else { recallArea.classList.add('hidden'); }
+
+            let filtered = rawData;
+            currentPath.forEach(p => { filtered = filtered.filter(d => d.tags[p.catId] && d.tags[p.catId].includes(p.tagId)); });
+
+            if (!nextKey) {
+                renderEndState(root, filtered); levelDisp.textContent = "探索完了"; skipBtn.classList.add('hidden'); statsDisp.textContent = `結果: ${filtered.length} 件`; return;
+            }
+
+            skipBtn.classList.remove('hidden');
+            const def = categories[nextKey]; levelDisp.textContent = def?.name || nextKey;
+            statsDisp.textContent = `該当アイテム: ${filtered.length} 件`;
+
+            const tagsInDef = def.tags || [];
+            tagsInDef.forEach((tagInfo, index) => {
+                const itemsInThisTag = filtered.filter(d => d.tags[nextKey] && d.tags[nextKey].includes(tagInfo.id));
+                const palette = ['bg-white border-blue-200 text-blue-900', 'bg-white border-emerald-200 text-emerald-900', 'bg-white border-amber-200 text-amber-900', 'bg-white border-rose-200 text-rose-900'][index % 4];
+                const node = document.createElement('div');
+                node.className = `category-node border-2 rounded-3xl p-6 flex flex-col ${palette} cursor-pointer group shadow-sm`;
+                node.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-xl font-black text-slate-800 tracking-tight">${tagInfo.name || "(無名)"}</h3>
+                        <div class="flex flex-col items-end gap-1">
+                            <span class="text-[10px] font-bold opacity-60">${itemsInThisTag.length} items</span>
+                            ${tagInfo.subCategories?.length > 0 ? '<span class="bg-indigo-600 text-white text-[9px] font-bold px-2 py-1 rounded-lg">SUB</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="flex-grow space-y-1 mb-6 overflow-y-auto max-h-[160px] custom-scroll">
+                        ${itemsInThisTag.slice(0, 5).map(it => `<div onclick="event.stopPropagation(); showDetail(${it.id})" class="data-item p-2 rounded-xl bg-slate-50/60 font-bold text-slate-600 shadow-sm transition">${it.name}</div>`).join('')}
+                    </div>
+                    <div class="mt-auto text-[10px] font-black text-slate-400 group-hover:text-indigo-600 uppercase tracking-widest flex items-center">選択 <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></div>
+                `;
+                node.onclick = () => { currentPath.push({ catId: nextKey, tagId: tagInfo.id }); renderExplorer(); };
+                root.appendChild(node);
+            });
+        }
+
+        function renderEndState(container, items) {
+            container.innerHTML = `<div class="col-span-full py-20 text-center bg-white border-2 border-dashed border-slate-200 rounded-[40px] shadow-sm">
+                <h2 class="text-3xl font-black text-slate-900 mb-8">探索結果</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto px-6 text-left">
+                    ${items.map(it => `<div onclick="showDetail(${it.id})" class="p-4 bg-slate-50 rounded-2xl font-bold text-slate-700 hover:bg-white hover:shadow hover:text-indigo-600 transition cursor-pointer flex justify-between items-center border border-transparent hover:border-indigo-100"><span>${it.name}</span> <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></div>`).join('')}
+                    ${items.length === 0 ? '<div class="col-span-full py-10 text-slate-400 font-bold italic">一致するデータなし</div>' : ''}
+                </div>
+                <button onclick="zoomToLevel(0)" class="mt-14 bg-indigo-600 text-white px-12 py-4 rounded-2xl font-black shadow-lg">リセット</button>
+            </div>`;
+        }
+
+        // --- 6. モーダルロジック ---
+        function openDataModal(item = null) {
+            editingItemId = item ? item.id : null;
+            document.getElementById('data-item-name').value = item ? item.name : '';
+            document.getElementById('data-modal-title').textContent = item ? "データの編集" : "新規データ登録";
+            tempItemTags = item ? JSON.parse(JSON.stringify(item.tags)) : {};
+            document.getElementById('adopt-filters-btn').style.display = item ? 'none' : 'block';
+            renderDataTagsForm();
+            document.getElementById('data-modal').classList.remove('hidden'); document.getElementById('data-modal').classList.add('flex');
+        }
+        function closeDataModal() { document.getElementById('data-modal').classList.add('hidden'); document.getElementById('data-modal').classList.remove('flex'); }
+
+        function adoptCurrentFilters() {
+            tempItemTags = {};
+            currentPath.forEach(p => { if (!tempItemTags[p.catId]) tempItemTags[p.catId] = []; tempItemTags[p.catId].push(p.tagId); });
+            renderDataTagsForm();
+        }
+
+        function renderDataTagsForm() {
+            const container = document.getElementById('data-tags-container'); container.innerHTML = '';
+            baseOrder.forEach(catId => renderTagSelectorInForm(container, catId));
+        }
+
+        function renderTagSelectorInForm(container, catId) {
+            const def = categories[catId]; if (!def) return;
+            const div = document.createElement('div'); div.className = "p-5 bg-slate-50 border border-slate-200 rounded-[24px] flex flex-col gap-3 shadow-sm mb-4";
+            const selIds = tempItemTags[catId] || [];
+            div.innerHTML = `<label class="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">${def.name}</label>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">${def.tags.map(t => {
+                    const isChecked = selIds.includes(t.id);
+                    return `<div class="relative"><input type="checkbox" id="form-${catId}-${t.id}" ${isChecked ? 'checked' : ''} onchange="toggleFormTag('${catId}', '${t.id}', this.checked)" class="hidden checkbox-custom">
+                            <label for="form-${catId}-${t.id}" class="block cursor-pointer px-4 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-bold text-slate-600 hover:border-blue-300 transition text-center select-none shadow-sm">${t.name || "(未設定)"}</label></div>`;
+                }).join('')}</div>`;
+            container.appendChild(div);
+            const subToRender = new Set();
+            selIds.forEach(tid => { const tag = def.tags.find(t => t.id === tid); if (tag && tag.subCategories) tag.subCategories.forEach(sid => subToRender.add(sid)); });
+            if (subToRender.size > 0) {
+                const subBox = document.createElement('div'); subBox.className = "ml-4 pl-4 border-l-2 border-indigo-100 flex flex-col mt-2";
+                Array.from(subToRender).forEach(sid => renderTagSelectorInForm(subBox, sid));
+                container.appendChild(subBox);
+            }
+        }
+
+        function toggleFormTag(catId, tagId, isChecked) {
+            if (!tempItemTags[catId]) tempItemTags[catId] = [];
+            if (isChecked) { if (!tempItemTags[catId].includes(tagId)) tempItemTags[catId].push(tagId); } 
+            else { tempItemTags[catId] = tempItemTags[catId].filter(id => id !== tagId); if (tempItemTags[catId].length === 0) delete tempItemTags[catId]; }
+            renderDataTagsForm();
+        }
+
+        function saveItem() {
+            const name = document.getElementById('data-item-name').value.trim(); if (!name) return alert("名前を入力してください。");
+            const final = {};
+            function collect(cid) {
+                const s = tempItemTags[cid] || [];
+                if (s.length > 0) { final[cid] = s; s.forEach(tid => { const d = categories[cid].tags.find(t => t.id === tid); if (d && d.subCategories) d.subCategories.forEach(sid => collect(sid)); }); }
+            }
+            baseOrder.forEach(r => collect(r));
+            if (editingItemId) { const i = rawData.findIndex(d => d.id === editingItemId); if (i !== -1) { rawData[i].name = name; rawData[i].tags = final; } } 
+            else { rawData.unshift({ id: Date.now(), name, tags: final }); }
+            closeDataModal(); renderExplorer();
+        }
+
+        function toggleHierarchyModal() { const m = document.getElementById('hierarchy-modal'); if (m.classList.contains('hidden')) { renderHierarchyTree(); m.classList.remove('hidden'); m.classList.add('flex'); } else { m.classList.add('hidden'); m.classList.remove('flex'); renderExplorer(); } }
+        function renderHierarchyTree() {
+            const c = document.getElementById('hierarchy-tree-container'); c.innerHTML = '<div class="text-[10px] font-black text-slate-400 uppercase pl-1 mb-2">ルート順序</div>';
+            baseOrder.forEach((cid, i) => { c.appendChild(createHierItem(cid, baseOrder, i, 0)); });
+        }
+        function createHierItem(cid, list, i, depth) {
+            const def = categories[cid]; if(!def) return document.createElement('div');
+            const d = document.createElement('div'); d.className = "flex flex-col gap-1";
+            const r = document.createElement('div'); r.className = "flex items-center justify-between p-3 bg-slate-50 border rounded-xl";
+            r.innerHTML = `<span class="font-bold text-sm text-slate-700">${def.name}</span><div class="flex gap-1"><button onclick="mvIn(event, 'baseOrder', ${i}, -1)" class="p-1 hover:bg-white rounded">▲</button><button onclick="mvIn(event, 'baseOrder', ${i}, 1)" class="p-1 hover:bg-white rounded">▼</button></div>`;
+            d.appendChild(r);
+            const tc = document.createElement('div'); tc.className = "ml-4 pl-4 border-l mt-2 space-y-2";
+            def.tags.forEach(tag => {
+                if(tag.subCategories && tag.subCategories.length > 0) {
+                    const tr = document.createElement('div'); const isExp = expandedTagIds.has(tag.id);
+                    tr.innerHTML = `<div class="text-xs cursor-pointer select-none" onclick="tgExp('${tag.id}')"><span class="transform transition inline-block ${isExp?'rotate-90':''}">▶</span> <span class="bg-indigo-50 px-2 py-0.5 rounded text-indigo-500 font-bold">${tag.name || "(無名)"}</span></div>`;
+                    if(isExp) {
+                        const sl = document.createElement('div'); sl.className = "ml-4 mt-1 space-y-1";
+                        tag.subCategories.forEach((sid, si) => {
+                            const sr = document.createElement('div'); sr.className = "flex items-center justify-between p-2 bg-white border rounded-lg text-xs font-bold";
+                            sr.innerHTML = `<span>${categories[sid]?.name || sid}</span><div class="flex"><button onclick="mvSub(event, '${cid}', '${tag.id}', ${si}, -1)">▲</button><button onclick="mvSub(event, '${cid}', '${tag.id}', ${si}, 1)">▼</button></div>`;
+                            sl.appendChild(sr);
+                        });
+                        tr.appendChild(sl);
+                    }
+                    tc.appendChild(tr);
+                }
+            });
+            if(tc.children.length > 0) d.appendChild(tc); return d;
+        }
+        function mvIn(e, l, i, d) { e.stopPropagation(); const n = [...baseOrder]; const ni = i+d; if(ni<0||ni>=n.length) return; const t = n[i]; n[i]=n[ni]; n[ni]=t; baseOrder=n; renderHierarchyTree(); }
+        function mvSub(e, cid, tid, i, d) { e.stopPropagation(); const tag = categories[cid].tags.find(t=>t.id===tid); const ni = i+d; if(ni<0||ni>=tag.subCategories.length) return; const t=tag.subCategories[i]; tag.subCategories[i]=tag.subCategories[ni]; tag.subCategories[ni]=t; renderHierarchyTree(); }
+        function tgExp(tid) { if(expandedTagIds.has(tid)) expandedTagIds.delete(tid); else expandedTagIds.add(tid); renderHierarchyTree(); }
+        function toggleEditor() { const e = document.getElementById('editor-view'); if (e.classList.contains('hidden')) { renderStructureEditor(); e.classList.remove('hidden'); } else { e.classList.add('hidden'); zoomToLevel(0); } }
+        function renderStructureEditor() {
+            const c = document.getElementById('editor-container'); c.innerHTML = '';
+            Object.keys(categories).forEach(cid => {
+                const def = categories[cid]; const card = document.createElement('div'); card.className = "bg-white border rounded-[32px] p-6 mb-6 shadow-sm";
+                card.innerHTML = `<div class="flex justify-between mb-4 flex-wrap gap-2"><div class="flex items-center gap-2"><input type="text" value="${def.name}" onchange="categories['${cid}'].name=this.value" class="font-bold text-slate-800 p-2 border-b"><span class="text-[9px] text-slate-400 font-mono">ID: ${cid}</span></div><div class="flex items-center gap-3"><label class="text-xs font-bold flex items-center gap-1 cursor-pointer"><input type="checkbox" ${def.isRoot?'checked':''} onchange="categories['${cid}'].isRoot=this.checked; if(this.checked){if(!baseOrder.includes('${cid}'))baseOrder.push('${cid}')}else{baseOrder=baseOrder.filter(k=>k!=='${cid}')}" class="w-4 h-4 rounded text-indigo-600">ROOT</label><button onclick="deleteCategory('${cid}')" class="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition">削除</button></div></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${def.tags.map(t => `<div class="bg-slate-50 p-5 rounded-2xl relative border border-slate-100"><div class="flex justify-between mb-2"><input type="text" value="${t.name}" onchange="categories['${cid}'].tags.find(x=>x.id==='${t.id}').name=this.value" class="bg-transparent font-black text-slate-700 w-full border-b border-slate-200 pb-1"><button onclick="deleteTag('${cid}', '${t.id}')" class="text-rose-400">&times;</button></div><div class="text-[9px] font-bold text-slate-400 mb-1">Sub Categories</div><div class="space-y-1">${t.subCategories.map((s,si) => `<div class="flex gap-1 mt-1 items-center"><select onchange="categories['${cid}'].tags.find(x=>x.id==='${t.id}').subCategories[${si}]=this.value" class="text-[10px] flex-grow bg-white border p-1 rounded outline-none"><option value="">NONE</option>${Object.keys(categories).filter(x=>x!==cid).map(x=>`<option value="${x}" ${s===x?'selected':''}>${categories[x].name}</option>`).join('')}</select><button onclick="categories['${cid}'].tags.find(x=>x.id==='${t.id}').subCategories.splice(${si},1); renderStructureEditor()" class="text-rose-400">&times;</button></div>`).join('')}</div><div class="mt-2 flex gap-2"><button onclick="categories['${cid}'].tags.find(x=>x.id==='${t.id}').subCategories.push(''); renderStructureEditor()" class="text-[9px] text-blue-500 font-bold hover:underline">+ ADD SUB</button></div></div>`).join('')}<button onclick="addTag('${cid}')" class="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-slate-400 hover:text-indigo-400 transition font-bold text-xs">新規タグを追加</button></div>`;
+                c.appendChild(card);
+            });
+        }
+        function addCategory() { const id = 'cat_' + Date.now(); categories[id] = { name: "新規分類", isRoot: false, tags: [] }; renderStructureEditor(); }
+        function deleteCategory(id) { if(confirm("削除しますか？")) { delete categories[id]; baseOrder = baseOrder.filter(k => k !== id); renderStructureEditor(); } }
+        function addTag(cid) { categories[cid].tags.push({ id: 't_' + Date.now(), name: "新規タグ", subCategories: [] }); renderStructureEditor(); }
+        function deleteTag(cid, tid) { categories[cid].tags = categories[cid].tags.filter(t => t.id !== tid); renderStructureEditor(); }
+        
+        function skipCurrent() { const n = getNextKey(); if (n) { skippedItems.push({ key: n, depth: currentPath.length }); renderExplorer(); } }
+        function zoomToLevel(level) { currentPath = currentPath.slice(0, level); skippedItems = skippedItems.filter(s => s.depth < level); renderExplorer(); }
+        function showDetail(id) {
+            const item = rawData.find(d => d.id == id); if(!item) return;
+            const m = document.getElementById('item-modal'); document.getElementById('modal-title').textContent = item.name;
+            const c = document.getElementById('modal-tags'); c.innerHTML = '';
+            Object.keys(categories).forEach(cid => {
+                const tids = item.tags[cid] || []; if (tids.length === 0) return;
+                const def = categories[cid]; c.innerHTML += `<div class="p-4 bg-slate-50 rounded-2xl border shadow-sm"><div class="text-[10px] font-black text-slate-400 mb-2">${def.name}</div><div class="flex flex-wrap gap-2">${tids.map(tid => `<span class="px-3 py-1 bg-white border rounded-xl text-xs font-bold text-slate-700">${def.tags.find(t=>t.id===tid)?.name || tid}</span>`).join('')}</div></div>`;
+            });
+            document.getElementById('detail-edit-btn').onclick = () => { closeModal(); openDataModal(item); };
+            document.getElementById('detail-delete-btn').onclick = () => { if(confirm(`「${item.name}」を削除しますか？`)) { rawData = rawData.filter(d => d.id !== item.id); closeModal(); renderExplorer(); } };
+            m.classList.remove('hidden'); m.classList.add('flex');
+        }
+        function closeModal() { document.getElementById('item-modal').classList.add('hidden'); }
+
+        window.onload = generateSampleData;
+    </script>
+</body>
+</html>

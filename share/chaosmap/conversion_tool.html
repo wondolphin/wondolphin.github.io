@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chaos Map - Data Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .converter-card {
+            transition: all 0.3s ease;
+        }
+        textarea::-webkit-scrollbar { width: 6px; }
+        textarea::-webkit-scrollbar-track { background: transparent; }
+        textarea::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+    </style>
+</head>
+<body class="p-4 md:p-10">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="mb-10 text-center">
+            <h1 class="text-3xl font-black text-slate-900 mb-2">Chaos Map Data Converter</h1>
+            <p class="text-slate-500 font-medium italic text-sm">CSV ⇄ JSON (rawData) 相互変換ツール</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- CSV Section -->
+            <div class="converter-card bg-white rounded-[32px] p-6 shadow-xl border border-slate-100 flex flex-col h-[700px]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                        <span class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center mr-2">C</span>
+                        CSV (rawData形式)
+                    </h2>
+                    <div class="flex gap-2">
+                        <label class="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-xl text-xs font-bold transition">
+                            ファイル読込
+                            <input type="file" accept=".csv" class="hidden" onchange="loadFile(event, 'csv')">
+                        </label>
+                        <button onclick="downloadContent('csv')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-3 py-1.5 rounded-xl text-xs font-bold transition">
+                            保存
+                        </button>
+                    </div>
+                </div>
+                <textarea id="csv-area" placeholder="id,name,cat_1,cat_2...&#10;ignore,ignore,ignore,ignore...&#10;1,コンテンツA,t_01,&quot;t_02,t_03&quot;" 
+                    class="flex-grow w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none resize-none mb-4 custom-scroll"></textarea>
+                <button onclick="csvToJson()" class="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-emerald-700 transition active:scale-95">
+                    CSVをJSONに変換 ➔
+                </button>
+            </div>
+
+            <!-- JSON Section -->
+            <div class="converter-card bg-white rounded-[32px] p-6 shadow-xl border border-slate-100 flex flex-col h-[700px]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center">
+                        <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mr-2">J</span>
+                        JSON (rawData配列)
+                    </h2>
+                    <div class="flex gap-2">
+                        <label class="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-xl text-xs font-bold transition">
+                            ファイル読込
+                            <input type="file" accept=".json" class="hidden" onchange="loadFile(event, 'json')">
+                        </label>
+                        <button onclick="downloadContent('json')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-xl text-xs font-bold transition">
+                            保存
+                        </button>
+                    </div>
+                </div>
+                <textarea id="json-area" placeholder='[&#10;  {&#10;    "id": 1,&#10;    "name": "コンテンツA",&#10;    "tags": { "cat_1": ["t_01"], "cat_2": ["t_02", "t_03"] }&#10;  }&#10;]' 
+                    class="flex-grow w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-none resize-none mb-4 custom-scroll"></textarea>
+                <button onclick="jsonToCsv()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition active:scale-95">
+                    &larr; JSONをCSVに変換
+                </button>
+            </div>
+        </div>
+
+        <!-- Info Footer -->
+        <footer class="mt-10 p-6 bg-white/50 rounded-3xl border border-slate-200 text-slate-500 text-xs leading-relaxed">
+            <h3 class="font-bold mb-2 uppercase tracking-widest text-[10px]">CSVフォーマットの注意点</h3>
+            <ul class="list-disc pl-5 space-y-1">
+                <li>1行目: ID、名前、カテゴリIDの順に記載してください（例: <code class="bg-white px-1 rounded">id,name,cat_A,cat_B</code>）。</li>
+                <li>2行目: 変換ツールではスキップされますが、Excel管理用のメモ等に使用できます。</li>
+                <li>3行目以降: データ本体。1つのカテゴリに複数のタグがある場合は、セル内をカンマで区切り、全体をダブルクォートで囲んでください（例: <code class="bg-white px-1 rounded">"tag_01,tag_02"</code>）。</li>
+            </ul>
+        </footer>
+    </div>
+
+    <script>
+        // --- CSVパーサー (RFC 4180準拠：クォート内のカンマに対応) ---
+        function parseCsv(text) {
+            const result = [];
+            let row = [];
+            let cell = '';
+            let inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const next = text[i+1];
+                if (inQuotes && char === '"' && next === '"') { cell += '"'; i++; }
+                else if (char === '"') { inQuotes = !inQuotes; }
+                else if (char === ',' && !inQuotes) { row.push(cell); cell = ''; }
+                else if ((char === '\r' || char === '\n') && !inQuotes) {
+                    row.push(cell);
+                    if (row.length > 1 || row[0] !== '') result.push(row);
+                    row = []; cell = '';
+                    if (char === '\r' && next === '\n') i++;
+                } else { cell += char; }
+            }
+            if (cell !== '' || row.length > 0) { row.push(cell); result.push(row); }
+            return result;
+        }
+
+        // --- CSVエスケープ (クォートが必要な場合のみ囲む) ---
+        function escapeCsvCell(val) {
+            let s = String(val);
+            if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+                s = '"' + s.replace(/"/g, '""') + '"';
+            }
+            return s;
+        }
+
+        // --- CSV -> JSON ---
+        function csvToJson() {
+            const csvText = document.getElementById('csv-area').value.trim();
+            if (!csvText) return;
+
+            try {
+                const rows = parseCsv(csvText);
+                if (rows.length < 3) throw new Error("CSVには最低3行（ヘッダー、スキップ行、データ）必要です。");
+
+                const headers = rows[0];
+                const dataRows = rows.slice(2); // 2行目をスキップ
+                
+                const jsonResult = dataRows.map((row, rowIdx) => {
+                    const item = {
+                        id: row[0] || (Date.now() + rowIdx),
+                        name: row[1] || "No Name",
+                        tags: {}
+                    };
+
+                    for (let j = 2; j < headers.length; j++) {
+                        const catId = headers[j];
+                        const cellVal = row[j];
+                        if (!catId || !cellVal) continue;
+                        
+                        // カンマ区切りのマルチタグを配列化
+                        item.tags[catId] = cellVal.split(',').map(t => t.trim()).filter(t => t);
+                    }
+                    return item;
+                });
+
+                document.getElementById('json-area').value = JSON.stringify(jsonResult, null, 2);
+            } catch (err) {
+                alert("CSV変換エラー: " + err.message);
+            }
+        }
+
+        // --- JSON -> CSV ---
+        function jsonToCsv() {
+            const jsonText = document.getElementById('json-area').value.trim();
+            if (!jsonText) return;
+
+            try {
+                const data = JSON.parse(jsonText);
+                if (!Array.isArray(data)) throw new Error("JSONは配列形式である必要があります。");
+
+                // 全データからユニークなカテゴリIDを抽出
+                const categorySet = new Set();
+                data.forEach(item => {
+                    if (item.tags) {
+                        Object.keys(item.tags).forEach(cid => categorySet.add(cid));
+                    }
+                });
+                const catIds = Array.from(categorySet).sort();
+
+                // ヘッダー作成
+                const headerRow = ['id', 'name', ...catIds];
+                const skipRow = ['ignore', 'ignore', ...catIds.map(() => 'ignore')];
+                
+                const csvRows = [headerRow, skipRow];
+
+                // データ行作成
+                data.forEach(item => {
+                    const row = [
+                        item.id,
+                        item.name
+                    ];
+                    catIds.forEach(cid => {
+                        const tags = item.tags[cid] || [];
+                        row.push(tags.join(',')); // マルチタグはカンマで繋ぐ
+                    });
+                    csvRows.push(row);
+                });
+
+                const csvOutput = csvRows.map(row => row.map(escapeCsvCell).join(',')).join('\n');
+                document.getElementById('csv-area').value = csvOutput;
+            } catch (err) {
+                alert("JSON変換エラー: " + err.message);
+            }
+        }
+
+        // --- ファイル操作 ---
+        function loadFile(event, type) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById(`${type}-area`).value = e.target.result;
+                event.target.value = ''; // リセット
+            };
+            reader.readAsText(file);
+        }
+
+        function downloadContent(type) {
+            const content = document.getElementById(`${type}-area`).value;
+            if (!content) return;
+            const blob = new Blob([content], { type: type === 'csv' ? 'text/csv' : 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `converted_data.${type}`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
