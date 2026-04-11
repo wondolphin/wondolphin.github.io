@@ -4,39 +4,378 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ポケモンごちゃまぜアナグラム</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 10px;
+            background-color: #f4f4f4;
+            color: #333;
+            font-size: 14px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 1.8em;
+            margin-bottom: 10px;
+        }
+
+        .header-button {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            padding: 8px 12px;
+            background-color: #9b59b6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: background-color 0.2s;
+        }
+
+        .header-button:hover {
+            background-color: #8e44ad;
+        }
+
+        .controls {
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #fff;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .controls label {
+            margin-right: 4px;
+        }
+
+        .controls select, .controls button {
+            padding: 6px 10px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+            margin-left: 4px;
+            font-size: 0.9em;
+        }
+
+        .controls button#start-button {
+            background-color: #3498db;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .controls button#start-button:hover {
+            background-color: #2980b9;
+        }
+
+        .seed-controls {
+            margin-bottom: 5px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .seed-controls input {
+            padding: 6px 8px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+            font-size: 0.9em;
+        }
+
+        .seed-controls button {
+            padding: 6px 10px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+            font-size: 0.9em;
+            background-color: #eee;
+            cursor: pointer;
+        }
+
+        .list-selector-container {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            width: 95%;
+            box-sizing: border-box;
+        }
+
+        .list-selector-container h3 {
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-size: 1em;
+            color: #333;
+        }
+
+        #word-list-checkboxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        #word-list-checkboxes label {
+            display: flex;
+            align-items: center;
+            font-size: 0.9em;
+            padding: 5px 8px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #timer-area {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        #game-area {
+            padding: 15px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            width: 95%;
+            max-width: 550px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+        }
+
+        .problem-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            margin-bottom: 8px;
+        }
+
+        .problem-header-row h2 {
+            font-size: 1.2em;
+            margin: 0;
+        }
+
+        .font-size-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .font-size-controls button {
+            padding: 2px 8px;
+            font-size: 0.9em;
+            cursor: pointer;
+            background-color: #eee;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        #problem-area {
+            font-size: 1.5em; 
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px dashed #ddd;
+            min-height: 30px;
+            line-height: 1.5;
+            letter-spacing: 2px;
+            text-align: center;
+            word-break: break-all;
+        }
+
+        #problem-area span.problem-char {
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 2px 4px;
+            transition: background-color 0.2s, color 0.2s;
+            user-select: none;
+        }
+
+        #problem-area span.problem-char:hover {
+            background-color: #ffffdd;
+        }
+
+        .answer-section {
+            display: flex;
+            margin-bottom: 10px;
+        }
+
+        #answer-input {
+            flex-grow: 1;
+            padding: 8px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+            margin-right: 8px;
+            font-size: 0.95em;
+        }
+
+        #delete-char-button {
+            padding: 8px 12px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-right: 8px;
+        }
+
+        #submit-button {
+            padding: 8px 15px;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        button:disabled {
+            background-color: #bdc3c7 !important;
+            cursor: not-allowed !important;
+        }
+
+        #give-up-button {
+            padding: 7px 12px;
+            background-color: #f39c12;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.85em;
+            margin: 0 auto 15px auto;
+            display: block;
+        }
+
+        #correct-answers-area div {
+            margin-bottom: 6px;
+            padding: 4px 6px;
+            font-weight: bold;
+            background-color: #e8f8f0;
+            border-left: 2px solid #27ae60;
+            font-size: 0.9em;
+        }
+
+        #correct-answers-area div.given-up {
+            color: #c0392b;
+            background-color: #fdecea;
+            border-left-color: #c0392b;
+        }
+
+        #clear-message-area {
+            margin-top: 15px;
+            padding: 15px 8px;
+            font-size: 1.1em;
+            color: #3498db;
+            font-weight: bold;
+            text-align: center;
+            background-color: #eaf5fb;
+            border-radius: 3px;
+            display: none; 
+        }
+
+        #clear-message-area.speed-clear {
+            color: #e67e22;
+            background-color: #fdf3e6;
+        }
+        #clear-message-area.give-up-clear {
+            color: #7f8c8d;
+            background-color: #f0f1f1;
+        }
+
+        #x-share-area {
+            text-align: center; 
+            margin-top: 12px; 
+            display: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            overflow-x: auto;
+            position: relative;
+        }
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .record-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .record-table th, .record-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        .record-table th { background-color: #f8f9fa; }
+        .all-record-row { font-weight: bold; border-top: 2px solid #333; }
+        .medal-icon { font-size: 1.2em; }
+        .x-share-button {
+            background-color: #0f1419;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 9999px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        .x-share-button:hover {
+            background-color: #272c30;
+        }
+        .footer-link { color: #95a5a6; text-decoration: none; font-size: 0.9em; }
+    </style>
 </head>
 <body>
     <button id="record-button" class="header-button">クリア記録</button>
     <h1>ポケモンごちゃまぜアナグラム</h1>
 
-    <!-- クリア記録モーダル -->
-    <div id="record-modal" class="modal" style="display: none;">
+    <div id="record-modal" class="modal">
         <div class="modal-content">
             <span class="close-button" id="close-record-modal">&times;</span>
             <h2>クリア記録</h2>
             <div id="record-list"></div>
             <div style="text-align: right; margin-top: 15px;">
-                <button id="clear-all-records-button" class="subtle-button">記録全消去</button>
+                <button id="clear-all-records-button" style="padding: 5px 10px;">記録全消去</button>
             </div>
         </div>
     </div>
 
     <div class="list-selector-container">
         <h3>範囲を選択 (複数可):</h3>
-        <div id="word-list-checkboxes">
-            </div>
+        <div id="word-list-checkboxes"></div>
         <div style="text-align: right; margin-top: 10px;">
             <button id="select-all-button" style="font-size: 0.8em; padding: 2px 8px;">全て選択</button>
             <button id="deselect-all-button" style="font-size: 0.8em; padding: 2px 8px;">全て解除</button>
         </div>
     </div>
 
-
     <div class="controls">
         <label for="mix-count">混ぜる数：</label>
-        <select id="mix-count">
-            </select>
+        <select id="mix-count"></select>
         <button id="start-button">スタート</button>
     </div>
 
@@ -45,15 +384,17 @@
         <button id="generate-seed-button">ランダムシード生成</button>
     </div>
 
-    <div id="share-link-area">
-        </div>
-
     <div id="timer-area">Time: <span id="time-elapsed">0</span>s</div>
 
     <div id="game-area">
-        <h2>問題</h2>
-        <div id="problem-area">
+        <div class="problem-header-row">
+            <h2>問題</h2>
+            <div class="font-size-controls">
+                <button id="font-decrease">－</button>
+                <button id="font-increase">＋</button>
             </div>
+        </div>
+        <div id="problem-area"></div>
 
         <h2>解答</h2>
         <div class="answer-section">
@@ -64,23 +405,391 @@
         <button id="give-up-button">ギブアップ（１つ）</button>
 
         <h2>正解した単語</h2>
-        <div id="correct-answers-area">
-            </div>
+        <div id="correct-answers-area"></div>
 
         <div id="clear-message-area">
+            <span id="clear-text"></span>
+            <div id="x-share-area">
+                <button id="x-share-button" class="x-share-button">Xで問題を共有</button>
             </div>
-        
-        <div id="x-share-area" style="text-align: center; margin-top: 15px; display: none;">
-            <button id="x-share-button" class="x-share-button">Xで問題を共有</button>
         </div>
     </div>
 
     <div style="margin-top: 30px; margin-bottom: 20px; font-size: 0.85em; text-align: center;">
-        <a href="../../profile.html" target="_blank" class="footer-link">作者へのコンタクト</a>
-        <span style="margin: 0 10px; color: #ccc;">|</span>
-        <a href="https://example.com/dummy" target="_blank" class="footer-link x-like-link" id="x-like-repost-link" style="display: none;">Xでのいいね・リポスト</a>
+        <a href="#" class="footer-link">作者へのコンタクト</a>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const allWordListsData = [
+            { id: 'list1', name: '初代 (赤緑/No.1-151)', words: ["フシギダネ", "フシギソウ", "フシギバナ", "ヒトカゲ", "リザード", "リザードン", "ゼニガメ", "カメール", "カメックス", "キャタピー", "トランセル", "バタフリー", "ビードル", "コクーン", "スピアー", "ポッポ", "ピジョン", "ピジョット", "コラッタ", "ラッタ", "オニスズメ", "オニドリル", "アーボ", "アーボック", "ピカチュウ", "ライチュウ", "サンド", "サンドパン", "ニドリーナ", "ニドクイン", "ニドリーノ", "ニドキング", "ピッピ", "ピクシー", "ロコン", "キュウコン", "プリン", "プクリン", "ズバット", "ゴルバット", "ナゾノクサ", "クサイハナ", "ラフレシア", "パラス", "パラセクト", "コンパン", "モルフォン", "ディグダ", "ダグトリオ", "ニャース", "ペルシアン", "コダック", "ゴルダック", "マンキー", "オコリザル", "ガーディ", "ウインディ", "ニョロモ", "ニョロゾ", "ニョロボン", "ケーシィ", "ユンゲラー", "フーディン", "ワンリキー", "ゴーリキー", "カイリキー", "マダツボミ", "ウツドン", "ウツボット", "メノクラゲ", "ドククラゲ", "イシツブテ", "ゴローン", "ゴローニャ", "ポニータ", "ギャロップ", "ヤドン", "ヤドラン", "コイル", "レアコイル", "カモネギ", "ドードー", "ドードリオ", "パウワウ", "ジュゴン", "ベトベター", "ベトベトン", "シェルダー", "パルシェン", "ゴース", "ゴースト", "ゲンガー", "イワーク", "スリープ", "スリーパー", "クラブ", "キングラー", "ビリリダマ", "マルマイン", "タマタマ", "ナッシー", "カラカラ", "ガラガラ", "サワムラー", "エビワラー", "ベロリンガ", "ドガース", "マタドガス", "サイホーン", "サイドン", "ラッキー", "モンジャラ", "ガルーラ", "タッツー", "シードラ", "トサキント", "アズマオウ", "ヒトデマン", "スターミー", "バリヤード", "ストライク", "ルージュラ", "エレブー", "ブーバー", "カイロス", "ケンタロス", "コイキング", "ギャラドス", "ラプラス", "メタモン", "イーブイ", "シャワーズ", "サンダース", "ブースター", "ポリゴン", "オムナイト", "オムスター", "カブト", "カブトプス", "プテラ", "カビゴン", "フリーザー", "サンダー", "ファイヤー", "ミニリュウ", "ハクリュー", "カイリュー", "ミュウツー", "ミュウ"] },
+            { id: 'list2', name: '2代目 (金銀/No.152-251)', words: ["チコリータ", "ベイリーフ", "メガニウム", "ヒノアラシ", "マグマラシ", "バクフーン", "ワニノコ", "アリゲイツ", "オーダイル", "オタチ", "オオタチ", "ホーホー", "ヨルノズク", "レディバ", "レディアン", "イトマル", "アリアドス", "クロバット", "チョンチー", "ランターン", "ピチュー", "ピィ", "ププリン", "トゲピー", "トゲチック", "ネイティ", "ネイティオ", "メリープ", "モココ", "デンリュウ", "キレイハナ", "マリル", "マリルリ", "ウソッキー", "ニョロトノ", "ハネッコ", "ポポッコ", "ワタッコ", "エイパム", "ヒマナッツ", "キマワリ", "ヤンヤンマ", "ウパー", "ヌオー", "エーフィ", "ブラッキー", "ヤミカラス", "ヤドキング", "ムウマ", "アンノーン", "ソーナンス", "キリンリキ", "クヌギダマ", "フォレトス", "ノコッチ", "グライガー", "ハガネール", "ブルー", "グランブル", "ハリーセン", "ハッサム", "ツボツボ", "ヘラクロス", "ニューラ", "ヒメグマ", "リングマ", "マグマッグ", "マグカルゴ", "ウリムー", "イノムー", "サニーゴ", "テッポウオ", "オクタン", "デリバード", "マンタイン", "エアームド", "デルビル", "ヘルガー", "キングドラ", "ゴマゾウ", "ドンファン", "ポリゴン2", "オドシシ", "ドーブル", "バルキー", "カポエラー", "ムチュール", "エレキッド", "ブビィ", "ミルタンク", "ハピナス", "ライコウ", "エンテイ", "スイクン", "ヨーギラス", "サナギラス", "バンギラス", "ルギア", "ホウオウ", "セレビィ"] },
+            { id: 'list3', name: '3代目 (ルビサファ/No.252-386)', words: ["キモリ", "ジュプトル", "ジュカイン", "アチャモ", "ワカシャモ", "バシャーモ", "ミズゴロウ", "ヌマクロー", "ラグラージ", "ポチエナ", "グラエナ", "ジグザグマ", "マッスグマ", "ケムッソ", "カラサリス", "アゲハント", "マユルド", "ドクケイル", "ハスボー", "ハスブレロ", "ルンパッパ", "タネボー", "コノハナ", "ダーテング", "スバメ", "オオスバメ", "キャモメ", "ペリッパー", "ラルトス", "キルリア", "サーナイト", "アメタマ", "アメモース", "キノココ", "キノガッサ", "ナマケロ", "ヤルキモノ", "ケッキング", "ツチニン", "テッカニン", "ヌケニン", "ゴニョニョ", "ドゴーム", "バクオング", "マクノシタ", "ハリテヤマ", "ルリリ", "ノズパス", "エネコ", "エネコロロ", "ヤミラミ", "クチート", "ココドラ", "コドラ", "ボスゴドラ", "アサナン", "チャーレム", "ラクライ", "ライボルト", "プラスル", "マイナン", "バルビート", "イルミーゼ", "ロゼリア", "ゴクリン", "マルノーム", "キバニア", "サメハダー", "ホエルコ", "ホエルオー", "ドンメル", "バクーダ", "コータス", "バネブー", "ブーピッグ", "パッチール", "ナックラー", "ビブラーバ", "フライゴン", "サボネア", "ノクタス", "チルット", "チルタリス", "ザングース", "ハブネーク", "ルナトーン", "ソルロック", "ドジョッチ", "ナマズン", "ヘイガニ", "シザリガー", "ヤジロン", "ネンドール", "リリーラ", "ユレイドル", "アノプス", "アーマルド", "ヒンバス", "ミロカロス", "ポワルン", "カクレオン", "カゲボウズ", "ジュペッタ", "ヨマワル", "サマヨール", "トロピウス", "チリーン", "アブソル", "ソーナノ", "ユキワラシ", "オニゴーリ", "タマザラシ", "トドグラー", "トドゼルガ", "パールル", "ハンテール", "サクラビス", "ジーランス", "ラブカス", "タツベイ", "コモルー", "ボーマンダ", "ダンバル", "メタング", "メタグロス", "レジロック", "レジアイス", "レジスチル", "ラティアス", "ラティオス", "カイオーガ", "グラードン", "レックウザ", "ジラーチ", "デオキシス"] },
+            { id: 'list4', name: '4代目 (ダイパ/No.387-493)', words: ["ナエトル", "ハヤシガメ", "ドダイトス", "ヒコザル", "モウカザル", "ゴウカザル", "ポッチャマ", "ポッタイシ", "エンペルト", "ムックル", "ムクバード", "ムクホーク", "ビッパ", "ビーダル", "コロボーシ", "コロトック", "コリンク", "ルクシオ", "レントラー", "スボミー", "ロズレイド", "ズガイドス", "ラムパルド", "タテトプス", "トリデプス", "ミノムッチ", "ミノマダム", "ガーメイル", "ミツハニー", "ビークイン", "パチリス", "ブイゼル", "フローゼル", "チェリンボ", "チェリム", "カラナクシ", "トリトドン", "エテボース", "フワンテ", "フワライド", "ミミロル", "ミミロップ", "ムウマージ", "ドンカラス", "ニャルマー", "ブニャット", "リーシャン", "スカンプー", "スカタンク", "ドーミラー", "ドータクン", "ウソハチ", "マネネ", "ピンプク", "ペラップ", "ミカルゲ", "フカマル", "ガバイト", "ガブリアス", "ゴンベ", "リオル", "ルカリオ", "ヒポポタス", "カバルドン", "スコルピ", "ドラピオン", "グレッグル", "ドクロッグ", "マスキッパ", "ケイコウオ", "ネオラント", "タマンタ", "ユキカブリ", "ユキノオー", "マニューラ", "ジバコイル", "ドサイドン", "モジャンボ", "エレキブル", "ブーバーン", "トゲキッス", "メガヤンマ", "リーフィア", "グレイシア", "グライオン", "マンムー", "ポリゴンZ", "エルレイド", "ダイノーズ", "ヨノワール", "ユキメノコ", "ロトム", "ユクシー", "エムリット", "アグノム", "ディアルガ", "パルキア", "ヒードラン", "レジギガス", "ギラティナ", "クレセリア", "フィオネ", "マナフィ", "ダークライ", "シェイミ", "アルセウス"] },
+            { id: 'list5', name: '5代目 (BW/No.494-649)', words: ["ビクティニ", "ツタージャ", "ジャノビー", "ジャローダ", "ポカブ", "チャオブー", "エンブオー", "ミジュマル", "フタチマル", "ダイケンキ", "ミネズミ", "ミルホッグ", "ヨーテリー", "ハーデリア", "ムーランド", "チョロネコ", "レパルダス", "ヤナップ", "ヤナッキー", "バオップ", "バオッキー", "ヒヤップ", "ヒヤッキー", "ムンナ", "ムシャーナ", "マメパト", "ハトーボー", "ケンホロウ", "シママ", "ゼブライカ", "ダンゴロ", "ガントル", "ギガイアス", "コロモリ", "ココロモリ", "モグリュー", "ドリュウズ", "タブンネ", "ドッコラー", "ローブシン", "オタマロ", "ガマゲロゲ", "ナゲキ", "ダゲキ", "クルミル", "ハハコモリ", "フシデ", "ペンドラー", "モンメン", "エルフーン", "ドレディア", "バスラオ", "メグロコ", "ワルビアル", "ダルマッカ", "ヒヒダルマ", "マラカッチ", "イシズマイ", "ズルッグ", "シンボラー", "デスカーン", "プロトーガ", "アーケオス", "ヤブクロン", "ゾロアーク", "チラーミィ", "チラチーノ", "ゴチム", "ゴチルゼル", "ユニラン", "ランクルス", "コアルヒー", "バニプッチ", "バイバニラ", "シキジカ", "エモンガ", "カブルモ", "タマゲタケ", "モロバレル", "プルリル", "ママンボウ", "デンチュラ", "テッシード", "ナットレイ", "ギギギアル", "シビシラス", "シビルドン", "リグレー", "ヒトモシ", "シャンデラ", "キバゴ", "オノノクス", "クマシュン", "フリージオ", "アギルダー", "マッギョ", "コジョンド", "クリムガン", "ゴルーグ", "キリキザン", "バッフロン", "ウォーグル", "バルジーナ", "クイタラン", "アイアント", "サザンドラ", "ウルガモス", "コバルオン", "テラキオン", "ビリジオン", "トルネロス", "レシラム", "ゼクロム", "キュレム", "メロエッタ", "ゲノセクト"] },
+            { id: 'list6', name: '6代目 (XY/No.650-721)', words: ["ハリマロン", "ブリガロン", "フォッコ", "マフォクシー", "ケロマツ", "ゲッコウガ", "ホルビー", "ヤヤコマ", "ファイアロー", "コフキムシ", "ビビヨン", "シシコ", "フラベベ", "メェークル", "ヤンチャム", "ゴロンダ", "トリミアン", "ニャスパー", "ヒトツキ", "ギルガルド", "シュシュプ", "ペロッパフ", "マーイーカ", "カメテテ", "クズモー", "ウデッポウ", "ブロスター", "エリキテル", "チゴラス", "ガチゴラス", "アマルス", "ニンフィア", "ルチャブル", "デデンネ", "メレシー", "ヌメラ", "ヌメルゴン", "クレッフィ", "ボクレー", "バケッチャ", "パンプジン", "カチコール", "オンバーン", "ゼルネアス", "イベルタル", "ジガルデ", "フーパ"] },
+            { id: 'list7', name: '7代目 (SM/No.722-809)', words: ["モクロー", "ジュナイパー", "ニャビー", "ガオガエン", "アシマリ", "アシレーヌ", "ツツケラ", "デカグース", "アゴジムシ", "クワガノン", "マケンカニ", "オドリドリ", "アブリボン", "イワンコ", "ルガルガン", "ヨワシ", "ドヒドイデ", "ドロバンコ", "バンバドロ", "シズクモ", "オニシズクモ", "ラランテス", "エンニュート", "キテルグマ", "アママイコ", "アマージョ", "キュワワー", "ヤレユータン", "ナゲツケサル", "グソクムシャ", "シロデスナ", "ナマコブシ", "シルヴァディ", "メテノ", "ネッコアラ", "バクガメス", "トゲデマル", "ミミッキュ", "ハギギシリ", "ジジーロン", "ダダリン", "ジャラコ", "ジャラランガ", "カプ・コケコ", "ソルガレオ", "ルナアーラ", "ウツロイド", "デンジュモク", "カミツルギ", "ネクロズマ", "マギアナ", "マーシャドー", "ゼラオラ", "メルメタル"] },
+            { id: 'list8', name: '8代目 (剣盾/No.810-905)', words: ["サルノリ", "ゴリランダー", "ヒバニー", "エースバーン", "メッソン", "インテレオン", "ヨクバリス", "アーマーガア", "イオルブ", "クスネ", "ワタシラガ", "ウールー", "カジリガメ", "ワンパチ", "パルスワン", "タンドン", "セキタンザン", "カジッチュ", "アップリュー", "タルップル", "サダイジャ", "ウッウ", "サシカマス", "カマスジョー", "エレズン", "ストリンダー", "マルヤクデ", "オトスパス", "ヤバチャ", "ポットデス", "ブリムオン", "オーロンゲ", "タチフサグマ", "ニャイキング", "サニゴーン", "ネギガナイト", "バリコオル", "デスバーン", "マホイップ", "タイレーツ", "バチンウニ", "モスノウ", "イシヘンジン", "コオリッポ", "モルペコ", "ダイオウドウ", "ドラパルト", "ザシアン", "ザマゼンタ", "ムゲンダイナ", "ウーラオス", "レジエレキ", "レジドラゴ", "バドレックス", "ガチグマ", "イダイトウ"] },
+            { id: 'list9', name: '9代目 (SV/No.906-1025)', words: ["ニャオハ", "マスカーニャ", "ホゲータ", "ラウドボーン", "クワッス", "ウェーニバル", "グルトン", "ワナイダー", "エクスレッグ", "パーモット", "イッカネズミ", "バウッツェル", "オリーヴァ", "イキリンコ", "キョジオーン", "カルボウ", "グレンアルマ", "ソウブレイズ", "ハラバリー", "タイカイデン", "マフィティフ", "タギングル", "アノホラグサ", "リククラゲ", "ガケガニ", "スコヴィラン", "ベラカス", "クエスパトラ", "デカヌチャン", "ウミトリオ", "オトシドリ", "イルカマン", "ブロロローム", "モトトカゲ", "ミミズズ", "キラフロル", "ハカドッグ", "カラミンゴ", "ハルクジラ", "ミガルーサ", "ヘイラッシャ", "シャリタツ", "コノヨザル", "ドオー", "リキキリン", "ノココッチ", "ドドゲザン", "イダイナキバ", "ハバタクカミ", "テツノツツミ", "テツノカイナ", "コレクレー", "サーフゴー", "パオジアン", "イーユイ", "トドロクツキ", "テツノブジン", "コライドン", "ミライドン", "カミッチュ", "ヤバソチャ", "オーガポン", "ブリジュラス", "テラパゴス", "モモワロウ"] }
+        ];
+
+        const mixCountSelect = document.getElementById('mix-count');
+        const startButton = document.getElementById('start-button');
+        const seedInput = document.getElementById('seed-input');
+        const generateSeedButton = document.getElementById('generate-seed-button');
+        const wordListCheckboxesContainer = document.getElementById('word-list-checkboxes');
+        const problemArea = document.getElementById('problem-area');
+        const answerInput = document.getElementById('answer-input');
+        const deleteCharButton = document.getElementById('delete-char-button');
+        const submitButton = document.getElementById('submit-button');
+        const giveUpButton = document.getElementById('give-up-button');
+        const correctAnswersArea = document.getElementById('correct-answers-area');
+        const clearMessageArea = document.getElementById('clear-message-area');
+        const clearText = document.getElementById('clear-text');
+        const xShareArea = document.getElementById('x-share-area');
+        const timeElapsedDisplay = document.getElementById('time-elapsed');
+        const fontIncreaseBtn = document.getElementById('font-increase');
+        const fontDecreaseBtn = document.getElementById('font-decrease');
+
+        let currentProblemFontSize = 1.5;
+        let selectedWords = [];
+        let problemCharacters = [];
+        let foundWords = [];
+        let timerInterval = null;
+        let secondsElapsed = 0;
+        let giveUpUsed = false;
+        let targetTime = 0;
+        let currentPrng = Math.random;
+        let isRandomSeed = false; // アプリ側で生成したランダムシードかどうか
+        let lastStartedSeed = null;
+        let playedMixCount = 3;
+        let playedWithRandomSeed = false; // 実際に記録対象としてゲームを開始したかどうか
+
+        function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash |= 0;
+            }
+            return hash;
+        }
+
+        function createPRNG(seedStr) {
+            let seed = simpleHash(seedStr.toString());
+            return function () {
+                seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
+                return (seed >>> 0) / 4294967296;
+            };
+        }
+
+        function generateRandomSeedString(length = 10) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let res = '';
+            for (let i = 0; i < length; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+            return res;
+        }
+
+        function hiraganaToKatakana(str) {
+            return str.replace(/[\u3041-\u3096]/g, m => String.fromCharCode(m.charCodeAt(0) + 0x60));
+        }
+
+        function shuffleArray(array, prngFunc) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(prngFunc() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        function updateProblemDisplay() {
+            problemArea.innerHTML = problemCharacters.map(pc => {
+                let color = '#333'; let fontWeight = 'normal';
+                if (pc.isGivenUp) { color = '#FF69B4'; fontWeight = 'bold'; }
+                else if (pc.found) { color = '#32CD32'; fontWeight = 'bold'; }
+                return `<span class="problem-char" style="color: ${color}; font-weight: ${fontWeight};">${pc.char}</span>`;
+            }).join('');
+        }
+
+        function startTimer() {
+            stopTimer(); secondsElapsed = 0; timeElapsedDisplay.textContent = secondsElapsed;
+            timerInterval = setInterval(() => { secondsElapsed++; timeElapsedDisplay.textContent = secondsElapsed; }, 1000);
+        }
+
+        function stopTimer() { clearInterval(timerInterval); }
+
+        function populateWordListCheckboxes() {
+            allWordListsData.forEach(listData => {
+                const label = document.createElement('label');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox'; checkbox.id = listData.id; checkbox.value = listData.id;
+                if (listData.id === 'list1') checkbox.checked = true;
+                label.appendChild(checkbox); label.appendChild(document.createTextNode(listData.name));
+                wordListCheckboxesContainer.appendChild(label);
+            });
+        }
+
+        function initializeGameControls() {
+            mixCountSelect.innerHTML = '';
+            for (let i = 1; i <= 10; i++) {
+                const opt = document.createElement('option'); opt.value = i; opt.textContent = i;
+                mixCountSelect.appendChild(opt);
+            }
+            if (!new URLSearchParams(window.location.search).has('count')) mixCountSelect.value = "3";
+            problemArea.textContent = "リストと数を選んでスタート！";
+            startButton.disabled = false; answerInput.disabled = true; deleteCharButton.disabled = true;
+            submitButton.disabled = true; giveUpButton.disabled = true;
+            timeElapsedDisplay.textContent = "0";
+            clearMessageArea.style.display = 'none';
+        }
+
+        function getSelectedWordLists() {
+            const selected = [];
+            wordListCheckboxesContainer.querySelectorAll('input:checked').forEach(cb => {
+                const data = allWordListsData.find(l => l.id === cb.value);
+                if (data) selected.push(...data.words);
+            });
+            return selected.map(w => hiraganaToKatakana(w.trim())).filter(w => w.length > 0);
+        }
+
+        function generateShareLink() {
+            const seed = seedInput.value.trim();
+            const count = mixCountSelect.value;
+            const ids = Array.from(wordListCheckboxesContainer.querySelectorAll('input:checked')).map(cb => cb.value);
+            const p = new URLSearchParams();
+            if (seed) p.append('seed', seed); p.append('count', count); if (ids.length > 0) p.append('lists', ids.join(','));
+            return `${window.location.origin}${window.location.pathname}?${p.toString()}`;
+        }
+
+        function startGame() {
+            const activeList = getSelectedWordLists();
+            if (activeList.length === 0) { problemArea.textContent = '出題範囲を選択してください。'; return; }
+
+            let seed = seedInput.value.trim();
+            if (!seed) { 
+                seed = generateRandomSeedString(); 
+                seedInput.value = seed; 
+                isRandomSeed = true; 
+            }
+            
+            currentPrng = createPRNG(seed);
+            const count = parseInt(mixCountSelect.value);
+            targetTime = count * (count - 1) * 5 + 10;
+            
+            // 記録対象判定：アプリ生成のシードであること ＆ 前回のゲーム（リスタート）ではないこと
+            playedWithRandomSeed = (seed !== lastStartedSeed) && isRandomSeed;
+            
+            lastStartedSeed = seed;
+            playedMixCount = count;
+
+            selectedWords = []; foundWords = []; problemCharacters = []; giveUpUsed = false;
+            correctAnswersArea.innerHTML = ''; clearMessageArea.style.display = 'none'; answerInput.value = '';
+
+            const shuffled = shuffleArray(activeList, currentPrng);
+            selectedWords = shuffled.slice(0, Math.min(count, activeList.length));
+
+            let chars = selectedWords.join('').split('');
+            chars = shuffleArray(chars, currentPrng);
+            problemCharacters = chars.map(c => ({ char: c, found: false, isGivenUp: false }));
+
+            updateProblemDisplay(); startTimer();
+            answerInput.disabled = false; deleteCharButton.disabled = false; submitButton.disabled = false; giveUpButton.disabled = false;
+            answerInput.focus();
+        }
+
+        function checkAnswer() {
+            const wasFocused = (document.activeElement === answerInput);
+            const raw = answerInput.value.trim();
+            if (!raw || answerInput.disabled) return;
+            const ans = hiraganaToKatakana(raw);
+            if (selectedWords.includes(ans) && !foundWords.includes(ans)) {
+                foundWords.push(ans);
+                const div = document.createElement('div'); div.textContent = `正解： ${ans}`;
+                correctAnswersArea.appendChild(div);
+                let charsToFind = ans.split('');
+                for (let i = 0; i < problemCharacters.length; i++) {
+                    if (!problemCharacters[i].found) {
+                        const idx = charsToFind.indexOf(problemCharacters[i].char);
+                        if (idx !== -1) {
+                            problemCharacters[i].found = true; problemCharacters[i].isGivenUp = false;
+                            charsToFind.splice(idx, 1); if (charsToFind.length === 0) break;
+                        }
+                    }
+                }
+                updateProblemDisplay(); checkGameClear();
+            }
+            answerInput.value = '';
+            if (wasFocused && !answerInput.disabled) answerInput.focus();
+        }
+
+        function handleGiveUp() {
+            if (giveUpButton.disabled) return;
+            giveUpUsed = true;
+            const unfound = selectedWords.filter(w => !foundWords.includes(w));
+            if (unfound.length > 0) {
+                const reveal = unfound[0]; foundWords.push(reveal);
+                const div = document.createElement('div'); div.textContent = `ギブアップ： ${reveal}`; div.classList.add('given-up');
+                correctAnswersArea.appendChild(div);
+                let charsToReveal = reveal.split('');
+                for (let i = 0; i < problemCharacters.length; i++) {
+                    if (!problemCharacters[i].found && !problemCharacters[i].isGivenUp) {
+                        const idx = charsToReveal.indexOf(problemCharacters[i].char);
+                        if (idx !== -1) {
+                            problemCharacters[i].found = true; problemCharacters[i].isGivenUp = true;
+                            charsToReveal.splice(idx, 1); if (charsToReveal.length === 0) break;
+                        }
+                    }
+                }
+                updateProblemDisplay(); checkGameClear();
+            }
+            if (selectedWords.filter(w => !foundWords.includes(w)).length === 0) giveUpButton.disabled = true;
+        }
+
+        function saveRecord(clearType) {
+            if (clearType === 'none' || !playedWithRandomSeed) return;
+            const records = JSON.parse(localStorage.getItem('mixanagram_records2D') || '{}');
+            const countStr = playedMixCount.toString();
+            const selectedIds = Array.from(wordListCheckboxesContainer.querySelectorAll('input:checked')).map(cb => cb.value);
+            
+            const updateKey = (key, type) => {
+                if (!records[key]) records[key] = {};
+                const current = records[key][countStr];
+                if (type === 'gold') records[key][countStr] = 'gold';
+                else if (type === 'silver' && current !== 'gold') records[key][countStr] = 'silver';
+            };
+
+            selectedIds.forEach(id => updateKey(id, clearType));
+            if (selectedIds.length === allWordListsData.length) updateKey('all', clearType);
+            localStorage.setItem('mixanagram_records2D', JSON.stringify(records));
+        }
+
+        function checkGameClear() {
+            if (foundWords.length === selectedWords.length && selectedWords.length > 0) {
+                stopTimer();
+                answerInput.disabled = true; deleteCharButton.disabled = true; submitButton.disabled = true; giveUpButton.disabled = true;
+                const link = generateShareLink();
+                let tweet = ''; let clearType = 'none';
+
+                clearMessageArea.style.display = 'block';
+                if (giveUpUsed) {
+                    clearText.textContent = 'クリア！目指せ全正解！'; clearMessageArea.className = 'give-up-clear';
+                    tweet = `${selectedWords.length}匹をごちゃまぜクリア！（ギブアップあり）\n${link}`;
+                } else if (secondsElapsed <= targetTime) {
+                    clearText.textContent = '👑スピードクリア！おめでとう！👑'; clearMessageArea.className = 'speed-clear';
+                    tweet = `👑${selectedWords.length}匹をスピードクリア！👑 タイム: ${secondsElapsed}秒\n${link}`;
+                    clearType = 'gold';
+                } else {
+                    clearText.textContent = '🎉クリア！おめでとうございます！🎉'; clearMessageArea.className = '';
+                    tweet = `🎉${selectedWords.length}匹をクリア！🎉 タイム: ${secondsElapsed}秒\n${link}`;
+                    clearType = 'silver';
+                }
+                
+                saveRecord(clearType);
+                xShareArea.style.display = 'block';
+                document.getElementById('x-share-button').onclick = () => {
+                    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, '_blank');
+                };
+
+                setTimeout(() => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }, 150);
+            }
+        }
+
+        function renderRecords() {
+            const records = JSON.parse(localStorage.getItem('mixanagram_records2D') || '{}');
+            let html = '<table class="record-table"><thead><tr><th style="min-width:120px;">範囲</th>';
+            for (let i = 1; i <= 10; i++) html += `<th>${i}</th>`;
+            html += '</tr></thead><tbody>';
+
+            const row = (id, name, isAll = false) => {
+                let r = `<tr class="${isAll ? 'all-record-row' : ''}"><td>${name}</td>`;
+                for (let i = 1; i <= 10; i++) {
+                    const rec = records[id] ? records[id][i.toString()] : null;
+                    const medal = rec === 'gold' ? '🥇' : (rec === 'silver' ? '🥈' : '');
+                    r += `<td><span class="medal-icon">${medal}</span></td>`;
+                }
+                return r + '</tr>';
+            };
+
+            allWordListsData.forEach(l => html += row(l.id, l.name));
+            html += row('all', 'すべての範囲', true);
+            html += '</tbody></table>';
+            html += '<div style="font-size:0.85em; margin-top:10px; color:#555; text-align:left; line-height:1.6;">';
+            html += '<p>※手動でシードを入力した場合や、同じ問題をリスタートした場合は記録されません。</p>';
+            html += '<p>※スピードクリアの条件は、混ぜる数が少ない順に10秒,20秒,40秒,70秒,110秒,160秒,220秒,290秒,370秒,460秒です。</p>';
+            html += '</div>';
+            document.getElementById('record-list').innerHTML = html;
+        }
+
+        // --- イベントリスナー ---
+        startButton.addEventListener('click', startGame);
+        
+        const preventFocus = (e) => { if (document.activeElement === answerInput) e.preventDefault(); };
+        deleteCharButton.addEventListener('mousedown', preventFocus);
+        deleteCharButton.addEventListener('click', () => { if (!answerInput.disabled && answerInput.value.length > 0) answerInput.value = answerInput.value.slice(0, -1); });
+
+        problemArea.addEventListener('mousedown', (e) => { if (e.target.classList.contains('problem-char')) preventFocus(e); });
+        problemArea.addEventListener('click', (e) => { if (e.target.classList.contains('problem-char') && !answerInput.disabled) answerInput.value += e.target.textContent; });
+
+        submitButton.addEventListener('mousedown', preventFocus);
+        submitButton.addEventListener('click', checkAnswer);
+
+        answerInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (e.isComposing) return; 
+                checkAnswer();
+            }
+        });
+
+        giveUpButton.addEventListener('mousedown', preventFocus);
+        giveUpButton.addEventListener('click', handleGiveUp);
+        
+        generateSeedButton.addEventListener('click', () => { 
+            seedInput.value = generateRandomSeedString(); 
+            isRandomSeed = true;
+        });
+
+        // 混ぜる数を変更したときはランダムシードを再生成
+        mixCountSelect.addEventListener('change', () => {
+            seedInput.value = generateRandomSeedString();
+            isRandomSeed = true;
+        });
+
+        // シードを手動で編集した場合はフラグを落とす
+        seedInput.addEventListener('input', () => {
+            isRandomSeed = false;
+        });
+
+        fontIncreaseBtn.addEventListener('click', () => { currentProblemFontSize += 0.1; problemArea.style.fontSize = currentProblemFontSize + 'em'; });
+        fontDecreaseBtn.addEventListener('click', () => { if (currentProblemFontSize > 0.5) { currentProblemFontSize -= 0.1; problemArea.style.fontSize = currentProblemFontSize + 'em'; } });
+
+        const recordModal = document.getElementById('record-modal');
+        document.getElementById('record-button').onclick = () => { renderRecords(); recordModal.style.display = 'flex'; };
+        document.getElementById('close-record-modal').onclick = () => { recordModal.style.display = 'none'; };
+        window.onclick = (e) => { if (e.target === recordModal) recordModal.style.display = 'none'; };
+
+        document.getElementById('clear-all-records-button').onclick = () => { if (confirm("全記録を消去しますか？")) { localStorage.removeItem('mixanagram_records2D'); renderRecords(); } };
+        document.getElementById('select-all-button').onclick = () => wordListCheckboxesContainer.querySelectorAll('input').forEach(cb => cb.checked = true);
+        document.getElementById('deselect-all-button').onclick = () => wordListCheckboxesContainer.querySelectorAll('input').forEach(cb => cb.checked = false);
+
+        populateWordListCheckboxes();
+        initializeGameControls();
+        
+        // URLパラメータからの復元
+        const urlP = new URLSearchParams(window.location.search);
+        const uSeed = urlP.get('seed'); 
+        if (uSeed) {
+            seedInput.value = decodeURIComponent(uSeed);
+            isRandomSeed = false; // URL経由は外部指定扱い
+        }
+        const uCount = urlP.get('count'); if (uCount && mixCountSelect.querySelector(`option[value="${uCount}"]`)) mixCountSelect.value = uCount;
+        const uLists = urlP.get('lists');
+        if (uLists) {
+            const ids = uLists.split(',');
+            wordListCheckboxesContainer.querySelectorAll('input').forEach(cb => cb.checked = false);
+            ids.forEach(id => { const cb = document.getElementById(id); if (cb) cb.checked = true; });
+        }
+    });
+    </script>
 </body>
 </html>
