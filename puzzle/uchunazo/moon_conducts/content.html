@@ -372,7 +372,7 @@
         const SHARE_MODE_CHOICE = true; // ★ここを書き換えて切り替え可能
 
         // 原ポストのURL (必要に応じて設定)
-        const ORIGINAL_POST_URL = "https://twitter.com/wondolphin/status/2040733699839492336"; 
+        const ORIGINAL_POST_URL = "https://x.com/"; 
 
         const GRID_SIZE = 6;
         const SEGMENTS = 36;
@@ -577,7 +577,7 @@
 
         // ポスト投稿画面を開く関数
         function openTweetWindow() {
-            const text = encodeURIComponent("宇宙謎「月は導く」をクリアしました！\n#宇宙謎　#ルール発見型パズル　@wondolphin\nhttps://wondolphin.github.io/puzzle/uchunazo/moon_conducts/index.html");
+            const text = encodeURIComponent("ルールを推測するパズル「月は導く」をクリアしました！\n#宇宙謎　#ルール発見型パズル　@wondolphin\nhttps://wondolphin.github.io/puzzle/uchunazo/moon_conducts/index.html");
             window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
         }
 
