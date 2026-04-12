@@ -10,6 +10,10 @@
             --board-color: #00e5ff;
             --lamp-color: #ffab00;
             --bg-color: #0a0a0a;
+            --btn-top: #444;
+            /* ボタンの影（厚み）の色 */
+            --btn-shadow: #222; 
+            --panel-bg: #151515;
         }
 
         body {
@@ -41,7 +45,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
         #monitor {
@@ -75,8 +79,8 @@
             gap: 12px;
             flex-wrap: wrap;
             justify-content: center;
-            background: #151515;
-            padding: 16px;
+            background: var(--panel-bg);
+            padding: 20px;
             border-radius: 12px;
             border: 1px solid #333;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
@@ -89,36 +93,47 @@
             gap: 8px;
         }
 
+        /* 自然な立体感を持たせたボタンのデザイン */
         .num-btn {
             width: 48px;
             height: 48px;
-            background: linear-gradient(145deg, #444, #222);
+            background: linear-gradient(145deg, var(--btn-top), #2a2a2a);
             color: #fff;
+            /* 枠線は全方向に均一に */
             border: 1px solid #555;
-            border-bottom: 4px solid #000;
             border-radius: 8px;
             font-size: 1.2rem;
             font-weight: bold;
             cursor: pointer;
-            transition: all 0.1s;
+            transition: transform 0.1s, box-shadow 0.1s, background 0.1s;
             display: flex;
             align-items: center;
             justify-content: center;
             user-select: none;
+            /* 下側だけのフチではなく、全体的な影で厚みを表現 */
+            box-shadow: 0 4px 0 var(--btn-shadow);
+            position: relative;
+            outline: none;
         }
 
+        .num-btn:hover:not(:disabled) {
+            background: linear-gradient(145deg, #4f4f4f, #333);
+        }
+
+        /* 押した時の沈み込み演出 */
         .num-btn:active:not(:disabled) {
-            transform: translateY(2px);
-            border-bottom-width: 2px;
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 var(--btn-shadow);
             background: var(--board-color);
             color: #000;
+            border-color: #00e5ff;
         }
 
         .num-btn:disabled {
-            opacity: 0.1;
+            opacity: 0.15;
             cursor: not-allowed;
-            border-bottom-width: 1px;
-            transform: translateY(2px);
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 var(--btn-shadow);
         }
 
         .lamp {
@@ -135,7 +150,6 @@
             box-shadow: 0 0 10px var(--lamp-color), inset 0 0 3px #fff;
         }
 
-        /* リセットボタンの強調アニメーション */
         @keyframes pulse-soft {
             0% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.4); border-color: #444; }
             50% { box-shadow: 0 0 0 10px rgba(0, 229, 255, 0); border-color: #00e5ff; color: #fff; }
@@ -164,7 +178,6 @@
             color: #ccc;
         }
 
-        /* クリアオーバーレイ */
         #clear-overlay {
             position: absolute;
             top: 0;
@@ -275,11 +288,10 @@
     </div>
 
     <script>
-        // --- 設定 ---
         const SHARE_CONFIG = {
             MODE: 'DIRECT', 
-            TWEET_TEXT: "パズル「ロジックセルズ」をクリアしました！\n#ロジックセルズ #ルール発見型パズル\n",
-            TWEET_URL: window.location.href,
+            TWEET_TEXT: "ルールを推測するパズル「ロジックセルズ」をクリアしました！\n#宇宙謎 #ルール発見型パズル @wondolphin",
+            TWEET_URL: "https://wondolphin.github.io/puzzle/uchunazo/logic_cells/index.html",
             SUPPORT_URL: "https://twitter.com/wondolphin"
         };
 
@@ -340,7 +352,6 @@
                 }
             }
 
-            // 全消灯（信号途絶）チェック
             const allOff = activeCount === 0;
             
             if (allOff) {
@@ -353,7 +364,6 @@
                 const btn = document.getElementById(`btn-${i}`);
                 const lamp = document.getElementById(`lamp-${i}`);
                 
-                // クリア後は全てのボタンをアクティブにする。ただし全消灯時は無効。
                 if (gameCleared) {
                     btn.disabled = allOff;
                 } else {
@@ -367,7 +377,7 @@
 
         function resetGame() {
             grid = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
-            grid[1][2] = true; // 初期値(1,2) に変更
+            grid[1][2] = true; 
             maxUnlocked = 1;
             pressedButtons.clear();
             gameCleared = false;
@@ -376,7 +386,6 @@
         }
 
         function handleButtonClick(n) {
-            // クリア後、または未解放ボタンのガード
             if (!gameCleared && n > maxUnlocked) return;
             
             const allOff = grid.flat().every(v => !v);
@@ -443,7 +452,8 @@
                 supportLink.target = '_blank';
                 supportLink.innerText = '原ポストにいいね・リポスト';
                 
-                mainBtn.onclick = () => {
+                mainBtn.onclick = (e) => {
+                    e.stopPropagation();
                     mainBtn.classList.add('hidden');
                     choicesDiv.classList.remove('hidden');
                 };
@@ -457,9 +467,15 @@
 
         function hideClear() {
             clearOverlay.style.display = 'none';
-            // クリアフラグは維持したまま表示更新
             updateDisplay();
         }
+
+        // 背景クリックで閉じるときのガード
+        clearOverlay.onclick = (event) => {
+            if (event.target === clearOverlay) {
+                hideClear();
+            }
+        };
 
         resetBtn.onclick = resetGame;
         window.onload = () => {
