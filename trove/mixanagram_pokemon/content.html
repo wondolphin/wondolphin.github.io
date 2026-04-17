@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ポケモンごちゃまぜアナグラム</title>
+    <meta property="og:title" content="ポケモンごちゃまぜアナグラム">
+    <meta property="og:description" content="ポケモンごちゃまぜアナグラム">
+    <meta property="og:image" content="https://wondolphin.github.io/trove/mixanagram_pokemon/images/thumbnail.png">
+    <meta property="og:url" content="https://wondolphin.github.io/trove/mixanagram_pokemon/content.html">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:creator" content="@wondolphin">
+    <meta name="twitter:image" content="https://wondolphin.github.io/trove/mixanagram_pokemon/images/thumbnail.png">
+
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -673,14 +682,14 @@
                 clearMessageArea.style.display = 'block';
                 if (giveUpUsed) {
                     clearText.textContent = 'クリア！目指せ全正解！'; clearMessageArea.className = 'give-up-clear';
-                    tweet = `${selectedWords.length}匹をごちゃまぜクリア！（ギブアップあり）\n${link}`;
+                    tweet = `${selectedWords.length}匹をごちゃまぜクリア！（ギブアップあり）ーーーポケモンごちゃまぜアナグラム\n${link}`;
                 } else if (secondsElapsed <= targetTime) {
                     clearText.textContent = '👑スピードクリア！おめでとう！👑'; clearMessageArea.className = 'speed-clear';
-                    tweet = `👑${selectedWords.length}匹をスピードクリア！👑 タイム: ${secondsElapsed}秒\n${link}`;
+                    tweet = `👑${selectedWords.length}匹をスピードクリア！👑 タイム: ${secondsElapsed}秒　ーーーポケモンごちゃまぜアナグラム\n${link}`;
                     clearType = 'gold';
                 } else {
                     clearText.textContent = '🎉クリア！おめでとうございます！🎉'; clearMessageArea.className = '';
-                    tweet = `🎉${selectedWords.length}匹をクリア！🎉 タイム: ${secondsElapsed}秒\n${link}`;
+                    tweet = `🎉${selectedWords.length}匹をクリア！🎉 タイム: ${secondsElapsed}秒　ーーーポケモンごちゃまぜアナグラム\n${link}`;
                     clearType = 'silver';
                 }
                 
