@@ -424,7 +424,7 @@
     </div>
 
     <div style="margin-top: 30px; margin-bottom: 20px; font-size: 0.85em; text-align: center;">
-        <a href="https://x.com/wondolphin" class="footer-link">作者へのコンタクト</a>
+        <a href="https://x.com/wondolphin" target="_blank" class="footer-link">作者へのコンタクト</a>
     </div>
 
     <script>
@@ -682,14 +682,14 @@
                 clearMessageArea.style.display = 'block';
                 if (giveUpUsed) {
                     clearText.textContent = 'クリア！目指せ全正解！'; clearMessageArea.className = 'give-up-clear';
-                    tweet = `${selectedWords.length}匹をごちゃまぜクリア！（ギブアップあり）ーーーポケモンごちゃまぜアナグラム\n${link}`;
+                    tweet = `${selectedWords.length}匹のポケモンごちゃまぜアナグラムをクリアした！（ギブアップあり）\n\n同じ問題で遊ぶ👇\n${link}`;
                 } else if (secondsElapsed <= targetTime) {
                     clearText.textContent = '👑スピードクリア！おめでとう！👑'; clearMessageArea.className = 'speed-clear';
-                    tweet = `👑${selectedWords.length}匹をスピードクリア！👑 タイム: ${secondsElapsed}秒　ーーーポケモンごちゃまぜアナグラム\n${link}`;
+                    tweet = `👑${selectedWords.length}匹のポケモンごちゃまぜアナグラムをスピードクリアした！👑 タイム: ${secondsElapsed}秒\n\n同じ問題で遊ぶ👇\n${link}`;
                     clearType = 'gold';
                 } else {
                     clearText.textContent = '🎉クリア！おめでとうございます！🎉'; clearMessageArea.className = '';
-                    tweet = `🎉${selectedWords.length}匹をクリア！🎉 タイム: ${secondsElapsed}秒　ーーーポケモンごちゃまぜアナグラム\n${link}`;
+                    tweet = `🎉${selectedWords.length}匹のポケモンごちゃまぜアナグラムをクリアした！🎉 タイム: ${secondsElapsed}秒\n\n同じ問題で遊ぶ👇\n${link}`;
                     clearType = 'silver';
                 }
                 
