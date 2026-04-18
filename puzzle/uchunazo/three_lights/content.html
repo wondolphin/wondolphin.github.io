@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>３つの光</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #050505;
+            color: #e0e0e0;
+            overflow: hidden;
+            touch-action: none;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+        }
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+        }
+        canvas {
+            cursor: crosshair;
+        }
+        #clear-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+            cursor: pointer;
+        }
+        .clear-text {
+            font-size: 5rem;
+            font-weight: 100;
+            letter-spacing: 1rem;
+            color: #fff;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+
+        /* シェアボタンコンテナ */
+        #share-container {
+            margin-top: 3rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+        #share-container.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .share-btn, .choice-link {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.8rem 2rem;
+            border-radius: 2rem;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 200;
+            letter-spacing: 0.1rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            min-width: 240px;
+            text-align: center;
+        }
+        .share-btn:hover, .choice-link:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.02);
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <h1 class="absolute top-0 left-0 w-full text-center py-8 text-3xl font-extralight tracking-widest text-white opacity-80 z-20">３つの光</h1>
+    
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="clear-overlay" onclick="closeClear(event)">
+        <div class="clear-text">CLEAR!</div>
+        <div id="share-container">
+            <!-- JSで動的に生成 -->
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const clearOverlay = document.getElementById('clear-overlay');
+    const shareContainer = document.getElementById('share-container');
+    
+    let width, height, centerX, centerY, radiusInner, radiusOuter;
+    let points = []; 
+    let markers = []; 
+    let isCleared = false;
+    let hasClearedOnce = false; 
+
+    const NUM_ROOMS = 24;
+    const MARKER_LIFETIME = 7000;
+    const FADE_DURATION = 0.6;
+
+    const SHARE_CONFIG = {
+        TWEET_TEXT: "ルールを推測するパズル「３つの光」をクリアしました！\n#宇宙謎 #ルール発見型パズル @wondolphin",
+        TWEET_URL: "https://wondolphin.github.io/puzzle/uchunazo/three_lights/index.html",
+        SUPPORT_URL: "https://twitter.com/wondolphin"
+    };
+
+    let roomStates = Array.from({ length: NUM_ROOMS }, () => ({
+        type: 0,
+        opacity: 0,
+        targetOpacity: 0
+    }));
+
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        const minDim = Math.min(width, height);
+        canvas.width = width;
+        canvas.height = height;
+        centerX = width / 2;
+        centerY = height / 2;
+        radiusInner = (minDim * 0.6) / 2;
+        radiusOuter = radiusInner * 1.3;
+    }
+
+    function isValidTriangle(p1, p2, p3) {
+        if (!p1 || !p2 || !p3) return false;
+        const distSq = (a, b) => (a.x - b.x)**2 + (a.y - b.y)**2;
+        if (distSq(p1, p2) < 1 || distSq(p2, p3) < 1 || distSq(p1, p3) < 1) return false;
+        const area = Math.abs(p1.x*(p2.y - p3.y) + p2.x*(p3.y - p1.y) + p3.x*(p1.y - p2.y)) / 2;
+        return area > 50;
+    }
+
+    function getBisectorData() {
+        if (points.length < 3 || !isValidTriangle(points[0], points[1], points[2])) return [];
+        
+        const res = [];
+        const triangle = [points[0], points[1], points[2]];
+
+        for (let i = 0; i < 3; i++) {
+            const pV = triangle[i]; 
+            const p1 = triangle[(i + 1) % 3];
+            const p2 = triangle[(i + 2) % 3];
+
+            const v1 = { x: p1.x - pV.x, y: p1.y - pV.y };
+            const v2 = { x: p2.x - pV.x, y: p2.y - pV.y };
+
+            const d1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+            const d2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+            
+            const u1 = { x: v1.x / d1, y: v1.y / d1 };
+            const u2 = { x: v2.x / d2, y: v2.y / d2 };
+
+            let dir = { x: u1.x + u2.x, y: u1.y + u2.y };
+            let dirLen = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
+            
+            if (dirLen < 0.0001) continue;
+            dir.x /= dirLen;
+            dir.y /= dirLen;
+
+            const relV = { x: pV.x - centerX, y: pV.y - centerY };
+            const a = dir.x * dir.x + dir.y * dir.y;
+            const b = 2 * (relV.x * dir.x + relV.y * dir.y);
+            const c = (relV.x * relV.x + relV.y * relV.y) - (radiusInner * radiusInner);
+            const discriminant = b * b - 4 * a * c;
+            
+            if (discriminant < 0) continue;
+
+            const t = (-b + Math.sqrt(discriminant)) / (2 * a);
+            const hitX = centerX + relV.x + t * dir.x;
+            const hitY = centerY + relV.y + t * dir.y;
+
+            let angle = Math.atan2(hitY - centerY, hitX - centerX);
+            if (angle < 0) angle += Math.PI * 2;
+            const roomIdx = Math.floor((angle / (Math.PI * 2)) * NUM_ROOMS);
+
+            res.push({ start: pV, end: { x: hitX, y: hitY }, roomIdx });
+        }
+        return res;
+    }
+
+    let lastTime = 0;
+    function draw(time) {
+        const deltaTime = (time - lastTime) / 1000;
+        lastTime = time;
+
+        ctx.clearRect(0, 0, width, height);
+
+        for (let i = 0; i < NUM_ROOMS; i++) {
+            const room = roomStates[i];
+            
+            if (room.opacity < room.targetOpacity) {
+                room.opacity = Math.min(1, room.opacity + deltaTime / FADE_DURATION);
+            } else if (room.opacity > room.targetOpacity) {
+                room.opacity = Math.max(0, room.opacity - deltaTime / FADE_DURATION);
+            }
+
+            if (room.opacity <= 0) continue;
+
+            const startAngle = (i * Math.PI * 2) / NUM_ROOMS;
+            const endAngle = ((i + 1) * Math.PI * 2) / NUM_ROOMS;
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radiusOuter, startAngle, endAngle);
+            ctx.arc(centerX, centerY, radiusInner, endAngle, startAngle, true);
+            ctx.closePath();
+            
+            let r, g, b;
+            if (isCleared || room.type === 2) {
+                r = 255; g = 255; b = 180;
+                ctx.shadowBlur = 25 * room.opacity;
+                ctx.shadowColor = `rgba(255, 255, 100, ${room.opacity * 0.8})`;
+            } else {
+                r = 180; g = 230; b = 255;
+                ctx.shadowBlur = 15 * room.opacity;
+                ctx.shadowColor = `rgba(100, 200, 255, ${room.opacity * 0.5})`;
+            }
+
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${room.opacity * 0.9})`;
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${room.opacity * 0.1})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radiusInner, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(15, 15, 20, 0.9)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.stroke();
+
+        if (hasClearedOnce && points.length === 3 && !isCleared) {
+            const bisectorData = getBisectorData();
+            
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            ctx.lineTo(points[1].x, points[1].y);
+            ctx.lineTo(points[2].x, points[2].y);
+            ctx.closePath();
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            bisectorData.forEach(data => {
+                ctx.beginPath();
+                ctx.moveTo(data.start.x, data.start.y);
+                ctx.lineTo(data.end.x, data.end.y);
+                ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.arc(data.end.x, data.end.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = '#22c55e';
+                ctx.fill();
+            });
+        }
+
+        const now = Date.now();
+        markers = markers.filter(m => now - m.time < MARKER_LIFETIME);
+        markers.forEach(m => {
+            const age = (now - m.time) / MARKER_LIFETIME;
+            const opacity = Math.pow(1 - age, 1.5);
+            const size = 6 + age * 80;
+            
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, size, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${opacity * 0.3})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            ctx.fill();
+        });
+
+        requestAnimationFrame(draw);
+    }
+
+    function handleInput(e) {
+        if (isCleared) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        const d = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+        if (d <= radiusInner) {
+            points.push({ x, y });
+            if (points.length > 3) points.shift();
+            
+            markers.push({ x, y, time: Date.now() });
+            
+            if (points.length === 3) {
+                const bisectorData = getBisectorData();
+                const nextActive = bisectorData.map(d => d.roomIdx);
+                
+                if (nextActive.length === 0) {
+                    roomStates.forEach(room => {
+                        room.type = 0;
+                        room.targetOpacity = 0;
+                    });
+                } else {
+                    const currentlyLit = roomStates
+                        .map((s, idx) => (s.targetOpacity > 0 ? idx : -1))
+                        .filter(idx => idx !== -1);
+
+                    const hasNewRoom = nextActive.some(idx => !currentlyLit.includes(idx));
+                    
+                    if (hasNewRoom) {
+                        for (let i = 0; i < NUM_ROOMS; i++) {
+                            if (nextActive.includes(i)) {
+                                roomStates[i].type = 2;
+                                roomStates[i].targetOpacity = 1;
+                            } else if (currentlyLit.includes(i)) {
+                                roomStates[i].type = 1;
+                                roomStates[i].targetOpacity = 1;
+                            } else {
+                                roomStates[i].type = 0;
+                                roomStates[i].targetOpacity = 0;
+                            }
+                        }
+                    } else {
+                        roomStates.forEach((room, i) => {
+                            if (nextActive.includes(i)) {
+                                room.type = 2;
+                                room.targetOpacity = 1;
+                            } else {
+                                room.type = 0;
+                                room.targetOpacity = 0;
+                            }
+                        });
+                    }
+                }
+
+                const totalLit = roomStates.filter(r => r.targetOpacity > 0).length;
+                if (totalLit === NUM_ROOMS) {
+                    triggerClear();
+                }
+            }
+        }
+    }
+
+    function triggerClear() {
+        isCleared = true;
+        hasClearedOnce = true;
+        setupShareUI();
+        setTimeout(() => {
+            clearOverlay.style.display = 'flex';
+            setTimeout(() => {
+                shareContainer.classList.add('visible');
+            }, 500);
+        }, 800);
+    }
+
+    function setupShareUI() {
+        const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(SHARE_CONFIG.TWEET_TEXT)}&url=${encodeURIComponent(SHARE_CONFIG.TWEET_URL)}`;
+        shareContainer.innerHTML = '';
+
+        const mainBtn = document.createElement('button');
+        mainBtn.className = 'share-btn';
+        mainBtn.innerText = '喜びをXでシェアする';
+        
+        const choicesDiv = document.createElement('div');
+        choicesDiv.className = 'hidden flex flex-col gap-3 items-center';
+        
+        const reportLink = document.createElement('a');
+        reportLink.className = 'choice-link';
+        reportLink.href = tweetUrl;
+        reportLink.target = '_blank';
+        reportLink.innerText = 'クリア報告のポスト';
+        
+        const supportLink = document.createElement('a');
+        supportLink.className = 'choice-link';
+        supportLink.href = SHARE_CONFIG.SUPPORT_URL;
+        supportLink.target = '_blank';
+        supportLink.innerText = '原ポストにいいね・リポスト';
+        
+        mainBtn.onclick = (e) => {
+            e.stopPropagation();
+            mainBtn.classList.add('hidden');
+            choicesDiv.classList.remove('hidden');
+        };
+
+        choicesDiv.appendChild(reportLink);
+        choicesDiv.appendChild(supportLink);
+        shareContainer.appendChild(mainBtn);
+        shareContainer.appendChild(choicesDiv);
+    }
+
+    function closeClear(e) {
+        if (e && shareContainer.contains(e.target)) return;
+        clearOverlay.style.display = 'none';
+        shareContainer.classList.remove('visible');
+        isCleared = false;
+    }
+
+    window.addEventListener('resize', resize);
+    canvas.addEventListener('mousedown', handleInput);
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handleInput(e);
+    });
+
+    resize();
+    requestAnimationFrame(draw);
+
+</script>
+
+</body>
+</html>
