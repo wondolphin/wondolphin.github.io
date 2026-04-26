@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radial Lamp Puzzle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            user-select: none;
+            touch-action: manipulation;
+            overflow: hidden;
+        }
+        .btn-active {
+            background-color: #3b82f6 !important;
+            color: white;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+            border-color: #60a5fa !important;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        /* 画面の短い方の60%にサイズを固定 */
+        #canvasContainer {
+            width: 60vmin;
+            height: 60vmin;
+            background-color: #0f172a;
+        }
+
+        /* モーダル共通スタイル */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+            padding: 20px;
+        }
+
+        /* シェアボタン関連 */
+        #share-container {
+            margin-top: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            align-items: center;
+            width: 100%;
+            max-width: 320px;
+        }
+        .share-btn, .choice-btn, .copy-btn, .back-btn {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.6rem 1.2rem;
+            border-radius: 2rem;
+            font-size: 0.85rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            min-width: 240px;
+            text-align: center;
+        }
+        .share-btn:hover, .choice-btn:hover, .copy-btn:hover {
+            background: #eab308;
+            color: #000;
+        }
+
+        /* 設定パネル用 */
+        .settings-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 2rem;
+            border-radius: 1.5rem;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        input[type="range"] {
+            width: 100%;
+            accent-color: #3b82f6;
+        }
+        input[type="text"] {
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: white;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+
+        .hidden { display: none !important; }
+
+        /* 未点灯ランプ表示のスタイル調整 */
+        #offStatus {
+            min-height: 2rem;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #94a3b8;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            letter-spacing: -0.025em;
+            max-width: 90%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="text-center mb-2">
+        <h1 class="text-3xl md:text-4xl font-bold tracking-widest opacity-80 uppercase">Radial Lamp Puzzle</h1>
+    </div>
+
+    <!-- 未点灯ランプ通知用 -->
+    <div id="offStatus" class="mb-4"></div>
+
+    <!-- メインキャンバス -->
+    <div id="canvasContainer" class="relative flex items-center justify-center rounded-full shadow-2xl">
+        <canvas id="puzzleCanvas" width="600" height="600"></canvas>
+    </div>
+
+    <!-- クリア画面 -->
+    <div id="winOverlay" class="modal-overlay">
+        <div class="text-center">
+            <h2 class="text-6xl md:text-8xl font-black text-yellow-400 mb-6 tracking-tighter">CLEAR!</h2>
+            <div id="share-container"></div>
+            <button onclick="closeWinOverlay()" class="mt-12 px-10 py-3 bg-slate-700 text-white font-bold rounded-full hover:bg-slate-600 transition-all">とじる</button>
+        </div>
+    </div>
+
+    <!-- 隠しコマンドヒント画面 -->
+    <div id="hintOverlay" class="modal-overlay">
+        <div class="text-center max-w-sm">
+            <h3 class="text-xl font-bold mb-4">隠しコマンド</h3>
+            <p class="text-slate-300 mb-8 leading-relaxed">
+                数字ボタンを「<span class="text-yellow-400 font-mono font-bold">２５２５２５２</span>」と押すと、パラメータを好きな数にして遊べます。
+            </p>
+            <button onclick="closeHintOverlay()" class="px-10 py-2 bg-blue-600 text-white font-bold rounded-full hover:bg-blue-500 transition-all">とじる</button>
+        </div>
+    </div>
+
+    <!-- 設定画面 -->
+    <div id="settingsOverlay" class="modal-overlay">
+        <div class="settings-card">
+            <h3 class="text-2xl font-bold mb-1">隠しコマンドが入力されました</h3>
+            <p class="text-slate-400 mb-6 text-sm">パラメータを変更できます。</p>
+            
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium mb-2">ランプ数: <span id="lampCountVal" class="text-blue-400">15</span></label>
+                    <input type="range" id="lampCountInput" min="10" max="50" value="15" oninput="document.getElementById('lampCountVal').innerText=this.value">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">数字ボタンの数: <span id="btnCountVal" class="text-blue-400">7</span></label>
+                    <input type="range" id="btnCountInput" min="5" max="24" value="7" oninput="document.getElementById('btnCountVal').innerText=this.value">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1">ONのランプ (例: 1,4,5,8)</label>
+                    <p class="text-[10px] text-slate-500 mb-2">「ランダム」と入力するとランダムになります</p>
+                    <input type="text" id="onLampsInput" value="1,4,6,10,13,15" placeholder="数字をカンマ区切りで入力">
+                </div>
+            </div>
+
+            <div class="flex gap-4 mt-8">
+                <button onclick="document.getElementById('settingsOverlay').style.display='none'" class="flex-1 py-3 rounded-xl bg-slate-700 font-bold hover:bg-slate-600">キャンセル</button>
+                <button onclick="applySettings()" class="flex-1 py-3 rounded-xl bg-blue-600 font-bold hover:bg-blue-500">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- コントロールパネル -->
+    <div id="buttonPanel" class="mt-8 md:mt-12 w-full max-w-2xl px-4">
+        <!-- JSで動的に生成 -->
+    </div>
+
+    <script>
+        const canvas = document.getElementById('puzzleCanvas');
+        const ctx = canvas.getContext('2d');
+        const winOverlay = document.getElementById('winOverlay');
+        const hintOverlay = document.getElementById('hintOverlay');
+        const settingsOverlay = document.getElementById('settingsOverlay');
+        const shareContainer = document.getElementById('share-container');
+        const buttonPanel = document.getElementById('buttonPanel');
+        const offStatusDiv = document.getElementById('offStatus');
+
+        // 設定
+        let NUM_SECTORS = 15; 
+        let NUM_BUTTONS = 7;
+        let INITIAL_ON = [1,4,6,10,13,15];
+        let isCustomized = false;
+        const BASE_ANGLE = -Math.PI / 2; 
+
+        const SHARE_CONFIG = {
+            TWEET_TEXT: "ルールを推測するパズル「Radial Lamp Puzzle」をクリアしました！\n#宇宙謎 #ルール発見型パズル @wondolphin",
+            TWEET_TEXT_MANUAL: "ルールを推測するパズル「Radial Lamp Puzzle」をクリアしました！\n#ルール発見型パズル #宇宙謎 @wondolphin",
+            TWEET_URL: "https://wondolphin.github.io/puzzle/uchunazo/radial_lamp_puzzle/index.html",
+            SUPPORT_URL: "https://x.com/wondolphin/status/2045803765367029938"
+        };
+        
+        let currentN = 1;
+        let isGameCleared = false;
+        let clearTriggered = false;
+        let sectorStates = [];
+        let meterValue = 0; 
+        let inputBuffer = ""; 
+
+        // ナンバー固有の色彩決定
+        function getFixedHue(id) {
+            if (id <= 15) {
+                // 1-15は青から紫へのグラデーション (190:青 〜 280:紫)
+                return 190 + (id - 1) * 6.42;
+            } else {
+                // 16以降はその他の色へ
+                return (290 + (id - 16) * 12) % 360;
+            }
+        }
+
+        function init() {
+            isGameCleared = false;
+            clearTriggered = false;
+            winOverlay.style.display = 'none';
+            currentN = 1;
+            meterValue = 0;
+            inputBuffer = "";
+
+            sectorStates = [];
+            for (let id = 0; id <= NUM_SECTORS; id++) {
+                const isOn = INITIAL_ON.includes(id);
+                const areaIdx = id % currentN;
+                const targetTheta = (Math.PI * 2 / currentN) * areaIdx;
+                const targetArc = (Math.PI * 2 / currentN);
+
+                sectorStates[id] = {
+                    id: id,
+                    isOn: isOn,
+                    currentTheta: targetTheta,
+                    targetThetaForAnim: targetTheta,
+                    currentArc: targetArc,
+                    colorHue: getFixedHue(id)
+                };
+            }
+
+            renderButtons();
+            updateButtons();
+            updateOffStatus();
+            requestAnimationFrame(animate);
+        }
+
+        function renderButtons() {
+            buttonPanel.innerHTML = '';
+            const grid = document.createElement('div');
+            grid.className = "grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 md:gap-4 justify-items-center mx-auto max-w-fit";
+            
+            for (let i = 1; i <= NUM_BUTTONS; i++) {
+                const btn = document.createElement('button');
+                btn.id = `btn${i}`;
+                btn.innerText = i;
+                btn.className = "w-12 h-12 md:w-14 md:h-14 text-lg md:text-xl font-bold rounded-xl bg-slate-800 border border-slate-600 transition";
+                btn.onclick = () => setN(i);
+                grid.appendChild(btn);
+            }
+            buttonPanel.appendChild(grid);
+        }
+
+        function updateOffStatus() {
+            if (!isCustomized) {
+                offStatusDiv.innerText = "";
+                return;
+            }
+            const offIds = sectorStates.slice(1).filter(s => !s.isOn).map(s => s.id);
+            if (offIds.length === 0) {
+                offStatusDiv.innerText = "All lamps are ON";
+            } else {
+                offStatusDiv.innerText = "OFF: " + offIds.join(", ");
+            }
+        }
+
+        function resetGame() {
+            init();
+        }
+
+        function closeWinOverlay() {
+            winOverlay.style.display = 'none';
+            hintOverlay.style.display = 'flex';
+        }
+
+        function closeHintOverlay() {
+            hintOverlay.style.display = 'none';
+            // 操作可能状態にリセット
+            isGameCleared = false;
+            // clearTriggeredはtrueのまま。次の操作(setNやtoggleArea)でクリア判定を再度有効化する
+        }
+
+        function setN(n) {
+            // コマンド判定
+            inputBuffer += n;
+            if (inputBuffer.endsWith("2525252")) {
+                settingsOverlay.style.display = 'flex';
+                inputBuffer = ""; 
+                return;
+            }
+            if (inputBuffer.length > 20) inputBuffer = inputBuffer.slice(-10);
+
+            if (isGameCleared || n === currentN) return;
+            
+            // 操作があったのでクリア判定をリセット
+            clearTriggered = false;
+
+            const nIncreased = n > currentN;
+            currentN = n;
+            updateButtons();
+
+            for (let id = 1; id <= NUM_SECTORS; id++) {
+                const state = sectorStates[id];
+                const areaIdx = id % currentN;
+                let targetTheta = (Math.PI * 2 / currentN) * areaIdx;
+
+                state.currentTheta = ((state.currentTheta % (Math.PI * 2)) + (Math.PI * 2)) % (Math.PI * 2);
+
+                if (nIncreased) {
+                    while (targetTheta > state.currentTheta) targetTheta -= Math.PI * 2;
+                } else {
+                    while (targetTheta < state.currentTheta) targetTheta += Math.PI * 2;
+                }
+                state.targetThetaForAnim = targetTheta;
+            }
+            checkGameState();
+        }
+
+        function updateButtons() {
+            for (let i = 1; i <= NUM_BUTTONS; i++) {
+                const btn = document.getElementById(`btn${i}`);
+                if (btn) {
+                    if (i === currentN) btn.classList.add('btn-active');
+                    else btn.classList.remove('btn-active');
+                }
+            }
+        }
+
+        function applySettings() {
+            const lampCount = parseInt(document.getElementById('lampCountInput').value);
+            const btnCount = parseInt(document.getElementById('btnCountInput').value);
+            const onLampsText = document.getElementById('onLampsInput').value;
+
+            NUM_SECTORS = lampCount;
+            NUM_BUTTONS = btnCount;
+            isCustomized = true;
+            
+            if (onLampsText.includes('ランダム')) {
+                INITIAL_ON = [];
+                for (let i = 1; i <= NUM_SECTORS; i++) {
+                    if (Math.random() < 0.4) INITIAL_ON.push(i);
+                }
+            } else {
+                INITIAL_ON = onLampsText.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+            }
+
+            settingsOverlay.style.display = 'none';
+            init();
+        }
+
+        function animate() {
+            const width = canvas.width;
+            const height = canvas.height;
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const maxRadius = 260;
+            const unitRadius = maxRadius / NUM_SECTORS;
+            const lerpFactor = 0.12; 
+
+            ctx.clearRect(0, 0, width, height);
+
+            let totalLitAreaUnits = 0;
+            const totalAreaUnits = NUM_SECTORS * NUM_SECTORS;
+
+            for (let m = 0; m < currentN; m++) {
+                for (let k = 1; k <= NUM_SECTORS; k++) {
+                    let visibleId = -1;
+                    for (let id = k; id <= NUM_SECTORS; id++) {
+                        if (id % currentN === m) {
+                            visibleId = id;
+                            break;
+                        }
+                    }
+                    if (visibleId !== -1 && sectorStates[visibleId].isOn) {
+                        totalLitAreaUnits += (k * k - (k - 1) * (k - 1));
+                    }
+                }
+            }
+            
+            const targetMeter = totalLitAreaUnits / (currentN * totalAreaUnits);
+            meterValue += (targetMeter - meterValue) * 0.1;
+
+            drawMeter(centerX, centerY, 285, meterValue);
+
+            // クリア判定
+            if (!clearTriggered && meterValue > 0.999 && currentN === 1 && sectorStates.slice(1).every(s => s.isOn)) {
+                clearTriggered = true;
+                triggerClear();
+            }
+
+            // 境界
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // ガイドライン
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < currentN; i++) {
+                const theta = (Math.PI * 2 / currentN) * i;
+                const drawAngle = theta + BASE_ANGLE;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX + Math.cos(drawAngle) * maxRadius, centerY + Math.sin(drawAngle) * maxRadius);
+                ctx.stroke();
+            }
+
+            for (let id = NUM_SECTORS; id >= 1; id--) {
+                const state = sectorStates[id];
+                const radius = id * unitRadius;
+                const targetArc = (Math.PI * 2 / currentN);
+
+                if (Math.abs(state.targetThetaForAnim - state.currentTheta) < 0.0001) {
+                    state.currentTheta = state.targetThetaForAnim;
+                } else {
+                    state.currentTheta += (state.targetThetaForAnim - state.currentTheta) * lerpFactor;
+                }
+
+                if (Math.abs(targetArc - state.currentArc) < 0.0001) {
+                    state.currentArc = targetArc;
+                } else {
+                    state.currentArc += (targetArc - state.currentArc) * lerpFactor;
+                }
+
+                const startAngle = state.currentTheta + BASE_ANGLE;
+                const endAngle = startAngle + state.currentArc;
+
+                const isFullCircle = (currentN === 1 && Math.abs(state.currentArc - Math.PI * 2) < 0.01);
+
+                ctx.beginPath();
+                if (isFullCircle) {
+                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                } else {
+                    ctx.moveTo(centerX, centerY);
+                    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                    ctx.closePath();
+                }
+
+                if (state.isOn) {
+                    ctx.fillStyle = `hsl(${state.colorHue}, 80%, 60%)`;
+                } else {
+                    ctx.fillStyle = `rgba(50, 60, 80, 1)`;
+                }
+                
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function drawMeter(x, y, r, val) {
+            if (val > 0) {
+                ctx.beginPath();
+                ctx.arc(x, y, r, BASE_ANGLE, BASE_ANGLE + (Math.PI * 2 * Math.min(val, 1)));
+                const hue = 180 + (val * 60); 
+                ctx.strokeStyle = `hsl(${hue}, 80%, 60%)`;
+                ctx.lineWidth = 8;
+                ctx.stroke();
+            }
+        }
+
+        canvas.addEventListener('mousedown', handleInteraction);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleInteraction(e.touches[0]);
+        });
+
+        function handleInteraction(e) {
+            if (isGameCleared || clearTriggered) return;
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const dx = mouseX - (rect.width / 2);
+            const dy = mouseY - (rect.height / 2);
+            const scale = canvas.width / rect.width;
+            const dist = Math.sqrt(dx * dx + dy * dy) * scale;
+
+            let theta = Math.atan2(dy, dx) - BASE_ANGLE;
+            while (theta < 0) theta += Math.PI * 2;
+            while (theta >= Math.PI * 2) theta -= Math.PI * 2;
+
+            const maxRadius = 260;
+            const unitRadius = maxRadius / NUM_SECTORS;
+
+            let clickedId = -1;
+            for (let id = 1; id <= NUM_SECTORS; id++) {
+                if (dist <= id * unitRadius) {
+                    const areaIdx = id % currentN;
+                    const startTheta = (Math.PI * 2 / currentN) * areaIdx;
+                    const endTheta = startTheta + (Math.PI * 2 / currentN);
+                    if (theta >= startTheta && theta < endTheta) {
+                        clickedId = id;
+                        break;
+                    }
+                }
+            }
+            if (clickedId !== -1) {
+                clearTriggered = false; // 操作があったのでクリア判定をリセット
+                toggleArea(clickedId % currentN);
+            }
+        }
+
+        function toggleArea(targetAreaIdx) {
+            for (let id = 1; id <= NUM_SECTORS; id++) {
+                if (id % currentN === targetAreaIdx) {
+                    sectorStates[id].isOn = !sectorStates[id].isOn;
+                }
+            }
+            updateOffStatus();
+            checkGameState();
+        }
+
+        function checkGameState() {
+            // Logic handled in animate loop
+        }
+
+        function triggerClear() {
+            setTimeout(() => {
+                isGameCleared = true;
+                setupShareUI();
+                winOverlay.style.display = 'flex';
+            }, 600); 
+        }
+
+        function setupShareUI() {
+            shareContainer.innerHTML = '';
+            const manualText = SHARE_CONFIG.TWEET_TEXT_MANUAL + "\n" + SHARE_CONFIG.TWEET_URL;
+
+            const mainBtn = document.createElement('button');
+            mainBtn.className = 'share-btn';
+            mainBtn.innerText = '喜びをXでシェアする';
+            
+            const choicesDiv = document.createElement('div');
+            choicesDiv.className = 'hidden flex flex-col gap-3 items-center';
+            
+            const reportBtn = document.createElement('button');
+            reportBtn.className = 'choice-btn';
+            reportBtn.innerText = 'クリア報告のポスト';
+            
+            const supportBtn = document.createElement('button');
+            supportBtn.className = 'choice-btn';
+            supportBtn.innerText = '原ポストにいいね・リポスト';
+
+            const helpLink = document.createElement('div');
+            helpLink.className = 'text-[0.7rem] text-slate-500 underline cursor-pointer mt-2';
+            helpLink.innerText = 'シェアがうまくいかない場合';
+
+            const manualCopySection = document.createElement('div');
+            manualCopySection.className = 'hidden flex flex-col gap-3 items-center w-full bg-slate-800/50 p-4 rounded-xl border border-slate-700';
+            
+            const manualTextArea = document.createElement('div');
+            manualTextArea.className = 'text-[0.7rem] bg-black/40 p-3 rounded font-mono text-slate-300 break-all text-left w-full';
+            manualTextArea.innerText = manualText;
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn';
+            copyBtn.innerText = 'テキストをコピーする';
+            
+            const backBtn = document.createElement('button');
+            backBtn.className = 'text-xs text-slate-400 mt-2';
+            backBtn.innerText = '戻る';
+            
+            reportBtn.onclick = (e) => {
+                const text = encodeURIComponent(SHARE_CONFIG.TWEET_TEXT);
+                const url = encodeURIComponent(SHARE_CONFIG.TWEET_URL);
+                window.open(`https://x.com/intent/tweet?text=${text}&url=${url}`, '_blank');
+            };
+
+            supportBtn.onclick = () => window.open(SHARE_CONFIG.SUPPORT_URL, '_blank');
+            
+            mainBtn.onclick = () => {
+                mainBtn.classList.add('hidden');
+                choicesDiv.classList.remove('hidden');
+            };
+
+            helpLink.onclick = () => {
+                choicesDiv.classList.add('hidden');
+                manualCopySection.classList.remove('hidden');
+            };
+
+            backBtn.onclick = () => {
+                manualCopySection.classList.add('hidden');
+                choicesDiv.classList.remove('hidden');
+            };
+
+            copyBtn.onclick = () => {
+                const el = document.createElement('textarea');
+                el.value = manualText;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                copyBtn.innerText = 'コピーしました！';
+                setTimeout(() => copyBtn.innerText = 'テキストをコピーする', 2000);
+            };
+
+            choicesDiv.appendChild(reportBtn);
+            choicesDiv.appendChild(supportBtn);
+            choicesDiv.appendChild(helpLink);
+            
+            manualCopySection.appendChild(manualTextArea);
+            manualCopySection.appendChild(copyBtn);
+            manualCopySection.appendChild(backBtn);
+
+            shareContainer.appendChild(mainBtn);
+            shareContainer.appendChild(choicesDiv);
+            shareContainer.appendChild(manualCopySection);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
