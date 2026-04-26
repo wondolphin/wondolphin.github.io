@@ -596,11 +596,11 @@
             backBtn.className = 'text-xs text-slate-400 mt-2';
             backBtn.innerText = '戻る';
             
-            reportBtn.onclick = (e) => {
-                const text = encodeURIComponent(SHARE_CONFIG.TWEET_TEXT);
-                const url = encodeURIComponent(SHARE_CONFIG.TWEET_URL);
-                window.open(`https://x.com/intent/tweet?text=${text}&url=${url}`, '_blank');
-            };
+reportBtn.onclick = (e) => {
+    const fullText = SHARE_CONFIG.TWEET_TEXT + "\n" + SHARE_CONFIG.TWEET_URL;
+    const encodedText = encodeURIComponent(fullText);
+    window.open(`https://x.com/intent/tweet?text=${encodedText}`, '_blank');
+};
 
             supportBtn.onclick = () => window.open(SHARE_CONFIG.SUPPORT_URL, '_blank');
             
