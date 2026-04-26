@@ -24,10 +24,10 @@
             height: 100%;
             cursor: pointer;
         }
-        /* 画面の短い方の60%にサイズを固定 */
+        /* 画面の短い方の55%にサイズを固定（ボタンのスペースを確保） */
         #canvasContainer {
-            width: 60vmin;
-            height: 60vmin;
+            width: 55vmin;
+            height: 55vmin;
             background-color: #0f172a;
         }
 
@@ -100,20 +100,38 @@
             margin-top: 0.5rem;
         }
 
-        .hidden { display: none !important; }
-
         /* 未点灯ランプ表示のスタイル調整 */
         #offStatus {
-            min-height: 2rem;
-            font-size: 1.25rem;
-            font-weight: 700;
+            min-height: 2.5rem;
+            font-size: 1.5rem;
+            font-weight: 800;
             color: #94a3b8;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             letter-spacing: -0.025em;
-            max-width: 90%;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            max-width: 95%;
+            overflow-x: auto;
             white-space: nowrap;
+            text-align: center;
+        }
+        
+        /* スクロールバー非表示（offStatus用） */
+        #offStatus::-webkit-scrollbar { display: none; }
+
+        .hidden { display: none !important; }
+
+        /* ボタンエリアの見切れ防止 */
+        #buttonPanelWrapper {
+            max-height: 30vh;
+            overflow-y: auto;
+            width: 100%;
+            padding-bottom: 20px;
+        }
+        #buttonPanelWrapper::-webkit-scrollbar {
+            width: 4px;
+        }
+        #buttonPanelWrapper::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
         }
     </style>
 </head>
@@ -124,7 +142,7 @@
     </div>
 
     <!-- 未点灯ランプ通知用 -->
-    <div id="offStatus" class="mb-4"></div>
+    <div id="offStatus" class="mb-2"></div>
 
     <!-- メインキャンバス -->
     <div id="canvasContainer" class="relative flex items-center justify-center rounded-full shadow-2xl">
@@ -183,8 +201,10 @@
     </div>
 
     <!-- コントロールパネル -->
-    <div id="buttonPanel" class="mt-8 md:mt-12 w-full max-w-2xl px-4">
-        <!-- JSで動的に生成 -->
+    <div id="buttonPanelWrapper" class="mt-8 md:mt-12 flex justify-center">
+        <div id="buttonPanel" class="w-full max-w-2xl px-4 flex flex-wrap justify-center gap-3 md:gap-4">
+            <!-- JSで動的に生成 -->
+        </div>
     </div>
 
     <script>
@@ -208,7 +228,7 @@
             TWEET_TEXT: "ルールを推測するパズル「Radial Lamp Puzzle」をクリアしました！\n#宇宙謎 #ルール発見型パズル @wondolphin",
             TWEET_TEXT_MANUAL: "ルールを推測するパズル「Radial Lamp Puzzle」をクリアしました！\n#ルール発見型パズル #宇宙謎 @wondolphin",
             TWEET_URL: "https://wondolphin.github.io/puzzle/uchunazo/radial_lamp_puzzle/index.html",
-            SUPPORT_URL: "https://x.com/wondolphin/status/2045803765367029938"
+            SUPPORT_URL: "https://x.com/wondolphin"
         };
         
         let currentN = 1;
@@ -240,7 +260,8 @@
             sectorStates = [];
             for (let id = 0; id <= NUM_SECTORS; id++) {
                 const isOn = INITIAL_ON.includes(id);
-                const areaIdx = id % currentN;
+                // ID 1 を theta 0 に配置するため (id-1) を使用
+                const areaIdx = (id > 0) ? (id - 1) % currentN : 0;
                 const targetTheta = (Math.PI * 2 / currentN) * areaIdx;
                 const targetArc = (Math.PI * 2 / currentN);
 
@@ -262,18 +283,14 @@
 
         function renderButtons() {
             buttonPanel.innerHTML = '';
-            const grid = document.createElement('div');
-            grid.className = "grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 md:gap-4 justify-items-center mx-auto max-w-fit";
-            
             for (let i = 1; i <= NUM_BUTTONS; i++) {
                 const btn = document.createElement('button');
                 btn.id = `btn${i}`;
                 btn.innerText = i;
-                btn.className = "w-12 h-12 md:w-14 md:h-14 text-lg md:text-xl font-bold rounded-xl bg-slate-800 border border-slate-600 transition";
+                btn.className = "w-11 h-11 md:w-14 md:h-14 text-lg md:text-xl font-bold rounded-xl bg-slate-800 border border-slate-600 transition flex-shrink-0";
                 btn.onclick = () => setN(i);
-                grid.appendChild(btn);
+                buttonPanel.appendChild(btn);
             }
-            buttonPanel.appendChild(grid);
         }
 
         function updateOffStatus() {
@@ -283,7 +300,7 @@
             }
             const offIds = sectorStates.slice(1).filter(s => !s.isOn).map(s => s.id);
             if (offIds.length === 0) {
-                offStatusDiv.innerText = "All lamps are ON";
+                offStatusDiv.innerText = "ALL LAMPS ON";
             } else {
                 offStatusDiv.innerText = "OFF: " + offIds.join(", ");
             }
@@ -300,13 +317,11 @@
 
         function closeHintOverlay() {
             hintOverlay.style.display = 'none';
-            // 操作可能状態にリセット
             isGameCleared = false;
-            // clearTriggeredはtrueのまま。次の操作(setNやtoggleArea)でクリア判定を再度有効化する
+            clearTriggered = true; 
         }
 
         function setN(n) {
-            // コマンド判定
             inputBuffer += n;
             if (inputBuffer.endsWith("2525252")) {
                 settingsOverlay.style.display = 'flex';
@@ -317,7 +332,6 @@
 
             if (isGameCleared || n === currentN) return;
             
-            // 操作があったのでクリア判定をリセット
             clearTriggered = false;
 
             const nIncreased = n > currentN;
@@ -326,7 +340,7 @@
 
             for (let id = 1; id <= NUM_SECTORS; id++) {
                 const state = sectorStates[id];
-                const areaIdx = id % currentN;
+                const areaIdx = (id - 1) % currentN;
                 let targetTheta = (Math.PI * 2 / currentN) * areaIdx;
 
                 state.currentTheta = ((state.currentTheta % (Math.PI * 2)) + (Math.PI * 2)) % (Math.PI * 2);
@@ -338,7 +352,6 @@
                 }
                 state.targetThetaForAnim = targetTheta;
             }
-            checkGameState();
         }
 
         function updateButtons() {
@@ -352,14 +365,15 @@
         }
 
         function applySettings() {
-            const lampCount = parseInt(document.getElementById('lampCountInput').value);
-            const btnCount = parseInt(document.getElementById('btnCountInput').value);
-            const onLampsText = document.getElementById('onLampsInput').value;
+            const lampCountInput = document.getElementById('lampCountInput');
+            const btnCountInput = document.getElementById('btnCountInput');
+            const onLampsInput = document.getElementById('onLampsInput');
 
-            NUM_SECTORS = lampCount;
-            NUM_BUTTONS = btnCount;
+            NUM_SECTORS = parseInt(lampCountInput.value);
+            NUM_BUTTONS = parseInt(btnCountInput.value);
             isCustomized = true;
             
+            const onLampsText = onLampsInput.value;
             if (onLampsText.includes('ランダム')) {
                 INITIAL_ON = [];
                 for (let i = 1; i <= NUM_SECTORS; i++) {
@@ -391,7 +405,7 @@
                 for (let k = 1; k <= NUM_SECTORS; k++) {
                     let visibleId = -1;
                     for (let id = k; id <= NUM_SECTORS; id++) {
-                        if (id % currentN === m) {
+                        if ((id - 1) % currentN === m) {
                             visibleId = id;
                             break;
                         }
@@ -407,20 +421,17 @@
 
             drawMeter(centerX, centerY, 285, meterValue);
 
-            // クリア判定
             if (!clearTriggered && meterValue > 0.999 && currentN === 1 && sectorStates.slice(1).every(s => s.isOn)) {
                 clearTriggered = true;
                 triggerClear();
             }
 
-            // 境界
             ctx.beginPath();
             ctx.arc(centerX, centerY, maxRadius, 0, Math.PI * 2);
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // ガイドライン
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
             ctx.lineWidth = 1;
             for (let i = 0; i < currentN; i++) {
@@ -496,7 +507,7 @@
         });
 
         function handleInteraction(e) {
-            if (isGameCleared || clearTriggered) return;
+            if (isGameCleared || (clearTriggered && meterValue > 0.99)) return;
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
@@ -515,7 +526,7 @@
             let clickedId = -1;
             for (let id = 1; id <= NUM_SECTORS; id++) {
                 if (dist <= id * unitRadius) {
-                    const areaIdx = id % currentN;
+                    const areaIdx = (id - 1) % currentN;
                     const startTheta = (Math.PI * 2 / currentN) * areaIdx;
                     const endTheta = startTheta + (Math.PI * 2 / currentN);
                     if (theta >= startTheta && theta < endTheta) {
@@ -525,23 +536,18 @@
                 }
             }
             if (clickedId !== -1) {
-                clearTriggered = false; // 操作があったのでクリア判定をリセット
-                toggleArea(clickedId % currentN);
+                clearTriggered = false; 
+                toggleArea((clickedId - 1) % currentN);
             }
         }
 
         function toggleArea(targetAreaIdx) {
             for (let id = 1; id <= NUM_SECTORS; id++) {
-                if (id % currentN === targetAreaIdx) {
+                if ((id - 1) % currentN === targetAreaIdx) {
                     sectorStates[id].isOn = !sectorStates[id].isOn;
                 }
             }
             updateOffStatus();
-            checkGameState();
-        }
-
-        function checkGameState() {
-            // Logic handled in animate loop
         }
 
         function triggerClear() {
