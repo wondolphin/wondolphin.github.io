@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>勇者はおうちに帰りたい</title>
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --ui-bg: rgba(20, 20, 25, 0.98);
+            --text-color: #e0e0e0;
+            --accent-color: #00d4ff;
+            --paradox-color: #ff4757;
+            --tile-size: 60px;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Consolas', 'Monaco', 'Hiragino Kaku Gothic ProN', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #worldline-bar {
+            width: 100%;
+            padding: 8px 15px;
+            background: #000;
+            color: var(--accent-color);
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #333;
+            box-sizing: border-box;
+            letter-spacing: 1px;
+        }
+
+        #status-bar {
+            width: 100%;
+            padding: 10px;
+            background: #111;
+            display: flex;
+            justify-content: space-around;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-bottom: 2px solid var(--accent-color);
+            z-index: 10;
+        }
+
+        #menu-btn {
+            position: absolute;
+            top: 85px;
+            left: 10px;
+            z-index: 20;
+            padding: 8px 15px;
+            font-size: 0.85rem;
+            background: #222;
+            border: 1px solid #444;
+            color: #eee;
+            border-radius: 4px;
+        }
+
+        #game-container {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            overflow: hidden;
+            background: #050505;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+
+        .action-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: auto;
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 5px;
+            pointer-events: auto;
+        }
+
+        button {
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px #000;
+            user-select: none;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px #000;
+        }
+
+        .btn-main {
+            width: 90px;
+            height: 50px;
+            font-weight: bold;
+        }
+
+        .btn-attack {
+            background: #8e44ad;
+        }
+
+        .btn-move {
+            background: #2980b9;
+        }
+
+        .btn-item {
+            background: #27ae60;
+        }
+
+        .btn-wait {
+            background: #444;
+        }
+
+        #look-mode-toggle {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 100px;
+            height: 50px;
+            pointer-events: auto;
+            background: #34495e;
+        }
+
+        #message-log {
+            position: absolute;
+            top: 80px;
+            right: 15px;
+            width: 320px;
+            max-height: 120px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 10px;
+            font-size: 0.85rem;
+            border-radius: 4px;
+            z-index: 5;
+            pointer-events: none;
+            border-right: 4px solid var(--accent-color);
+            overflow-y: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            text-align: right;
+            transition: opacity 0.2s;
+        }
+
+        #modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background: var(--ui-bg);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #444;
+            width: 90%;
+            max-width: 450px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        #monologue-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.65);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            cursor: pointer;
+        }
+
+        .monologue-box {
+            width: 80%;
+            max-width: 600px;
+            padding: 40px;
+            text-align: left;
+            line-height: 1.8;
+            font-size: 1.2rem;
+            color: #fff;
+            border-left: 2px solid var(--accent-color);
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .monologue-box .click-prompt {
+            margin-top: 30px;
+            font-size: 0.8rem;
+            color: var(--accent-color);
+            text-align: right;
+            opacity: 0.6;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 0.2;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        .timeline-list {
+            text-align: left;
+            margin: 15px 0;
+            padding: 5px;
+        }
+
+        .timeline-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            cursor: help;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .timeline-item:hover {
+            background: #252525;
+            border-color: var(--accent-color);
+        }
+
+        .timeline-item.active {
+            border-color: var(--accent-color);
+            background: #1a252a;
+        }
+
+        #custom-tooltip {
+            position: fixed;
+            z-index: 3000;
+            background: rgba(0, 0, 0, 0.95);
+            color: #fff;
+            padding: 10px 15px;
+            border: 1px solid var(--accent-color);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            line-height: 1.6;
+            white-space: pre-wrap;
+            transition: opacity 0.05s;
+        }
+
+        .new-badge {
+            background: #f1c40f;
+            color: #000;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .stage-selector {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stage-btn {
+            padding: 10px;
+            background: #333;
+            border: 1px solid #444;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .stage-btn.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .approach-item {
+            background: #222;
+            border: 1px solid #444;
+            padding: 10px;
+            margin-bottom: 10px;
+            text-align: left;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .approach-item:hover {
+            border-color: var(--accent-color);
+            background: #2a2a2a;
+        }
+
+        #full-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #monster-popup {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid var(--accent-color);
+            padding: 12px;
+            border-radius: 6px;
+            pointer-events: none;
+            display: none;
+            z-index: 200;
+            min-width: 180px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        #monster-popup h4 {
+            margin: 0 0 8px 0;
+            color: var(--accent-color);
+            border-bottom: 1px solid #444;
+            padding-bottom: 4px;
+        }
+
+        #monster-popup p {
+            margin: 4px 0;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        #monster-popup .stat {
+            color: #f1c40f;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="worldline-bar">
+        <span>WL: <span id="worldline-id">世界線 1</span> <small id="branch-suffix" style="opacity:0.6"></small></span>
+        <span id="paradox-warning" style="display:none; color:var(--paradox-color)">⚠ CAUSALITY BRANCHED</span>
+    </div>
+
+    <div id="status-bar">
+        <span>HP: <span id="hp">0</span>/<span id="max-hp">0</span></span>
+        <span>ATK: <span id="atk">5</span> <span id="atk-status" style="font-size:0.8rem; color:#f1c40f"></span></span>
+        <span>STAGE: <span id="stage-num">1</span></span>
+    </div>
+
+    <button id="menu-btn" onclick="openTimelineMenu()">ステージ選択</button>
+
+    <div id="message-log"></div>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="monster-popup">
+            <h4 id="pop-name">名前</h4>
+            <p>最大HP: <span id="pop-hp" class="stat">0</span></p>
+            <p>攻撃力: <span id="pop-atk" class="stat">0</span></p>
+            <p>特徴: <span id="pop-trait">...</span></p>
+        </div>
+    </div>
+
+    <button id="look-mode-toggle" onclick="toggleLookMode()">見渡す</button>
+
+    <div id="ui-layer">
+        <div class="action-group">
+            <button class="btn-main btn-attack" onclick="executeAttack()">攻撃</button>
+            <button class="btn-main btn-item" onclick="openItemMenu()">アイテム</button>
+        </div>
+        <div class="action-group">
+            <div class="top-row-actions" style="display:flex; gap:5px">
+                <button class="btn-main btn-move" onclick="executeMove()">移動</button>
+                <button class="btn-main btn-wait" onclick="passTurn()">待機</button>
+            </div>
+            <div class="d-pad">
+                <button onclick="changeDirection('ul')">↖</button>
+                <button onclick="changeDirection('u')">↑</button>
+                <button onclick="changeDirection('ur')">↗</button>
+                <button onclick="changeDirection('l')">←</button>
+                <button style="background:transparent;box-shadow:none;border:none;"></button>
+                <button onclick="changeDirection('r')">→</button>
+                <button onclick="changeDirection('dl')">↙</button>
+                <button onclick="changeDirection('d')">↓</button>
+                <button onclick="changeDirection('dr')">↘</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-overlay">
+        <div class="modal-content" id="modal-body"></div>
+    </div>
+
+    <div id="full-overlay">
+        <h2 id="full-title" style="font-size:5rem; font-weight: 900; letter-spacing: 10px;">CLEAR!</h2>
+        <div id="full-content" style="width: 100%; display:flex; flex-direction:column; align-items:center;"></div>
+    </div>
+
+    <div id="monologue-overlay" onclick="advanceMonologue()">
+        <div class="monologue-box">
+            <div id="monologue-text"></div>
+            <div class="click-prompt">Click to continue...</div>
+        </div>
+    </div>
+
+    <div id="custom-tooltip"></div>
+
+    <script>
+        /* --- データの定義 --- */
+        const TILE_SIZE = 60;
+        const DIRECTIONS = {
+            u: { x: 0, y: -1 }, d: { x: 0, y: 1 }, l: { x: -1, y: 0 }, r: { x: 1, y: 0 },
+            ul: { x: -1, y: -1 }, ur: { x: 1, y: -1 }, dl: { x: -1, y: 1 }, dr: { x: 1, y: 1 }
+        };
+        const MONSTER_INFO = {
+            "1": { name: "こうもり", hp: 10, atk: 5, trait: "普通のモンスター" },
+            "2": { name: "弓使い", hp: 10, atk: 5, trait: "8方向の射程にプレイヤーがいると遠距離攻撃を行う。" },
+            "3": { name: "回復おばけ", hp: 24, atk: 2, trait: "HPが半分を切ると回復魔法（+6）を使用する。" },
+            "4": { name: "イノシシ", hp: 20, atk: 20, trait: "普段は眠っているが、プレイヤーを視認すると覚醒する。" },
+            "5": { name: "魔王", hp: 100, atk: 100, trait: "圧倒的な力。この世界の支配者。" }
+        };
+        const ITEM_DATA = {
+            "1": { name: "脱出ボタン", desc: "これを使うとダンジョンから脱出でき、クリアとなる。" },
+            "2": { name: "回復薬", desc: "HPを5回復。" },
+            "3": { name: "剣", desc: "ATKを10にする。" },
+            "4": { name: "滅びの魔法の書", desc: "周囲5×5マスの範囲にいるモンスターを消し去る。" },
+            "5": { name: "エナドリ", desc: "ATK2倍(3ターン)。" },
+            "8": { name: "炎の魔法の書", desc: "前方1〜3マスの範囲に5ダメージの攻撃を行う。" },
+            "10": { name: "ローラースケート", desc: "向いている方向に、壁や敵にぶつかるまで進む（このターンのみ）。" },
+            "11": { name: "入れ替わりの魔法の書", desc: "向いている方向にいるモンスターと場所を入れ替える。" },
+            "12": { name: "風の魔法の書", desc: "前方モンスターを吹き飛ばす。" },
+            "13": { name: "銀の鍵", desc: "銀の扉を消す。" },
+            "100": { name: "送信機a", desc: "アイテムを過去に送る。" },
+            "101": { name: "送信機b", desc: "アイテムを過去に送る。" },
+            "102": { name: "送信機c", desc: "アイテムを過去に送る。" },
+            "103": { name: "送信機d", desc: "アイテムを過去に送る。" },
+            "999": { name: "平和の箱", desc: "これを使うと世界が平和になる。" }
+        };
+
+        // 修正：HPと最大HPをステージごとに設定可能にする
+        const STAGES = [
+                {
+                    name: "Stage 1", hp: 10, maxHp: 100, map: [
+
+                        [0, 0, 0, 0, 0, 'x', 0, 0, 0, 0, 0, 0, 0, 'x', 0, 0],
+                        ['x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x'],
+                        ['x', 0, 0, 0, 0, 'x', 0, 0, 0, 0, 0, 0, 0, 'x', 0, 0],
+                        ['x', 0, 0, 'stairs', 0, 'x', 0, 'm_1_d', 'm_1_d', 'm_1_d', 0, 0, 0, 'x', 0, 0],
+                        ['x', 0, 0, 0, 0, 'x', 0, 0, 0, 0, 0, 0, 0, 'x', 0, 0],
+                        ['x', 'x', 'x', 'x', 'm_1_r', 0, 0, 0, 'i_4', 0, 0, 0, 'i_1', 'x', 0, 0],
+                        ['x', 0, 0, 0, 'm_1_r', 0, 0, 0, 'p_1_u', 0, 0, 0, 0, 'x', 0, 0],
+                        ['x', 0, 0, 'x', 'm_1_r', 0, 0, 0, 0, 0, 0, 0, 0, 'x', 0, 0],
+                        ['x', 'i_5', 0, 'x', 0, 0, 0, 'm_1_u', 'm_1_u', 'm_1_u', 0, 0, 0, 'x', 0, 0],
+                        ['x', 0, 0, 'x', 0, 0, 0, 0, 0, 0, 0, 0, 0, 'x', 0, 0],
+                        ['x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x'],
+
+                    ]
+                },
+                {
+                    name: "Stage 2", hp: 10, maxHp: 100, map: [
+
+                        [0, 0, 0, 0, 0, 0, 0, 0, 'x', 'x', 'x', 0, 0, 0, 0],
+                        ['x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 0, 'x', 0, 0, 0, 0],
+                        ['x', 0, 0, 0, 0, 0, 0, 0, 0, 0, 'x', 0, 0, 0, 0],
+                        ['x', 0, 'stairs', 0, 0, 0, 0, 0, 0, 0, 'x', 0, 0, 0, 0],
+                        ['x', 0, 0, 0, 'x', 'x', 'x', 'x', 'x', 0, 'x', 0, 0, 0, 0],
+                        ['x', 0, 0, 0, 'x', 0, 0, 'm_1_d', 'x', 0, 'x', 0, 0, 0, 0],
+                        ['x', 0, 0, 0, 'x', 0, 'x', 0, 'x', 0, 'x', 'x', 'x', 'x', 'x'],
+                        ['x', 'x', 'x', 'x', 'x', 0, 'x', 0, 'x', 'm_4', 0, 0, 'i_102', 'i_10', 'x'],
+                        ['x', 'i_2', 0, 0, 'x', 'm_1_d', 'x', 0, 'x', 0, 'x', 'x', 'x', 'x', 'x'],
+                        ['x', 0, 0, 0, 'x', 0, 0, 0, 'x', 0, 'x', 0, 0, 0, 0],
+                        ['x', 'i_8', 'p_1_r', 0, 'm_1_l', 0, 0, 0, 0, 'i_1', 'x', 0, 0, 0, 0],
+                        ['x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 0, 0, 0, 0]
+
+                    ]
+                },
+                {
+                    name: "Stage 3", hp: 10, maxHp: 100, map: [
+
+                        ['x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x'],
+                        ['x', 'i_3', 0, 0, 0, 'm_1_d', 0, 0, 0, 0, 0, 0, 'x'],
+                        ['x', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'x'],
+                        ['x', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'x'],
+                        ['x', 'x', 'x', 'x', 'x', 0, 'x', 'x', 'x', 'x', 'x', 'x', 'x'],
+                        ['x', 'x', 'x', 'x', 'x', 0, 'x', 0, 0, 'x', 0, 0, 0],
+                        ['x', 'x', 'x', 'x', 'x', 0, 0, 0, 0, 'x', 'x', 'x', 'x'],
+                        ['x', 0, 0, 0, 0, 0, 'm_1_d', 0, 0, 'i_1', 's', 0, 'x'],
+                        ['x', 0, 0, 0, 0, 0, 0, 0, 0, 'x', 'x', 'i_101', 'x'],
+                        ['x', 0, 0, 0, 'i_11', 0, 0, 0, 0, 'x', 'x', 'i_12', 'x'],
+                        ['x', 0, 0, 'p_1_d', 0, 0, 0, 0, 0, 'x', 'x', 'x', 'x'],
+                        ['x', 0, 0, 0, 0, 0, 0, 0, 0, 'x', 0, 0, 'x'],
+                        ['x', 0, 0, 'i_10', 'm_4_u', 0, 0, 0, 0, 'x', 0, 'stairs', 'x'],
+                        ['x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x']
+                    ]
+                },
+                { name: "Stage 4", hp: 10, maxHp: 100, map: [
+                    
+              ['x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x'],
+                    ['x', 0, 0, 0, 0, 0, 0, 0, 0, 0, 'stairs', 0, 0, 0, 0, 0, 'x'],
+                    ['x', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'x'],
+                    ['x', 'p_1_r', 0, 0, 0, 0, 0, 'i_13', 0, 0, 0, 'i_100', 0, 0, 0, 'i_1', 'x'],
+                    ['x', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'x'],
+                    ['x', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'x'],
+                    ['x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x'],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+            ] },
+                { name: "Stage 5", hp: 100, maxHp: 100, map: [
+                    
+                    ['x', 'x', 'x', 'x', 'x', 'x', 'x'],
+                    ['x', 0, 0, 0, 0, 0, 'x'],
+                    ['x', 0, 0, 'm_5_d', 0, 0, 'x'],
+                    ['x', 0, 0, 0, 0, 0, 'x'],
+                    ['x', 0, 0, 0, 0, 0, 'x'],
+                    ['x', 0, 0, 0, 0, 0, 'x'],
+                    ['x', 0, 0, 0, 0, 0, 'x'],
+                    ['x', 'x', 'x', 0, 'x', 'x', 'x'],
+                    ['x', 'x', 'x', 's', 'x', 'x', 'x'],
+                    ['x', 'x', 'x', 0, 'x', 'x', 'x'],
+                    ['x', 0, 0, 0, 0, 0, 'x'],
+                    ['x', 0, 0, 'p_1_u', 0, 0, 'x'],
+                    ['x', 0, 0, 0, 0, 0, 'x'],
+                    ['x', 'x', 'x', 'x', 'x', 'x', 'x']
+            
+            ] }
+            ];
+
+        /* --- アセット管理 --- */
+        const IMAGES = {
+            floor: new Image(), wall: new Image(), item: new Image(),
+            door: new Image(), stairs: new Image(), // 修正：扉と階段を追加
+            player: {}, monsters: {}
+        };
+        function loadAssets() {
+            IMAGES.floor.src = "floor_tile.png"; IMAGES.wall.src = "wall_tile.png"; IMAGES.item.src = "item.png";
+            IMAGES.door.src = "door_s.png"; // 修正：sで記述される扉の画像
+            IMAGES.stairs.src = "stairs.png"; // 修正：階段の画像
+            for (let dir in DIRECTIONS) { IMAGES.player[dir] = new Image(); IMAGES.player[dir].src = `player_${dir}.png`; }
+            for (let i = 1; i <= 5; i++) { IMAGES.monsters[i] = {}; for (let dir in DIRECTIONS) { IMAGES.monsters[i][dir] = new Image(); IMAGES.monsters[i][dir].src = `monster${i}_${dir}.png`; } }
+        }
+
+        /* --- モノローグデータ --- */
+        const MONOLOGUE_DATA = {
+            start: {
+                0: ["ぐうぅ…。魔王をたおすためダンジョンの奥まで来たけど、\n食糧が底をつきて限界だ…。帰りたい…。", "しかもモンスターに囲まれてしまった。絶体絶命！\nどうしよう…。", "（なんとかして、ダンジョンを脱出しよう）"],
+                1: ["あれから１週間の休養をして再びダンジョンに来た。", "しかし、またもやピンチだ。帰りたい…。"],
+                2: ["３度目の挑戦。今日も体力が限界だ。帰りたい…。"],
+                3: ["４度目の挑戦。かなり奥まで来れたけど、痛手が大きい。\n今回はここらで帰ろう…。"],
+                4: ["５度目の挑戦。ついに魔王のところに来たぞ！\nここまで来たら、もう帰らずに、倒すぞ！"]
+            },
+            defeat: {
+                4: ["ぐぐぐ…。強すぎる…。", "勝つ方法はあったのだろうか…？", "この間行ったダンジョンにあった“転送機”というのを\n使ってみるか…？", "頼んだぞ・・・・“違う世界線の自分”・・・。"]
+            }
+        };
+
+        /* --- ゲーム状態管理 --- */
+        let timeline = { "α000000000": { branches: { "B1": { stages: [], clearedStages: [] } }, lastBranchId: "B1" } };
+        let worldlineOrder = ["α000000000"];
+        let lastCreatedWorldline = null;
+        let allRecordedApproaches = STAGES.map(() => []);
+        let currentWorldlineBase = "α000000000";
+        let currentBranchId = "B1";
+        let currentStageIndex = 0;
+        let currentApproach = { picked: [], used: [], sent: null };
+        let map = [], player = null, monsters = [], items = [], gameState = "player_turn", isLookMode = false, lookOffset = { x: 0, y: 0 }, isDragging = false, lastMousePos = { x: 0, y: 0 };
+        let canvas, ctx;
+        let pendingWorldlineNotification = null;
+
+        /* --- モノローグロジック --- */
+        let activeMonologue = null, monologueIndex = 0, monologueCallback = null;
+        function startMonologue(lines, callback) { activeMonologue = lines; monologueIndex = 0; monologueCallback = callback; document.getElementById('monologue-overlay').style.display = 'flex'; updateMonologueText(); }
+        function updateMonologueText() { const text = activeMonologue[monologueIndex].replace(/\n/g, '<br>'); document.getElementById('monologue-text').innerHTML = text; }
+        function advanceMonologue() { monologueIndex++; if (monologueIndex < activeMonologue.length) { updateMonologueText(); } else { document.getElementById('monologue-overlay').style.display = 'none'; activeMonologue = null; if (monologueCallback) monologueCallback(); } }
+
+        /* --- ツールチップ表示 --- */
+        function showWorldlineTooltip(e, text) {
+            const tooltip = document.getElementById('custom-tooltip');
+            tooltip.innerHTML = text.replace(/\\n/g, '<br>');
+            tooltip.style.display = 'block';
+            tooltip.style.opacity = '1';
+            const rect = e.target.getBoundingClientRect();
+            tooltip.style.left = (rect.right + 15) + 'px';
+            tooltip.style.top = rect.top + 'px';
+            if (rect.right + tooltip.offsetWidth > window.innerWidth) { tooltip.style.left = (rect.left - tooltip.offsetWidth - 15) + 'px'; }
+        }
+        function hideWorldlineTooltip() { const t = document.getElementById('custom-tooltip'); t.style.display = 'none'; t.style.opacity = '0'; }
+
+        /* --- ゲームロジック --- */
+        function getDistance(a, b) { return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)); }
+        function getGifts(wlBase) {
+            const gifts = []; const idBase = wlBase.substring(1);
+            for (let i = 0; i < idBase.length; i++) {
+                if (idBase[i] !== '0') { gifts.push({ id: (idBase[i].charCodeAt(0) - 'a'.charCodeAt(0) + 1).toString(), isGift: true }); }
+            }
+            return gifts;
+        }
+        function calculateInventory(wlBase, branchId, stageIdx) {
+            let inv = getGifts(wlBase); const wlData = timeline[wlBase]; if (!wlData || !wlData.branches[branchId]) return inv;
+            const stages = wlData.branches[branchId].stages;
+            for (let i = 0; i < stageIdx; i++) {
+                const ap = stages[i]; if (!ap) continue;
+                ap.picked.forEach(id => inv.push({ id, isGift: false }));
+                ap.used.forEach(id => { const idx = inv.findIndex(it => it.id === id); if (idx !== -1) inv.splice(idx, 1); });
+                if (ap.sent) { const sIdx = inv.findIndex(it => it.id === ap.sent.itemId); if (sIdx !== -1) inv.splice(sIdx, 1); const tIdx = inv.findIndex(it => it.id === ap.sent.txId.toString()); if (tIdx !== -1) inv.splice(tIdx, 1); }
+            }
+            return inv;
+        }
+
+        function initStage(index, fromSelection = false) {
+            closeModal();
+            currentStageIndex = index;
+            setupStageData(index);
+            if (currentWorldlineBase === "α000000000" && MONOLOGUE_DATA.start[index]) {
+                const sessionKey = `monologue_viewed_${index}`;
+                if (!sessionStorage.getItem(sessionKey)) {
+                    sessionStorage.setItem(sessionKey, "true");
+                    startMonologue(MONOLOGUE_DATA.start[index], null);
+                }
+            }
+        }
+
+        function setupStageData(index) {
+            const stage = STAGES[index];
+            let startInventory = calculateInventory(currentWorldlineBase, currentBranchId, index);
+            currentApproach = { picked: [], used: [], sent: null };
+            map = []; monsters = []; items = [];
+
+            // 修正：各ステージごとに設定されたHPと最大HPを反映
+            const maxHp = stage.maxHp || 100;
+            const startHp = stage.hp || 10;
+
+            const idBase = currentWorldlineBase.substring(1);
+            for (let y = 0; y < stage.map.length; y++) {
+                map[y] = [];
+                for (let x = 0; x < stage.map[y].length; x++) {
+                    const cell = stage.map[y][x];
+                    if (cell === 'x') map[y][x] = 'wall';
+                    else if (cell === 's') map[y][x] = 'door';
+                    else if (cell === 'stairs') map[y][x] = 'stairs'; // 修正：階段の設定
+                    else if (typeof cell === 'string' && cell.startsWith('p')) {
+                        const p = cell.split('_');
+                        player = { x, y, visualX: x, visualY: y, dir: p[2] || 'd', hp: startHp, maxHp: maxHp, baseAtk: 5, atk: 5, inventory: JSON.parse(JSON.stringify(startInventory)), flash: 0, atkBoostTurns: 0, opacity: 1, isDying: false };
+                        map[y][x] = 'floor';
+                    }
+                    else if (typeof cell === 'string' && cell.startsWith('m')) { const m = cell.split('_'), info = MONSTER_INFO[m[1]]; monsters.push({ x, y, visualX: x, visualY: y, id: m[1], dir: m[2] || 'd', hp: info.hp, maxHp: info.hp, atk: info.atk, flash: 0, awake: (m[1] !== "4") }); map[y][x] = 'floor'; }
+                    else if (typeof cell === 'string' && cell.startsWith('i')) {
+                        const itemId = cell.split('_')[1]; let exists = true;
+                        if (parseInt(itemId) >= 100) { if (idBase[parseInt(itemId) - 100] !== '0') exists = false; } else { if (idBase.includes(String.fromCharCode('a'.charCodeAt(0) + parseInt(itemId) - 1))) exists = false; }
+                        if (exists) items.push({ x, y, id: itemId }); map[y][x] = 'floor';
+                    } else map[y][x] = 'floor';
+                }
+            }
+            document.getElementById('stage-num').innerText = index + 1;
+            document.getElementById('worldline-id').innerText = `世界線 ${worldlineOrder.indexOf(currentWorldlineBase) + 1}`;
+            gameState = "player_turn";
+            updateUIState(); resizeCanvas(); updateStatus();
+        }
+
+        function getWorldlineRelation(id) {
+            const relations = []; const idBase = id.substring(1);
+            for (let i = 0; i < idBase.length; i++) {
+                if (idBase[i] !== '0') {
+                    const txId = 100 + i; const itemId = idBase[i].charCodeAt(0) - 'a'.charCodeAt(0) + 1;
+                    const txName = ITEM_DATA[txId] ? ITEM_DATA[txId].name : `送信機${String.fromCharCode(97 + i)}`;
+                    const itemName = ITEM_DATA[itemId] ? ITEM_DATA[itemId].name : `アイテム${itemId}`;
+                    relations.push(`${txName}―${itemName}`);
+                }
+            }
+            return relations.length > 0 ? relations.join('\\n') : "初期世界線";
+        }
+
+        function openTimelineMenu() {
+            const body = document.getElementById('modal-body');
+            let notifyHtml = "";
+            if (pendingWorldlineNotification) {
+                notifyHtml = `<div style="background:rgba(0, 212, 255, 0.1); border:1px solid var(--accent-color); padding:15px; border-radius:8px; margin-bottom:20px; font-size:0.9rem; color:#fff; text-align:left; line-height:1.6;">${pendingWorldlineNotification.replace(/\n/g, '<br>')}</div>`;
+                pendingWorldlineNotification = null;
+            }
+            let html = "";
+            if (worldlineOrder.length > 1) {
+                html += `<h3>世界線選択</h3>${notifyHtml}<div class="timeline-list">`;
+                worldlineOrder.forEach((id, idx) => {
+                    const active = id === currentWorldlineBase ? "active" : "";
+                    const isNew = id === lastCreatedWorldline ? '<span class="new-badge">New</span>' : "";
+                    const relations = getWorldlineRelation(id);
+                    html += `<div class="timeline-item ${active}" onclick="switchWL('${id}')" onmouseenter="showWorldlineTooltip(event, '${relations}')" onmouseleave="hideWorldlineTooltip()"><span>世界線 ${idx + 1}${isNew}</span><small style="opacity:0.5; font-size:0.7rem;">${id}</small></div>`;
+                });
+                html += `</div>`;
+            }
+            html += `<h3>ステージ選択</h3><div class="stage-selector">`;
+            STAGES.forEach((s, i) => {
+                const cleared = timeline[currentWorldlineBase].branches[currentBranchId].clearedStages.includes(i);
+                const accessible = i === 0 || timeline[currentWorldlineBase].branches[currentBranchId].clearedStages.includes(i - 1);
+                html += `<button class="stage-btn ${!accessible ? "disabled" : ""}" onclick="${accessible ? `jumpToStage(${i})` : ''}">${cleared ? "✅" : (accessible ? "▶" : "🔒")} ${s.name}</button>`;
+            });
+            html += `</div><button onclick="closeModal()" style="margin-top:20px; width:100%">閉じる</button>`;
+            body.innerHTML = html; document.getElementById('modal-overlay').style.display = 'flex';
+        }
+
+        function jumpToStage(idx) {
+            const wl = timeline[currentWorldlineBase].branches[currentBranchId];
+            const isCleared = wl.clearedStages.includes(idx);
+            const currentAp = wl.stages[idx];
+            const candidates = getApproaches(idx);
+            const alternatives = candidates.filter(ap => !checkApproachEquality(ap, currentAp));
+            if (alternatives.length === 0 && !isCleared) { initStage(idx, true); return; }
+            const body = document.getElementById('modal-body');
+            let html = `<h3>${STAGES[idx].name}</h3>`;
+            if (isCleared && currentAp) {
+                html += `<div style="background:rgba(39, 174, 96, 0.1); border:1px solid #27ae60; padding:10px; border-radius:4px; margin-bottom:15px; text-align:left;">
+                    <strong style="color:#27ae60">採用中のアプローチ:</strong><br>
+                    <small>拾得: ${currentAp.picked.map(id => ITEM_DATA[id].name).join(', ') || "なし"}</small><br>
+                    <small>使用: ${currentAp.used.map(id => ITEM_DATA[id].name).join(', ') || "なし"}</small><br>
+                    <small>転送: ${currentAp.sent ? ITEM_DATA[currentAp.sent.itemId].name : "なし"}</small>
+                </div>`;
+            }
+            if (alternatives.length > 0) {
+                html += `<p style="font-size:0.85rem">適用可能な${isCleared ? '別の' : ''}アプローチがあります。</p>
+                ${alternatives.map((c, i) => {
+                    const originalIdx = candidates.indexOf(c);
+                    return `<div class="approach-item" onclick="applyApproach(${idx}, ${originalIdx})">拾得: ${c.picked.map(id => ITEM_DATA[id].name).join(', ') || "なし"}<br>使用: ${c.used.map(id => ITEM_DATA[id].name).join(', ') || "なし"}<br>転送: ${c.sent ? ITEM_DATA[c.sent.itemId].name : "なし"}</div>`;
+                }).join('')}`;
+            }
+            html += `<button onclick="initStage(${idx}, true)" style="margin-top:10px; width:100%">${isCleared ? '新しいアプローチで攻略する' : '自分で攻略する'}</button><button onclick="openTimelineMenu()" style="margin-top:5px; width:100%; background:#222;">戻る</button>`;
+            body.innerHTML = html; document.getElementById('modal-overlay').style.display = 'flex';
+        }
+
+        function applyApproach(sIdx, apIdx) {
+            const candidates = getApproaches(sIdx); const ap = candidates[apIdx];
+            currentApproach = JSON.parse(JSON.stringify(ap)); currentStageIndex = sIdx; executeClear();
+        }
+
+        function getApproaches(stageIdx) {
+            const idBase = currentWorldlineBase.substring(1);
+            const currentInvIds = calculateInventory(currentWorldlineBase, currentBranchId, stageIdx).map(it => it.id);
+            const mapItemIds = [];
+            STAGES[stageIdx].map.forEach(row => row.forEach(cell => {
+                if (typeof cell === 'string' && cell.startsWith('i')) {
+                    const id = cell.split('_')[1]; let exists = true;
+                    if (parseInt(id) >= 100) { if (idBase[parseInt(id) - 100] !== '0') exists = false; } else { if (idBase.includes(String.fromCharCode('a'.charCodeAt(0) + parseInt(id) - 1))) exists = false; }
+                    if (exists) mapItemIds.push(id);
+                }
+            }));
+            return allRecordedApproaches[stageIdx].filter(ap => {
+                let inv = [...currentInvIds];
+                for (let pId of ap.picked) { if (!mapItemIds.includes(pId)) return false; inv.push(pId); }
+                for (let uId of ap.used) { const idx = inv.indexOf(uId); if (idx === -1) return false; inv.splice(idx, 1); }
+                if (ap.sent) {
+                    const txIdx = parseInt(ap.sent.txId) - 100;
+                    if (idBase[txIdx] === '0') { if (!inv.includes(ap.sent.txId.toString()) || !inv.includes(ap.sent.itemId)) return false; }
+                }
+                return true;
+            });
+        }
+
+        function checkApproachEquality(a, b) { if (!a || !b) return false; return JSON.stringify([...a.picked].sort()) === JSON.stringify([...b.picked].sort()) && JSON.stringify([...a.used].sort()) === JSON.stringify([...b.used].sort()) && (a.sent?.txId === b.sent?.txId && a.sent?.itemId === b.sent?.itemId); }
+
+        async function executeClear() {
+            const stageIdx = currentStageIndex; const overlay = document.getElementById('full-overlay');
+            document.getElementById('full-title').innerText = "CLEAR!"; document.getElementById('full-title').style.color = "#00d4ff";
+            document.getElementById('full-content').innerHTML = ""; overlay.style.display = 'flex';
+            await new Promise(resolve => setTimeout(resolve, 2000)); overlay.style.display = 'none';
+
+            if (!allRecordedApproaches[stageIdx].some(a => checkApproachEquality(a, currentApproach))) { allRecordedApproaches[stageIdx].push(JSON.parse(JSON.stringify(currentApproach))); }
+
+            const wlData = timeline[currentWorldlineBase];
+            if (!wlData.branches[currentBranchId].clearedStages.includes(stageIdx)) { wlData.branches[currentBranchId].clearedStages.push(stageIdx); }
+            wlData.branches[currentBranchId].stages[stageIdx] = JSON.parse(JSON.stringify(currentApproach));
+
+            const transmitterUsed = !!currentApproach.sent;
+            const oldApproach = wlData.branches[currentBranchId].stages[stageIdx];
+            const isDifferent = !oldApproach || !checkApproachEquality(oldApproach, currentApproach);
+
+            if (isDifferent || transmitterUsed) {
+                let newAlpha = currentWorldlineBase;
+                let branchApForNewWorldline = JSON.parse(JSON.stringify(currentApproach));
+                if (transmitterUsed) {
+                    let chars = currentWorldlineBase.split('');
+                    const txIdStr = currentApproach.sent.txId.toString(); const itemIdStr = currentApproach.sent.itemId.toString();
+                    chars[parseInt(txIdStr) - 100 + 1] = String.fromCharCode('a'.charCodeAt(0) + parseInt(itemIdStr) - 1);
+                    newAlpha = chars.join('');
+                    branchApForNewWorldline.picked = branchApForNewWorldline.picked.filter(id => id !== txIdStr && id !== itemIdStr);
+                    branchApForNewWorldline.sent = null;
+                    const txName = ITEM_DATA[txIdStr].name; const itemName = ITEM_DATA[itemIdStr].name;
+                    pendingWorldlineNotification = `新しい世界線＜${txName}によって${itemName}が送られてきた世界線＞ができました。\n※新しい世界線では、使用した送信機と送られたアイテムはステージ内から消えます。`;
+                }
+                if (!timeline[newAlpha]) { timeline[newAlpha] = { branches: {}, lastBranchId: "" }; worldlineOrder.push(newAlpha); lastCreatedWorldline = newAlpha; }
+                let newBId = "B" + (Object.keys(timeline[newAlpha].branches).length + 1);
+                propagate(currentWorldlineBase, currentBranchId, newAlpha, newBId, stageIdx, branchApForNewWorldline);
+                currentWorldlineBase = newAlpha; currentBranchId = newBId; timeline[newAlpha].lastBranchId = newBId;
+            }
+            openTimelineMenu();
+        }
+
+        function propagate(oldAlpha, oldB, newAlpha, newB, branchIdx, branchAp) {
+            const oldStages = timeline[oldAlpha].branches[oldB].stages; const newBranch = timeline[newAlpha].branches[newB] = { stages: [], clearedStages: [] };
+            const idBase = newAlpha.substring(1);
+            for (let i = 0; i < branchIdx; i++) { newBranch.stages[i] = JSON.parse(JSON.stringify(oldStages[i])); newBranch.clearedStages.push(i); }
+            newBranch.stages[branchIdx] = JSON.parse(JSON.stringify(branchAp)); newBranch.clearedStages.push(branchIdx);
+            for (let i = branchIdx + 1; i < STAGES.length; i++) {
+                const ap = oldStages[i]; if (!ap) break;
+                let invIds = calculateInventory(newAlpha, newB, i).map(it => it.id);
+                let mapIds = []; STAGES[i].map.forEach(row => row.forEach(c => { if (typeof c === 'string' && c.startsWith('i')) { const id = c.split('_')[1]; let ex = true; if (parseInt(id) >= 100) { if (idBase[parseInt(id) - 100] !== '0') ex = false; } else { if (idBase.includes(String.fromCharCode('a'.charCodeAt(0) + parseInt(id) - 1))) ex = false; } if (ex) mapIds.push(id); } }));
+                let paradox = false; let currentAp = JSON.parse(JSON.stringify(ap));
+                for (let p of currentAp.picked) { if (!mapIds.includes(p)) { paradox = true; break; } invIds.push(p); } if (paradox) break;
+                for (let u of currentAp.used) { const idx = invIds.indexOf(u); if (idx === -1) { paradox = true; break; } invIds.splice(idx, 1); } if (paradox) break;
+                if (currentAp.sent) { const txIdx = parseInt(currentAp.sent.txId) - 100; if (idBase[txIdx] !== '0') currentAp.sent = null; else { const tIdx = invIds.indexOf(currentAp.sent.txId.toString()); const iIdx = invIds.indexOf(currentAp.sent.itemId); if (tIdx === -1 || iIdx === -1) { paradox = true; break; } } }
+                newBranch.stages[i] = currentAp; newBranch.clearedStages.push(i);
+            }
+        }
+
+        async function startDyingSequence() {
+            player.isDying = true; log("やられてしまった！");
+            for (let i = 0; i < 10; i++) { player.flash = 10; player.opacity -= 0.1; await new Promise(r => setTimeout(r, 100)); }
+            player.opacity = 0;
+            if (currentWorldlineBase === "α000000000" && MONOLOGUE_DATA.defeat[currentStageIndex]) { startMonologue(MONOLOGUE_DATA.defeat[currentStageIndex], showGameOverUI); } else { showGameOverUI(); }
+        }
+        function showGameOverUI() { const overlay = document.getElementById('full-overlay'); document.getElementById('full-title').innerText = "GAME OVER"; document.getElementById('full-title').style.color = "#ff4757"; document.getElementById('full-content').innerHTML = `<button onclick="restartStage()" style="padding:15px 50px; font-size:1.2rem; background:#333; color:white; border:1px solid #555;">Restart</button>`; overlay.style.display = 'flex'; }
+        function restartStage() { document.getElementById('full-overlay').style.display = 'none'; initStage(currentStageIndex, true); }
+
+        function executeMove() {
+            if (gameState !== "player_turn" || (player && player.isDying)) return;
+            const d = DIRECTIONS[player.dir], nx = player.x + d.x, ny = player.y + d.y;
+            if (ny < 0 || ny >= map.length || nx < 0 || nx >= map[0].length || map[ny][nx] === 'wall' || map[ny][nx] === 'door' || monsters.find(m => m.x === nx && m.y === ny)) return;
+
+            player.x = nx; player.y = ny;
+
+            // 修正：階段に踏み入れた場合のギミック
+            if (map[ny][nx] === 'stairs') {
+                log("この先は危険だ。やめておこう。");
+            }
+
+            const iIdx = items.findIndex(i => i.x === nx && i.y === ny);
+            if (iIdx !== -1) {
+                const it = items.splice(iIdx, 1)[0];
+                player.inventory.push({ id: it.id, isGift: false });
+                currentApproach.picked.push(it.id);
+                log(`${ITEM_DATA[it.id].name}を拾った。`);
+            }
+            endTurn();
+        }
+
+        function executeAttack() { if (gameState !== "player_turn" || (player && player.isDying)) return; const d = DIRECTIONS[player.dir], tx = player.x + d.x, ty = player.y + d.y; const target = monsters.find(m => m.x === tx && m.y === ty); if (target) { target.hp -= player.atk; target.flash = 10; target.awake = true; log(`プレイヤーが${MONSTER_INFO[target.id].name}に${player.atk}ダメージ！`); if (target.hp <= 0) { monsters = monsters.filter(m => m !== target); log(`${MONSTER_INFO[target.id].name}を撃破！`); if (target.id === "5") { items.push({ x: target.x, y: target.y, id: "999" }); log("魔王のいた場所に「平和の箱」が現れた！"); } } } else log("空振り！"); endTurn(); }
+        function passTurn() { log("待機した。"); endTurn(); }
+        function endTurn() { if (player.atkBoostTurns > 0) { player.atkBoostTurns--; if (player.atkBoostTurns === 0) log("攻撃力上昇が終了。"); } updateStatus(); gameState = "monster_turn"; setTimeout(monsterAI, 300); }
+        function monsterAI() { if (player.isDying) return; const sortedMonsters = [...monsters].sort((a, b) => getDistance(a, player) - getDistance(b, player)); const nextOccupied = sortedMonsters.map(m => ({ x: m.x, y: m.y })); sortedMonsters.forEach((m, idx) => { const dx = player.x - m.x, dy = player.y - m.y; if (!m.awake && m.id === "4") { if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) { m.awake = true; log("イノシシが目を覚ました！"); } else { const md = DIRECTIONS[m.dir]; if (Math.sign(dx) === md.x && Math.sign(dy) === md.y && (dx === 0 || dy === 0 || Math.abs(dx) === Math.abs(dy))) { m.awake = true; log("イノシシが覚醒！"); } } } if (!m.awake) return; if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) { const newDir = getDirectionKey(m, player); if (newDir) m.dir = newDir; player.hp -= m.atk; player.flash = 10; log(`${MONSTER_INFO[m.id].name}の攻撃！ ${m.atk}ダメ。`); } else { const attackTargets = []; for (let k in DIRECTIONS) { const tx = player.x + DIRECTIONS[k].x, ty = player.y + DIRECTIONS[k].y; if (ty >= 0 && ty < map.length && tx >= 0 && tx < map[0].length && (map[ty][tx] === 'floor' || map[ty][tx] === 'stairs')) attackTargets.push({ x: tx, y: ty }); } let bestMove = null; let minDistToAttack = Infinity; let minAbsoluteDist = Infinity; const possibleMoves = [{ x: 0, y: 0 }, ...Object.values(DIRECTIONS)]; possibleMoves.forEach(move => { const nx = m.x + move.x, ny = m.y + move.y; if (ny < 0 || ny >= map.length || nx < 0 || nx >= map[0].length || (map[ny][nx] !== 'floor' && map[ny][nx] !== 'stairs') || nextOccupied.findIndex((pos, i) => i !== idx && pos.x === nx && pos.y === ny) !== -1 || (nx === player.x && ny === player.y)) return; let dToAttack = Infinity; attackTargets.forEach(t => { const d = getDistance({ x: nx, y: ny }, t); if (d < dToAttack) dToAttack = d; }); const dAbs = getDistance({ x: nx, y: ny }, player); if (dToAttack < minDistToAttack || (dToAttack === minDistToAttack && dAbs < minAbsoluteDist)) { minDistToAttack = dToAttack; minAbsoluteDist = dAbs; bestMove = { x: nx, y: ny }; } }); if (bestMove) { const nd = getDirectionKey(m, bestMove); if (nd) m.dir = nd; m.x = bestMove.x; m.y = bestMove.y; nextOccupied[idx] = { x: m.x, y: m.y }; } } }); if (player.hp <= 0) startDyingSequence(); else gameState = "animating"; updateStatus(); }
+        function getDirectionKey(from, to) { const dx = Math.sign(to.x - from.x), dy = Math.sign(to.y - from.y); for (let k in DIRECTIONS) { if (DIRECTIONS[k].x === dx && DIRECTIONS[k].y === dy) return k; } return null; }
+
+        function useItem(idx) {
+            const it = player.inventory[idx];
+            if (it.id === "999") {
+                const clearOverlay = document.getElementById('full-overlay');
+                document.getElementById('full-title').innerText = "GAME CLEAR!";
+                document.getElementById('full-title').style.color = "#f1c40f";
+                document.getElementById('full-content').innerHTML = "<p style='color:white; font-size:1.2rem; margin:20px 0;'>世界に平和が訪れた！</p><button onclick='closeModal(); document.getElementById(\"full-overlay\").style.display=\"none\";' style='padding:10px 30px;'>冒険を続ける</button>";
+                clearOverlay.style.display = 'flex';
+                currentApproach.used.push(it.id);
+                player.inventory.splice(idx, 1);
+                closeModal();
+                return;
+            }
+
+            if (parseInt(it.id) >= 100) {
+                openTransmitModal(it.id);
+                return;
+            }
+
+            const itemName = ITEM_DATA[it.id].name; currentApproach.used.push(it.id); player.inventory.splice(idx, 1); closeModal();
+            let resultMsg = `${itemName}を使った。`; const d = DIRECTIONS[player.dir];
+            switch (it.id) {
+                case "1": executeClear(); return;
+                case "2": player.hp = Math.min(player.maxHp, player.hp + 5); resultMsg += "HPが5回復した！"; break;
+                case "3": player.baseAtk = 10; player.atk = 10; resultMsg += "攻撃力が10になった！"; break;
+                case "4": {
+                    const range = 2;
+                    const targets = monsters.filter(m => Math.abs(m.x - player.x) <= range && Math.abs(m.y - player.y) <= range);
+                    const maou = targets.find(m => m.id === "5");
+                    if (maou) { items.push({ x: maou.x, y: maou.y, id: "999" }); log("魔王のいた場所に「平和の箱」が現れた！"); }
+                    monsters = monsters.filter(m => !targets.includes(m));
+                    resultMsg += "周囲の敵を消し去った！";
+                    break;
+                }
+                case "5": player.atk *= 2; player.atkBoostTurns = 4; resultMsg += "火力が倍増した！"; break;
+                case "8": {
+                    for (let i = 1; i <= 3; i++) {
+                        let tx = player.x + d.x * i, ty = player.y + d.y * i; if (ty < 0 || ty >= map.length || tx < 0 || tx >= map[0].length || (map[ty][tx] !== 'floor' && map[ty][tx] !== 'stairs')) break; const target = monsters.find(m => m.x === tx && m.y === ty); if (target) {
+                            target.hp -= 5; target.flash = 10; if (target.hp <= 0) {
+                                monsters = monsters.filter(m => m !== target);
+                                if (target.id === "5") { items.push({ x: target.x, y: target.y, id: "999" }); log("魔王のいた場所に「平和の箱」が現れた！"); }
+                            }
+                        }
+                    } resultMsg += "前方に火柱が上がった！"; break;
+                }
+                case "10": { while (true) { let nx = player.x + d.x, ny = player.y + d.y; if (ny < 0 || ny >= map.length || nx < 0 || nx >= map[0].length || (map[ny][nx] !== 'floor' && map[ny][nx] !== 'stairs') || monsters.some(o => o.x === nx && o.y === ny)) break; player.x = nx; player.y = ny; } const iIdx = items.findIndex(i => i.x === player.x && i.y === player.y); if (iIdx !== -1) { const foundItem = items.splice(iIdx, 1)[0]; player.inventory.push({ id: foundItem.id, isGift: false }); currentApproach.picked.push(foundItem.id); resultMsg += ` 高速移動の末に${ITEM_DATA[foundItem.id].name}を拾った！`; } else resultMsg += "高速移動した！"; break; }
+                case "11": { let tx = player.x + d.x, ty = player.y + d.y, target = null; while (tx >= 0 && tx < map[0].length && ty >= 0 && ty < map.length) { if (map[ty][tx] === 'wall' || map[ty][tx] === 'door') break; target = monsters.find(m => m.x === tx && m.y === ty); if (target) break; tx += d.x; ty += d.y; } if (target) { let px = player.x, py = player.y; player.x = target.x; player.y = target.y; target.x = px; target.y = py; resultMsg += `${MONSTER_INFO[target.id].name}と入れ替わった！`; } else resultMsg += "不発。"; break; }
+                case "12": { let tx = player.x + d.x, ty = player.y + d.y, target = null; while (tx >= 0 && tx < map[0].length && ty >= 0 && ty < map.length) { if (map[ty][tx] === 'wall' || map[ty][tx] === 'door') break; target = monsters.find(m => m.x === tx && m.y === ty); if (target) break; tx += d.x; ty += d.y; } if (target) { while (true) { let nx = target.x + d.x, ny = target.y + d.y; if (ny < 0 || ny >= map.length || nx < 0 || nx >= map[0].length || (map[ny][nx] !== 'floor' && map[ny][nx] !== 'stairs') || monsters.some(o => o.x === nx && o.y === ny)) break; target.x = nx; target.y = ny; } resultMsg += `${MONSTER_INFO[target.id].name}を吹き飛ばした！`; } else resultMsg += "不発に終わった。"; break; }
+                case "13": map.forEach((r, y) => r.forEach((c, x) => { if (c === 'door') map[y][x] = 'floor' })); resultMsg += "封印を解除した。"; break;
+            }
+            log(resultMsg); endTurn();
+        }
+        function log(m) { const logBox = document.getElementById('message-log'); const p = document.createElement('div'); p.innerText = m; logBox.appendChild(p); if (logBox.children.length > 5) logBox.removeChild(logBox.firstChild); logBox.scrollTop = logBox.scrollHeight; }
+        function updateStatus() { if (!player) return; document.getElementById('hp').innerText = player.hp; document.getElementById('max-hp').innerText = player.maxHp; document.getElementById('atk').innerText = player.atk; document.getElementById('atk-status').innerText = player.atkBoostTurns > 0 ? `(Boost ${player.atkBoostTurns})` : ""; }
+        function closeModal() { document.getElementById('modal-overlay').style.display = 'none'; hideWorldlineTooltip(); }
+        function updateUIState() { document.getElementById('ui-layer').style.display = isLookMode ? "none" : "flex"; }
+        function changeDirection(dir) { if (gameState === "player_turn" && !player.isDying) { if (player.dir === dir) executeMove(); else player.dir = dir; } }
+        function toggleLookMode() { isLookMode = !isLookMode; updateUIState(); }
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        function switchWL(id) { currentWorldlineBase = id; currentBranchId = timeline[id].lastBranchId; hideWorldlineTooltip(); openTimelineMenu(); }
+        function openTransmitModal(txId) { let html = `<h3>${ITEM_DATA[txId].name}</h3><p>過去へ送るアイテムを選択</p><ul class="timeline-list">`; player.inventory.forEach((it, i) => { if (parseInt(it.id) < 100) html += `<li class="timeline-item" onclick="setTransmitItem(${txId}, ${i})">${ITEM_DATA[it.id].name}</li>`; }); html += `</ul><button onclick="openItemMenu()">戻る</button>`; document.getElementById('modal-body').innerHTML = html; document.getElementById('modal-overlay').style.display = 'flex'; }
+        function setTransmitItem(txId, invIdx) {
+            const item = player.inventory[invIdx]; currentApproach.sent = { txId, itemId: item.id };
+            const txItemIdx = player.inventory.findIndex(it => it.id === txId.toString());
+            const toRem = [invIdx, txItemIdx].sort((a, b) => b - a); toRem.forEach(idx => player.inventory.splice(idx, 1));
+            const body = document.getElementById('modal-body');
+            body.innerHTML = `<h3>送信準備完了</h3><p style="margin:20px 0;">送信機がセットされました。<br>ステージをクリアすることで送信が確定します。</p><button onclick="closeModal()" style="width:100%">了解</button>`;
+            document.getElementById('modal-overlay').style.display = 'flex';
+        }
+        function openItemMenu() { if (gameState !== "player_turn") return; const body = document.getElementById('modal-body'); let html = `<h3>所持アイテム</h3><div class="timeline-list">`; if (player.inventory.length === 0) html += "<p>なし</p>"; else player.inventory.forEach((it, i) => { const colorStyle = it.isGift ? "color:#f1c40f;" : ""; html += `<div class="timeline-item" style="${colorStyle}" onclick="showItemDetail(${i})">${ITEM_DATA[it.id].name}</div>`; }); html += `</div><button onclick="closeModal()" style="width:100%">閉じる</button>`; body.innerHTML = html; document.getElementById('modal-overlay').style.display = 'flex'; }
+        function showItemDetail(idx) { const it = player.inventory[idx], data = ITEM_DATA[it.id], body = document.getElementById('modal-body'); body.innerHTML = `<h3>${data.name}</h3><p style="text-align:left; font-size:0.9rem; margin:20px 0;">${data.desc}</p><div style="display:flex; gap:10px;"><button onclick="useItem(${idx})" style="flex:1; background:var(--accent-color); color:#000;">使用</button><button onclick="openItemMenu()" style="flex:1;">戻る</button></div>`; }
+
+        window.addEventListener('load', () => {
+            sessionStorage.clear(); loadAssets();
+            canvas = document.getElementById('gameCanvas'); ctx = canvas.getContext('2d'); window.addEventListener('resize', resizeCanvas);
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect(); const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top; if (!player) return;
+                let camX = canvas.width / 2 - (player.visualX + 0.5) * TILE_SIZE + (isLookMode ? lookOffset.x : 0); let camY = canvas.height / 2 - (player.visualY + 0.5) * TILE_SIZE + (isLookMode ? lookOffset.y : 0);
+                const worldX = Math.floor((mouseX - camX) / TILE_SIZE), worldY = Math.floor((mouseY - camY) / TILE_SIZE);
+                const targetMonster = monsters.find(m => m.x === worldX && m.y === worldY); const popup = document.getElementById('monster-popup');
+                if (targetMonster) { const info = MONSTER_INFO[targetMonster.id]; document.getElementById('pop-name').innerText = info.name; document.getElementById('pop-hp').innerText = targetMonster.hp; document.getElementById('pop-atk').innerText = info.atk; document.getElementById('pop-trait').innerText = info.trait; popup.style.display = 'block'; popup.style.left = (e.clientX + 15) + 'px'; popup.style.top = (e.clientY + 15) + 'px'; } else popup.style.display = 'none';
+                if (isDragging) { lookOffset.x += e.clientX - lastMousePos.x; lookOffset.y += e.clientY - lastMousePos.y; lastMousePos = { x: e.clientX, y: e.clientY }; }
+            });
+            canvas.addEventListener('mousedown', (e) => { if (!isLookMode) return; isDragging = true; lastMousePos = { x: e.clientX, y: e.clientY }; });
+            window.addEventListener('mouseup', () => isDragging = false);
+            initStage(0); gameLoop();
+        });
+        function gameLoop() {
+            const lerp = (s, e, a) => s + (e - s) * a;
+            if (player) { player.visualX = lerp(player.visualX, player.x, 0.2); player.visualY = lerp(player.visualY, player.y, 0.2); if (player.flash > 0) player.flash--; }
+            monsters.forEach(m => { m.visualX = lerp(m.visualX, m.x, 0.2); m.visualY = lerp(m.visualY, m.y, 0.2); if (m.flash > 0) m.flash--; });
+            const mov = monsters.some(m => Math.abs(m.visualX - m.x) > 0.01) || (player && Math.abs(player.visualX - player.x) > 0.01);
+            if (gameState === "animating" && !mov) gameState = "player_turn"; render(); requestAnimationFrame(gameLoop);
+        }
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); if (!player) return;
+            let camX = canvas.width / 2 - (player.visualX + 0.5) * TILE_SIZE + (isLookMode ? lookOffset.x : 0);
+            let camY = canvas.height / 2 - (player.visualY + 0.5) * TILE_SIZE + (isLookMode ? lookOffset.y : 0);
+            ctx.save(); ctx.translate(camX, camY);
+            for (let y = 0; y < map.length; y++) {
+                for (let x = 0; x < map[y].length; x++) {
+                    const cell = map[y][x];
+                    let img = (cell === 'wall') ? IMAGES.wall : IMAGES.floor;
+
+                    if (img.complete && img.naturalWidth > 0) { ctx.drawImage(img, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE); }
+                    else { if (cell === 'wall') { ctx.fillStyle = '#333'; ctx.fillRect(x * TILE_SIZE + 1, y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2); } else { ctx.strokeStyle = '#222'; ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE); } }
+
+                    // 修正：扉と階段の画像描画
+                    if (cell === 'door') {
+                        if (IMAGES.door.complete && IMAGES.door.naturalWidth > 0) {
+                            ctx.drawImage(IMAGES.door, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        } else {
+                            ctx.fillStyle = 'rgba(85, 85, 85, 0.8)';
+                            ctx.fillRect(x * TILE_SIZE + 10, y * TILE_SIZE + 10, TILE_SIZE - 20, TILE_SIZE - 20);
+                        }
+                    }
+                    if (cell === 'stairs') {
+                        if (IMAGES.stairs.complete && IMAGES.stairs.naturalWidth > 0) {
+                            ctx.drawImage(IMAGES.stairs, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        } else {
+                            ctx.fillStyle = '#666';
+                            ctx.beginPath();
+                            ctx.moveTo(x * TILE_SIZE + 10, (y + 1) * TILE_SIZE - 10);
+                            ctx.lineTo((x + 1) * TILE_SIZE - 10, (y + 1) * TILE_SIZE - 10);
+                            ctx.lineTo((x + 1) * TILE_SIZE - 10, y * TILE_SIZE + 10);
+                            ctx.closePath();
+                            ctx.fill();
+                        }
+                    }
+                }
+            }
+            items.forEach(i => { if (IMAGES.item.complete && IMAGES.item.naturalWidth > 0) { ctx.drawImage(IMAGES.item, i.x * TILE_SIZE, i.y * TILE_SIZE, TILE_SIZE, TILE_SIZE); } else { const isTx = parseInt(i.id) >= 100; ctx.fillStyle = isTx ? '#f39c12' : (i.id === '1' ? '#f1c40f' : '#27ae60'); ctx.beginPath(); ctx.arc((i.x + 0.5) * TILE_SIZE, (i.y + 0.5) * TILE_SIZE, TILE_SIZE * 0.2, 0, Math.PI * 2); ctx.fill(); } });
+            monsters.forEach(m => {
+                ctx.globalAlpha = m.flash > 0 ? 0.3 : (m.awake ? 1 : 0.5); const img = IMAGES.monsters[m.id] ? IMAGES.monsters[m.id][m.dir] : null;
+                if (img && img.complete && img.naturalWidth > 0) { ctx.drawImage(img, m.visualX * TILE_SIZE, m.visualY * TILE_SIZE, TILE_SIZE, TILE_SIZE); }
+                else { ctx.fillStyle = (m.id === '5' ? '#000' : (m.id === '4' ? '#d35400' : '#c0392b')); ctx.beginPath(); ctx.arc((m.visualX + 0.5) * TILE_SIZE, (m.visualY + 0.5) * TILE_SIZE, TILE_SIZE * 0.4, 0, Math.PI * 2); ctx.fill(); }
+                ctx.globalAlpha = 1; ctx.fillStyle = "white"; ctx.font = "10px Arial"; ctx.textAlign = "center"; ctx.fillText(`HP:${m.hp}`, (m.visualX + 0.5) * TILE_SIZE, (m.visualY + 1) * TILE_SIZE - 5);
+            });
+            if (!player.isDying || player.flash % 2 === 0) {
+                ctx.globalAlpha = player.flash > 0 ? 0.3 : player.opacity; const img = IMAGES.player[player.dir];
+                if (img && img.complete && img.naturalWidth > 0) { ctx.drawImage(img, player.visualX * TILE_SIZE, player.visualY * TILE_SIZE, TILE_SIZE, TILE_SIZE); }
+                else { ctx.fillStyle = '#3498db'; ctx.beginPath(); ctx.arc((player.visualX + 0.5) * TILE_SIZE, (player.visualY + 0.5) * TILE_SIZE, TILE_SIZE * 0.4, 0, Math.PI * 2); ctx.fill(); }
+            }
+            ctx.globalAlpha = 1; ctx.restore();
+        }
+    </script>
+</body>
+
+</html>
