@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buttons' Array</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #f8fafc;
+            overflow: hidden; /* 紙吹雪のはみ出し防止 */
+        }
+        
+        /* ボタンのスタイル */
+        .btn-r { background-color: #ef4444; border: 1px solid #7f1d1d; box-shadow: 0 4px 0 #991b1b; }
+        .btn-b { background-color: #3b82f6; border: 1px solid #1e3a8a; box-shadow: 0 4px 0 #1e40af; }
+        .btn-w { background-color: #ffffff; border: 1px solid #94a3b8; box-shadow: 0 4px 0 #cbd5e1; }
+        
+        .grid-button {
+            aspect-ratio: 1 / 1;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        .grid-button:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #64748b;
+        }
+
+        /* ランプのデザイン */
+        .lamp {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid transparent;
+            position: relative;
+            transition: all 0.5s ease;
+        }
+        
+        .lamp-inner {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #1e293b;
+            transition: all 0.3s ease;
+        }
+
+        /* 点灯状態のエフェクト */
+        .lamp.lit-r { border-color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); }
+        .lamp.lit-r .lamp-inner { background-color: #ef4444; box-shadow: 0 0 10px #ef4444; }
+
+        .lamp.lit-b { border-color: #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.6); }
+        .lamp.lit-b .lamp-inner { background-color: #3b82f6; box-shadow: 0 0 10px #3b82f6; }
+
+        .lamp.lit-w { border-color: #ffffff; box-shadow: 0 0 15px rgba(255, 255, 255, 0.8); }
+        .lamp.lit-w .lamp-inner { 
+            background-color: #ffffff; 
+            box-shadow: 0 0 10px #ffffff, inset 0 0 4px rgba(0,0,0,0.2); 
+        }
+
+        /* クリア時のキラキラアニメーション */
+        @keyframes sparkle {
+            0%, 100% { filter: brightness(1) saturate(1); transform: scale(1); box-shadow: 0 0 15px currentColor; }
+            50% { filter: brightness(1.8) saturate(1.5); transform: scale(1.2); box-shadow: 0 0 30px currentColor; }
+        }
+        .sparkle-lamp {
+            animation: sparkle 0.8s infinite ease-in-out;
+        }
+
+        /* レイアウト維持用 */
+        #game-area {
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* CLEAR! テキストアニメーション */
+        @keyframes clear-reveal {
+            0% { transform: scale(0); opacity: 0; filter: blur(10px); }
+            70% { transform: scale(1.2); filter: blur(0px); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .clear-text {
+            font-size: 7rem;
+            line-height: 1;
+            font-weight: 900;
+            color: #fbbf24;
+            text-shadow: 0 0 20px rgba(251, 191, 36, 0.6), 0 0 40px rgba(251, 191, 36, 0.4);
+            animation: clear-reveal 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            z-index: 10;
+        }
+
+        /* シェアセクションのスタイル */
+        .share-container {
+            margin-top: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+            z-index: 20;
+            width: 100%;
+            max-width: 280px;
+        }
+
+        .share-btn-main {
+            display: inline-block;
+            color: #fff;
+            text-decoration: none;
+            font-size: 1rem;
+            padding: 14px 24px;
+            border-radius: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            box-sizing: border-box;
+            font-weight: 600;
+        }
+
+        .share-btn-main:hover {
+            background: #000;
+            border-color: #555;
+            transform: scale(1.02);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* 紙吹雪のスタイル */
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            top: -10px;
+            z-index: 50;
+            animation: fall linear forwards;
+            pointer-events: none;
+        }
+        @keyframes fall {
+            to {
+                transform: translateY(110vh) rotate(720deg);
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="max-w-md w-full bg-slate-900 rounded-3xl shadow-2xl p-8 border border-slate-800 relative">
+        <h1 class="text-xl font-light tracking-widest text-center text-slate-400 mb-8 uppercase">Buttons' Array</h1>
+
+        <!-- Lamps Section -->
+        <div class="flex justify-between mb-10 px-4">
+            <div id="lamps-container" class="flex gap-3 justify-center w-full">
+                <!-- Lamps generated by JS -->
+            </div>
+        </div>
+
+        <!-- Game Area -->
+        <div id="game-area">
+            <div id="game-grid" class="grid gap-2 mx-auto">
+                <!-- Buttons generated by JS -->
+            </div>
+            
+            <!-- Status/Clear Message Container -->
+            <div id="status-container" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span id="status-msg" class="transition-all"></span>
+                
+                <!-- Share Section (Direct link) -->
+                <div id="shareSection" class="share-container hidden pointer-events-auto">
+                    <a id="shareBtn" href="#" target="_blank" rel="noopener noreferrer" class="share-btn-main">
+                        喜びをXで共有する
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="mt-8">
+            <button id="reset-btn" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-3 px-6 rounded-xl transition-all border border-slate-700 active:scale-95">
+                RESET
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const INITIAL_GRID_DATA = [
+            ['w','w','r','w','r','w','w'],
+            ['b','r','w','b','w','r','b'],
+            ['w','w','r','w','w','w','r'],
+            ['w','r','b','w','r','w','b'],
+            ['w','w','w','w','b','w','w'],
+            ['b','r','b','r','w','w','b'],
+            ['w','b','w','b','r','w','r']
+        ];
+
+        const TARGET_SEQUENCE = ['r', 'b', 'r', 'b', 'r', 'b', 'r'];
+        const TARGET_LAMP_BORDERS = ['r', 'b', 'r', 'b', 'r', 'b', 'r'];
+        
+        let currentGrid = [];
+        let litLamps = [];
+        let gameOver = false;
+
+        const lampsContainer = document.getElementById('lamps-container');
+        const gameGrid = document.getElementById('game-grid');
+        const statusMsg = document.getElementById('status-msg');
+        const resetBtn = document.getElementById('reset-btn');
+        const shareSection = document.getElementById('shareSection');
+        const shareBtn = document.getElementById('shareBtn');
+
+        function initGame() {
+            currentGrid = INITIAL_GRID_DATA.map(row => [...row]);
+            litLamps = [];
+            gameOver = false;
+            statusMsg.textContent = "";
+            statusMsg.className = "";
+            shareSection.classList.add('hidden');
+            
+            document.querySelectorAll('.confetti').forEach(el => el.remove());
+            renderLamps();
+            renderGrid();
+        }
+
+        function renderLamps() {
+            lampsContainer.innerHTML = '';
+            TARGET_LAMP_BORDERS.forEach((borderColorCode, index) => {
+                const lampWrapper = document.createElement('div');
+                lampWrapper.className = `lamp`;
+                
+                if (borderColorCode === 'r') lampWrapper.style.borderColor = '#991b1b';
+                else if (borderColorCode === 'b') lampWrapper.style.borderColor = '#1e3a8a';
+                
+                if (litLamps[index]) {
+                    lampWrapper.classList.add(`lit-${litLamps[index]}`);
+                    if (gameOver && litLamps.every((c, i) => c === TARGET_SEQUENCE[i])) {
+                        lampWrapper.classList.add('sparkle-lamp');
+                        lampWrapper.style.animationDelay = `${index * 0.1}s`;
+                        lampWrapper.style.color = getColorHex(litLamps[index]);
+                    }
+                }
+                
+                const inner = document.createElement('div');
+                inner.className = 'lamp-inner';
+                lampWrapper.appendChild(inner);
+                lampsContainer.appendChild(lampWrapper);
+            });
+        }
+
+        function getColorHex(code) {
+            if (code === 'r') return '#ef4444';
+            if (code === 'b') return '#3b82f6';
+            return '#ffffff';
+        }
+
+        function renderGrid() {
+            const size = currentGrid.length;
+            gameGrid.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+            gameGrid.style.width = '100%';
+            gameGrid.style.maxWidth = '320px';
+            gameGrid.innerHTML = '';
+
+            if (size === 0 || gameOver) return;
+
+            currentGrid.forEach((row, rowIndex) => {
+                row.forEach((cell, colIndex) => {
+                    const btn = document.createElement('button');
+                    btn.className = `grid-button btn-${cell}`;
+                    btn.onclick = () => handleButtonClick(rowIndex, colIndex);
+                    gameGrid.appendChild(btn);
+                });
+            });
+        }
+
+        function handleButtonClick(rowIndex, colIndex) {
+            if (gameOver) return;
+            const selectedColor = currentGrid[rowIndex][colIndex];
+            litLamps.push(selectedColor);
+            
+            const newGrid = [];
+            for (let r = 0; r < currentGrid.length; r++) {
+                if (r === rowIndex) continue;
+                const newRow = [];
+                for (let c = 0; c < currentGrid[r].length; c++) {
+                    if (c === colIndex) continue;
+                    newRow.push(currentGrid[r][c]);
+                }
+                newGrid.push(newRow);
+            }
+            
+            currentGrid = newGrid;
+            renderLamps();
+            renderGrid();
+            checkGameState();
+        }
+
+        function checkGameState() {
+            if (litLamps.length === 7) {
+                gameOver = true;
+                const isWin = litLamps.every((color, index) => color === TARGET_SEQUENCE[index]);
+                
+                if (isWin) {
+                    statusMsg.textContent = "CLEAR!";
+                    statusMsg.className = "clear-text";
+                    renderLamps();
+                    startConfetti();
+                    
+                    // シェアリンクを直接ボタンにセット
+                    const clearMsg = "Buttons' Array をクリアしました！";
+                    const baseParams = "%0A%23%E5%AE%87%E5%AE%99%E8%AC%8E%E3%80%80%23%E3%83%AB%E3%83%BC%E3%83%AB%E7%99%BA%E8%A6%8B%E5%9E%8B%E3%83%91%E3%82%BA%E3%83%AB%E3%80%80%40wondolphin%0Ahttps%3A%2F%2Fwondolphin.github.io%2Fpuzzle%2Fuchunazo%2Fbuttons_array%2Findex.html";
+                    shareBtn.href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(clearMsg) + baseParams;
+                    
+                    // CLEAR!表示から少し遅れてシェアセクションを表示
+                    setTimeout(() => {
+                        shareSection.classList.remove('hidden');
+                    }, 1000);
+                } else {
+                    statusMsg.textContent = "FAILED";
+                    statusMsg.className = "text-slate-600 text-2xl font-black uppercase tracking-widest";
+                }
+                gameGrid.innerHTML = '';
+            }
+        }
+
+        function startConfetti() {
+            const colors = ['#ef4444', '#3b82f6', '#ffffff', '#fbbf24', '#10b981'];
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                confetti.style.opacity = Math.random();
+                document.body.appendChild(confetti);
+            }
+        }
+
+        resetBtn.onclick = initGame;
+        initGame();
+
+    </script>
+</body>
+</html>
