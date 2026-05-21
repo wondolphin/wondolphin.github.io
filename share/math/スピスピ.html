@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPEED! SPEED!</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React本体 -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel (JSXを変換) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-blue-50 m-0 p-0 font-sans text-gray-800" style="zoom: 0.7;">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // === 動物アイコン・グラフ描画用コンポーネント ===
+    const Turtle = ({ className }) => (
+      <svg viewBox="0 0 120 100" className={className}>
+        <g fill="white" stroke="#1f2937" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round">
+          <path d="M 90 65 L 110 60 L 100 75 Z" />
+          <path d="M 35 75 Q 40 95 45 90 Q 55 80 50 75 Z" />
+          <path d="M 80 75 Q 85 95 90 90 Q 100 80 95 75 Z" />
+          <circle cx="30" cy="55" r="16" />
+          <circle cx="24" cy="50" r="3" fill="#1f2937" stroke="none" />
+          <path d="M 18 60 Q 24 65 30 60" fill="none" />
+          <path d="M 30 75 Q 30 25 70 25 Q 110 25 105 75 Z" />
+          <path d="M 25 75 L 110 75" fill="none" strokeWidth="5" />
+          <path d="M 50 45 L 60 35 L 80 35 L 90 45 L 80 60 L 60 60 Z" fill="none" strokeWidth="3" />
+          <path d="M 50 45 L 35 50" fill="none" strokeWidth="3" />
+          <path d="M 60 35 L 55 25" fill="none" strokeWidth="3" />
+          <path d="M 80 35 L 85 25" fill="none" strokeWidth="3" />
+          <path d="M 90 45 L 105 50" fill="none" strokeWidth="3" />
+          <path d="M 80 60 L 85 75" fill="none" strokeWidth="3" />
+          <path d="M 60 60 L 55 75" fill="none" strokeWidth="3" />
+          <path d="M 35 50 L 40 75" fill="none" strokeWidth="3" />
+          <path d="M 105 50 L 100 75" fill="none" strokeWidth="3" />
+        </g>
+      </svg>
+    );
+
+    const Bear = ({ className }) => (
+      <svg viewBox="0 0 100 100" className={className}>
+        <g stroke="#1f2937" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round">
+          <circle cx="25" cy="25" r="14" fill="#9ca3af" />
+          <circle cx="25" cy="25" r="6" fill="white" />
+          <circle cx="75" cy="25" r="14" fill="#9ca3af" />
+          <circle cx="75" cy="25" r="6" fill="white" />
+          <circle cx="50" cy="60" r="38" fill="#9ca3af" />
+          <circle cx="35" cy="55" r="4" fill="#1f2937" stroke="none" />
+          <circle cx="65" cy="55" r="4" fill="#1f2937" stroke="none" />
+          <ellipse cx="50" cy="70" rx="16" ry="13" fill="#9ca3af" stroke="none" />
+          <circle cx="50" cy="65" r="5" fill="#1f2937" stroke="none" />
+          <path d="M 50 65 L 50 74" fill="none" />
+          <path d="M 50 74 Q 40 82 35 72" fill="none" />
+          <path d="M 50 74 Q 60 82 65 72" fill="none" />
+        </g>
+      </svg>
+    );
+
+    const Rabbit = ({ className }) => (
+      <svg viewBox="0 0 100 120" className={className}>
+        <g stroke="#1f2937" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round">
+          <path d="M 35 60 C 15 5, 45 0, 45 60 Z" fill="white" />
+          <path d="M 38 55 C 25 15, 42 10, 42 55 Z" fill="#9ca3af" stroke="none" />
+          <path d="M 65 60 C 85 5, 55 0, 55 60 Z" fill="white" />
+          <path d="M 62 55 C 75 15, 58 10, 58 55 Z" fill="#9ca3af" stroke="none" />
+          <circle cx="50" cy="80" r="32" fill="white" />
+          <circle cx="35" cy="75" r="4" fill="#1f2937" stroke="none" />
+          <circle cx="65" cy="75" r="4" fill="#1f2937" stroke="none" />
+          <circle cx="50" cy="85" r="4" fill="#1f2937" stroke="none" />
+          <path d="M 50 85 L 50 94" fill="none" />
+          <path d="M 50 94 Q 40 102 35 92" fill="none" />
+          <path d="M 50 94 Q 60 102 65 92" fill="none" />
+        </g>
+      </svg>
+    );
+
+    const TurtleSilhouette = ({ className }) => (
+      <svg viewBox="0 0 120 100" className={className}>
+        <g fill="#1f2937" stroke="#1f2937" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round">
+          <path d="M 90 65 L 110 60 L 100 75 Z" />
+          <path d="M 35 75 Q 40 95 45 90 Q 55 80 50 75 Z" />
+          <path d="M 80 75 Q 85 95 90 90 Q 100 80 95 75 Z" />
+          <circle cx="30" cy="55" r="16" />
+          <path d="M 30 75 Q 30 25 70 25 Q 110 25 105 75 Z" />
+        </g>
+      </svg>
+    );
+
+    const BearSilhouette = ({ className }) => (
+      <svg viewBox="0 0 100 100" className={className}>
+        <g fill="#9ca3af" stroke="#1f2937" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round">
+          <circle cx="25" cy="25" r="14" />
+          <circle cx="75" cy="25" r="14" />
+          <circle cx="50" cy="60" r="38" />
+        </g>
+      </svg>
+    );
+
+    const RabbitSilhouette = ({ className }) => (
+      <svg viewBox="0 0 100 120" className={className}>
+        <g fill="white" stroke="#1f2937" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round">
+          <path d="M 35 60 C 15 5, 45 0, 45 60 Z" />
+          <path d="M 65 60 C 85 5, 55 0, 55 60 Z" />
+          <circle cx="50" cy="80" r="32" />
+        </g>
+      </svg>
+    );
+
+    const AnimalGraph = ({ title, turtleH, rabbitH, bearH }) => {
+      return (
+        <div className="flex flex-col items-center">
+          <div className="w-8 h-8 md:w-12 md:h-12 rounded-full border-2 border-dashed border-gray-400 flex items-center justify-center text-lg md:text-2xl font-bold text-gray-800 mb-2 bg-white shadow-sm">
+            {title}
+          </div>
+          <div className="relative w-20 h-20 md:w-32 md:h-32 border-l-2 border-b-2 border-gray-800 flex items-end justify-around px-0.5 pb-0.5 bg-white">
+            <div className="w-4 md:w-6 bg-[#1f2937] border-2 border-gray-800" style={{ height: `${turtleH}%` }}></div>
+            <div className="w-4 md:w-6 bg-white border-2 border-gray-800" style={{ height: `${rabbitH}%` }}></div>
+            <div className="w-4 md:w-6 bg-[#9ca3af] border-2 border-gray-800" style={{ height: `${bearH}%` }}></div>
+          </div>
+          <div className="flex justify-around items-center w-20 md:w-32 mt-1 px-0.5">
+            <TurtleSilhouette className="w-5 h-5 md:w-8 md:h-8" />
+            <RabbitSilhouette className="w-4 h-5 md:w-7 md:h-8" />
+            <BearSilhouette className="w-5 h-5 md:w-8 md:h-8" />
+          </div>
+        </div>
+      );
+    };
+
+
+    // === 01版の問題データ ===
+    const questions01 = [
+      {
+        id: 1,
+        type: 'choice',
+        isNumberChoice: true,
+        instruction: <><ruby>工夫<rt>くふう</rt></ruby>して<ruby>暗算<rt>あんざん</rt></ruby>しましょう。</>,
+        text: <div className="text-[6vw] sm:text-4xl md:text-2xl lg:text-4xl xl:text-5xl font-black text-center my-6 md:my-8 tracking-wide text-gray-800 whitespace-nowrap">3 + 7 + 6 + 4 = □</div>,
+        choices: [{id:'10',text:'10'}, {id:'20',text:'20'}, {id:'30',text:'30'}],
+        answer: '20'
+      },
+      {
+        id: 2,
+        type: 'choice',
+        isNumberChoice: true,
+        instruction: <><ruby>工夫<rt>くふう</rt></ruby>して<ruby>暗算<rt>あんざん</rt></ruby>しましょう。</>,
+        text: <div className="text-[6vw] sm:text-4xl md:text-2xl lg:text-4xl xl:text-5xl font-black text-center my-6 md:my-8 tracking-wide text-gray-800 whitespace-nowrap">8 + 2 + 1 + 9 = □</div>,
+        choices: [{id:'10',text:'10'}, {id:'20',text:'20'}, {id:'30',text:'30'}],
+        answer: '20'
+      },
+      {
+        id: 3,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <><span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">3</span>、<span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">6</span>、<span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">9</span>が<ruby>書<rt>か</rt></ruby>かれたカードが1<ruby>枚<rt>まい</rt></ruby>ずつあります。<br/>これを<ruby>使<rt>つか</rt></ruby>って2<ruby>桁<rt>けた</rt></ruby>の<ruby>数<rt>かず</rt></ruby>をつくります。<br/><br/><ruby>小<rt>ちい</rt></ruby>さい<ruby>順<rt>じゅん</rt></ruby>に<ruby>並<rt>なら</rt></ruby>べたとき、<span className="text-3xl md:text-4xl font-black text-blue-600 mx-1 px-1 border-b-4 border-blue-600">93</span>は<ruby>何番目<rt>なんばんめ</rt></ruby>ですか？</>,
+        showHints01: true,
+        choices: [{id:'4',text:'4'}, {id:'5',text:'5'}, {id:'6',text:'6'}],
+        answer: '5',
+        suffix: <><ruby>番目<rt>ばんめ</rt></ruby></>
+      },
+      {
+        id: 4,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <><span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">3</span>、<span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">6</span>、<span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">9</span>が<ruby>書<rt>か</rt></ruby>かれたカードが1<ruby>枚<rt>まい</rt></ruby>ずつあります。<br/>これを<ruby>使<rt>つか</rt></ruby>って2<ruby>桁<rt>けた</rt></ruby>の<ruby>数<rt>かず</rt></ruby>をつくります。<br/><br/><ruby>小<rt>ちい</rt></ruby>さい<ruby>順<rt>じゅん</rt></ruby>に<ruby>並<rt>なら</rt></ruby>べたとき、<span className="text-3xl md:text-4xl font-black text-blue-600 mx-1 px-1 border-b-4 border-blue-600">69</span>は<ruby>何番目<rt>なんばんめ</rt></ruby>ですか？</>,
+        showHints01: true,
+        choices: [{id:'4',text:'4'}, {id:'5',text:'5'}, {id:'6',text:'6'}],
+        answer: '4',
+        suffix: <><ruby>番目<rt>ばんめ</rt></ruby></>
+      },
+      {
+        id: 5,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <><span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">3</span>、<span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">6</span>、<span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">9</span>が<ruby>書<rt>か</rt></ruby>かれたカードが1<ruby>枚<rt>まい</rt></ruby>ずつあります。<br/>これを<ruby>使<rt>つか</rt></ruby>って2<ruby>桁<rt>けた</rt></ruby>の<ruby>数<rt>かず</rt></ruby>をつくります。<br/><br/><ruby>小<rt>ちい</rt></ruby>さい<ruby>順<rt>じゅん</rt></ruby>に<ruby>並<rt>なら</rt></ruby>べたとき、<span className="text-3xl md:text-4xl font-black text-blue-600 mx-1 px-1 border-b-4 border-blue-600">96</span>は<ruby>何番目<rt>なんばんめ</rt></ruby>ですか？</>,
+        showHints01: true,
+        choices: [{id:'4',text:'4'}, {id:'5',text:'5'}, {id:'6',text:'6'}],
+        answer: '6',
+        suffix: <><ruby>番目<rt>ばんめ</rt></ruby></>
+      },
+      {
+        id: 6,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <>〇の<ruby>数<rt>かず</rt></ruby>はいくつですか？</>,
+        showCircles: true,
+        choices: [{id:'8',text:'8'}, {id:'10',text:'10'}, {id:'12',text:'12'}],
+        answer: '10',
+        suffix: 'こ'
+      },
+      {
+        id: 7,
+        type: 'choice',
+        text: <>「 2 + 3 = 」<br/>この<ruby>式<rt>しき</rt></ruby>を<ruby>表<rt>あらわ</rt></ruby>す<ruby>文<rt>ぶん</rt></ruby>はどれ？</>,
+        choices: [
+          { id: 'A', text: <>りんごが2こ、なしが3こあります。<ruby>果物<rt>くだもの</rt></ruby>は<ruby>全部<rt>ぜんぶ</rt></ruby>で<ruby>何<rt>なん</rt></ruby>こ？</> },
+          { id: 'B', text: <><ruby>姉<rt>あね</rt></ruby>が3さい、<ruby>妹<rt>いもうと</rt></ruby>が2さいの<ruby>姉妹<rt>しまい</rt></ruby>がいます。2<ruby>人<rt>ふたり</rt></ruby>のお<ruby>兄<rt>にい</rt></ruby>さんは<ruby>何<rt>なん</rt></ruby>さい？</> },
+          { id: 'C', text: <><ruby>今日<rt>きょう</rt></ruby>は2<ruby>月<rt>がつ</rt></ruby>です。3<ruby>日後<rt>みっかご</rt></ruby>は<ruby>何月<rt>なんがつ</rt></ruby>？</> }
+        ],
+        answer: 'A'
+      },
+      {
+        id: 8,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <><ruby>表<rt>ひょう</rt></ruby>にかきこまずに<ruby>暗算<rt>あんざん</rt></ruby>しよう。</>,
+        showTable: true,
+        choices: [{id:'12',text:'12'}, {id:'14',text:'14'}, {id:'15',text:'15'}],
+        answer: '15'
+      },
+      {
+        id: 9,
+        type: 'choice',
+        text: <div className="text-center text-2xl md:text-4xl font-black my-4">3を<ruby>選<rt>えら</rt></ruby>べ！</div>,
+        showLineLength01: true,
+        choices: [
+          { id: 'A', text: <><ruby>線<rt>せん</rt></ruby> A</> },
+          { id: 'B', text: <><ruby>線<rt>せん</rt></ruby> B</> },
+          { id: 'C', text: <><ruby>線<rt>せん</rt></ruby> C</> },
+          { id: 'D', text: <><ruby>線<rt>せん</rt></ruby> D</> }
+        ],
+        answer: 'B'
+      }
+    ];
+
+    // === 02版の問題データ ===
+    const questions02 = [
+      {
+        id: 1,
+        type: 'choice',
+        isNumberChoice: true,
+        instruction: <><ruby>工夫<rt>くふう</rt></ruby>して<ruby>暗算<rt>あんざん</rt></ruby>しましょう。</>,
+        text: <div className="text-[6vw] sm:text-4xl md:text-2xl lg:text-4xl xl:text-5xl font-black text-center my-6 md:my-8 tracking-wide text-gray-800 whitespace-nowrap">4 + 10 + 6 = □</div>,
+        choices: [{id:'10',text:'10'}, {id:'20',text:'20'}, {id:'30',text:'30'}],
+        answer: '20'
+      },
+      {
+        id: 2,
+        type: 'choice',
+        isNumberChoice: true,
+        instruction: <><ruby>工夫<rt>くふう</rt></ruby>して<ruby>暗算<rt>あんざん</rt></ruby>しましょう。</>,
+        text: <div className="text-[6vw] sm:text-4xl md:text-2xl lg:text-4xl xl:text-5xl font-black text-center my-6 md:my-8 tracking-wide text-gray-800 whitespace-nowrap">1 + 7 + 3 + 9 = □</div>,
+        choices: [{id:'10',text:'10'}, {id:'20',text:'20'}, {id:'30',text:'30'}],
+        answer: '20'
+      },
+      {
+        id: 3,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <><span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">3</span>、<span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">5</span>、<span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">7</span>が<ruby>書<rt>か</rt></ruby>かれたカードが1<ruby>枚<rt>まい</rt></ruby>ずつあります。<br/>これを<ruby>使<rt>つか</rt></ruby>って3<ruby>桁<rt>けた</rt></ruby>の<ruby>数<rt>かず</rt></ruby>をつくります。<br/><br/><ruby>小<rt>ちい</rt></ruby>さい<ruby>順<rt>じゅん</rt></ruby>に<ruby>並<rt>なら</rt></ruby>べたとき、<span className="text-3xl md:text-4xl font-black text-blue-600 mx-1 px-1 border-b-4 border-blue-600">753</span>は<ruby>何番目<rt>なんばんめ</rt></ruby>ですか？</>,
+        showHints02: true,
+        choices: [{id:'4',text:'4'}, {id:'5',text:'5'}, {id:'6',text:'6'}],
+        answer: '6',
+        suffix: <><ruby>番目<rt>ばんめ</rt></ruby></>
+      },
+      {
+        id: 4,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <><span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">3</span>、<span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">5</span>、<span className="inline-block px-2 py-0.5 mx-0.5 border-2 border-gray-800 rounded bg-white shadow-sm font-black text-xl text-gray-800">7</span>が<ruby>書<rt>か</rt></ruby>かれたカードが1<ruby>枚<rt>まい</rt></ruby>ずつあります。<br/>これを<ruby>使<rt>つか</rt></ruby>って3<ruby>桁<rt>けた</rt></ruby>の<ruby>数<rt>かず</rt></ruby>をつくります。<br/><br/><ruby>小<rt>ちい</rt></ruby>さい<ruby>順<rt>じゅん</rt></ruby>に<ruby>並<rt>なら</rt></ruby>べたとき、<span className="text-3xl md:text-4xl font-black text-blue-600 mx-1 px-1 border-b-4 border-blue-600">735</span>は<ruby>何番目<rt>なんばんめ</rt></ruby>ですか？</>,
+        showHints02: true,
+        choices: [{id:'4',text:'4'}, {id:'5',text:'5'}, {id:'6',text:'6'}],
+        answer: '5',
+        suffix: <><ruby>番目<rt>ばんめ</rt></ruby></>
+      },
+      {
+        id: 5,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <>〇は×より いくつ<ruby>多<rt>おお</rt></ruby>いですか？</>,
+        showOx: true,
+        choices: [{id:'2',text:'2'}, {id:'4',text:'4'}, {id:'6',text:'6'}],
+        answer: '4',
+        suffix: 'こ'
+      },
+      {
+        id: 6,
+        type: 'choice',
+        text: <>「 6 + 3 = □ 」<br/>この<ruby>式<rt>しき</rt></ruby>を<ruby>表<rt>あらわ</rt></ruby>す<ruby>図<rt>ず</rt></ruby>はどれですか？</>,
+        showTapeDiagram: true,
+        choices: [
+          { id: 'A', text: <><ruby>図<rt>ず</rt></ruby> A</> },
+          { id: 'B', text: <><ruby>図<rt>ず</rt></ruby> B</> },
+          { id: 'C', text: <><ruby>図<rt>ず</rt></ruby> C</> }
+        ],
+        answer: 'C'
+      },
+      {
+        id: 7,
+        type: 'choice',
+        text: <><ruby>左<rt>ひだり</rt></ruby>と<ruby>同<rt>おな</rt></ruby>じ<ruby>形<rt>かたち</rt></ruby>にするために、<ruby>右<rt>みぎ</rt></ruby>の<ruby>縦線<rt>たてせん</rt></ruby>と<ruby>結<rt>むす</rt></ruby>ぶ<ruby>点<rt>てん</rt></ruby>はどれですか？</>,
+        showGeometry: true,
+        choices: [
+          { id: 'A', text: <><ruby>点<rt>てん</rt></ruby> A</> },
+          { id: 'B', text: <><ruby>点<rt>てん</rt></ruby> B</> },
+          { id: 'C', text: <><ruby>点<rt>てん</rt></ruby> C</> },
+          { id: 'D', text: <><ruby>点<rt>てん</rt></ruby> D</> }
+        ],
+        answer: 'B'
+      },
+      {
+        id: 8,
+        type: 'multi-choice',
+        text: <>カゴにみかんとりんごがあわせていくつ<ruby>入<rt>はい</rt></ruby>っているか<ruby>知<rt>し</rt></ruby>りたいです。<br/><ruby>何<rt>なに</rt></ruby>がわかればいいか、<ruby>下<rt>した</rt></ruby>から「2つ」<ruby>選<rt>えら</rt></ruby>びましょう。</>,
+        choices: [
+          { id: 'A', text: <>みかんの<ruby>数<rt>かず</rt></ruby></> },
+          { id: 'B', text: <>りんご1この<ruby>値段<rt>ねだん</rt></ruby></> },
+          { id: 'C', text: <>りんごの<ruby>数<rt>かず</rt></ruby></> },
+          { id: 'D', text: <>みかんの<ruby>甘<rt>あま</rt></ruby>さ</> }
+        ],
+        answer: ['A', 'C']
+      }
+    ];
+
+    // === 03版の問題データ ===
+    const questions03 = [
+      {
+        id: 1,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <><ruby>表<rt>ひょう</rt></ruby>にかきこまずに<ruby>暗算<rt>あんざん</rt></ruby>しよう。<br/><br/>「あ」＋「い」＋「う」の<ruby>答<rt>こた</rt></ruby>えはいくつですか？</>,
+        showTable03: true,
+        choices: [{id:'12',text:'12'}, {id:'14',text:'14'}, {id:'15',text:'15'}],
+        answer: '15'
+      },
+      {
+        id: 2,
+        type: 'choice',
+        text: <>「 5 + 2 = 」<br/>この<ruby>式<rt>しき</rt></ruby>を<ruby>表<rt>あらわ</rt></ruby>す<ruby>文<rt>ぶん</rt></ruby>はどれ？</>,
+        choices: [
+          { id: 'A', text: <>5さつのノートを<ruby>忘<rt>わす</rt></ruby>れ、<ruby>友<rt>とも</rt></ruby>だちと2<ruby>人<rt>ふたり</rt></ruby>で<ruby>取<rt>と</rt></ruby>りに<ruby>帰<rt>かえ</rt></ruby>りました。<ruby>今何時<rt>いまなんじ</rt></ruby>？</> },
+          { id: 'B', text: <>5さつのノートと2つの<ruby>消<rt>け</rt></ruby>しゴムをかばんに<ruby>入<rt>い</rt></ruby>れました. かばんの<ruby>中<rt>なか</rt></ruby>のノートは<ruby>何<rt>なん</rt></ruby>さつ？</> },
+          { id: 'C', text: <>かばんからノートを2さつ<ruby>取<rt>と</rt></ruby>り<ruby>出<rt>だ</rt></ruby>したら、かばんの<ruby>中<rt>なか</rt></ruby>のノートは5さつになりました。<ruby>最初<rt>さいしょ</rt></ruby>にかばんの<ruby>中<rt>なか</rt></ruby>に<ruby>入<rt>はい</rt></ruby>っていたのは<ruby>何<rt>なん</rt></ruby>さつ？</> }
+        ],
+        answer: 'C'
+      },
+      {
+        id: 3,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <>まるいピザは <ruby>何<rt>なん</rt></ruby>まい<ruby>分<rt>ぶん</rt></ruby>ですか？</>,
+        showPizza03: true,
+        choices: [{id:'1',text:'1'}, {id:'2',text:'2'}, {id:'3',text:'3'}],
+        answer: '2',
+        suffix: 'まい'
+      },
+      {
+        id: 4,
+        type: 'choice',
+        text: <div className="text-center text-2xl md:text-4xl font-black my-4">4を<ruby>選<rt>えら</rt></ruby>べ！</div>,
+        showLineLength: true,
+        choices: [
+          { id: 'A', text: <><ruby>線<rt>せん</rt></ruby> A</> },
+          { id: 'B', text: <><ruby>線<rt>せん</rt></ruby> B</> },
+          { id: 'C', text: <><ruby>線<rt>せん</rt></ruby> C</> },
+          { id: 'D', text: <><ruby>線<rt>せん</rt></ruby> D</> }
+        ],
+        answer: 'C'
+      },
+      {
+        id: 5,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <>〇の<ruby>数<rt>かず</rt></ruby>はいくつですか？</>,
+        showCircles03: true,
+        choices: [{id:'10',text:'10'}, {id:'12',text:'12'}, {id:'14',text:'14'}],
+        answer: '12',
+        suffix: 'こ'
+      },
+      {
+        id: 6,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <div className="text-center font-black text-2xl md:text-4xl tracking-widest text-gray-800 my-4"><ruby>面積<rt>めんせき</rt></ruby>は？</div>,
+        showAreaSquare: true,
+        choices: [{id:'1',text:'1'}, {id:'2',text:'2'}, {id:'3',text:'3'}],
+        answer: '1',
+        suffix: 'cm²'
+      },
+      {
+        id: 7,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <div className="text-center font-black text-2xl md:text-4xl tracking-widest text-gray-800 my-4"><ruby>面積<rt>めんせき</rt></ruby>は？</div>,
+        showAreaRect: true,
+        choices: [{id:'5',text:'5'}, {id:'6',text:'6'}, {id:'7',text:'7'}],
+        answer: '6',
+        suffix: 'cm²'
+      }
+    ];
+
+    // === 04版の問題データ ===
+    const questions04 = [
+      {
+        id: 1,
+        type: 'choice',
+        isNumberChoice: true,
+        instruction: <><ruby>工夫<rt>くふう</rt></ruby>して<ruby>暗算<rt>あんざん</rt></ruby>しましょう。</>,
+        text: <div className="text-[6vw] sm:text-4xl md:text-2xl lg:text-4xl xl:text-5xl font-black text-center my-6 md:my-8 tracking-wide text-gray-800 whitespace-nowrap">6 + 2 + 8 + 4 = □</div>,
+        choices: [{id:'10',text:'10'}, {id:'20',text:'20'}, {id:'30',text:'30'}],
+        answer: '20'
+      },
+      {
+        id: 2,
+        type: 'choice',
+        isNumberChoice: true,
+        instruction: <><ruby>工夫<rt>くふう</rt></ruby>して<ruby>暗算<rt>あんざん</rt></ruby>しましょう。</>,
+        text: <div className="text-[4.5vw] sm:text-2xl md:text-lg lg:text-2xl xl:text-4xl font-black text-center my-6 md:my-8 tracking-normal text-gray-800 whitespace-nowrap">2 + 3 + 4 + 6 + 7 + 8 = □</div>,
+        choices: [{id:'20',text:'20'}, {id:'30',text:'30'}, {id:'40',text:'40'}],
+        answer: '30'
+      },
+      {
+        id: 3,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <>りんご、みかん、なしが1つずつあります。<br/>このうち2つを<ruby>食<rt>た</rt></ruby>べる<ruby>順番<rt>じゅんばん</rt></ruby>の<ruby>組<rt>く</rt></ruby>み<ruby>合<rt>あ</rt></ruby>わせは？<br/><br/>「なし → りんご」は<ruby>何番目<rt>なんばんめ</rt></ruby>ですか？</>,
+        showFruits04: true,
+        choices: [{id:'4',text:'4'}, {id:'5',text:'5'}, {id:'6',text:'6'}],
+        answer: '5',
+        suffix: <><ruby>番目<rt>ばんめ</rt></ruby></>
+      },
+      {
+        id: 4,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <>りんご、みかん、なしが1つずつあります。<br/>このうち2つを<ruby>食<rt>た</rt></ruby>べる<ruby>順番<rt>じゅんばん</rt></ruby>の<ruby>組<rt>く</rt></ruby>み<ruby>合<rt>あ</rt></ruby>わせは？<br/><br/>「みかん → なし」は<ruby>何番目<rt>なんばんめ</rt></ruby>ですか？</>,
+        showFruits04: true,
+        choices: [{id:'4',text:'4'}, {id:'5',text:'5'}, {id:'6',text:'6'}],
+        answer: '4',
+        suffix: <><ruby>番目<rt>ばんめ</rt></ruby></>
+      },
+      {
+        id: 5,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <>りんご、みかん、なしが1つずつあります。<br/>このうち2つを<ruby>食<rt>た</rt></ruby>べる<ruby>順番<rt>じゅんばん</rt></ruby>の<ruby>組<rt>く</rt></ruby>み<ruby>合<rt>あ</rt></ruby>わせは？<br/><br/>「なし → みかん」は<ruby>何番目<rt>なんばんめ</rt></ruby>ですか？</>,
+        showFruits04: true,
+        choices: [{id:'4',text:'4'}, {id:'5',text:'5'}, {id:'6',text:'6'}],
+        answer: '6',
+        suffix: <><ruby>番目<rt>ばんめ</rt></ruby></>
+      },
+      {
+        id: 6,
+        type: 'choice',
+        isNumberChoice: true,
+        text: <>〇は×より いくつ<ruby>多<rt>おお</rt></ruby>いですか？</>,
+        showOx04: true,
+        choices: [{id:'2',text:'2'}, {id:'4',text:'4'}, {id:'6',text:'6'}],
+        answer: '4',
+        suffix: 'こ'
+      },
+      {
+        id: 7,
+        type: 'choice',
+        text: <>「 □ + 2 = 7 」<br/>この<ruby>式<rt>しき</rt></ruby>を<ruby>表<rt>あらわ</rt></ruby>す<ruby>図<rt>ず</rt></ruby>はどれですか？</>,
+        showTapeDiagram04: true,
+        choices: [
+          { id: 'A', text: <><ruby>図<rt>ず</rt></ruby> A</> },
+          { id: 'B', text: <><ruby>図<rt>ず</rt></ruby> B</> },
+          { id: 'C', text: <><ruby>図<rt>ず</rt></ruby> C</> }
+        ],
+        answer: 'B'
+      },
+      {
+        id: 8,
+        type: 'multi-choice',
+        text: <>スイカとメロンを1つずつ<ruby>買<rt>か</rt></ruby>うときの<ruby>値段<rt>ねだん</rt></ruby>を<ruby>知<rt>し</rt></ruby>りたいです。<br/><ruby>何<rt>なに</rt></ruby>がわかればいいか、<ruby>下<rt>した</rt></ruby>から「2つ」<ruby>選<rt>えら</rt></ruby>びましょう。</>,
+        choices: [
+          { id: 'A', text: <>お<ruby>母<rt>かあ</rt></ruby>さんの<ruby>機嫌<rt>きげん</rt></ruby></> },
+          { id: 'B', text: <>メロンの<ruby>値段<rt>ねだん</rt></ruby></> },
+          { id: 'C', text: <>イチゴの<ruby>値段<rt>ねだん</rt></ruby></> },
+          { id: 'D', text: <>スイカの<ruby>値段<rt>ねだん</rt></ruby></> }
+        ],
+        answer: ['B', 'D']
+      },
+      {
+        id: 9,
+        type: 'choice',
+        text: <>この<ruby>絵<rt>え</rt></ruby>をあらわしているのは？</>,
+        showAnimalGraphQuestion: true,
+        choices: [
+          { id: '1', text: <>グラフ ①</> },
+          { id: '2', text: <>グラフ ②</> },
+          { id: '3', text: <>グラフ ③</> }
+        ],
+        answer: '1'
+      }
+    ];
+
+    const courseData = {
+      '01': questions01,
+      '02': questions02,
+      '03': questions03,
+      '04': questions04
+    };
+
+    function App() {
+      const [gameState, setGameState] = useState('start');
+      const [selectedCourse, setSelectedCourse] = useState(null);
+      const [countdownPhase, setCountdownPhase] = useState('info');
+      const [countdownCount, setCountdownCount] = useState(3);
+      const [time, setTime] = useState(0);
+      const [currentIndex, setCurrentIndex] = useState(0);
+      const [score, setScore] = useState(0);
+      const [resultStep, setResultStep] = useState(0);
+
+      const [selectedChoices, setSelectedChoices] = useState([]);
+
+      const [isChecking, setIsChecking] = useState(false);
+      const [isCorrect, setIsCorrect] = useState(false);
+
+      const audioCtxRef = useRef(null);
+
+      const initAudio = () => {
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      };
+
+      const playSound = (type) => {
+        initAudio();
+        const ctx = audioCtxRef.current;
+        if (!ctx) return;
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const t = ctx.currentTime;
+        const playTone = (freq, waveType, time, dur, vol) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = waveType;
+          osc.frequency.value = freq;
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          gain.gain.setValueAtTime(vol, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+          osc.start(time);
+          osc.stop(time + dur);
+        };
+
+        switch (type) {
+          case 'click': playTone(800, 'sine', t, 0.05, 0.1); break;
+          case 'delete': playTone(300, 'triangle', t, 0.05, 0.1); break;
+          case 'countdown': playTone(880, 'sine', t, 0.1, 0.1); break;
+          case 'start': playTone(1760, 'sine', t, 0.4, 0.1); break;
+          case 'pop': playTone(600, 'sine', t, 0.1, 0.1); break;
+          case 'correct':
+            playTone(880, 'sine', t, 0.15, 0.1);
+            playTone(1108.73, 'sine', t + 0.15, 0.3, 0.1);
+            break;
+          case 'wrong': playTone(150, 'sawtooth', t, 0.3, 0.05); break;
+          case 'fanfare':
+            playTone(523.25, 'triangle', t, 0.8, 0.1);
+            playTone(659.25, 'triangle', t, 0.8, 0.1);
+            playTone(783.99, 'triangle', t, 0.8, 0.1);
+            break;
+          default: break;
+        }
+      };
+
+      useEffect(() => {
+        if (gameState === 'countdown') {
+          if (countdownPhase === 'info') {
+            const timer = setTimeout(() => { setCountdownPhase('counting'); }, 4000);
+            return () => clearTimeout(timer);
+          } else if (countdownPhase === 'counting') {
+            if (countdownCount > 0) {
+              playSound('countdown');
+              const timer = setTimeout(() => { setCountdownCount(c => c - 1); }, 1000);
+              return () => clearTimeout(timer);
+            } else {
+              playSound('start');
+              const timer = setTimeout(() => { setGameState('playing'); }, 800);
+              return () => clearTimeout(timer);
+            }
+          }
+        }
+      }, [gameState, countdownPhase, countdownCount]);
+
+      useEffect(() => {
+        if (gameState === 'result') {
+          setResultStep(0);
+          const t1 = setTimeout(() => { setResultStep(1); playSound('pop'); }, 600);
+          const t2 = setTimeout(() => { setResultStep(2); playSound('pop'); }, 1400);
+          const t3 = setTimeout(() => { setResultStep(3); playSound('fanfare'); }, 2400);
+          const t4 = setTimeout(() => { setResultStep(4); }, 3200);
+          return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
+        }
+      }, [gameState]);
+
+      useEffect(() => {
+        let timer;
+        let lastTick = Date.now();
+        if (gameState === 'playing' && !isChecking) {
+          timer = setInterval(() => {
+            const now = Date.now();
+            const delta = (now - lastTick) / 1000;
+            setTime(t => t + delta);
+            lastTick = now;
+          }, 50); // 0.05秒ごとに更新して滑らかに
+        }
+        return () => clearInterval(timer);
+      }, [gameState, isChecking]);
+
+      useEffect(() => {
+        setSelectedChoices([]);
+      }, [currentIndex]);
+
+      const handleCourseSelect = (courseId) => {
+        playSound('click');
+        setSelectedCourse(courseId);
+        setGameState('countdown');
+        setCountdownPhase('info');
+        setCountdownCount(3);
+        setTime(0);
+        setCurrentIndex(0);
+        setScore(0);
+        setSelectedChoices([]);
+      };
+
+      const currentQuestions = selectedCourse ? courseData[selectedCourse] : [];
+      const currentQ = currentQuestions[currentIndex];
+
+      const handleAnswer = (userAnswer) => {
+        if (isChecking || !currentQ) return;
+        let isCorrectAns = false;
+
+        if (currentQ.type === 'multi-choice') {
+          const sortedUser = [...userAnswer].sort();
+          const sortedCorrect = [...currentQ.answer].sort();
+          isCorrectAns = JSON.stringify(sortedUser) === JSON.stringify(sortedCorrect);
+        } else {
+          isCorrectAns = String(userAnswer) === String(currentQ.answer);
+        }
+
+        if (isCorrectAns) { setScore(s => s + 1); playSound('correct'); } else { playSound('wrong'); }
+        setIsCorrect(isCorrectAns);
+        setIsChecking(true);
+        setTimeout(() => {
+          setIsChecking(false);
+          if (currentIndex + 1 < currentQuestions.length) { setCurrentIndex(i => i + 1); } else { setGameState('result'); }
+        }, 800);
+      };
+
+      const handleMultiChoiceToggle = (choiceId) => {
+        // すでに判定中か、2つ選ばれている場合はこれ以上選べないようにする
+        if (isChecking || selectedChoices.length >= 2) return;
+
+        playSound('click');
+        const newChoices = selectedChoices.includes(choiceId)
+          ? selectedChoices.filter(x => x !== choiceId)
+          : [...selectedChoices, choiceId];
+
+        setSelectedChoices(newChoices);
+
+        // 2つ選ばれたら、枠の色が変わるのを確認できるように少し待ってから判定
+        if (newChoices.length === 2) {
+          setTimeout(() => {
+            handleAnswer(newChoices);
+          }, 400); // 0.4秒後に正誤判定
+        }
+      };
+
+      const calculateGrade = (correctCount, timeTaken, totalQuestions) => {
+        let scoreGrade = 'C';
+        let scoreVal = 0;
+        const ratio = correctCount / totalQuestions;
+        if (ratio === 1) { scoreGrade = 'S'; scoreVal = 6; }
+        else if (ratio >= 0.7) { scoreGrade = 'A'; scoreVal = 4; }
+        else if (ratio >= 0.5) { scoreGrade = 'B'; scoreVal = 2; }
+        else { scoreGrade = 'C'; scoreVal = 0; }
+
+        let timeGrade = 'C';
+        let timeVal = 0;
+        const timeRatio = timeTaken / totalQuestions;
+        if (timeRatio <= 10) { timeGrade = 'S'; timeVal = 3; }
+        else if (timeRatio <= 15) { timeGrade = 'A'; timeVal = 2; }
+        else if (timeRatio <= 20) { timeGrade = 'B'; timeVal = 1; }
+        else { timeGrade = 'C'; timeVal = 0; }
+
+        const totalVal = scoreVal + timeVal;
+        let totalGrade = 'C';
+        if (totalVal >= 8) totalGrade = 'S';
+        else if (totalVal >= 5) totalGrade = 'A';
+        else if (totalVal >= 3) totalGrade = 'B';
+        else totalGrade = 'C';
+
+        return { scoreGrade, timeGrade, totalGrade };
+      };
+
+      const getGradeStyle = (grade) => {
+        if (grade === 'S') return 'text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-500 font-black drop-shadow-md';
+        if (grade === 'A') return 'text-red-500 font-bold';
+        if (grade === 'B') return 'text-green-500 font-bold';
+        return 'text-blue-500 font-bold';
+      };
+
+      return (
+        <div className="min-h-screen bg-blue-50 flex flex-col items-center justify-center p-4 font-sans text-gray-800">
+          {gameState === 'start' && (
+            <div className="bg-white p-8 md:p-12 rounded-3xl shadow-xl max-w-md w-full text-center border-4 border-blue-200">
+              <h1 className="text-4xl md:text-5xl font-black text-blue-600 mb-8 tracking-wider italic">SPEED! SPEED!</h1>
+              <p className="text-lg font-bold text-gray-500 mb-4 bg-gray-100 py-2 rounded-full">あそぶコースをえらんでね</p>
+              <div className="flex flex-col gap-4">
+                {Object.keys(courseData).sort().map(courseId => (
+                  <button key={courseId} onClick={() => handleCourseSelect(courseId)} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-2xl text-2xl transition shadow-[0_6px_0_#2563eb] active:shadow-none active:translate-y-[6px]">
+                    コース {courseId}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {gameState === 'countdown' && (
+            <div className="bg-white p-8 md:p-12 rounded-3xl shadow-xl max-w-md w-full text-center border-4 border-blue-200 min-h-[350px] flex flex-col justify-center">
+              <h2 className="text-3xl font-black text-blue-600 mb-6">コース {selectedCourse}</h2>
+              {countdownPhase === 'info' ? (
+                <div className="bg-blue-50 rounded-2xl p-6 text-xl font-bold text-gray-700 flex flex-col gap-4">
+                  <div className="flex justify-between items-center border-b-2 border-blue-200 pb-3">
+                    <span>もんだい<ruby>数<rt>すう</rt></ruby></span>
+                    <span className="text-3xl text-blue-800">{currentQuestions.length} 問</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1">
+                    <span>目標タイム</span>
+                    <span className="text-3xl text-blue-800">{currentQuestions.length * 10} 秒</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-32 flex items-center justify-center">
+                  {countdownCount > 0 ? <span className="text-8xl font-black text-orange-500 animate-pulse">{countdownCount}</span> : <span className="text-6xl font-black text-red-500 animate-bounce">スタート！</span>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {gameState === 'playing' && currentQ && (
+            <div className="w-full max-w-4xl relative">
+              <div className="flex justify-between items-center mb-6 md:mb-8 px-2 relative h-14 md:h-20">
+                {/* 左：戻るボタン */}
+                <button
+                  onClick={() => { playSound('click'); setGameState('start'); }}
+                  className="bg-white px-3 md:px-4 py-2 md:py-3 rounded-full shadow-sm text-gray-600 border-2 border-gray-200 hover:bg-gray-50 active:scale-95 transition-transform flex items-center gap-1 font-bold text-sm md:text-base z-10 shrink-0"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4 md:w-5 md:h-5 shrink-0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                  </svg>
+                  <span className="hidden sm:inline"><ruby>戻<rt>もど</rt></ruby>る</span>
+                </button>
+
+                {/* 中央：タイマー（大きく目立つように絶対配置） */}
+                <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-3xl md:text-5xl font-black bg-white px-6 md:px-10 py-3 md:py-4 rounded-full shadow-lg text-blue-600 border-4 border-blue-200 flex items-baseline gap-1 md:gap-2 z-0 min-w-[140px] md:min-w-[180px] justify-center tabular-nums">
+                  {time.toFixed(1)} <span className="text-sm md:text-xl text-gray-500 font-bold mb-1">秒</span>
+                </div>
+
+                {/* 右：問題数 */}
+                <div className="text-sm sm:text-base md:text-xl font-bold bg-white px-3 sm:px-5 py-2 md:py-3 rounded-full shadow-sm text-gray-700 border-2 border-gray-100 flex items-center gap-1 whitespace-nowrap z-10 shrink-0">
+                  <span className="hidden sm:inline">もんだい</span> {currentIndex + 1} / {currentQuestions.length}
+                </div>
+              </div>
+
+              <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl relative overflow-hidden border-2 border-gray-100 flex flex-col md:flex-row gap-6 md:gap-8 items-stretch min-h-[400px]">
+                {isChecking && (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-white bg-opacity-90 backdrop-blur-sm">
+                    {isCorrect ? <div className="text-red-500 flex flex-col items-center transform scale-150 animate-bounce"><svg className="w-32 h-32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span className="text-3xl font-black mt-2">せいかい！</span></div> : <div className="text-blue-500 flex flex-col items-center transform scale-125"><svg className="w-32 h-32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span className="text-3xl font-black mt-2">ざんねん...</span></div>}
+                  </div>
+                )}
+
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <div className="mb-4">
+                    {currentQ.instruction && <div className="text-xl md:text-2xl font-bold mb-4 text-gray-800 leading-loose">{currentQ.instruction}</div>}
+                    <div className="text-xl md:text-2xl font-bold whitespace-pre-wrap leading-relaxed text-gray-800">{currentQ.text}</div>
+                  </div>
+
+                  {currentQ.showHints01 && (
+                    <div className="flex justify-center my-3 md:my-6 bg-gray-50 p-3 md:p-6 rounded-2xl border-2 border-dashed border-gray-300 w-full">
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-4 md:gap-x-12 md:gap-y-8 w-full max-w-lg justify-items-center">
+                        {[{ num: '1', value: '36' }, { num: '3', value: '63' }, { num: '', value: '93' }, { num: '2', value: '39' }, { num: '', value: '69' }, { num: '', value: '96' }].map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-2 md:gap-4 w-full max-w-[120px] md:max-w-none justify-center">
+                            <div className="flex flex-col items-center shrink-0">
+                              <div className="border-2 md:border-4 border-gray-400 w-8 h-8 md:w-14 md:h-14 flex items-center justify-center text-lg md:text-3xl font-bold text-gray-800 bg-white">{item.num}</div>
+                              <span className="text-[9px] md:text-sm font-bold text-gray-700 mt-0.5 md:mt-1">ばんめ</span>
+                            </div>
+                            <div className="text-2xl md:text-5xl font-black text-gray-800 tracking-wider md:tracking-widest shrink-0">{item.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentQ.showCircles && (
+                    <div className="my-6 bg-gray-50 py-6 md:py-8 px-2 md:px-4 rounded-2xl border-2 border-gray-200 flex justify-center w-full">
+                      <div className="flex flex-wrap justify-center gap-3 sm:gap-4 md:gap-6">
+                        {[1, 2, 3, 4, 5].map(i => <div key={i} className="flex flex-col gap-2 md:gap-3 shrink-0"><div className="w-8 h-8 md:w-10 md:h-10 rounded-full border-[4px] md:border-[5px] border-gray-800"></div><div className="w-8 h-8 md:w-10 md:h-10 rounded-full border-[4px] md:border-[5px] border-gray-800"></div></div>)}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentQ.showTable && (
+                    <div className="my-6 w-full flex flex-col items-center gap-4 md:gap-8">
+                      <div className="p-2 md:p-4 bg-gray-50 rounded-2xl border-2 border-gray-200 w-full overflow-x-auto flex justify-center shadow-inner">
+                        <table className="border-collapse bg-white mx-auto shadow-sm shrink-0">
+                          <tbody>
+                            <tr><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black">＋</td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black">3</td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black">4</td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black">6</td></tr>
+                            <tr><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black">5</td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black"></td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black"></td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black"></td></tr>
+                            <tr><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black">2</td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-2xl md:text-5xl font-black italic">あ</td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black"></td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black"></td></tr>
+                            <tr><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black">4</td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black"></td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-3xl md:text-6xl font-black"></td><td className="border-[3px] border-gray-800 text-center w-14 h-14 md:w-24 md:h-24 text-2xl md:text-5xl font-black italic">い</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-3xl md:text-5xl font-black tracking-wider italic">あ＋い＝</span>
+                        <div className="w-24 h-14 md:w-36 md:h-20 border-[4px] border-dashed border-gray-400 bg-gray-50 flex items-center justify-center text-3xl md:text-5xl font-black text-gray-400">?</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentQ.showLineLength01 && (
+                    <div className="my-6 w-full max-w-sm mx-auto bg-gray-50 p-6 rounded-2xl border-2 border-gray-200">
+                      <svg viewBox="0 0 360 440" className="w-full h-auto">
+                        <line x1="80" y1="50" x2="80" y2="430" stroke="#9ca3af" strokeWidth="2.5" strokeDasharray="4 4" /><line x1="104" y1="90" x2="104" y2="430" stroke="#9ca3af" strokeWidth="2.5" strokeDasharray="4 4" /><line x1="200" y1="50" x2="200" y2="430" stroke="#9ca3af" strokeWidth="2.5" strokeDasharray="4 4" /><line x1="320" y1="50" x2="320" y2="430" stroke="#9ca3af" strokeWidth="2.5" strokeDasharray="4 4" />
+                        <line x1="80" y1="60" x2="320" y2="60" stroke="#1f2937" strokeWidth="3" /><line x1="80" y1="50" x2="80" y2="70" stroke="#1f2937" strokeWidth="3" /><line x1="320" y1="50" x2="320" y2="70" stroke="#1f2937" strokeWidth="3" /><text x="200" y="46" textAnchor="middle" fontSize="24" fontWeight="900">10</text>
+                        <line x1="80" y1="100" x2="104" y2="100" stroke="#1f2937" strokeWidth="3" /><line x1="80" y1="90" x2="80" y2="110" stroke="#1f2937" strokeWidth="3" /><line x1="104" y1="90" x2="104" y2="110" stroke="#1f2937" strokeWidth="3" /><text x="92" y="86" textAnchor="middle" fontSize="20" fontWeight="900">1</text>
+                        {[{id:'A',x:48},{id:'B',x:72},{id:'C',x:192},{id:'D',x:264}].map((l,idx)=>(<g key={l.id} transform={`translate(0, ${170+idx*70})`}><circle cx="40" cy="0" r="22" stroke="#9ca3af" strokeWidth="2" strokeDasharray="4 4" fill="white" /><text x="40" y="10" textAnchor="middle" fontSize="32" fontWeight="900">{l.id}</text><line x1="80" y1="0" x2={80+l.x} y2="0" stroke="#1f2937" strokeWidth="4" /><line x1="80" y1="-15" x2="80" y2="15" stroke="#1f2937" strokeWidth="4" /><line x1={80+l.x} y1="-15" x2={80+l.x} y2="15" stroke="#1f2937" strokeWidth="4" /></g>))}
+                      </svg>
+                    </div>
+                  )}
+
+                  {/* === 02版のUI === */}
+                  {currentQ.showHints02 && (
+                    <div className="flex justify-center my-3 md:my-6 bg-gray-50 p-3 md:p-6 rounded-2xl border-2 border-dashed border-gray-300 w-full">
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-4 md:gap-x-12 md:gap-y-8 w-full max-w-lg justify-items-center">
+                        {[{ num: '3', value: '537' }, { num: '1', value: '357' }, { num: '2', value: '375' }, { num: '', value: '753' }, { num: '4', value: '573' }, { num: '', value: '735' }].map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-2 md:gap-4 w-full max-w-[120px] md:max-w-none justify-center">
+                            <div className="flex flex-col items-center shrink-0">
+                              <div className="border-2 md:border-4 border-gray-400 w-8 h-8 md:w-14 md:h-14 flex items-center justify-center text-lg md:text-3xl font-bold text-gray-800 bg-white">{item.num}</div>
+                              <span className="text-[9px] md:text-sm font-bold text-gray-700 mt-0.5 md:mt-1">ばんめ</span>
+                            </div>
+                            <div className="text-2xl md:text-5xl font-black text-gray-800 tracking-wider md:tracking-widest shrink-0">{item.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentQ.showOx && (
+                    <div className="my-6 bg-gray-50 py-8 px-4 rounded-2xl border-2 border-gray-200 flex justify-center w-full">
+                      <div className="grid grid-cols-4 gap-4 md:gap-8 justify-items-center">
+                        {Array.from({ length: 4 }).map((_, i) => <div key={`o1-${i}`} className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"><div className="w-8 h-8 md:w-12 md:h-12 rounded-full border-[4px] md:border-[6px] border-gray-800"></div></div>)}
+                        {Array.from({ length: 4 }).map((_, i) => <div key={`x-${i}`} className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"><svg viewBox="0 0 24 24" className="w-8 h-8 md:w-12 md:h-12 text-gray-800" stroke="currentColor" strokeWidth="5"><line x1="3" y1="3" x2="21" y2="21" /><line x1="21" y1="3" x2="3" y2="21" /></svg></div>)}
+                        {Array.from({ length: 4 }).map((_, i) => <div key={`o2-${i}`} className="w-10 h-10 md:w-14 md:h-14 flex items-center justify-center"><div className="w-8 h-8 md:w-12 md:h-12 rounded-full border-[4px] md:border-[6px] border-gray-800"></div></div>)}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentQ.showTapeDiagram && (
+                    <div className="my-6 flex flex-col gap-6 w-full max-w-sm mx-auto bg-gray-50 p-6 rounded-2xl border-2 border-gray-200">
+                      {/* 図A, B, C のSVG... */}
+                      {[{id:'A',vals:[6,6,6],qPos:-1},{id:'B',vals:[3,'box'],total:6,qPos:1},{id:'C',vals:[6,3],total:'box',qPos:0}].map(d => (
+                        <div key={d.id} className="flex items-center gap-4">
+                          <div className="w-12 h-12 md:w-14 md:h-14 rounded-full border-[3px] border-dashed border-gray-400 flex items-center justify-center font-bold text-2xl bg-white">{d.id}</div>
+                          <div className="flex-1"><svg viewBox="0 0 300 100" className="w-full h-auto">
+                            <line x1="20" y1="50" x2="280" y2="50" stroke="#1f2937" strokeWidth="2.5" /><line x1="20" y1="35" x2="20" y2="65" stroke="#1f2937" strokeWidth="3" /><line x1="280" y1="35" x2="280" y2="65" stroke="#1f2937" strokeWidth="3" />
+                            {d.total === 'box' ? <rect x="138" y="6" width="24" height="24" fill="white" stroke="#1f2937" strokeWidth="2" /> : d.total && <text x="150" y="22" textAnchor="middle" fontSize="22" fontWeight="bold" fontStyle="italic">{d.total}</text>}
+                            <path d="M 20 42 Q 150 20 280 42" fill="none" stroke="#1f2937" strokeWidth="1.5" />
+                            {d.id==='A' ? [0,1,2].map(i=>(<g key={i}><line x1={20+(i+1)*86.6} y1="40" x2={20+(i+1)*86.6} y2="60" stroke="#1f2937" strokeWidth="2.5" /><text x={20+i*86.6+43.3} y="85" textAnchor="middle" fontSize="22" fontWeight="bold" fontStyle="italic">6</text><path d={`M ${20+i*86.6} 58 Q ${20+i*86.6+43.3} 75 ${20+(i+1)*86.6} 58`} fill="none" stroke="#1f2937" strokeWidth="1.5" /></g>))
+                             : d.id==='B' ? (<g><line x1="150" y1="40" x2="150" y2="60" stroke="#1f2937" strokeWidth="2.5" /><text x="85" y="85" textAnchor="middle" fontSize="22" fontWeight="bold" fontStyle="italic">3</text><rect x="203" y="73" width="24" height="24" fill="white" stroke="#1f2937" strokeWidth="2" /><path d="M 20 58 Q 85 75 150 58" fill="none" stroke="#1f2937" strokeWidth="1.5" /><path d="M 150 58 Q 215 75 280 58" fill="none" stroke="#1f2937" strokeWidth="1.5" /></g>)
+                             : (<g><line x1="193.3" y1="40" x2="193.3" y2="60" stroke="#1f2937" strokeWidth="2.5" /><text x="106.6" y="85" textAnchor="middle" fontSize="22" fontWeight="bold" fontStyle="italic">6</text><text x="236.6" y="85" textAnchor="middle" fontSize="22" fontWeight="bold" fontStyle="italic">3</text><path d="M 20 58 Q 106.6 75 193.3 58" fill="none" stroke="#1f2937" strokeWidth="1.5" /><path d="M 193.3 58 Q 236.6 75 280 58" fill="none" stroke="#1f2937" strokeWidth="1.5" /></g>)
+                            }
+                          </svg></div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {currentQ.showGeometry && (
+                    <div className="my-6 flex flex-row justify-center items-center gap-4 md:gap-10 bg-gray-50 p-4 md:p-8 rounded-2xl border-2 border-gray-200 w-full overflow-hidden">
+                      <div className="w-1/2 max-w-[200px] bg-white border-2 border-gray-400 shrink-0"><svg viewBox="0 0 160 180" className="w-full h-auto"><g stroke="#d1d5db" strokeWidth="2">{Array.from({length:10}).map((_,i)=>(<line key={i} x1="0" y1={i*20} x2="160" y2={i*20} />))}{Array.from({length:9}).map((_,i)=>(<line key={i} x1={i*20} y1="0" x2={i*20} y2="180" />))}</g><polygon points="40,20 120,20 40,140" fill="none" stroke="#1f2937" strokeWidth="4" /></svg></div>
+                      <div className="w-1/2 max-w-[200px] bg-white border-2 border-gray-400 shrink-0"><svg viewBox="0 0 160 180" className="w-full h-auto"><g stroke="#d1d5db" strokeWidth="2">{Array.from({length:10}).map((_,i)=>(<line key={i} x1="0" y1={i*20} x2="160" y2={i*20} />))}{Array.from({length:9}).map((_,i)=>(<line key={i} x1={i*20} y1="0" x2={i*20} y2="180" />))}</g><line x1="20" y1="40" x2="20" y2="160" stroke="#1f2937" strokeWidth="4" />{[{id:'A',x:60,y:40},{id:'B',x:100,y:40},{id:'C',x:140,y:40},{id:'D',x:100,y:80}].map(p=>(<g key={p.id}><circle cx={p.x} cy={p.y} r="4.5" fill="#1f2937" /><text x={p.x} y={p.id==='D'?p.y+28:p.y-8} textAnchor="middle" fontSize="22" fontWeight="900">{p.id}</text></g>))}</svg></div>
+                    </div>
+                  )}
+
+                  {/* === 03版のUI === */}
+                  {currentQ.showTable03 && (
+                    <div className="my-6 w-full flex flex-col items-center gap-4 md:gap-8">
+                      <div className="p-2 md:p-4 bg-gray-50 rounded-2xl border-2 border-gray-200 w-full overflow-x-auto flex justify-center shadow-inner">
+                        <table className="border-collapse bg-white mx-auto shadow-sm shrink-0">
+                          <tbody>
+                            <tr>{[ '＋', '5', '3', '1', '2' ].map((v,i)=>(<td key={i} className="border-[3px] border-gray-800 text-center w-12 h-12 sm:w-14 sm:h-14 md:w-20 md:h-20 text-2xl sm:text-3xl md:text-5xl font-black">{v}</td>))}</tr>
+                            {[[ '2', '', 'あ', '', '' ], [ '4', '', '', '', '' ], [ '3', '', '', 'い', '' ], [ '1', 'う', '', '', '' ]].map((row,ri)=>(
+                              <tr key={ri}>
+                                {row.map((v,ci)=>(
+                                  <td key={ci} className={`border-[3px] border-gray-800 text-center w-12 h-12 sm:w-14 sm:h-14 md:w-20 md:h-20 ${v.match(/[あ-ん]/)?'text-lg sm:text-2xl md:text-4xl italic':'text-2xl sm:text-3xl md:text-5xl'} font-black`}>{v}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex items-center gap-1 sm:gap-2 w-full justify-center">
+                        <span className="text-xl sm:text-3xl md:text-5xl font-black italic whitespace-nowrap">あ＋い＋う＝</span>
+                        <div className="w-16 h-10 sm:w-24 sm:h-14 md:w-36 md:h-20 border-[4px] border-dashed border-gray-400 bg-gray-50 flex items-center justify-center text-3xl md:text-5xl font-black text-gray-400 shrink-0">?</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentQ.showPizza03 && (
+                    <div className="my-6 w-full max-w-sm mx-auto bg-white p-6 rounded-3xl border-2 border-gray-100 shadow-inner flex justify-center items-center h-64 md:h-80 overflow-hidden">
+                      <svg viewBox="0 0 400 400" className="w-full h-full">
+                        {/* 左上: 1/2 */}
+                        <g transform="translate(100, 100) rotate(-45)">
+                          <path d="M -70 0 A 70 70 0 0 1 70 0 Z" fill="white" stroke="#1f2937" strokeWidth="4" strokeLinejoin="round" />
+                          <line x1="0" y1="0" x2="0" y2="-70" stroke="#1f2937" strokeWidth="3" strokeDasharray="6 6" />
+                        </g>
+
+                        {/* 右上: 1/2 */}
+                        <g transform="translate(300, 100) rotate(45)">
+                          <path d="M -70 0 A 70 70 0 0 1 70 0 Z" fill="white" stroke="#1f2937" strokeWidth="4" strokeLinejoin="round" />
+                          <line x1="0" y1="0" x2="0" y2="-70" stroke="#1f2937" strokeWidth="3" strokeDasharray="6 6" />
+                        </g>
+
+                        {/* 左下: 3/4 */}
+                        <g transform="translate(100, 300) rotate(15)">
+                          <path d="M 70 0 A 70 70 0 1 1 0 -70 L 0 0 Z" fill="white" stroke="#1f2937" strokeWidth="4" strokeLinejoin="round" />
+                          <line x1="0" y1="0" x2="-70" y2="0" stroke="#1f2937" strokeWidth="3" strokeDasharray="6 6" />
+                          <line x1="0" y1="0" x2="0" y2="70" stroke="#1f2937" strokeWidth="3" strokeDasharray="6 6" />
+                        </g>
+
+                        {/* 右下: 1/4 */}
+                        <g transform="translate(290, 290) rotate(15)">
+                          <path d="M 70 0 A 70 70 0 0 0 0 -70 L 0 0 Z" fill="white" stroke="#1f2937" strokeWidth="4" strokeLinejoin="round" />
+                        </g>
+                      </svg>
+                    </div>
+                  )}
+
+                  {currentQ.showLineLength && (
+                    <div className="my-6">
+                      <svg viewBox="0 0 300 220" className="w-full max-w-sm mx-auto bg-gray-50 rounded-xl border-2 border-gray-200">
+                        <line x1="50" y1="30" x2="250" y2="30" stroke="black" strokeWidth="4" />
+                        <text x="150" y="20" textAnchor="middle" fontSize="16" fontWeight="bold">7</text>
+                        <line x1="50" y1="20" x2="50" y2="40" stroke="black" strokeWidth="2" />
+                        <line x1="250" y1="20" x2="250" y2="40" stroke="black" strokeWidth="2" />
+
+                        <text x="25" y="85" fontSize="16" fontWeight="bold">A</text>
+                        <line x1="50" y1="80" x2="78.6" y2="80" stroke="black" strokeWidth="4" />
+                        <line x1="50" y1="70" x2="50" y2="90" stroke="black" strokeWidth="2" />
+                        <line x1="78.6" y1="70" x2="78.6" y2="90" stroke="black" strokeWidth="2" />
+
+                        <text x="25" y="125" fontSize="16" fontWeight="bold">B</text>
+                        <line x1="50" y1="120" x2="135.7" y2="120" stroke="black" strokeWidth="4" />
+                        <line x1="50" y1="110" x2="50" y2="130" stroke="black" strokeWidth="2" />
+                        <line x1="135.7" y1="110" x2="135.7" y2="130" stroke="black" strokeWidth="2" />
+
+                        <text x="25" y="165" fontSize="16" fontWeight="bold">C</text>
+                        <line x1="50" y1="160" x2="164.3" y2="160" stroke="black" strokeWidth="4" />
+                        <line x1="50" y1="150" x2="50" y2="170" stroke="black" strokeWidth="2" />
+                        <line x1="164.3" y1="150" x2="164.3" y2="170" stroke="black" strokeWidth="2" />
+
+                        <text x="25" y="205" fontSize="16" fontWeight="bold">D</text>
+                        <line x1="50" y1="200" x2="278.6" y2="200" stroke="black" strokeWidth="4" />
+                        <line x1="50" y1="190" x2="50" y2="210" stroke="black" strokeWidth="2" />
+                        <line x1="278.6" y1="190" x2="278.6" y2="210" stroke="black" strokeWidth="2" />
+
+                        <line x1="50" y1="40" x2="50" y2="210" stroke="gray" strokeWidth="1" strokeDasharray="4 4" />
+                        <line x1="250" y1="40" x2="250" y2="210" stroke="gray" strokeWidth="1" strokeDasharray="4 4" />
+                      </svg>
+                    </div>
+                  )}
+
+                  {currentQ.showCircles03 && (
+                    <div className="flex flex-col gap-4 my-8 items-center bg-gray-50 p-6 rounded-2xl border-2 border-gray-200">
+                      {Array.from({length: 3}).map((_, i) => (
+                        <div key={i} className="flex gap-4">
+                          {Array.from({length: 4}).map((_, j) => (
+                            <div key={j} className="w-8 h-8 md:w-10 md:h-10 rounded-full border-[5px] md:border-[6px] border-gray-800"></div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {currentQ.showAreaSquare && (
+                    <div className="my-8 flex justify-center w-full bg-white p-6 md:p-12 rounded-3xl">
+                      <div className="flex flex-col w-full max-w-sm gap-8">
+                        {/* 1x1 の図 */}
+                        <div className="self-start shrink-0">
+                          <svg viewBox="-40 -40 120 120" className="w-28 md:w-36 h-auto overflow-visible">
+                            {/* 上の括弧 */}
+                            <path d="M 0 -5 Q 30 -20 60 -5" fill="none" stroke="#1f2937" strokeWidth="2.5" />
+                            <text x="30" y="-12" textAnchor="middle" fontSize="20" fontWeight="900" fill="white" stroke="white" strokeWidth="6" strokeLinejoin="round">1cm</text>
+                            <text x="30" y="-12" textAnchor="middle" fontSize="20" fontWeight="900" fill="#1f2937">1cm</text>
+
+                            {/* 左の括弧 */}
+                            <path d="M -5 0 Q -20 30 -5 60" fill="none" stroke="#1f2937" strokeWidth="2.5" />
+                            <text x="-12" y="30" textAnchor="end" dominantBaseline="middle" fontSize="20" fontWeight="900" fill="white" stroke="white" strokeWidth="6" strokeLinejoin="round">1cm</text>
+                            <text x="-12" y="30" textAnchor="end" dominantBaseline="middle" fontSize="20" fontWeight="900" fill="#1f2937">1cm</text>
+
+                            {/* 正方形 */}
+                            <rect x="0" y="0" width="60" height="60" fill="white" stroke="#1f2937" strokeWidth="3" />
+
+                            {/* 直角マーク */}
+                            <rect x="0" y="0" width="8" height="8" fill="none" stroke="#1f2937" strokeWidth="2" />
+                            <rect x="52" y="0" width="8" height="8" fill="none" stroke="#1f2937" strokeWidth="2" />
+                            <rect x="0" y="52" width="8" height="8" fill="none" stroke="#1f2937" strokeWidth="2" />
+                            <rect x="52" y="52" width="8" height="8" fill="none" stroke="#1f2937" strokeWidth="2" />
+                          </svg>
+                        </div>
+
+                        {/* 解答枠 */}
+                        <div className="self-end relative w-36 md:w-48 h-16 md:h-24 border-[3px] md:border-[4px] border-dashed border-gray-400 bg-gray-50 flex items-center justify-center pb-2 md:pb-3 pr-4 md:pr-5">
+                          <span className="text-4xl md:text-6xl font-black text-gray-400 mr-8 md:mr-12">?</span>
+                          <span className="absolute bottom-2 md:bottom-3 right-3 md:right-5 text-3xl md:text-5xl font-bold text-gray-800 tracking-tighter leading-none">cm²</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentQ.showAreaRect && (
+                    <div className="my-8 flex justify-center w-full bg-white p-6 md:p-12 rounded-3xl">
+                      <div className="flex flex-col w-full max-w-md gap-8 md:gap-12">
+                        {/* 3x2 の図 */}
+                        <div className="self-start shrink-0">
+                          <svg viewBox="-50 -50 250 170" className="w-48 md:w-64 h-auto overflow-visible">
+                            {/* 上の括弧 */}
+                            <path d="M 0 -5 Q 90 -30 180 -5" fill="none" stroke="#1f2937" strokeWidth="2.5" />
+                            <text x="90" y="-12" textAnchor="middle" fontSize="24" fontWeight="900" fill="white" stroke="white" strokeWidth="8" strokeLinejoin="round">3cm</text>
+                            <text x="90" y="-12" textAnchor="middle" fontSize="24" fontWeight="900" fill="#1f2937">3cm</text>
+
+                            {/* 左の括弧 */}
+                            <path d="M -5 0 Q -30 60 -5 120" fill="none" stroke="#1f2937" strokeWidth="2.5" />
+                            <text x="-12" y="60" textAnchor="end" dominantBaseline="middle" fontSize="24" fontWeight="900" fill="white" stroke="white" strokeWidth="8" strokeLinejoin="round">2cm</text>
+                            <text x="-12" y="60" textAnchor="end" dominantBaseline="middle" fontSize="24" fontWeight="900" fill="#1f2937">2cm</text>
+
+                            {/* 背景の白塗り */}
+                            <rect x="0" y="0" width="180" height="120" fill="white" stroke="none" />
+
+                            {/* グリッド点線 */}
+                            <line x1="60" y1="0" x2="60" y2="120" stroke="#9ca3af" strokeWidth="2" strokeDasharray="4 4" />
+                            <line x1="120" y1="0" x2="120" y2="120" stroke="#9ca3af" strokeWidth="2" strokeDasharray="4 4" />
+                            <line x1="0" y1="60" x2="180" y2="60" stroke="#9ca3af" strokeWidth="2" strokeDasharray="4 4" />
+
+                            {/* 長方形の枠線 */}
+                            <rect x="0" y="0" width="180" height="120" fill="none" stroke="#1f2937" strokeWidth="3" />
+
+                            {/* 直角マーク */}
+                            <rect x="0" y="0" width="8" height="8" fill="none" stroke="#1f2937" strokeWidth="2" />
+                            <rect x="172" y="0" width="8" height="8" fill="none" stroke="#1f2937" strokeWidth="2" />
+                            <rect x="0" y="112" width="8" height="8" fill="none" stroke="#1f2937" strokeWidth="2" />
+                            <rect x="172" y="112" width="8" height="8" fill="none" stroke="#1f2937" strokeWidth="2" />
+                          </svg>
+                        </div>
+
+                        {/* 解答枠 */}
+                        <div className="self-end relative w-36 md:w-48 h-16 md:h-24 border-[3px] md:border-[4px] border-dashed border-gray-400 bg-gray-50 flex items-center justify-center pb-2 md:pb-3 pr-4 md:pr-5">
+                          <span className="text-4xl md:text-6xl font-black text-gray-400 mr-8 md:mr-12">?</span>
+                          <span className="absolute bottom-2 md:bottom-3 right-3 md:right-5 text-3xl md:text-5xl font-bold text-gray-800 tracking-tighter leading-none">cm²</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* === 04版のUI === */}
+                  {currentQ.showFruits04 && (
+                    <div className="my-4">
+                      <div className="flex gap-4 justify-center mb-4 flex-wrap">
+                        {['🍎', '🍊', '🍐'].map(fruit => (
+                          <div key={fruit} className="w-14 h-14 md:w-16 md:h-16 bg-white border-4 border-gray-800 rounded-full flex items-center justify-center text-3xl md:text-4xl shadow-md shrink-0">
+                            {fruit}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex flex-col sm:flex-row justify-center gap-4 md:gap-10 text-sm md:text-lg font-bold text-gray-700 bg-gray-50 p-4 rounded-2xl border-2 border-dashed border-gray-300">
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center gap-2"><span className="w-16 md:w-20 text-right tracking-widest">🍊→🍎</span> <span>：</span> <span className="w-8 text-center border-b-4 border-gray-400">3</span> <span>ばんめ</span></div>
+                          <div className="flex items-center gap-2"><span className="w-16 md:w-20 text-right tracking-widest">🍎→🍐</span> <span>：</span> <span className="w-8 text-center border-b-4 border-gray-400">2</span> <span>ばんめ</span></div>
+                          <div className="flex items-center gap-2"><span className="w-16 md:w-20 text-right tracking-widest">🍐→🍎</span> <span>：</span> <span className="w-8 text-center border-b-4 border-gray-400 text-transparent select-none">_</span> <span>ばんめ</span></div>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center gap-2"><span className="w-16 md:w-20 text-right tracking-widest">🍎→🍊</span> <span>：</span> <span className="w-8 text-center border-b-4 border-gray-400">1</span> <span>ばんめ</span></div>
+                          <div className="flex items-center gap-2"><span className="w-16 md:w-20 text-right tracking-widest">🍊→🍐</span> <span>：</span> <span className="w-8 text-center border-b-4 border-gray-400 text-transparent select-none">_</span> <span>ばんめ</span></div>
+                          <div className="flex items-center gap-2"><span className="w-16 md:w-20 text-right tracking-widest">🍐→🍊</span> <span>：</span> <span className="w-8 text-center border-b-4 border-gray-400 text-transparent select-none">_</span> <span>ばんめ</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentQ.showOx04 && (
+                    <div className="my-6 bg-gray-50 p-4 md:py-8 md:px-6 rounded-2xl border-2 border-gray-200 flex justify-center w-full">
+                      <div className="flex flex-wrap justify-center gap-2 md:gap-4 max-w-[280px] md:max-w-md">
+                        {/* 〇 (12個) */}
+                        {Array.from({ length: 12 }).map((_, i) => (
+                          <div key={`o-${i}`} className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center shrink-0">
+                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full border-[4px] md:border-[6px] border-gray-800"></div>
+                          </div>
+                        ))}
+                        {/* × (8個) */}
+                        {Array.from({ length: 8 }).map((_, i) => (
+                          <div key={`x-${i}`} className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center shrink-0">
+                            <svg viewBox="0 0 24 24" className="w-8 h-8 md:w-10 md:h-10 text-gray-800" stroke="currentColor" strokeWidth="5" strokeLinecap="round">
+                              <line x1="3" y1="3" x2="21" y2="21" />
+                              <line x1="21" y1="3" x2="3" y2="21" />
+                            </svg>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentQ.showTapeDiagram04 && (
+                    <div className="my-6 flex flex-col gap-6 w-full max-w-sm mx-auto bg-gray-50 p-6 rounded-2xl border-2 border-gray-200">
+                      {/* 図A: 画像の上の図 (全体□, 左7, 右2) */}
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 font-bold text-xl text-gray-500 text-right">A</div>
+                        <div className="flex-1">
+                          <svg viewBox="0 0 300 100" className="w-full h-auto">
+                            <line x1="20" y1="50" x2="280" y2="50" stroke="#1f2937" strokeWidth="2" />
+                            <line x1="20" y1="35" x2="20" y2="65" stroke="#1f2937" strokeWidth="2.5" />
+                            <line x1="200" y1="40" x2="200" y2="60" stroke="#1f2937" strokeWidth="2" />
+                            <line x1="280" y1="35" x2="280" y2="65" stroke="#1f2937" strokeWidth="2.5" />
+
+                            <path d="M 20 42 Q 150 25 280 42" fill="none" stroke="#1f2937" strokeWidth="1.5" />
+                            <rect x="138" y="8" width="24" height="24" fill="white" stroke="#1f2937" strokeWidth="2" />
+
+                            <path d="M 20 58 Q 110 70 200 58" fill="none" stroke="#1f2937" strokeWidth="1.5" />
+                            <text x="110" y="82" textAnchor="middle" dominantBaseline="middle" fontSize="22" fontWeight="bold" fill="#1f2937">7</text>
+
+                            <path d="M 200 58 Q 240 70 280 58" fill="none" stroke="#1f2937" strokeWidth="1.5" />
+                            <text x="240" y="82" textAnchor="middle" dominantBaseline="middle" fontSize="22" fontWeight="bold" fill="#1f2937">2</text>
+                          </svg>
+                        </div>
+                      </div>
+
+                      {/* 図B: 画像の中の図 (全体7, 左□, 右2) */}
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 font-bold text-xl text-gray-500 text-right">B</div>
+                        <div className="flex-1">
+                          <svg viewBox="0 0 300 100" className="w-full h-auto">
+                            <line x1="20" y1="50" x2="280" y2="50" stroke="#1f2937" strokeWidth="2" />
+                            <line x1="20" y1="35" x2="20" y2="65" stroke="#1f2937" strokeWidth="2.5" />
+                            <line x1="200" y1="40" x2="200" y2="60" stroke="#1f2937" strokeWidth="2" />
+                            <line x1="280" y1="35" x2="280" y2="65" stroke="#1f2937" strokeWidth="2.5" />
+
+                            <path d="M 20 42 Q 150 25 280 42" fill="none" stroke="#1f2937" strokeWidth="1.5" />
+                            <text x="150" y="22" textAnchor="middle" dominantBaseline="middle" fontSize="22" fontWeight="bold" fill="#1f2937">7</text>
+
+                            <path d="M 20 58 Q 110 70 200 58" fill="none" stroke="#1f2937" strokeWidth="1.5" />
+                            <rect x="98" y="70" width="24" height="24" fill="white" stroke="#1f2937" strokeWidth="2" />
+
+                            <path d="M 200 58 Q 240 70 280 58" fill="none" stroke="#1f2937" strokeWidth="1.5" />
+                            <text x="240" y="82" textAnchor="middle" dominantBaseline="middle" fontSize="22" fontWeight="bold" fill="#1f2937">2</text>
+                          </svg>
+                        </div>
+                      </div>
+
+                      {/* 図C: 画像の下の図 (全体9, 左□, 中2, 右7) */}
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 font-bold text-xl text-gray-500 text-right">C</div>
+                        <div className="flex-1">
+                          <svg viewBox="0 0 300 100" className="w-full h-auto">
+                            <line x1="20" y1="50" x2="280" y2="50" stroke="#1f2937" strokeWidth="2" />
+                            <line x1="20" y1="35" x2="20" y2="65" stroke="#1f2937" strokeWidth="2.5" />
+                            <line x1="120" y1="40" x2="120" y2="60" stroke="#1f2937" strokeWidth="2" />
+                            <line x1="180" y1="40" x2="180" y2="60" stroke="#1f2937" strokeWidth="2" />
+                            <line x1="280" y1="35" x2="280" y2="65" stroke="#1f2937" strokeWidth="2.5" />
+
+                            <path d="M 20 42 Q 150 25 280 42" fill="none" stroke="#1f2937" strokeWidth="1.5" />
+                            <text x="150" y="22" textAnchor="middle" dominantBaseline="middle" fontSize="22" fontWeight="bold" fill="#1f2937">9</text>
+
+                            <path d="M 20 58 Q 70 68 120 58" fill="none" stroke="#1f2937" strokeWidth="1.5" />
+                            <rect x="58" y="70" width="24" height="24" fill="white" stroke="#1f2937" strokeWidth="2" />
+
+                            <path d="M 120 58 Q 150 68 180 58" fill="none" stroke="#1f2937" strokeWidth="1.5" />
+                            <text x="150" y="82" textAnchor="middle" dominantBaseline="middle" fontSize="22" fontWeight="bold" fill="#1f2937">2</text>
+
+                            <path d="M 180 58 Q 230 70 280 58" fill="none" stroke="#1f2937" strokeWidth="1.5" />
+                            <text x="230" y="82" textAnchor="middle" dominantBaseline="middle" fontSize="22" fontWeight="bold" fill="#1f2937">7</text>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentQ.showAnimalGraphQuestion && (
+                    <div className="my-4">
+                      <div className="relative w-full max-w-sm h-56 md:h-72 mx-auto bg-white rounded-2xl border-2 border-gray-200 mb-6 overflow-hidden shadow-inner">
+                        {/* 上段 */}
+                        <Turtle className="absolute top-[5%] left-[5%] w-14 h-14 md:w-20 md:h-20" />
+                        <Bear className="absolute top-[8%] left-[42%] w-12 h-12 md:w-16 md:h-16" />
+                        <Rabbit className="absolute top-[4%] right-[8%] w-10 h-14 md:w-14 md:h-18" />
+
+                        {/* 中段 */}
+                        <Turtle className="absolute top-[42%] left-[3%] w-14 h-14 md:w-20 md:h-20" />
+                        <Bear className="absolute top-[45%] left-[38%] w-12 h-12 md:w-16 md:h-16" />
+                        <Bear className="absolute top-[40%] right-[20%] w-12 h-12 md:w-16 md:h-16" />
+
+                        {/* 下段 */}
+                        <Rabbit className="absolute bottom-[4%] left-[18%] w-10 h-14 md:w-14 md:h-18" />
+                        <Bear className="absolute bottom-[6%] left-[52%] w-12 h-12 md:w-16 md:h-16" />
+                        <Turtle className="absolute bottom-[5%] right-[4%] w-14 h-14 md:w-20 md:h-20" />
+                      </div>
+
+                      <div className="flex justify-center gap-2 md:gap-6 bg-gray-50 p-2 md:p-6 rounded-2xl border-2 border-gray-200">
+                        <AnimalGraph title="①" turtleH={60} rabbitH={40} bearH={90} />
+                        <AnimalGraph title="②" turtleH={40} rabbitH={60} bearH={90} />
+                        <AnimalGraph title="③" turtleH={60} rabbitH={60} bearH={90} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* --- 右側：解答エリア --- */}
+                <div className="w-full md:w-[280px] lg:w-[360px] flex-shrink-0 flex flex-col justify-center border-t-2 pt-6 mt-2 md:border-t-0 md:border-l-2 md:pl-6 lg:pl-8 border-gray-100">
+                  {currentQ.isNumberChoice ? (
+                    <div className="flex flex-col gap-4 w-full">
+                      {currentQ.choices.map(choice => (
+                        <button
+                          key={choice.id}
+                          onClick={() => handleAnswer(choice.id)}
+                          disabled={isChecking}
+                          className="bg-white border-4 border-gray-200 hover:border-blue-400 rounded-2xl p-4 md:p-5 lg:p-6 text-3xl md:text-4xl lg:text-5xl font-black text-gray-800 shadow-sm transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {choice.text}
+                          {currentQ.suffix && <span className="text-xl md:text-2xl lg:text-3xl text-gray-600 font-bold ml-1">{currentQ.suffix}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {currentQ.choices.map(choice => {
+                        const isSelected = selectedChoices.includes(choice.id);
+                        const isMulti = currentQ.type === 'multi-choice';
+                        return (
+                          <button
+                            key={choice.id}
+                            onClick={() => isMulti ? handleMultiChoiceToggle(choice.id) : handleAnswer(choice.id)}
+                            disabled={isChecking}
+                            className={`w-full text-left border-4 rounded-2xl p-3 md:p-4 text-sm md:text-base font-bold transition flex gap-3 items-center ${isMulti && isSelected ? 'bg-orange-50 border-orange-500' : 'bg-white border-gray-200'} disabled:opacity-50`}
+                          >
+                            <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isMulti && isSelected ? 'bg-orange-500 text-white' : 'bg-blue-500 text-white'}`}>{choice.id}</span>
+                            <div className="flex-1 leading-loose">{choice.text}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* リザルト画面 */}
+          {gameState === 'result' && (() => {
+            const grades = calculateGrade(score, time, currentQuestions.length);
+            return (
+              <div className="bg-white p-8 md:p-12 rounded-3xl shadow-2xl max-w-lg w-full text-center border-4 border-yellow-200">
+                <h1 className="text-4xl md:text-5xl font-black text-orange-500 mb-6 drop-shadow-sm">けっか<ruby>発表<rt>はっぴょう</rt></ruby>！</h1>
+
+                <div className="space-y-4 mb-8">
+                  <div className={`transition-all duration-700 transform ${resultStep >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                    <div className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl border-2 border-gray-100">
+                      <span className="text-xl md:text-2xl font-bold text-gray-600"><ruby>正解数<rt>せいかいすう</rt></ruby></span>
+                      <div className="flex items-center gap-4">
+                        <span className="text-3xl font-bold text-gray-800">{score} <span className="text-xl">/ {currentQuestions.length}</span></span>
+                        <span className={`text-4xl ${getGradeStyle(grades.scoreGrade)}`}>{grades.scoreGrade}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`transition-all duration-700 transform ${resultStep >= 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                    <div className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl border-2 border-gray-100">
+                      <span className="text-xl md:text-2xl font-bold text-gray-600">クリア<ruby>時間<rt>じかん</rt></ruby></span>
+                      <div className="flex items-center gap-4">
+                        <span className="text-3xl font-bold text-gray-800 tabular-nums">{time.toFixed(1)} <span className="text-xl"><ruby>秒<rt>びょう</rt></ruby></span></span>
+                        <span className={`text-4xl ${getGradeStyle(grades.timeGrade)}`}>{grades.timeGrade}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`transition-all duration-1000 transform ${resultStep >= 3 ? 'opacity-100 scale-100' : 'opacity-0 scale-50'} bg-yellow-50 border-4 border-yellow-300 p-4 rounded-3xl mb-8 rotate-1 shadow-sm`}>
+                  <div className="text-xl font-bold text-yellow-800 mb-1"><ruby>総合評価<rt>そうごうひょうか</rt></ruby></div>
+                  <div className={`text-6xl md:text-8xl mt-2 ${getGradeStyle(grades.totalGrade)}`}>
+                    {grades.totalGrade}
+                  </div>
+                </div>
+
+                <div className={`transition-all duration-700 flex flex-col gap-4 ${resultStep >= 4 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                  <button
+                    onClick={() => {
+                      playSound('click');
+                      setGameState('start');
+                    }}
+                    className="w-full bg-gradient-to-r from-blue-400 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-4 px-8 rounded-2xl text-xl md:text-2xl transition shadow-[0_4px_0_#2563eb] active:shadow-none active:translate-y-[4px]"
+                  >
+                    メニューに<ruby>戻<rt>もど</rt></ruby>る
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
