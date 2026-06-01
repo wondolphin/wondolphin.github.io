@@ -57,7 +57,7 @@
         <div id="statusArea" class="hidden bg-gray-800/40 border border-indigo-500/30 rounded-xl p-6 text-center mb-6">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-400 mb-3"></div>
             <p id="statusText" class="text-indigo-200 text-sm font-medium">ニュースサイトから最新フィードを読み込んでいます...</p>
-            <p class="text-gray-500 text-xs mt-1">※Cloudflareによるアクセスブロックを回避するため、中継サービスを使用しています</p>
+            <p class="text-gray-500 text-xs mt-1">※セキュリティブロックを回避するため、直接通信と専用サーバーを組み合わせています</p>
         </div>
 
         <!-- エラー警告表示エリア -->
@@ -88,9 +88,19 @@
     <script>
         // ニュースフィード定義
         const FEEDS = [
-            { name: 'Indie Freaks', url: 'https://indiefreaks.com/feed/' },
-            { name: 'IGN Japan', url: 'https://jp.ign.com/feed.xml' }
+            // isWordPress: true を付与し、直接安全にJSONを取得可能にする
+            { name: 'Indie Freaks', url: 'https://indiefreaks.com/feed/', baseUrl: 'https://indiefreaks.com', isWordPress: true },
+            { name: 'IGN Japan', url: 'https://jp.ign.com/feed.xml', isWordPress: false }
         ];
+
+        // HTMLタグを除去し、特殊文字をデコードするユーティリティ
+        function decodeHtml(html) {
+            const txt = document.createElement("textarea");
+            txt.innerHTML = html;
+            const decoded = txt.value;
+            // HTMLタグを取り除いてピュアな文章にする
+            return decoded.replace(/<\/?[^>]+(>|$)/g, "").trim();
+        }
 
         // トースト通知を表示する関数
         function showToast(message, icon = '✨') {
@@ -111,96 +121,150 @@
             document.getElementById('statusText').textContent = text;
         }
 
-        // 手法1: Cloudflareブロックに最も強い RSS-to-JSON 専用APIを使う方法
-        async function fetchViaRss2Json(feedUrl, siteName) {
-            // 無料のrss2jsonサービスを経由
-            const target = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}&_=${Date.now()}`;
+        // 🚀 最強の取得手法: WordPress REST API から直接取得 (CORS/Cloudflare制限をバイパス)
+        async function fetchViaWordPressAPI(baseUrl, siteName) {
+            // WordPress標準のAPIエンドポイントから最新20件を取得
+            const target = `${baseUrl.replace(/\/$/, '')}/wp-json/wp/v2/posts?per_page=20&_=${Date.now()}`;
             const response = await fetch(target);
             if (!response.ok) {
-                throw new Error(`HTTP status ${response.status}`);
+                throw new Error(`WordPress API HTTP ${response.status}`);
             }
-            const data = await response.json();
-            if (data.status !== 'ok') {
-                throw new Error(data.message || 'RSS変換APIがエラーを返しました');
+            const posts = await response.json();
+            if (!Array.isArray(posts)) {
+                throw new Error('APIから返されたデータがリスト形式ではありません');
             }
-            
-            // 記事リストを統一フォーマットにマッピングして返却
-            return data.items.map(item => {
-                // rss2jsonの返す日付は "YYYY-MM-DD HH:MM:SS" 形式なのでパース
-                const pubDate = new Date(item.pubDate.replace(/-/g, '/')); 
+
+            return posts.map(post => {
+                // WordPressの時間はGMTで返ってくるので協定世界時(UTC)として安全にパース
+                const pubDate = post.date_gmt ? new Date(post.date_gmt + 'Z') : new Date(post.date || "");
                 return {
                     siteName: siteName,
-                    title: item.title || "",
-                    link: item.link || "",
+                    title: decodeHtml(post.title?.rendered || ""),
+                    link: post.link || "",
                     pubDate: pubDate,
-                    description: item.description || ""
+                    description: decodeHtml(post.excerpt?.rendered || post.content?.rendered || "")
                 };
             });
         }
 
-        // 手法2: 手法1が予期せず使えなかった場合のフォールバック（CORSプロキシ + 自力XMLパース）
-        async function fetchViaCorsProxy(feedUrl, siteName) {
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(feedUrl)}`;
-            const response = await fetch(proxyUrl);
+        // 取得手法A: RSS-to-JSON 専用APIを使う方法
+        async function fetchViaRss2Json(feedUrl, siteName) {
+            const target = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}&_=${Date.now()}`;
+            const response = await fetch(target);
             if (!response.ok) {
-                throw new Error(`CORSプロキシ HTTP status ${response.status}`);
+                throw new Error(`RSS変換 API HTTP ${response.status}`);
             }
-            const xmlText = await response.text();
-
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-            const parserError = xmlDoc.querySelector("parsererror");
-            if (parserError) {
-                throw new Error("XMLの形式が正しくありません");
+            const data = await response.json();
+            if (data.status !== 'ok') {
+                throw new Error(data.message || 'RSS変換APIエラー');
             }
-
-            const items = xmlDoc.querySelectorAll("item, entry");
-            const results = [];
-
-            items.forEach(item => {
-                const title = item.querySelector("title")?.textContent || "";
-                
-                let link = item.querySelector("link")?.textContent || "";
-                if (!link && item.querySelector("link")) {
-                    link = item.querySelector("link").getAttribute("href") || "";
-                }
-                
-                const pubDateStr = item.querySelector("pubDate")?.textContent || 
-                                   item.querySelector("dc\\:date")?.textContent || 
-                                   item.querySelector("published")?.textContent || 
-                                   item.querySelector("updated")?.textContent || "";
-                
-                const description = item.querySelector("description")?.textContent || 
-                                    item.querySelector("summary")?.textContent || "";
-
-                if (!title || !link) return;
-
-                results.push({
+            
+            return data.items.map(item => {
+                const pubDate = new Date(item.pubDate.replace(/-/g, '/')); 
+                return {
                     siteName: siteName,
-                    title: title.trim(),
-                    link: link.trim(),
-                    pubDate: new Date(pubDateStr),
-                    description: description
-                });
+                    title: decodeHtml(item.title || ""),
+                    link: item.link || "",
+                    pubDate: pubDate,
+                    description: decodeHtml(item.description || "")
+                };
             });
-
-            return results;
         }
 
-        // 取得用ラッパー関数（プロキシエラー時に自動的に手法を切り替える）
+        // 取得手法B: CORSプロキシ + XMLパース (何重ものプロキシを用意)
+        async function fetchViaCorsProxy(feedUrl, siteName) {
+            // 信頼性の高いいくつかのCORSプロキシリスト
+            const corsProxies = [
+                `https://corsproxy.io/?${encodeURIComponent(feedUrl)}`,
+                `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}&_=${Date.now()}`,
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(feedUrl)}`
+            ];
+
+            let lastError = null;
+            for (const proxyUrl of corsProxies) {
+                try {
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) continue;
+
+                    let xmlText;
+                    if (proxyUrl.includes('allorigins')) {
+                        const json = await response.json();
+                        xmlText = json.contents;
+                    } else {
+                        xmlText = await response.text();
+                    }
+
+                    if (!xmlText) continue;
+
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                    if (xmlDoc.querySelector("parsererror")) continue;
+
+                    const items = xmlDoc.querySelectorAll("item, entry");
+                    const results = [];
+
+                    items.forEach(item => {
+                        const title = item.querySelector("title")?.textContent || "";
+                        let link = item.querySelector("link")?.textContent || "";
+                        if (!link && item.querySelector("link")) {
+                            link = item.querySelector("link").getAttribute("href") || "";
+                        }
+                        const pubDateStr = item.querySelector("pubDate")?.textContent || 
+                                           item.querySelector("dc\\:date")?.textContent || 
+                                           item.querySelector("published")?.textContent || 
+                                           item.querySelector("updated")?.textContent || "";
+                        
+                        const description = item.querySelector("description")?.textContent || 
+                                            item.querySelector("summary")?.textContent || "";
+
+                        if (!title || !link) return;
+
+                        results.push({
+                            siteName: siteName,
+                            title: decodeHtml(title),
+                            link: link.trim(),
+                            pubDate: new Date(pubDateStr),
+                            description: decodeHtml(description)
+                        });
+                    });
+
+                    if (results.length > 0) {
+                        return results; // 成功したら抜ける
+                    }
+                } catch (e) {
+                    lastError = e;
+                }
+            }
+            throw lastError || new Error("すべてのCORSプロキシサーバーとの通信に失敗しました。");
+        }
+
+        // 巡回マネージャー（サイトの種類を検知して最適ルートを選択）
         async function getArticles(feed) {
+            // 手法1: WordPressサイトなら直接APIにリクエスト（超強力・最速・CORSもCloudflareも突破可能）
+            if (feed.isWordPress && feed.baseUrl) {
+                try {
+                    updateStatusText(`[${feed.name}] 取得中 (接続方法1: 直接API通信)...`);
+                    return await fetchViaWordPressAPI(feed.baseUrl, feed.name);
+                } catch (err) {
+                    console.warn(`[${feed.name}] 直接API接続に失敗しました。RSS中継(手法2)に切り替えます:`, err);
+                }
+            }
+
+            // 手法2: RSS-to-JSON API を試行
             try {
-                updateStatusText(`[${feed.name}] 取得中 (接続方法A: 専用中継サーバー)...`);
+                updateStatusText(`[${feed.name}] 取得中 (接続方法2: 専用中継サーバー)...`);
                 return await fetchViaRss2Json(feed.url, feed.name);
             } catch (err) {
-                console.warn(`[${feed.name}] 接続方法Aが失敗したため、方法B（CORSバイパス）を試します:`, err);
-                try {
-                    updateStatusText(`[${feed.name}] 取得中 (接続方法B: CORSプロキシ経由)...`);
-                    return await fetchViaCorsProxy(feed.url, feed.name);
-                } catch (err2) {
-                    console.error(`[${feed.name}] すべての接続方法が失敗しました:`, err2);
-                    throw new Error(`データの取得に失敗しました。サイト側のセキュリティ制限または中継サーバーの混雑が原因です。`);
-                }
+                console.warn(`[${feed.name}] 専用中継サーバーが失敗しました。予備プロキシ(手法3)を試します:`, err);
+            }
+
+            // 手法3: 複数のCORSプロキシを使った自力パースを最終試行
+            try {
+                updateStatusText(`[${feed.name}] 取得中 (接続方法3: 予備のCORSプロキシ経由)...`);
+                return await fetchViaCorsProxy(feed.url, feed.name);
+            } catch (err) {
+                console.error(`[${feed.name}] すべての接続ルートが遮断されました:`, err);
+                throw new Error(`すべての通信経路が遮断されました。一時的にアクセスが拒否されている可能性があります。`);
             }
         }
 
@@ -279,7 +343,7 @@
                         ${errorSites.map(site => `<li>${site}</li>`).join('')}
                     </ul>
                     <div class="mt-2 text-xs text-red-300">
-                        ※一時的なアクセス集中の可能性があります。時間をおいて再読み込みをお試しください。
+                        ※お使いのブラウザやセキュリティアドオン、一時的なアクセス規制が原因の場合があります。時間をおいてもう一度お試しください。
                     </div>
                 `;
                 errorArea.classList.remove('hidden');
