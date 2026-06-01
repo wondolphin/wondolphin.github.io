@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ゲームニュースカスタムフィルター</title>
+    <!-- Tailwind CSS (スタイリング用) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen selection:bg-indigo-500 selection:text-white">
+    <div class="max-w-4xl mx-auto p-4 sm:p-6 pb-24">
+        <!-- ヘッダー -->
+        <header class="mb-8 border-b border-gray-800 pb-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                    <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2">
+                        <span>🎮</span> Game News Filter
+                    </h1>
+                    <p class="text-gray-400 mt-1.5 text-xs sm:text-sm">Indie Freaks & IGN Japan からお好みのインディー情報を自動抽出</p>
+                </div>
+                <!-- ローカル実行警告バッジ（file://環境のみで動的に表示） -->
+                <div id="localWarning" class="hidden text-xs bg-amber-900/40 border border-amber-600/50 text-amber-300 px-3 py-1.5 rounded-lg max-w-xs">
+                    ⚠️ ローカルファイルとして実行中。ブラウザの制限により通信がブロックされる場合は、簡易サーバー等をご利用ください。
+                </div>
+            </div>
+        </header>
+
+        <!-- 設定パネル -->
+        <div class="bg-gray-800/90 border border-gray-700/50 rounded-xl p-5 sm:p-6 shadow-xl mb-6 backdrop-blur-sm">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <!-- キーワード入力 (2カラム分) -->
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                        キーワード <span class="text-gray-500 font-normal">(スペースやカンマで区切って複数入力 / OR条件)</span>
+                    </label>
+                    <input type="text" id="keywords" placeholder="例: ローグライク, メトロイドヴァニア, デモ, 体験版" 
+                           class="w-full bg-gray-900/80 text-white rounded-lg px-4 py-2.5 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 placeholder-gray-500 transition-all text-sm">
+                </div>
+                <!-- 期間指定 -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">期間指定</label>
+                    <div class="flex items-center">
+                        <input type="number" id="days" value="7" min="1" max="90"
+                               class="w-full bg-gray-900/80 text-white rounded-l-lg px-4 py-2.5 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-center text-sm font-semibold">
+                        <span class="bg-gray-700 border border-l-0 border-gray-700 text-gray-300 px-4 py-2.5 rounded-r-lg text-sm whitespace-nowrap">
+                            日間遡る
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- アクションボタン -->
+            <div class="mt-6">
+                <button id="searchBtn" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg shadow-indigo-900/20 active:scale-[0.99] text-sm">
+                    🔍 情報を収集して抽出する
+                </button>
+            </div>
+        </div>
+
+        <!-- 進捗ステータス -->
+        <div id="statusArea" class="hidden bg-gray-800/40 border border-indigo-500/30 rounded-xl p-6 text-center mb-6">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-400 mb-3"></div>
+            <p id="statusText" class="text-indigo-200 text-sm font-medium">ニュースサイトから最新フィードを読み込んでいます...</p>
+            <p class="text-gray-500 text-xs mt-1">※複数のプロキシサーバーを自動的に切り替えて試行します (5〜10秒ほどかかる場合があります)</p>
+        </div>
+
+        <!-- エラー警告表示エリア -->
+        <div id="errorArea" class="hidden bg-red-950/40 border border-red-500/40 text-red-200 p-4 rounded-xl mb-6 text-xs sm:text-sm"></div>
+
+        <!-- 結果表示コンテナ -->
+        <div id="resultContainer" class="hidden">
+            <div class="flex justify-between items-center mb-4 px-1">
+                <h2 class="text-lg font-bold text-gray-200 flex items-center gap-2">
+                    <span>📋</span> 抽出結果 (<span id="matchCount" class="text-indigo-400 font-extrabold">0</span>件ヒット)
+                </h2>
+                <button id="copyBtn" class="bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 hover:border-gray-600 text-xs py-2 px-4 rounded-lg transition-all flex items-center gap-1.5 active:scale-95">
+                    <span>📋</span> Discord用にコピー
+                </button>
+            </div>
+            
+            <!-- 抽出記事リスト -->
+            <div id="resultList" class="space-y-3"></div>
+        </div>
+    </div>
+
+    <!-- 自作トースト通知コンポーネント (alertを回避) -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-gray-100 border border-indigo-500 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-sm transition-all duration-300 transform translate-y-20 opacity-0 pointer-events-none z-50">
+        <span id="toastIcon">✨</span>
+        <span id="toastMessage">コピーしました！</span>
+    </div>
+
+    <script>
+        // ローカル環境(file://)で実行されているか判定してユーザーに警告を促す
+        if (window.location.protocol === 'file:') {
+            document.getElementById('localWarning').classList.remove('hidden');
+        }
+
+        // ニュースフィード定義
+        const FEEDS = [
+            { name: 'Indie Freaks', url: 'https://indiefreaks.com/feed/' },
+            { name: 'IGN Japan', url: 'https://jp.ign.com/feed.xml' }
+        ];
+
+        // 複数のCORSプロキシリスト (混雑やダウン時に上から順に自動フォールバックします)
+        const PROXY_LIST = [
+            {
+                name: 'AllOrigins',
+                getUrl: (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${Date.now()}`,
+                parse: (data) => data.contents // alloriginsはJSONにラップされて返る
+            },
+            {
+                name: 'CorsProxy.io',
+                getUrl: (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                parse: (data) => data // テキストダイレクト
+            },
+            {
+                name: 'Codetabs',
+                getUrl: (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+                parse: (data) => data // テキストダイレクト
+            }
+        ];
+
+        // トースト通知を表示する関数
+        function showToast(message, icon = '✨') {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = message;
+            document.getElementById('toastIcon').textContent = icon;
+            
+            // 表示
+            toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            // 3秒後に非表示
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+                toast.classList.remove('translate-y-0', 'opacity-100');
+            }, 3000);
+        }
+
+        // プロキシを順番に試しながらデータフェッチを行う関数
+        async function fetchWithFallback(targetUrl) {
+            let lastError = null;
+
+            for (let i = 0; i < PROXY_LIST.length; i++) {
+                const proxy = PROXY_LIST[i];
+                try {
+                    updateStatusText(`通信試行中: [${proxy.name}] からデータを読み込んでいます...`);
+                    const requestUrl = proxy.getUrl(targetUrl);
+                    
+                    const response = await fetch(requestUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP status ${response.status}`);
+                    }
+
+                    // AllOriginsはJSON、他はプレーンテキスト
+                    let rawData;
+                    if (proxy.name === 'AllOrigins') {
+                        const json = await response.json();
+                        rawData = proxy.parse(json);
+                    } else {
+                        const text = await response.text();
+                        rawData = proxy.parse(text);
+                    }
+
+                    if (!rawData) {
+                        throw new Error('空のデータが返されました');
+                    }
+
+                    return rawData; // 取得成功
+
+                } catch (err) {
+                    console.warn(`プロキシ [${proxy.name}] が失敗しました:`, err);
+                    lastError = err;
+                    // 次のプロキシに進む
+                }
+            }
+            throw lastError || new Error('すべてのプロキシサーバーとの通信に失敗しました。');
+        }
+
+        function updateStatusText(text) {
+            document.getElementById('statusText').textContent = text;
+        }
+
+        document.getElementById('searchBtn').addEventListener('click', async () => {
+            const searchBtn = document.getElementById('searchBtn');
+            const statusArea = document.getElementById('statusArea');
+            const errorArea = document.getElementById('errorArea');
+            const resultContainer = document.getElementById('resultContainer');
+            const resultList = document.getElementById('resultList');
+            const matchCount = document.getElementById('matchCount');
+
+            // 画面表示リセット
+            searchBtn.disabled = true;
+            statusArea.classList.remove('hidden');
+            errorArea.classList.add('hidden');
+            resultContainer.classList.add('hidden');
+            resultList.innerHTML = '';
+
+            // 入力データの整理
+            const kwInput = document.getElementById('keywords').value;
+            // カンマ、スペースでキーワードを配列化
+            const keywords = kwInput.split(/[,，\s]+/).filter(k => k.trim() !== "");
+            const days = parseInt(document.getElementById('days').value, 10) || 7;
+            
+            // ターゲットとなる日付を計算
+            const targetDate = new Date();
+            targetDate.setDate(targetDate.getDate() - days);
+            targetDate.setHours(0, 0, 0, 0);
+
+            let allResults = [];
+            let errorSites = [];
+
+            // 各フィードを巡回
+            for (const feed of FEEDS) {
+                try {
+                    updateStatusText(`${feed.name} のフィードを取得しています...`);
+                    const rawXmlText = await fetchWithFallback(feed.url);
+
+                    // XMLパース
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(rawXmlText, "text/xml");
+                    
+                    // パース失敗のチェック
+                    const parserError = xmlDoc.querySelector("parsererror");
+                    if (parserError) {
+                        throw new Error("XMLの解析に失敗しました。");
+                    }
+
+                    const items = xmlDoc.querySelectorAll("item, entry");
+                    if (items.length === 0) {
+                        throw new Error("フィード記事が見つかりませんでした。");
+                    }
+
+                    items.forEach(item => {
+                        const title = item.querySelector("title")?.textContent || "";
+                        
+                        // リンクタグ処理 (RSS/Atom対応)
+                        let link = item.querySelector("link")?.textContent || "";
+                        if (!link && item.querySelector("link")) {
+                            link = item.querySelector("link").getAttribute("href") || "";
+                        }
+                        
+                        // 投稿日時処理
+                        const pubDateStr = item.querySelector("pubDate")?.textContent || 
+                                           item.querySelector("dc\\:date")?.textContent || 
+                                           item.querySelector("published")?.textContent || 
+                                           item.querySelector("updated")?.textContent || "";
+                        
+                        // 本文・概要
+                        const description = item.querySelector("description")?.textContent || 
+                                            item.querySelector("summary")?.textContent || "";
+
+                        if (!title || !link) return;
+
+                        const pubDate = new Date(pubDateStr);
+                        // 日付が無効、または指定期間より古い場合はスキップ
+                        if (isNaN(pubDate.getTime()) || pubDate < targetDate) return;
+
+                        // キーワードチェック (大文字小文字無視のOR検索)
+                        const searchTarget = (title + " " + description).toLowerCase();
+                        const isMatch = keywords.length === 0 || keywords.some(kw => searchTarget.includes(kw.toLowerCase()));
+
+                        if (isMatch) {
+                            allResults.push({
+                                siteName: feed.name,
+                                title: title.trim(),
+                                link: link.trim(),
+                                pubDate: pubDate,
+                                dateString: pubDate.toLocaleDateString('ja-JP', { 
+                                    year: 'numeric', 
+                                    month: '2-digit', 
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                })
+                            });
+                        }
+                    });
+
+                } catch (err) {
+                    console.error(`${feed.name} の処理中にエラーが発生しました:`, err);
+                    errorSites.push(`${feed.name} (${err.message || '通信エラー'})`);
+                }
+            }
+
+            // 新しい順にソート
+            allResults.sort((a, b) => b.pubDate - a.pubDate);
+
+            // ローディング終了
+            statusArea.classList.add('hidden');
+            searchBtn.disabled = false;
+
+            // 部分エラー表示
+            if (errorSites.length > 0) {
+                errorArea.innerHTML = `
+                    <div class="font-bold mb-1">⚠️ 一部のニュースソースを取得できませんでした:</div>
+                    <ul class="list-disc list-inside space-y-1 text-xs opacity-90">
+                        ${errorSites.map(site => `<li>${site}</li>`).join('')}
+                    </ul>
+                    <div class="mt-2 text-xs text-red-300">
+                        ※一時的な通信遮断、またはプロキシサーバー側の接続規制が考えられます。時間を置いてもう一度試すか、キーワード条件を狭めてみてください。
+                    </div>
+                `;
+                errorArea.classList.remove('hidden');
+            }
+
+            // 結果構築
+            matchCount.textContent = allResults.length;
+            resultContainer.classList.remove('hidden');
+
+            if (allResults.length === 0) {
+                resultList.innerHTML = `
+                    <div class="text-center py-12 bg-gray-800/30 border border-gray-800 rounded-xl">
+                        <span class="text-3xl block mb-2">🔍</span>
+                        <p class="text-gray-400 text-sm">指定されたキーワード・期間に一致する記事は見つかりませんでした。</p>
+                        <p class="text-gray-600 text-xs mt-1">※キーワードを減らすか、遡る日数を増やしてお試しください。</p>
+                    </div>
+                `;
+                return;
+            }
+
+            allResults.forEach(res => {
+                const card = document.createElement('div');
+                card.className = "bg-gray-850 border border-gray-800 hover:border-indigo-500/50 p-4 rounded-xl transition-all duration-200 shadow-md flex flex-col gap-2";
+                
+                const badgeStyle = res.siteName === 'Indie Freaks' 
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-800/50' 
+                    : 'bg-rose-950 text-rose-300 border-rose-800/50';
+
+                card.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${badgeStyle}">${res.siteName}</span>
+                        <span class="text-xs text-gray-500">${res.dateString}</span>
+                    </div>
+                    <a href="${res.link}" target="_blank" rel="noopener noreferrer" class="text-base font-semibold text-indigo-300 hover:text-indigo-200 transition-colors leading-snug">
+                        ${res.title}
+                    </a>
+                `;
+                resultList.appendChild(card);
+            });
+
+            // クリップボードコピー処理の強化
+            document.getElementById('copyBtn').onclick = () => {
+                let markdown = "🎮 **カスタムゲームニュース ピックアップ** 🎮\n\n";
+                allResults.forEach(res => {
+                    markdown += `【${res.siteName}】 ${res.title}\n📅 ${res.dateString}\n🔗 ${res.link}\n\n`;
+                });
+
+                // クリップボードAPIの呼び出し
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(markdown.trim())
+                        .then(() => showToast("Discord用のテキストをコピーしました！", "✅"))
+                        .catch(err => fallbackCopyText(markdown));
+                } else {
+                    fallbackCopyText(markdown);
+                }
+            };
+        });
+
+        // コピー制限（非セキュアコンテキスト/iframe環境）対応のフォールバック
+        function fallbackCopyText(text) {
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = text.trim();
+                // 画面外に配置
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+
+                if (successful) {
+                    showToast("Discord用のテキストをコピーしました！(互換モード)", "✅");
+                } else {
+                    showToast("コピーできませんでした。ブラウザ設定を確認してください。", "❌");
+                }
+            } catch (err) {
+                console.error("フォールバックコピーに失敗:", err);
+                showToast("コピー中にエラーが発生しました。", "❌");
+            }
+        }
+    </script>
+</body>
+</html>
