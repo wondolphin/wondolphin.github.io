@@ -88,7 +88,6 @@
     <script>
         // ニュースフィード定義
         const FEEDS = [
-            // isWordPress: true を付与し、直接安全にJSONを取得可能にする
             { name: 'Indie Freaks', url: 'https://indiefreaks.com/feed/', baseUrl: 'https://indiefreaks.com', isWordPress: true },
             { name: 'IGN Japan', url: 'https://jp.ign.com/feed.xml', isWordPress: false }
         ];
@@ -98,7 +97,6 @@
             const txt = document.createElement("textarea");
             txt.innerHTML = html;
             const decoded = txt.value;
-            // HTMLタグを取り除いてピュアな文章にする
             return decoded.replace(/<\/?[^>]+(>|$)/g, "").trim();
         }
 
@@ -121,21 +119,19 @@
             document.getElementById('statusText').textContent = text;
         }
 
-        // 🚀 最強の取得手法: WordPress REST API から直接取得 (CORS/Cloudflare制限をバイパス)
+        // 🚀 手法1: WordPress REST API から直接取得 (最速・最もブロックされにくい)
         async function fetchViaWordPressAPI(baseUrl, siteName) {
-            // WordPress標準のAPIエンドポイントから最新20件を取得
             const target = `${baseUrl.replace(/\/$/, '')}/wp-json/wp/v2/posts?per_page=20&_=${Date.now()}`;
             const response = await fetch(target);
             if (!response.ok) {
-                throw new Error(`WordPress API HTTP ${response.status}`);
+                throw new Error(`WordPress API 応答エラー (Status: ${response.status})`);
             }
             const posts = await response.json();
             if (!Array.isArray(posts)) {
-                throw new Error('APIから返されたデータがリスト形式ではありません');
+                throw new Error('APIから返されたデータが不適切です');
             }
 
             return posts.map(post => {
-                // WordPressの時間はGMTで返ってくるので協定世界時(UTC)として安全にパース
                 const pubDate = post.date_gmt ? new Date(post.date_gmt + 'Z') : new Date(post.date || "");
                 return {
                     siteName: siteName,
@@ -147,16 +143,39 @@
             });
         }
 
-        // 取得手法A: RSS-to-JSON 専用APIを使う方法
+        // 🚀 手法2: Feed2JSON サービスを利用する (CORSに対応しており、Cloudflareの制限を受けにくい)
+        async function fetchViaFeed2Json(feedUrl, siteName) {
+            const target = `https://feed2json.org/convert?url=${encodeURIComponent(feedUrl)}`;
+            const response = await fetch(target);
+            if (!response.ok) {
+                throw new Error(`Feed2JSON API 応答エラー (Status: ${response.status})`);
+            }
+            const data = await response.json();
+            if (!data.items || !Array.isArray(data.items)) {
+                throw new Error('フィード項目が空、または形式が不正です');
+            }
+
+            return data.items.map(item => {
+                return {
+                    siteName: siteName,
+                    title: decodeHtml(item.title || ""),
+                    link: item.url || "",
+                    pubDate: new Date(item.date_published || item.date_modified || Date.now()),
+                    description: decodeHtml(item.summary || item.content_html || "")
+                };
+            });
+        }
+
+        // 手法3: RSS-to-JSON API
         async function fetchViaRss2Json(feedUrl, siteName) {
             const target = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}&_=${Date.now()}`;
             const response = await fetch(target);
             if (!response.ok) {
-                throw new Error(`RSS変換 API HTTP ${response.status}`);
+                throw new Error(`rss2json API 応答エラー (Status: ${response.status})`);
             }
             const data = await response.json();
             if (data.status !== 'ok') {
-                throw new Error(data.message || 'RSS変換APIエラー');
+                throw new Error(data.message || 'rss2json 内部エラー');
             }
             
             return data.items.map(item => {
@@ -171,13 +190,12 @@
             });
         }
 
-        // 取得手法B: CORSプロキシ + XMLパース (何重ものプロキシを用意)
+        // 手法4: CORSプロキシによるフォールバック (順番に別のプロキシを試す)
         async function fetchViaCorsProxy(feedUrl, siteName) {
-            // 信頼性の高いいくつかのCORSプロキシリスト
             const corsProxies = [
                 `https://corsproxy.io/?${encodeURIComponent(feedUrl)}`,
-                `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}&_=${Date.now()}`,
-                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(feedUrl)}`
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(feedUrl)}`,
+                `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}&_=${Date.now()}`
             ];
 
             let lastError = null;
@@ -229,42 +247,50 @@
                     });
 
                     if (results.length > 0) {
-                        return results; // 成功したら抜ける
+                        return results;
                     }
                 } catch (e) {
                     lastError = e;
                 }
             }
-            throw lastError || new Error("すべてのCORSプロキシサーバーとの通信に失敗しました。");
+            throw lastError || new Error("すべてのCORSプロキシが遮断されました");
         }
 
-        // 巡回マネージャー（サイトの種類を検知して最適ルートを選択）
+        // 接続自動切替・管理マネージャー
         async function getArticles(feed) {
-            // 手法1: WordPressサイトなら直接APIにリクエスト（超強力・最速・CORSもCloudflareも突破可能）
+            // ルート1: WordPress REST API (直接通信)
             if (feed.isWordPress && feed.baseUrl) {
                 try {
-                    updateStatusText(`[${feed.name}] 取得中 (接続方法1: 直接API通信)...`);
+                    updateStatusText(`[${feed.name}] 取得中 (接続方法1: 直接API)...`);
                     return await fetchViaWordPressAPI(feed.baseUrl, feed.name);
                 } catch (err) {
-                    console.warn(`[${feed.name}] 直接API接続に失敗しました。RSS中継(手法2)に切り替えます:`, err);
+                    console.warn(`[${feed.name}] 方法1(直接API)失敗:`, err);
                 }
             }
 
-            // 手法2: RSS-to-JSON API を試行
+            // ルート2: Feed2JSON (高信頼・Cloudflare回避)
             try {
-                updateStatusText(`[${feed.name}] 取得中 (接続方法2: 専用中継サーバー)...`);
-                return await fetchViaRss2Json(feed.url, feed.name);
+                updateStatusText(`[${feed.name}] 取得中 (接続方法2: Feed2JSON)...`);
+                return await fetchViaFeed2Json(feed.url, feed.name);
             } catch (err) {
-                console.warn(`[${feed.name}] 専用中継サーバーが失敗しました。予備プロキシ(手法3)を試します:`, err);
+                console.warn(`[${feed.name}] 方法2(Feed2JSON)失敗:`, err);
             }
 
-            // 手法3: 複数のCORSプロキシを使った自力パースを最終試行
+            // ルート3: RSS-to-JSON
             try {
-                updateStatusText(`[${feed.name}] 取得中 (接続方法3: 予備のCORSプロキシ経由)...`);
+                updateStatusText(`[${feed.name}] 取得中 (接続方法3: rss2json)...`);
+                return await fetchViaRss2Json(feed.url, feed.name);
+            } catch (err) {
+                console.warn(`[${feed.name}] 方法3(rss2json)失敗:`, err);
+            }
+
+            // ルート4: CORSプロキシ巡回
+            try {
+                updateStatusText(`[${feed.name}] 取得中 (接続方法4: CORSプロキシ)...`);
                 return await fetchViaCorsProxy(feed.url, feed.name);
             } catch (err) {
-                console.error(`[${feed.name}] すべての接続ルートが遮断されました:`, err);
-                throw new Error(`すべての通信経路が遮断されました。一時的にアクセスが拒否されている可能性があります。`);
+                console.error(`[${feed.name}] すべての方法が失敗しました:`, err);
+                throw new Error(`CORSポリシー、または相手サーバーのセキュリティ（Cloudflare）により通信が拒否されました。`);
             }
         }
 
@@ -335,16 +361,30 @@
             statusArea.classList.add('hidden');
             searchBtn.disabled = false;
 
-            // 一部エラーの表示
+            // エラー時の詳細説明表示
             if (errorSites.length > 0) {
+                const isOriginNull = window.location.protocol === 'file:' || !window.location.origin || window.location.origin === 'null';
+                let additionalWarning = '';
+                
+                if (isOriginNull) {
+                    additionalWarning = `
+                        <div class="mt-3 p-3 bg-amber-950/40 border border-amber-500/30 text-amber-300 rounded-lg text-xs leading-relaxed">
+                            <strong>💡 CORSポリシーエラーの対策:</strong><br>
+                            ブラウザ上でローカルファイル（file://...）として実行されているか、セキュリティの高いSandbox環境内にあります。
+                            GitHub Pagesに正しくアップロードし、<strong>「https://あなたのユーザー名.github.io/リポジトリ名/game_salvage_tool.html」</strong> という本番URLに直接アクセスしてご利用ください。
+                        </div>
+                    `;
+                }
+
                 errorArea.innerHTML = `
                     <div class="font-bold mb-1">⚠️ 一部のニュースソースを取得できませんでした:</div>
                     <ul class="list-disc list-inside space-y-1 text-xs opacity-90">
                         ${errorSites.map(site => `<li>${site}</li>`).join('')}
                     </ul>
                     <div class="mt-2 text-xs text-red-300">
-                        ※お使いのブラウザやセキュリティアドオン、一時的なアクセス規制が原因の場合があります。時間をおいてもう一度お試しください。
+                        相手のウェブサイトが外部プログラムからの自動アクセスを厳しく制限（Cloudflareチャレンジ等）している場合、CORSプロキシ経由の通信は失敗することがあります。
                     </div>
+                    ${additionalWarning}
                 `;
                 errorArea.classList.remove('hidden');
             }
