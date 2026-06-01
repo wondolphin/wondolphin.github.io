@@ -18,10 +18,6 @@
                     </h1>
                     <p class="text-gray-400 mt-1.5 text-xs sm:text-sm">Indie Freaks & IGN Japan からお好みのインディー情報を自動抽出</p>
                 </div>
-                <!-- ローカル実行警告バッジ（file://環境のみで動的に表示） -->
-                <div id="localWarning" class="hidden text-xs bg-amber-900/40 border border-amber-600/50 text-amber-300 px-3 py-1.5 rounded-lg max-w-xs">
-                    ⚠️ ローカルファイルとして実行中。ブラウザの制限により通信がブロックされる場合は、簡易サーバー等をご利用ください。
-                </div>
             </div>
         </header>
 
@@ -61,7 +57,7 @@
         <div id="statusArea" class="hidden bg-gray-800/40 border border-indigo-500/30 rounded-xl p-6 text-center mb-6">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-400 mb-3"></div>
             <p id="statusText" class="text-indigo-200 text-sm font-medium">ニュースサイトから最新フィードを読み込んでいます...</p>
-            <p class="text-gray-500 text-xs mt-1">※複数のプロキシサーバーを自動的に切り替えて試行します (5〜10秒ほどかかる場合があります)</p>
+            <p class="text-gray-500 text-xs mt-1">※Cloudflareによるアクセスブロックを回避するため、中継サービスを使用しています</p>
         </div>
 
         <!-- エラー警告表示エリア -->
@@ -90,34 +86,10 @@
     </div>
 
     <script>
-        // ローカル環境(file://)で実行されているか判定してユーザーに警告を促す
-        if (window.location.protocol === 'file:') {
-            document.getElementById('localWarning').classList.remove('hidden');
-        }
-
         // ニュースフィード定義
         const FEEDS = [
             { name: 'Indie Freaks', url: 'https://indiefreaks.com/feed/' },
             { name: 'IGN Japan', url: 'https://jp.ign.com/feed.xml' }
-        ];
-
-        // 複数のCORSプロキシリスト (混雑やダウン時に上から順に自動フォールバックします)
-        const PROXY_LIST = [
-            {
-                name: 'AllOrigins',
-                getUrl: (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${Date.now()}`,
-                parse: (data) => data.contents // alloriginsはJSONにラップされて返る
-            },
-            {
-                name: 'CorsProxy.io',
-                getUrl: (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-                parse: (data) => data // テキストダイレクト
-            },
-            {
-                name: 'Codetabs',
-                getUrl: (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-                parse: (data) => data // テキストダイレクト
-            }
         ];
 
         // トースト通知を表示する関数
@@ -126,59 +98,110 @@
             document.getElementById('toastMessage').textContent = message;
             document.getElementById('toastIcon').textContent = icon;
             
-            // 表示
             toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
             toast.classList.add('translate-y-0', 'opacity-100');
 
-            // 3秒後に非表示
             setTimeout(() => {
                 toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
                 toast.classList.remove('translate-y-0', 'opacity-100');
             }, 3000);
         }
 
-        // プロキシを順番に試しながらデータフェッチを行う関数
-        async function fetchWithFallback(targetUrl) {
-            let lastError = null;
-
-            for (let i = 0; i < PROXY_LIST.length; i++) {
-                const proxy = PROXY_LIST[i];
-                try {
-                    updateStatusText(`通信試行中: [${proxy.name}] からデータを読み込んでいます...`);
-                    const requestUrl = proxy.getUrl(targetUrl);
-                    
-                    const response = await fetch(requestUrl);
-                    if (!response.ok) {
-                        throw new Error(`HTTP status ${response.status}`);
-                    }
-
-                    // AllOriginsはJSON、他はプレーンテキスト
-                    let rawData;
-                    if (proxy.name === 'AllOrigins') {
-                        const json = await response.json();
-                        rawData = proxy.parse(json);
-                    } else {
-                        const text = await response.text();
-                        rawData = proxy.parse(text);
-                    }
-
-                    if (!rawData) {
-                        throw new Error('空のデータが返されました');
-                    }
-
-                    return rawData; // 取得成功
-
-                } catch (err) {
-                    console.warn(`プロキシ [${proxy.name}] が失敗しました:`, err);
-                    lastError = err;
-                    // 次のプロキシに進む
-                }
-            }
-            throw lastError || new Error('すべてのプロキシサーバーとの通信に失敗しました。');
-        }
-
         function updateStatusText(text) {
             document.getElementById('statusText').textContent = text;
+        }
+
+        // 手法1: Cloudflareブロックに最も強い RSS-to-JSON 専用APIを使う方法
+        async function fetchViaRss2Json(feedUrl, siteName) {
+            // 無料のrss2jsonサービスを経由
+            const target = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}&_=${Date.now()}`;
+            const response = await fetch(target);
+            if (!response.ok) {
+                throw new Error(`HTTP status ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.status !== 'ok') {
+                throw new Error(data.message || 'RSS変換APIがエラーを返しました');
+            }
+            
+            // 記事リストを統一フォーマットにマッピングして返却
+            return data.items.map(item => {
+                // rss2jsonの返す日付は "YYYY-MM-DD HH:MM:SS" 形式なのでパース
+                const pubDate = new Date(item.pubDate.replace(/-/g, '/')); 
+                return {
+                    siteName: siteName,
+                    title: item.title || "",
+                    link: item.link || "",
+                    pubDate: pubDate,
+                    description: item.description || ""
+                };
+            });
+        }
+
+        // 手法2: 手法1が予期せず使えなかった場合のフォールバック（CORSプロキシ + 自力XMLパース）
+        async function fetchViaCorsProxy(feedUrl, siteName) {
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(feedUrl)}`;
+            const response = await fetch(proxyUrl);
+            if (!response.ok) {
+                throw new Error(`CORSプロキシ HTTP status ${response.status}`);
+            }
+            const xmlText = await response.text();
+
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+            const parserError = xmlDoc.querySelector("parsererror");
+            if (parserError) {
+                throw new Error("XMLの形式が正しくありません");
+            }
+
+            const items = xmlDoc.querySelectorAll("item, entry");
+            const results = [];
+
+            items.forEach(item => {
+                const title = item.querySelector("title")?.textContent || "";
+                
+                let link = item.querySelector("link")?.textContent || "";
+                if (!link && item.querySelector("link")) {
+                    link = item.querySelector("link").getAttribute("href") || "";
+                }
+                
+                const pubDateStr = item.querySelector("pubDate")?.textContent || 
+                                   item.querySelector("dc\\:date")?.textContent || 
+                                   item.querySelector("published")?.textContent || 
+                                   item.querySelector("updated")?.textContent || "";
+                
+                const description = item.querySelector("description")?.textContent || 
+                                    item.querySelector("summary")?.textContent || "";
+
+                if (!title || !link) return;
+
+                results.push({
+                    siteName: siteName,
+                    title: title.trim(),
+                    link: link.trim(),
+                    pubDate: new Date(pubDateStr),
+                    description: description
+                });
+            });
+
+            return results;
+        }
+
+        // 取得用ラッパー関数（プロキシエラー時に自動的に手法を切り替える）
+        async function getArticles(feed) {
+            try {
+                updateStatusText(`[${feed.name}] 取得中 (接続方法A: 専用中継サーバー)...`);
+                return await fetchViaRss2Json(feed.url, feed.name);
+            } catch (err) {
+                console.warn(`[${feed.name}] 接続方法Aが失敗したため、方法B（CORSバイパス）を試します:`, err);
+                try {
+                    updateStatusText(`[${feed.name}] 取得中 (接続方法B: CORSプロキシ経由)...`);
+                    return await fetchViaCorsProxy(feed.url, feed.name);
+                } catch (err2) {
+                    console.error(`[${feed.name}] すべての接続方法が失敗しました:`, err2);
+                    throw new Error(`データの取得に失敗しました。サイト側のセキュリティ制限または中継サーバーの混雑が原因です。`);
+                }
+            }
         }
 
         document.getElementById('searchBtn').addEventListener('click', async () => {
@@ -198,7 +221,6 @@
 
             // 入力データの整理
             const kwInput = document.getElementById('keywords').value;
-            // カンマ、スペースでキーワードを配列化
             const keywords = kwInput.split(/[,，\s]+/).filter(k => k.trim() !== "");
             const days = parseInt(document.getElementById('days').value, 10) || 7;
             
@@ -213,60 +235,20 @@
             // 各フィードを巡回
             for (const feed of FEEDS) {
                 try {
-                    updateStatusText(`${feed.name} のフィードを取得しています...`);
-                    const rawXmlText = await fetchWithFallback(feed.url);
-
-                    // XMLパース
-                    const parser = new DOMParser();
-                    const xmlDoc = parser.parseFromString(rawXmlText, "text/xml");
+                    const articles = await getArticles(feed);
                     
-                    // パース失敗のチェック
-                    const parserError = xmlDoc.querySelector("parsererror");
-                    if (parserError) {
-                        throw new Error("XMLの解析に失敗しました。");
-                    }
-
-                    const items = xmlDoc.querySelectorAll("item, entry");
-                    if (items.length === 0) {
-                        throw new Error("フィード記事が見つかりませんでした。");
-                    }
-
-                    items.forEach(item => {
-                        const title = item.querySelector("title")?.textContent || "";
-                        
-                        // リンクタグ処理 (RSS/Atom対応)
-                        let link = item.querySelector("link")?.textContent || "";
-                        if (!link && item.querySelector("link")) {
-                            link = item.querySelector("link").getAttribute("href") || "";
-                        }
-                        
-                        // 投稿日時処理
-                        const pubDateStr = item.querySelector("pubDate")?.textContent || 
-                                           item.querySelector("dc\\:date")?.textContent || 
-                                           item.querySelector("published")?.textContent || 
-                                           item.querySelector("updated")?.textContent || "";
-                        
-                        // 本文・概要
-                        const description = item.querySelector("description")?.textContent || 
-                                            item.querySelector("summary")?.textContent || "";
-
-                        if (!title || !link) return;
-
-                        const pubDate = new Date(pubDateStr);
+                    articles.forEach(article => {
                         // 日付が無効、または指定期間より古い場合はスキップ
-                        if (isNaN(pubDate.getTime()) || pubDate < targetDate) return;
+                        if (isNaN(article.pubDate.getTime()) || article.pubDate < targetDate) return;
 
                         // キーワードチェック (大文字小文字無視のOR検索)
-                        const searchTarget = (title + " " + description).toLowerCase();
+                        const searchTarget = (article.title + " " + article.description).toLowerCase();
                         const isMatch = keywords.length === 0 || keywords.some(kw => searchTarget.includes(kw.toLowerCase()));
 
                         if (isMatch) {
                             allResults.push({
-                                siteName: feed.name,
-                                title: title.trim(),
-                                link: link.trim(),
-                                pubDate: pubDate,
-                                dateString: pubDate.toLocaleDateString('ja-JP', { 
+                                ...article,
+                                dateString: article.pubDate.toLocaleDateString('ja-JP', { 
                                     year: 'numeric', 
                                     month: '2-digit', 
                                     day: '2-digit',
@@ -278,8 +260,7 @@
                     });
 
                 } catch (err) {
-                    console.error(`${feed.name} の処理中にエラーが発生しました:`, err);
-                    errorSites.push(`${feed.name} (${err.message || '通信エラー'})`);
+                    errorSites.push(`${feed.name} (${err.message})`);
                 }
             }
 
@@ -290,7 +271,7 @@
             statusArea.classList.add('hidden');
             searchBtn.disabled = false;
 
-            // 部分エラー表示
+            // 一部エラーの表示
             if (errorSites.length > 0) {
                 errorArea.innerHTML = `
                     <div class="font-bold mb-1">⚠️ 一部のニュースソースを取得できませんでした:</div>
@@ -298,7 +279,7 @@
                         ${errorSites.map(site => `<li>${site}</li>`).join('')}
                     </ul>
                     <div class="mt-2 text-xs text-red-300">
-                        ※一時的な通信遮断、またはプロキシサーバー側の接続規制が考えられます。時間を置いてもう一度試すか、キーワード条件を狭めてみてください。
+                        ※一時的なアクセス集中の可能性があります。時間をおいて再読み込みをお試しください。
                     </div>
                 `;
                 errorArea.classList.remove('hidden');
@@ -339,14 +320,13 @@
                 resultList.appendChild(card);
             });
 
-            // クリップボードコピー処理の強化
+            // コピー機能
             document.getElementById('copyBtn').onclick = () => {
                 let markdown = "🎮 **カスタムゲームニュース ピックアップ** 🎮\n\n";
                 allResults.forEach(res => {
                     markdown += `【${res.siteName}】 ${res.title}\n📅 ${res.dateString}\n🔗 ${res.link}\n\n`;
                 });
 
-                // クリップボードAPIの呼び出し
                 if (navigator.clipboard && window.isSecureContext) {
                     navigator.clipboard.writeText(markdown.trim())
                         .then(() => showToast("Discord用のテキストをコピーしました！", "✅"))
@@ -357,12 +337,11 @@
             };
         });
 
-        // コピー制限（非セキュアコンテキスト/iframe環境）対応のフォールバック
+        // 非セキュア環境/互換用コピー処理
         function fallbackCopyText(text) {
             try {
                 const textArea = document.createElement("textarea");
                 textArea.value = text.trim();
-                // 画面外に配置
                 textArea.style.position = "fixed";
                 textArea.style.left = "-999999px";
                 textArea.style.top = "-999999px";
@@ -374,12 +353,12 @@
                 document.body.removeChild(textArea);
 
                 if (successful) {
-                    showToast("Discord用のテキストをコピーしました！(互換モード)", "✅");
+                    showToast("Discord用のテキストをコピーしました！", "✅");
                 } else {
                     showToast("コピーできませんでした。ブラウザ設定を確認してください。", "❌");
                 }
             } catch (err) {
-                console.error("フォールバックコピーに失敗:", err);
+                console.error(err);
                 showToast("コピー中にエラーが発生しました。", "❌");
             }
         }
