@@ -350,7 +350,8 @@
     // シェア用設定
     const SHARE_CONFIG = {
       TWEET_TEXT: "ルールを推測するパズル「Chromatic Apoptosis」をクリアしました！\n#宇宙謎 #ルール発見型パズル @wondolphin",
-      TWEET_URL: "https://wondolphin.github.io/puzzle/uchunazo/colorkuri/index.html",
+      TWEET_TEXT2: "ルールを推測するパズル「Chromatic Apoptosis」をクリアしました！\n #ルール発見型パズル #宇宙謎 @wondolphin",
+      TWEET_URL: "https://wondolphin.github.io/puzzle/uchunazo/chromatic_apoptosis/index.html",
       SUPPORT_URL: "https://x.com/wondolphin"
     };
 
@@ -571,7 +572,7 @@
     function setupShareUI() {
       shareContainer.innerHTML = '';
       
-      const manualText = SHARE_CONFIG.TWEET_TEXT + " (手動コピー)\n" + SHARE_CONFIG.TWEET_URL;
+      const manualText = SHARE_CONFIG.TWEET_TEXT2 + "\n" + SHARE_CONFIG.TWEET_URL;
 
       const mainBtn = document.createElement('button');
       mainBtn.className = 'share-btn flex items-center justify-center gap-2 mx-auto';
