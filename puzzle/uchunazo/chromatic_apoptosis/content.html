@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Chromatic Apoptosis</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts for Sci-Fi/Minimal aesthetic -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      background: radial-gradient(circle at center, #1a202c 0%, #080b11 100%);
+      font-family: 'Orbitron', 'Share Tech Mono', sans-serif;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    /* 正方形のラッパー：常に縦横の短い方の90%サイズを維持 */
+    .game-wrapper {
+      width: 90vmin;
+      height: 90vmin;
+      max-width: 600px;
+      max-height: 600px;
+      position: relative;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(255, 255, 255, 0.01);
+      border-radius: 20px;
+      backdrop-filter: blur(12px);
+      padding: 6%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* 盤面コンテナ */
+    .board-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: rgba(3, 7, 18, 0.6);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.9);
+    }
+
+    /* グリッド線のガイド */
+    .grid-guide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-template-rows: repeat(5, 1fr);
+      z-index: 1;
+    }
+
+    /* 各マスのグリッドセル */
+    .grid-guide-cell {
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.01);
+    }
+
+    /* 【空きマスのデザイン】点線を無くし、白っぽく神秘的に光るソケットに調整 */
+    .grid-guide-cell::after {
+      content: '';
+      position: absolute;
+      top: 10%;
+      left: 10%;
+      width: 80%;
+      height: 80%;
+      border-radius: 8px;
+      /* じんわりとした白の発光グラデーション */
+      background: radial-gradient(circle at center, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.02) 80%);
+      /* 内外に白っぽい柔らかな光彩をあてる */
+      box-shadow: 
+        inset 0 0 12px rgba(255, 255, 255, 0.15),
+        0 0 8px rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12); /* ぼんやりと境界がわかる程度の実線 */
+    }
+
+    /* 各コマのベーススタイル */
+    .tile {
+      position: absolute;
+      width: 18%; /* 20%よりやや小さくして隙間を作る */
+      height: 18%;
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: left 0.35s cubic-bezier(0.25, 1, 0.5, 1), top 0.35s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.5s ease, box-shadow 0.5s ease, transform 0.35s ease, opacity 0.5s ease;
+      z-index: 5;
+    }
+
+    /* コマのカラーIDごとの設定（鮮やかなネオン調） */
+    .tile-1 { /* シアン */
+      background: radial-gradient(circle at 35% 35%, #9ffffb 0%, #00d2ff 60%, #008fa8 100%);
+      box-shadow: 0 0 15px rgba(0, 210, 255, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+    }
+    .tile-2 { /* マゼンタ */
+      background: radial-gradient(circle at 35% 35%, #ffbfe0 0%, #ff007f 60%, #b30059 100%);
+      box-shadow: 0 0 15px rgba(255, 0, 127, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+    }
+    .tile-3 { /* イエロー */
+      background: radial-gradient(circle at 35% 35%, #fffae0 0%, #ffdf00 60%, #b39c00 100%);
+      box-shadow: 0 0 15px rgba(255, 223, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+    }
+    .tile-4 { /* ライムグリーン */
+      background: radial-gradient(circle at 35% 35%, #e0ffcc 0%, #39ff14 60%, #22990c 100%);
+      box-shadow: 0 0 15px rgba(57, 255, 20, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+    }
+    .tile-5 { /* オレンジ */
+      background: radial-gradient(circle at 35% 35%, #ffe6cc 0%, #ff6c00 60%, #b34b00 100%);
+      box-shadow: 0 0 15px rgba(255, 108, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+    }
+    .tile-6 { /* パープル */
+      background: radial-gradient(circle at 35% 35%, #f2ccff 0%, #b026ff 60%, #700db5 100%);
+      box-shadow: 0 0 15px rgba(176, 38, 255, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+    }
+
+    /* 【不活性コマのデザイン】通常コマと同等サイズ(scale(1))にし、明るめのダークスチール（鈍い金属光沢）に調整 */
+    .tile-black {
+      background: radial-gradient(circle at 35% 35%, #4a5568 0%, #2d3748 70%, #1a202c 100%) !important;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.2) !important;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      transform: scale(1) !important; /* 通常コマと同じ大きさに維持 */
+      opacity: 1;
+      cursor: default;
+    }
+
+    /* 黒化時のパルスアニメーション */
+    @keyframes blacken {
+      0% { transform: scale(1.1); filter: brightness(1.6); }
+      100% { transform: scale(1); filter: brightness(1); }
+    }
+    .anim-blacken {
+      animation: blacken 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* クリアオーバーレイ (盤面を暗くせず、クリック領域として機能する透明カバー) */
+    .clear-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(4, 6, 14, 0.15); /* 極めてわずかに暗くして文字の可読性をサポート */
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .clear-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* 黄色く、さらに大きくなったクリア表示 */
+    .clear-text {
+      font-size: 4rem;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      color: #f59e0b; /* 鮮やかなイエローゴールド */
+      text-shadow: 0 0 25px rgba(245, 158, 11, 0.7), 0 0 50px rgba(245, 158, 11, 0.3);
+      animation: pulse-glow-yellow 1.8s infinite ease-in-out;
+      margin-left: 0.15em;
+      margin-bottom: 1rem;
+    }
+
+    @keyframes pulse-glow-yellow {
+      0%, 100% { text-shadow: 0 0 25px rgba(245, 158, 11, 0.7), 0 0 50px rgba(245, 158, 11, 0.3); transform: scale(1); }
+      50% { text-shadow: 0 0 40px rgba(245, 158, 11, 0.9), 0 0 70px rgba(245, 158, 11, 0.5); transform: scale(1.06); }
+    }
+
+    /* 1秒後にフェードインするシェアエリア */
+    .share-container {
+      margin-top: 2rem;
+      opacity: 0;
+      transform: translateY(15px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .share-container.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* コマの表面に走るハイライトライン */
+    .tile::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 50%);
+      pointer-events: none;
+    }
+
+    /* 新設計のボタン・リンク群の共通デザイン */
+    .share-btn, .choice-btn, .copy-btn, .back-btn {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 0.8rem 2rem;
+      border-radius: 2rem;
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: bold;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      min-width: 260px;
+      text-align: center;
+      outline: none;
+      letter-spacing: 0.05em;
+    }
+    .share-btn:hover, .choice-btn:hover, .copy-btn:hover {
+      background: #f59e0b; /* イエローゴールド */
+      color: #0f172a; /* 紺黒 */
+      border-color: #fbbf24;
+      transform: scale(1.02);
+    }
+    .back-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    .back-btn {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 0.75rem;
+      padding: 0.5rem 2rem;
+      min-width: 150px;
+    }
+
+    .help-link {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.4);
+      text-decoration: underline;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    .help-link:hover {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .manual-copy-section {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 1.2rem;
+      border-radius: 12px;
+      width: 90%;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      align-items: center;
+      backdrop-filter: blur(8px);
+    }
+    .manual-text-area {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 0.8rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.7);
+      white-space: pre-wrap;
+      word-break: break-all;
+      text-align: left;
+      width: 100%;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body class="h-screen w-screen flex justify-center items-center relative select-none">
+
+  <!-- メインの正方形ラッパー -->
+  <main class="game-wrapper" id="gameWrapper">
+    
+    <!-- 盤面エリア（全体の76%幅に抑え、上下の余白を十分に確保） -->
+    <div class="w-[76%] aspect-square relative my-auto">
+      <div class="board-container" id="boardContainer">
+        <!-- グリッドの受け皿（ガイド線） -->
+        <div class="grid-guide" id="gridGuide"></div>
+      </div>
+    </div>
+
+    <!-- 下部ボタンエリア -->
+    <footer class="w-full grid grid-cols-2 gap-3 pb-2">
+      <button id="undoBtn" class="py-2.5 px-4 rounded-lg bg-white bg-opacity-5 hover:bg-opacity-10 active:bg-opacity-20 text-white text-opacity-80 text-[10px] font-bold tracking-widest border border-white border-opacity-10 transition-all duration-150 disabled:opacity-10 disabled:pointer-events-none" disabled>
+        UNDO
+      </button>
+      <button id="resetBtn" class="py-2.5 px-4 rounded-lg bg-white bg-opacity-5 hover:bg-opacity-10 active:bg-opacity-20 text-white text-opacity-80 text-[10px] font-bold tracking-widest border border-white border-opacity-10 transition-all duration-150">
+        RESET
+      </button>
+    </footer>
+
+  </main>
+
+  <!-- クリア画面 (背景はほぼ暗くせず透明に近い) -->
+  <div class="clear-overlay" id="clearOverlay">
+    <div class="text-center flex flex-col items-center w-full">
+      <h1 class="clear-text">CLEAR!</h1>
+      
+      <!-- 1秒後に現れるコンテナ -->
+      <div class="share-container" id="shareContainer">
+        <!-- JSで動的に生成 -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- 初期配置データ ---
+    const INITIAL_GRID = [
+      [1, 2, 3, 4, 5],
+      [4, 1, 5, 6, 2],
+      [6, 3, 0, 1, 4],
+      [2, 4, 1, 5, 3],
+      [3, 6, 4, 2, 1]
+    ];
+
+    const ROWS = 5;
+    const COLS = 5;
+
+    // シェア用設定
+    const SHARE_CONFIG = {
+      TWEET_TEXT: "ルールを推測するパズル「Chromatic Apoptosis」をクリアしました！\n#宇宙謎 #ルール発見型パズル @wondolphin",
+      TWEET_URL: "https://wondolphin.github.io/puzzle/uchunazo/colorkuri/index.html",
+      SUPPORT_URL: "https://x.com/wondolphin"
+    };
+
+    // ゲーム内状態管理
+    let tiles = []; // コマの配列 { id, color, r, c, isBlack, element }
+    let emptyPos = { r: 2, c: 2 }; // コマがないマスの位置 (初期状態は[2,2])
+    let isAnimating = false; // アニメーション中の連続クリック防止
+    let historyStack = []; // 手戻り用の状態スタック
+
+    const boardContainer = document.getElementById('boardContainer');
+    const gridGuide = document.getElementById('gridGuide');
+    const clearOverlay = document.getElementById('clearOverlay');
+    const shareContainer = document.getElementById('shareContainer');
+    const undoBtn = document.getElementById('undoBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    // グリッドガイド（受け皿）の生成
+    for (let i = 0; i < ROWS * COLS; i++) {
+      const cell = document.createElement('div');
+      cell.classList.add('grid-guide-cell');
+      gridGuide.appendChild(cell);
+    }
+
+    // コマ位置計算 (％)
+    function getPercentCoords(r, c) {
+      return {
+        top: `${r * 20 + 1}%`,
+        left: `${c * 20 + 1}%`
+      };
+    }
+
+    // 現在の盤面状態をスタックに保存
+    function saveState() {
+      const state = {
+        tiles: tiles.map(t => ({
+          id: t.id,
+          r: t.r,
+          c: t.c,
+          isBlack: t.isBlack
+        })),
+        emptyPos: { ...emptyPos }
+      };
+      historyStack.push(state);
+      updateUndoButton();
+    }
+
+    // UNDOボタンの有効/無効化制御
+    function updateUndoButton() {
+      undoBtn.disabled = historyStack.length === 0;
+    }
+
+    // ゲームの初期化
+    function initGame() {
+      // 既存のコマをクリア
+      const oldTiles = boardContainer.querySelectorAll('.tile');
+      oldTiles.forEach(t => t.remove());
+      
+      tiles = [];
+      emptyPos = { r: 2, c: 2 };
+      isAnimating = false;
+      historyStack = [];
+      updateUndoButton();
+
+      let tileId = 1;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const colorVal = INITIAL_GRID[r][c];
+          if (colorVal === 0) {
+            continue; // コマがないマス
+          }
+
+          // コマ要素の生成
+          const el = document.createElement('div');
+          el.className = `tile tile-${colorVal}`;
+          
+          const coords = getPercentCoords(r, c);
+          el.style.top = coords.top;
+          el.style.left = coords.left;
+
+          // データオブジェクト
+          const tileObj = {
+            id: tileId++,
+            color: colorVal,
+            r: r,
+            c: c,
+            isBlack: false,
+            element: el
+          };
+
+          // クリック / タップイベントの登録（pointerdownで迅速に反応）
+          el.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            onTileClicked(tileObj);
+          });
+
+          boardContainer.appendChild(el);
+          tiles.push(tileObj);
+        }
+      }
+    }
+
+    // コマがクリックされた時の処理
+    function onTileClicked(tile) {
+      if (tile.isBlack || isAnimating) return;
+
+      isAnimating = true;
+
+      // 移動する前に現在の状態を保存
+      saveState();
+
+      const prevR = tile.r;
+      const prevC = tile.c;
+
+      // 移動先の座標を設定
+      tile.r = emptyPos.r;
+      tile.c = emptyPos.c;
+
+      // 空きマスの場所を、クリックされたコマが元いた場所に更新
+      emptyPos.r = prevR;
+      emptyPos.c = prevC;
+
+      // 移動中に他のコマに重なっても裏側に隠れないよう、一時的に最前面にする(z-indexを30へ)
+      tile.element.style.zIndex = '30';
+
+      // 移動アニメーションの適用
+      const nextCoords = getPercentCoords(tile.r, tile.c);
+      tile.element.style.top = nextCoords.top;
+      tile.element.style.left = nextCoords.left;
+
+      // 移動完了を待つ（0.35s）
+      setTimeout(() => {
+        checkRulesAndEvaluate(tile);
+        // アニメーション完了後、z-indexを基準値(5)に戻す
+        tile.element.style.zIndex = '5';
+        isAnimating = false;
+      }, 350);
+    }
+
+    // 移動後のルール判定
+    function checkRulesAndEvaluate(movedTile) {
+      const { r, c, color } = movedTile;
+      
+      // 同じ行、同じ列にある「同じ色で、かつまだ黒くなっていない他のコマ」を探す
+      const targetsToBlacken = [];
+
+      tiles.forEach(t => {
+        if (t.id === movedTile.id || t.isBlack || t.color !== color) return;
+
+        if (t.r === r || t.c === c) {
+          targetsToBlacken.push(t);
+        }
+      });
+
+      // 条件に該当する場合、自身を含めて黒化する
+      if (targetsToBlacken.length > 0) {
+        targetsToBlacken.push(movedTile);
+
+        targetsToBlacken.forEach(t => {
+          t.isBlack = true;
+          t.element.classList.add('tile-black', 'anim-blacken');
+        });
+
+        // クリアチェック
+        checkClear();
+      }
+    }
+
+    // 手戻り処理 (UNDO)
+    function performUndo() {
+      if (historyStack.length === 0 || isAnimating) return;
+
+      const prevState = historyStack.pop();
+      emptyPos = { ...prevState.emptyPos };
+
+      prevState.tiles.forEach(savedTile => {
+        const tile = tiles.find(t => t.id === savedTile.id);
+        if (tile) {
+          tile.r = savedTile.r;
+          tile.c = savedTile.c;
+          tile.isBlack = savedTile.isBlack;
+
+          // 位置の復元
+          const coords = getPercentCoords(tile.r, tile.c);
+          tile.element.style.top = coords.top;
+          tile.element.style.left = coords.left;
+
+          // スタイルの復元
+          if (tile.isBlack) {
+            tile.element.classList.add('tile-black');
+          } else {
+            tile.element.classList.remove('tile-black', 'anim-blacken');
+          }
+        }
+      });
+
+      updateUndoButton();
+    }
+
+    // クリア判定
+    function checkClear() {
+      const allBlack = tiles.every(t => t.isBlack);
+      if (allBlack) {
+        setTimeout(() => {
+          setupShareUI();
+          // クリア画面（お祝い）を表示
+          clearOverlay.classList.add('active');
+          
+          // 1秒後にシェアボタンをフェードイン
+          setTimeout(() => {
+            shareContainer.classList.add('show');
+          }, 1000);
+
+        }, 500); // クリア判定後0.5秒後
+      }
+    }
+
+    // 多機能シェアUIの動的構築
+    function setupShareUI() {
+      shareContainer.innerHTML = '';
+      
+      const manualText = SHARE_CONFIG.TWEET_TEXT + " (手動コピー)\n" + SHARE_CONFIG.TWEET_URL;
+
+      const mainBtn = document.createElement('button');
+      mainBtn.className = 'share-btn flex items-center justify-center gap-2 mx-auto';
+      mainBtn.innerHTML = `
+        <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        </svg>
+        喜びをXでシェアする
+      `;
+      
+      const choicesDiv = document.createElement('div');
+      choicesDiv.className = 'hidden flex flex-col gap-3 items-center';
+      
+      const reportBtn = document.createElement('button');
+      reportBtn.className = 'choice-btn';
+      reportBtn.innerText = 'クリア報告のポスト';
+      
+      const supportBtn = document.createElement('button');
+      supportBtn.className = 'choice-btn';
+      supportBtn.innerText = '原ポストにいいね・リポスト';
+
+      const helpLink = document.createElement('div');
+      helpLink.className = 'help-link';
+      helpLink.innerText = 'シェアがうまくいかない場合';
+
+      // 手動コピーセクション
+      const manualCopySection = document.createElement('div');
+      manualCopySection.className = 'manual-copy-section hidden';
+      
+      const manualInstruction = document.createElement('div');
+      manualInstruction.className = 'text-xs font-light text-white opacity-70';
+      manualInstruction.innerText = 'こちらをコピーしてご投稿ください↓';
+
+      const manualTextArea = document.createElement('div');
+      manualTextArea.className = 'manual-text-area';
+      manualTextArea.innerText = manualText;
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'copy-btn';
+      copyBtn.innerText = 'テキストをコピーする';
+      
+      const backBtn = document.createElement('button');
+      backBtn.className = 'back-btn';
+      backBtn.innerText = '戻る';
+      
+      // クリックイベントの紐付け（伝播を防止してモーダル閉じるのを防ぐ）
+      reportBtn.onclick = (e) => {
+        e.stopPropagation();
+        const text = encodeURIComponent(SHARE_CONFIG.TWEET_TEXT);
+        const url = encodeURIComponent(SHARE_CONFIG.TWEET_URL);
+        window.open(`https://x.com/intent/tweet?text=${text}&url=${url}`, '_blank', 'noopener,noreferrer');
+      };
+
+      supportBtn.onclick = (e) => {
+        e.stopPropagation();
+        window.open(SHARE_CONFIG.SUPPORT_URL, '_blank', 'noopener,noreferrer');
+      };
+      
+      mainBtn.onclick = (e) => {
+        e.stopPropagation();
+        mainBtn.classList.add('hidden');
+        choicesDiv.classList.remove('hidden');
+      };
+
+      // 手動コピー画面を表示
+      helpLink.onclick = (e) => {
+        e.stopPropagation();
+        choicesDiv.classList.add('hidden');
+        manualCopySection.classList.remove('hidden');
+      };
+
+      // 選択肢に戻る
+      backBtn.onclick = (e) => {
+        e.stopPropagation();
+        manualCopySection.classList.add('hidden');
+        choicesDiv.classList.remove('hidden');
+      };
+
+      // クリップボードにコピー
+      copyBtn.onclick = (e) => {
+        e.stopPropagation();
+        const el = document.createElement('textarea');
+        el.value = manualText;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        
+        const originalText = copyBtn.innerText;
+        copyBtn.innerText = 'コピーしました！';
+        setTimeout(() => {
+          copyBtn.innerText = originalText;
+        }, 2000);
+      };
+
+      choicesDiv.appendChild(reportBtn);
+      choicesDiv.appendChild(supportBtn);
+      choicesDiv.appendChild(helpLink);
+      
+      manualCopySection.appendChild(manualInstruction);
+      manualCopySection.appendChild(manualTextArea);
+      manualCopySection.appendChild(copyBtn);
+      manualCopySection.appendChild(backBtn);
+
+      shareContainer.appendChild(mainBtn);
+      shareContainer.appendChild(choicesDiv);
+      shareContainer.appendChild(manualCopySection);
+    }
+
+    // イベントリスナーの登録
+    undoBtn.addEventListener('click', performUndo);
+    resetBtn.addEventListener('click', initGame);
+
+    // クリア画面全体がタップされた際のリスタート判定（シェア関連エリアを除外）
+    clearOverlay.addEventListener('click', (event) => {
+      if (shareContainer.contains(event.target)) {
+        return; // シェアUI内部ならリスタートしない
+      }
+      shareContainer.classList.remove('show');
+      clearOverlay.classList.remove('active');
+      initGame();
+    });
+
+    // 初期起動
+    initGame();
+  </script>
+</body>
+</html>
