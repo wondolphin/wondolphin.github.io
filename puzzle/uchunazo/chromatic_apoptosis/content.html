@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -9,8 +10,9 @@
   <!-- Google Fonts for Sci-Fi/Minimal aesthetic -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet">
+
   <style>
     body {
       background: radial-gradient(circle at center, #1a202c 0%, #080b11 100%);
@@ -82,16 +84,18 @@
       /* じんわりとした白の発光グラデーション */
       background: radial-gradient(circle at center, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.02) 80%);
       /* 内外に白っぽい柔らかな光彩をあてる */
-      box-shadow: 
+      box-shadow:
         inset 0 0 12px rgba(255, 255, 255, 0.15),
         0 0 8px rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12); /* ぼんやりと境界がわかる程度の実線 */
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      /* ぼんやりと境界がわかる程度の実線 */
     }
 
     /* 各コマのベーススタイル */
     .tile {
       position: absolute;
-      width: 18%; /* 20%よりやや小さくして隙間を作る */
+      width: 18%;
+      /* 20%よりやや小さくして隙間を作る */
       height: 18%;
       border-radius: 8px;
       display: flex;
@@ -104,27 +108,38 @@
     }
 
     /* コマのカラーIDごとの設定（鮮やかなネオン調） */
-    .tile-1 { /* シアン */
+    .tile-1 {
+      /* シアン */
       background: radial-gradient(circle at 35% 35%, #9ffffb 0%, #00d2ff 60%, #008fa8 100%);
       box-shadow: 0 0 15px rgba(0, 210, 255, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
     }
-    .tile-2 { /* マゼンタ */
+
+    .tile-2 {
+      /* マゼンタ */
       background: radial-gradient(circle at 35% 35%, #ffbfe0 0%, #ff007f 60%, #b30059 100%);
       box-shadow: 0 0 15px rgba(255, 0, 127, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
     }
-    .tile-3 { /* イエロー */
+
+    .tile-3 {
+      /* イエロー */
       background: radial-gradient(circle at 35% 35%, #fffae0 0%, #ffdf00 60%, #b39c00 100%);
       box-shadow: 0 0 15px rgba(255, 223, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
     }
-    .tile-4 { /* ライムグリーン */
+
+    .tile-4 {
+      /* ライムグリーン */
       background: radial-gradient(circle at 35% 35%, #e0ffcc 0%, #39ff14 60%, #22990c 100%);
       box-shadow: 0 0 15px rgba(57, 255, 20, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
     }
-    .tile-5 { /* オレンジ */
+
+    .tile-5 {
+      /* オレンジ */
       background: radial-gradient(circle at 35% 35%, #ffe6cc 0%, #ff6c00 60%, #b34b00 100%);
       box-shadow: 0 0 15px rgba(255, 108, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
     }
-    .tile-6 { /* パープル */
+
+    .tile-6 {
+      /* パープル */
       background: radial-gradient(circle at 35% 35%, #f2ccff 0%, #b026ff 60%, #700db5 100%);
       box-shadow: 0 0 15px rgba(176, 38, 255, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.5);
     }
@@ -134,16 +149,25 @@
       background: radial-gradient(circle at 35% 35%, #4a5568 0%, #2d3748 70%, #1a202c 100%) !important;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.2) !important;
       border: 1px solid rgba(255, 255, 255, 0.15);
-      transform: scale(1) !important; /* 通常コマと同じ大きさに維持 */
+      transform: scale(1) !important;
+      /* 通常コマと同じ大きさに維持 */
       opacity: 1;
       cursor: default;
     }
 
     /* 黒化時のパルスアニメーション */
     @keyframes blacken {
-      0% { transform: scale(1.1); filter: brightness(1.6); }
-      100% { transform: scale(1); filter: brightness(1); }
+      0% {
+        transform: scale(1.1);
+        filter: brightness(1.6);
+      }
+
+      100% {
+        transform: scale(1);
+        filter: brightness(1);
+      }
     }
+
     .anim-blacken {
       animation: blacken 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
@@ -155,7 +179,8 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(4, 6, 14, 0.15); /* 極めてわずかに暗くして文字の可読性をサポート */
+      background: rgba(4, 6, 14, 0.15);
+      /* 極めてわずかに暗くして文字の可読性をサポート */
       z-index: 100;
       display: flex;
       flex-direction: column;
@@ -176,7 +201,8 @@
       font-size: 4rem;
       font-weight: 900;
       letter-spacing: 0.15em;
-      color: #f59e0b; /* 鮮やかなイエローゴールド */
+      color: #f59e0b;
+      /* 鮮やかなイエローゴールド */
       text-shadow: 0 0 25px rgba(245, 158, 11, 0.7), 0 0 50px rgba(245, 158, 11, 0.3);
       animation: pulse-glow-yellow 1.8s infinite ease-in-out;
       margin-left: 0.15em;
@@ -184,8 +210,17 @@
     }
 
     @keyframes pulse-glow-yellow {
-      0%, 100% { text-shadow: 0 0 25px rgba(245, 158, 11, 0.7), 0 0 50px rgba(245, 158, 11, 0.3); transform: scale(1); }
-      50% { text-shadow: 0 0 40px rgba(245, 158, 11, 0.9), 0 0 70px rgba(245, 158, 11, 0.5); transform: scale(1.06); }
+
+      0%,
+      100% {
+        text-shadow: 0 0 25px rgba(245, 158, 11, 0.7), 0 0 50px rgba(245, 158, 11, 0.3);
+        transform: scale(1);
+      }
+
+      50% {
+        text-shadow: 0 0 40px rgba(245, 158, 11, 0.9), 0 0 70px rgba(245, 158, 11, 0.5);
+        transform: scale(1.06);
+      }
     }
 
     /* 1秒後にフェードインするシェアエリア */
@@ -217,12 +252,15 @@
       width: 100%;
       height: 100%;
       border-radius: 8px;
-      background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 50%);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 50%);
       pointer-events: none;
     }
 
     /* 新設計のボタン・リンク群の共通デザイン */
-    .share-btn, .choice-btn, .copy-btn, .back-btn {
+    .share-btn,
+    .choice-btn,
+    .copy-btn,
+    .back-btn {
       background: rgba(255, 255, 255, 0.05);
       color: #fff;
       border: 1px solid rgba(255, 255, 255, 0.2);
@@ -238,16 +276,23 @@
       outline: none;
       letter-spacing: 0.05em;
     }
-    .share-btn:hover, .choice-btn:hover, .copy-btn:hover {
-      background: #f59e0b; /* イエローゴールド */
-      color: #0f172a; /* 紺黒 */
+
+    .share-btn:hover,
+    .choice-btn:hover,
+    .copy-btn:hover {
+      background: #f59e0b;
+      /* イエローゴールド */
+      color: #0f172a;
+      /* 紺黒 */
       border-color: #fbbf24;
       transform: scale(1.02);
     }
+
     .back-btn:hover {
       background: rgba(255, 255, 255, 0.15);
       border-color: rgba(255, 255, 255, 0.5);
     }
+
     .back-btn {
       background: transparent;
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -264,6 +309,7 @@
       cursor: pointer;
       margin-top: 0.5rem;
     }
+
     .help-link:hover {
       color: rgba(255, 255, 255, 0.8);
     }
@@ -280,6 +326,7 @@
       align-items: center;
       backdrop-filter: blur(8px);
     }
+
     .manual-text-area {
       background: rgba(0, 0, 0, 0.4);
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -294,14 +341,17 @@
       font-family: 'Share Tech Mono', monospace;
     }
 
-    .hidden { display: none !important; }
+    .hidden {
+      display: none !important;
+    }
   </style>
 </head>
+
 <body class="h-screen w-screen flex justify-center items-center relative select-none">
 
   <!-- メインの正方形ラッパー -->
   <main class="game-wrapper" id="gameWrapper">
-    
+
     <!-- 盤面エリア（全体の76%幅に抑え、上下の余白を十分に確保） -->
     <div class="w-[76%] aspect-square relative my-auto">
       <div class="board-container" id="boardContainer">
@@ -312,10 +362,13 @@
 
     <!-- 下部ボタンエリア -->
     <footer class="w-full grid grid-cols-2 gap-3 pb-2">
-      <button id="undoBtn" class="py-2.5 px-4 rounded-lg bg-white bg-opacity-5 hover:bg-opacity-10 active:bg-opacity-20 text-white text-opacity-80 text-[10px] font-bold tracking-widest border border-white border-opacity-10 transition-all duration-150 disabled:opacity-10 disabled:pointer-events-none" disabled>
+      <button id="undoBtn"
+        class="py-2.5 px-4 rounded-lg bg-white bg-opacity-5 hover:bg-opacity-10 active:bg-opacity-20 text-white text-opacity-80 text-[10px] font-bold tracking-widest border border-white border-opacity-10 transition-all duration-150 disabled:opacity-10 disabled:pointer-events-none"
+        disabled>
         UNDO
       </button>
-      <button id="resetBtn" class="py-2.5 px-4 rounded-lg bg-white bg-opacity-5 hover:bg-opacity-10 active:bg-opacity-20 text-white text-opacity-80 text-[10px] font-bold tracking-widest border border-white border-opacity-10 transition-all duration-150">
+      <button id="resetBtn"
+        class="py-2.5 px-4 rounded-lg bg-white bg-opacity-5 hover:bg-opacity-10 active:bg-opacity-20 text-white text-opacity-80 text-[10px] font-bold tracking-widest border border-white border-opacity-10 transition-all duration-150">
         RESET
       </button>
     </footer>
@@ -326,7 +379,7 @@
   <div class="clear-overlay" id="clearOverlay">
     <div class="text-center flex flex-col items-center w-full">
       <h1 class="clear-text">CLEAR!</h1>
-      
+
       <!-- 1秒後に現れるコンテナ -->
       <div class="share-container" id="shareContainer">
         <!-- JSで動的に生成 -->
@@ -350,7 +403,7 @@
     // シェア用設定
     const SHARE_CONFIG = {
       TWEET_TEXT: "ルールを推測するパズル「Chromatic Apoptosis」をクリアしました！\n#宇宙謎 #ルール発見型パズル @wondolphin",
-      TWEET_TEXT2: "ルールを推測するパズル「Chromatic Apoptosis」をクリアしました！\n #ルール発見型パズル #宇宙謎 @wondolphin",
+      TWEET_TEXT2: "ルールを推測するパズル「Chromatic Apoptosis」をクリアしました！\n#ルール発見型パズル #宇宙謎 @wondolphin",
       TWEET_URL: "https://wondolphin.github.io/puzzle/uchunazo/chromatic_apoptosis/index.html",
       SUPPORT_URL: "https://x.com/wondolphin"
     };
@@ -360,6 +413,7 @@
     let emptyPos = { r: 2, c: 2 }; // コマがないマスの位置 (初期状態は[2,2])
     let isAnimating = false; // アニメーション中の連続クリック防止
     let historyStack = []; // 手戻り用の状態スタック
+    let shareTimeoutId = null; // シェアボタン表示用のタイマーID
 
     const boardContainer = document.getElementById('boardContainer');
     const gridGuide = document.getElementById('gridGuide');
@@ -405,15 +459,25 @@
 
     // ゲームの初期化
     function initGame() {
+      // 進行中のシェアボタン表示用タイマーがあればクリアする
+      if (shareTimeoutId) {
+        clearTimeout(shareTimeoutId);
+        shareTimeoutId = null;
+      }
+
       // 既存のコマをクリア
       const oldTiles = boardContainer.querySelectorAll('.tile');
       oldTiles.forEach(t => t.remove());
-      
+
       tiles = [];
       emptyPos = { r: 2, c: 2 };
       isAnimating = false;
       historyStack = [];
       updateUndoButton();
+
+      // シェアボタンの表示状態と中身もクリアしておく
+      shareContainer.classList.remove('show');
+      shareContainer.innerHTML = '';
 
       let tileId = 1;
       for (let r = 0; r < ROWS; r++) {
@@ -426,7 +490,7 @@
           // コマ要素の生成
           const el = document.createElement('div');
           el.className = `tile tile-${colorVal}`;
-          
+
           const coords = getPercentCoords(r, c);
           el.style.top = coords.top;
           el.style.left = coords.left;
@@ -493,7 +557,7 @@
     // 移動後のルール判定
     function checkRulesAndEvaluate(movedTile) {
       const { r, c, color } = movedTile;
-      
+
       // 同じ行、同じ列にある「同じ色で、かつまだ黒くなっていない他のコマ」を探す
       const targetsToBlacken = [];
 
@@ -558,20 +622,25 @@
           setupShareUI();
           // クリア画面（お祝い）を表示
           clearOverlay.classList.add('active');
-          
+
+          // 既存のタイマーがあれば一度リセット
+          if (shareTimeoutId) {
+            clearTimeout(shareTimeoutId);
+          }
+
           // 1秒後にシェアボタンをフェードイン
-          setTimeout(() => {
+          shareTimeoutId = setTimeout(() => {
             shareContainer.classList.add('show');
           }, 1000);
 
-        }, 500); // クリア判定後0.5秒後
+        }, 100); // クリア判定後0.1秒後
       }
     }
 
     // 多機能シェアUIの動的構築
     function setupShareUI() {
       shareContainer.innerHTML = '';
-      
+
       const manualText = SHARE_CONFIG.TWEET_TEXT2 + "\n" + SHARE_CONFIG.TWEET_URL;
 
       const mainBtn = document.createElement('button');
@@ -582,14 +651,14 @@
         </svg>
         喜びをXでシェアする
       `;
-      
+
       const choicesDiv = document.createElement('div');
       choicesDiv.className = 'hidden flex flex-col gap-3 items-center';
-      
+
       const reportBtn = document.createElement('button');
       reportBtn.className = 'choice-btn';
       reportBtn.innerText = 'クリア報告のポスト';
-      
+
       const supportBtn = document.createElement('button');
       supportBtn.className = 'choice-btn';
       supportBtn.innerText = '原ポストにいいね・リポスト';
@@ -601,7 +670,7 @@
       // 手動コピーセクション
       const manualCopySection = document.createElement('div');
       manualCopySection.className = 'manual-copy-section hidden';
-      
+
       const manualInstruction = document.createElement('div');
       manualInstruction.className = 'text-xs font-light text-white opacity-70';
       manualInstruction.innerText = 'こちらをコピーしてご投稿ください↓';
@@ -613,11 +682,11 @@
       const copyBtn = document.createElement('button');
       copyBtn.className = 'copy-btn';
       copyBtn.innerText = 'テキストをコピーする';
-      
+
       const backBtn = document.createElement('button');
       backBtn.className = 'back-btn';
       backBtn.innerText = '戻る';
-      
+
       // クリックイベントの紐付け（伝播を防止してモーダル閉じるのを防ぐ）
       reportBtn.onclick = (e) => {
         e.stopPropagation();
@@ -630,7 +699,7 @@
         e.stopPropagation();
         window.open(SHARE_CONFIG.SUPPORT_URL, '_blank', 'noopener,noreferrer');
       };
-      
+
       mainBtn.onclick = (e) => {
         e.stopPropagation();
         mainBtn.classList.add('hidden');
@@ -660,7 +729,7 @@
         el.select();
         document.execCommand('copy');
         document.body.removeChild(el);
-        
+
         const originalText = copyBtn.innerText;
         copyBtn.innerText = 'コピーしました！';
         setTimeout(() => {
@@ -671,7 +740,7 @@
       choicesDiv.appendChild(reportBtn);
       choicesDiv.appendChild(supportBtn);
       choicesDiv.appendChild(helpLink);
-      
+
       manualCopySection.appendChild(manualInstruction);
       manualCopySection.appendChild(manualTextArea);
       manualCopySection.appendChild(copyBtn);
@@ -691,6 +760,13 @@
       if (shareContainer.contains(event.target)) {
         return; // シェアUI内部ならリスタートしない
       }
+
+      // 未実行のシェアボタンフェードイン用タイマーをクリアする
+      if (shareTimeoutId) {
+        clearTimeout(shareTimeoutId);
+        shareTimeoutId = null;
+      }
+
       shareContainer.classList.remove('show');
       clearOverlay.classList.remove('active');
       initGame();
@@ -700,4 +776,5 @@
     initGame();
   </script>
 </body>
+
 </html>
