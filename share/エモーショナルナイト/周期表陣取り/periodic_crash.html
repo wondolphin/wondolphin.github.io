@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>元素の覇者 - Periodic Clash (Mage Edition)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind config to extend custom 18 grid columns -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          gridTemplateColumns: {
+            '18': 'repeat(18, minmax(0, 1fr))',
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Google Fonts for Orbitron and Noto Sans JP -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Orbitron:wght@500;700;900&display=swap"
+    rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+    }
+
+    .font-orbitron {
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    /* カスタムスクロールバー（明るい色調用） */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #e2e8f0;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* ファンタジーネオンエフェクト（明るい背景でも綺麗に見える柔らかな輝き） */
+    .neon-text-rose {
+      text-shadow: 0 0 8px rgba(244, 63, 94, 0.4);
+    }
+
+    .neon-text-cyan {
+      text-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+    }
+
+    .element-cell {
+      aspect-ratio: 1 / 1;
+      min-width: 50px;
+    }
+  </style>
+</head>
+
+<body class="text-slate-800 min-h-screen flex flex-col overflow-x-hidden">
+
+  <!-- ヘッダー兼プレイヤーステータスボード（明るく上品な魔法書院風デザイン） -->
+  <header
+    class="bg-white/80 border-b border-indigo-100/80 backdrop-blur-md px-6 py-4 sticky top-0 z-50 shadow-md flex flex-col gap-4">
+    <!-- 上段: タイトル と 陣地占領メーター -->
+    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-3">
+        <div
+          class="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-400 to-rose-400 flex items-center justify-center shadow-md shadow-indigo-200">
+          <i data-lucide="sparkles" class="w-6 h-6 text-white animate-pulse"></i>
+        </div>
+        <div>
+          <h1
+            class="text-xl font-black tracking-wider font-orbitron bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-rose-500">
+            PERIODIC CLASH
+          </h1>
+          <p class="text-[10px] text-indigo-500 tracking-widest font-extrabold uppercase">元素の覇者 - 精霊たちの錬金アカデミー</p>
+        </div>
+      </div>
+
+      <!-- 陣地占領メーター -->
+      <div class="flex items-center gap-4 bg-indigo-50/60 px-5 py-2 rounded-xl border border-indigo-100 shrink-0">
+        <div class="text-right">
+          <span class="text-[10px] text-slate-500 block font-bold leading-none mb-1">総魔力占領数</span>
+          <span class="font-orbitron font-extrabold text-base text-indigo-600" id="total-claimed">0 / 80</span>
+        </div>
+        <div class="w-40 bg-slate-200 h-3 rounded-full overflow-hidden relative border border-slate-300">
+          <div id="progress-p1"
+            class="bg-gradient-to-r from-rose-400 to-rose-500 h-full absolute left-0 transition-all duration-300"
+            style="width: 0%"></div>
+          <div id="progress-p2"
+            class="bg-gradient-to-r from-cyan-400 to-cyan-500 h-full absolute right-0 transition-all duration-300"
+            style="width: 0%"></div>
+        </div>
+        <div class="text-[10px] text-slate-500 font-bold leading-none">目標: 80 / 118マス</div>
+      </div>
+    </div>
+
+    <!-- 中段: プレイヤー1, ゲーム操作パネル(中央統合), プレイヤー2 のコア情報コックピット -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+      <!-- Player 1 コックピット (ローズの精霊) -->
+      <div
+        class="bg-white border-2 border-slate-200/60 p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all duration-300 shadow-sm"
+        id="p1-panel">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-3.5 h-3.5 rounded-full bg-rose-400 shadow-md shadow-rose-300 animate-pulse"></div>
+            <span class="font-orbitron font-black text-sm text-rose-500 tracking-wide">PLAYER 1</span>
+          </div>
+          <button onclick="openStockModal(1)"
+            class="px-2.5 py-1 text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold rounded-lg flex items-center gap-1 transition-all">
+            <i data-lucide="book-open" class="w-3 h-3"></i> ストックの書 (<span id="p1-stock-badge">0</span>)
+          </button>
+        </div>
+        <div class="flex items-center justify-between gap-4 border-t border-slate-100 pt-1.5 mt-0.5">
+          <div class="text-left">
+            <span class="text-[9px] text-slate-400 block leading-none mb-1 font-bold">支配陣地</span>
+            <span class="font-bold text-rose-600 font-orbitron text-sm" id="p1-territory">0</span>
+          </div>
+          <div class="text-right">
+            <span class="text-[9px] text-slate-500 block leading-none mb-1 font-bold">所持魔力</span>
+            <span class="font-orbitron text-sm font-black text-rose-600 leading-none" id="p1-electrons">5 e⁻</span>
+          </div>
+          <div class="text-right border-l border-slate-200 pl-3">
+            <span class="text-[9px] text-slate-500 block leading-none mb-1 font-bold">ストック原子和</span>
+            <span class="font-orbitron text-xs font-bold text-slate-600 leading-none" id="p1-atom-sum">0</span>
+          </div>
+          <div class="text-right border-l border-slate-200 pl-3">
+            <span class="text-[9px] text-slate-500 block leading-none mb-1 font-bold">次エーテル</span>
+            <span class="font-orbitron text-xs font-extrabold text-emerald-600 leading-none" id="p1-income">+3 e⁻</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 【統合コントロール】中央メイン・ゲームコントロール・センター -->
+      <div
+        class="bg-white/95 border border-indigo-100 p-3 rounded-2xl flex flex-col justify-between gap-2 shadow-md relative transition-all duration-300"
+        id="control-panel-center">
+        <!-- ターン数とフェイズ指示 -->
+        <div class="w-full flex justify-between items-center px-1">
+          <div class="flex items-center gap-1.5">
+            <div class="w-2.5 h-2.5 rounded-full transition-all duration-300" id="turn-indicator-color"></div>
+            <span class="font-orbitron font-black text-xs text-indigo-600" id="turn-count">TURN 1</span>
+          </div>
+          <span
+            class="text-[10px] text-indigo-700 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100 max-w-[200px] truncate"
+            id="phase-instruction">サイコロを振ってください</span>
+        </div>
+
+        <!-- 操作エリア (動的アクションが注入される) -->
+        <div
+          class="w-full flex items-center justify-between gap-3 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+          <div class="flex items-center gap-2 pl-1">
+            <div id="dice-visual"
+              class="w-9 h-9 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-lg border border-indigo-200 flex items-center justify-center text-lg font-black font-orbitron text-white shadow-md shadow-indigo-100 select-none">
+              -
+            </div>
+            <div class="text-left">
+              <span class="text-[8px] font-bold text-slate-400 block leading-none mb-1">ACTIVE</span>
+              <span class="text-xs font-black transition-colors" id="active-player-display">PLAYER 1</span>
+            </div>
+          </div>
+
+          <div id="central-actions-container" class="flex gap-1.5">
+            <!-- ボタンがフェイズに応じてJSから挿入されます -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Player 2 コックピット (シアンの精霊) -->
+      <div
+        class="bg-white border-2 border-slate-200/60 p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all duration-300 shadow-sm"
+        id="p2-panel">
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="w-3.5 h-3.5 rounded-full bg-cyan-400 shadow-md shadow-cyan-300 animate-pulse"></div>
+              <span class="font-orbitron font-black text-sm text-cyan-500 tracking-wide">PLAYER 2</span>
+            </div>
+            <button onclick="openStockModal(2)"
+              class="px-2.5 py-1 text-[10px] bg-cyan-50 hover:bg-cyan-100 text-cyan-600 border border-cyan-200 font-bold rounded-lg flex items-center gap-1 transition-all">
+              <i data-lucide="book-open" class="w-3 h-3"></i> ストックの書 (<span id="p2-stock-badge">0</span>)
+            </button>
+          </div>
+          <div class="flex items-center justify-between gap-4 border-t border-slate-100 pt-1.5 mt-0.5">
+            <div class="text-left">
+              <span class="text-[9px] text-slate-400 block leading-none mb-1 font-bold">支配陣地</span>
+              <span class="font-bold text-cyan-600 font-orbitron text-sm" id="p2-territory">0</span>
+            </div>
+            <div class="text-right">
+              <span class="text-[9px] text-slate-500 block leading-none mb-1 font-bold">所持魔力</span>
+              <span class="font-orbitron text-sm font-black text-cyan-600 leading-none" id="p2-electrons">5 e⁻</span>
+            </div>
+            <div class="text-right border-l border-slate-200 pl-3">
+              <span class="text-[9px] text-slate-500 block leading-none mb-1 font-bold">ストック原子和</span>
+              <span class="font-orbitron text-xs font-bold text-slate-600 leading-none" id="p2-atom-sum">0</span>
+            </div>
+            <div class="text-right border-l border-slate-200 pl-3">
+              <span class="text-[9px] text-slate-500 block leading-none mb-1 font-bold">次エーテル</span>
+              <span class="font-orbitron text-xs font-extrabold text-emerald-600 leading-none" id="p2-income">+3
+                e⁻</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="flex-1 flex flex-col p-6 gap-6 overflow-hidden">
+    <!-- 周期表大魔法陣 -->
+    <div
+      class="flex-1 bg-white/70 border border-indigo-100/80 rounded-[32px] p-6 shadow-md flex flex-col gap-4 overflow-hidden relative">
+      <!-- 支配ルール基本解説バー（パステル仕様） -->
+      <div
+        class="absolute bottom-2 right-2 bg-white/90 border border-indigo-100 px-3 py-1.5 rounded-lg text-[10px] text-slate-600 z-10 font-bold flex gap-3 shadow-md pointer-events-none">
+        <span class="text-indigo-600">● 支配の基本法則:</span>
+        <span>範囲内のマスに対して ➔【敵陣: 防衛Lv -1】【自陣: 防衛Lv +1】【中立: 自陣化(★0)】※Lvが0未満になった敵陣を強奪</span>
+      </div>
+
+      <!-- 周期表グリッドコンテナ -->
+      <div class="flex-1 overflow-auto bg-slate-50 rounded-2xl border border-slate-200 p-4 relative min-h-[360px]">
+        <div id="periodic-board" class="grid grid-cols-18 gap-1.5 mx-auto"
+          style="min-width: 1000px; max-width: 1300px;">
+          <!-- JSでここに周期表のセルを構築 (ランタノイドとアクチノイドは除外されて7行編成) -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 下段: 履歴ログ -->
+    <div class="bg-white/80 p-4 rounded-2xl border border-indigo-50 flex flex-col gap-2 max-h-[140px] shadow-sm">
+      <span
+        class="text-[10px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-1 border-b border-indigo-50 pb-1 shrink-0">
+        <i data-lucide="history" class="w-3.5 h-3.5 text-indigo-500"></i>
+        CLASH LOG (魔法記録)
+      </span>
+      <div id="log-container"
+        class="flex-1 overflow-y-auto text-[11px] flex flex-col gap-1 p-1 bg-slate-50/50 rounded-lg text-slate-700 font-medium">
+        <!-- ログ履歴 -->
+      </div>
+    </div>
+  </main>
+
+  <!-- ================= 各種ゲームダイアログ & モーダル (モザイク一切なし、ボードが透ける設計) ================= -->
+
+  <!-- 1. ゲームスタート/終了モーダル (メイン用) -->
+  <div id="game-modal"
+    class="fixed inset-0 bg-slate-900/15 z-50 flex items-center justify-center p-4 transition-all duration-300 hidden">
+    <div
+      class="bg-white border border-indigo-100 p-8 rounded-3xl max-w-md w-full shadow-2xl text-center flex flex-col gap-5 transform scale-95 transition-transform duration-300">
+      <div
+        class="w-16 h-16 rounded-full bg-indigo-50 border border-indigo-100 mx-auto flex items-center justify-center shadow-inner">
+        <i data-lucide="trophy" class="w-8 h-8 text-indigo-500" id="modal-icon"></i>
+      </div>
+      <div>
+        <h2 class="text-2xl font-black text-slate-800 font-orbitron" id="modal-title">ゲームスタート！</h2>
+        <p class="text-sm text-slate-500 mt-2 leading-relaxed" id="modal-desc">
+          お互いに水素(H)からスタートします。サイコロを振り、周期表の陣を奪い合いましょう！
+        </p>
+      </div>
+      <button id="modal-btn"
+        class="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-extrabold text-sm transition-all shadow-md shadow-indigo-200 active:scale-95">
+        対戦を開始する
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. ダイスロール専用モーダル (モザイクなし＆1秒オートクローズ機能搭載) -->
+  <div id="dice-modal"
+    class="fixed inset-0 bg-slate-900/15 z-50 flex items-center justify-center p-4 transition-all duration-300 hidden">
+    <div
+      class="bg-white border border-indigo-100 p-6 rounded-3xl max-w-xs w-full shadow-2xl text-center flex flex-col gap-4 transform scale-95 transition-all">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-orbitron">Dice Roll</span>
+        <span class="text-xs font-bold text-indigo-600 animate-pulse" id="dice-modal-turn">TURN 1</span>
+      </div>
+
+      <div class="py-2 flex flex-col items-center gap-3">
+        <div id="dice-modal-player-tag" class="text-xs font-extrabold px-3 py-0.5 rounded-full">PLAYER 1</div>
+
+        <div id="dice-modal-visual"
+          class="w-16 h-16 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-2xl border-2 border-indigo-200 flex items-center justify-center text-3xl font-black font-orbitron text-white shadow-lg shadow-indigo-100 select-none transform transition-transform duration-300">
+          -
+        </div>
+      </div>
+
+      <button id="btn-modal-roll"
+        class="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-black text-xs shadow-md transition-all active:scale-95 flex items-center justify-center gap-1">
+        <i data-lucide="dices" class="w-3.5 h-3.5"></i> サイコロを振る
+      </button>
+    </div>
+  </div>
+
+  <!-- 3. 召喚(キープ)確認モーダル (モザイクなし) -->
+  <div id="summon-modal"
+    class="fixed inset-0 bg-slate-900/15 z-50 flex items-center justify-center p-4 transition-all duration-300 hidden">
+    <div
+      class="bg-white border border-indigo-100 p-6 rounded-3xl max-w-sm w-full shadow-2xl text-center flex flex-col gap-4 transform scale-95 transition-all">
+      <div class="border-b border-indigo-50 pb-2">
+        <span class="text-xs font-bold text-indigo-500 tracking-widest uppercase">Elemental Summon</span>
+      </div>
+
+      <div class="py-2 flex flex-col gap-3">
+        <p class="text-xs text-slate-500">現在地に宿る元素の精霊を召喚(キープ)しますか?</p>
+        <div class="p-4 bg-indigo-50/40 rounded-2xl border border-indigo-100 text-left">
+          <div class="flex justify-between items-start mb-2">
+            <div>
+              <span id="summon-modal-type"
+                class="text-[9px] font-extrabold text-indigo-500 tracking-wider block">非金属</span>
+              <span id="summon-modal-display" class="text-base font-black text-slate-800">[No.1] H (水素)</span>
+            </div>
+            <div class="text-right">
+              <span class="text-[9px] text-slate-400 block font-bold leading-none mb-1">召喚コスト</span>
+              <span id="summon-modal-cost" class="font-orbitron font-extrabold text-indigo-600 text-sm">1 e⁻</span>
+            </div>
+          </div>
+          <div class="text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-100/80 leading-relaxed">
+            <span class="font-bold text-indigo-600 block mb-0.5">【支配効果】</span>
+            <span id="summon-modal-effect">-</span>
+          </div>
+        </div>
+        <div class="flex justify-between items-center text-xs text-slate-500 px-1 font-bold">
+          <span>あなたの所持魔力:</span>
+          <span id="summon-modal-player-electrons" class="font-orbitron text-indigo-600 text-sm">5 e⁻</span>
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <button id="btn-modal-summon-skip"
+          class="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition-all">
+          パス
+        </button>
+        <button id="btn-modal-summon-confirm"
+          class="flex-[2] py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-black text-xs shadow-md transition-all">
+          召喚してストックに加える
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. ランタノイド／アクチノイド特殊ショップモーダル (モザイクなし) -->
+  <div id="shop-modal"
+    class="fixed inset-0 bg-slate-900/15 z-50 flex items-center justify-center p-4 transition-all duration-300 hidden">
+    <div
+      class="bg-white border border-indigo-100 p-6 rounded-3xl max-w-4xl w-full shadow-2xl flex flex-col gap-4 max-h-[85vh] transform scale-95 transition-all">
+      <div class="flex justify-between items-center border-b border-indigo-100 pb-3">
+        <div>
+          <h3 id="shop-modal-title" class="text-base font-black text-indigo-600 flex items-center gap-1">
+            <i data-lucide="store" class="w-5 h-5"></i> 秘境 of 元素ショップ
+          </h3>
+          <p class="text-[10px] text-slate-400 font-semibold mt-0.5">中継点ゲートが開き、通常は周期表ボードに配置されない精霊を特別に召喚できます。</p>
+        </div>
+        <div class="bg-indigo-50 px-3 py-1 rounded-xl text-xs font-bold text-indigo-600 flex items-center gap-2">
+          <span>あなたの所持魔力:</span>
+          <span id="shop-modal-player-electrons" class="font-orbitron text-sm">5 e⁻</span>
+        </div>
+      </div>
+
+      <!-- 精霊カードグリッド -->
+      <div id="shop-cards-container"
+        class="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-1">
+        <!-- JSで動的に注入 -->
+      </div>
+
+      <div class="border-t border-slate-100 pt-3 flex justify-end gap-2 shrink-0">
+        <button onclick="closeShopModal()"
+          class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition-all">
+          何も召喚せずに戻る
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. ストックの書モーダル（原子番号ソート ＆ 支配発動） (モザイクなし) -->
+  <div id="stock-modal"
+    class="fixed inset-0 bg-slate-900/15 z-50 flex items-center justify-center p-4 transition-all duration-300 hidden">
+    <div
+      class="bg-white border border-indigo-100 p-6 rounded-3xl max-w-xl w-full shadow-2xl flex flex-col gap-4 max-h-[75vh] transform scale-95 transition-all">
+      <div class="flex justify-between items-center border-b border-indigo-50 pb-3 shrink-0">
+        <div class="flex items-center gap-2">
+          <div id="stock-modal-player-dot" class="w-3.5 h-3.5 rounded-full bg-rose-400 shadow-md"></div>
+          <h3 id="stock-modal-title" class="text-base font-black text-slate-800">PLAYER 1 の魔導書</h3>
+        </div>
+        <span
+          class="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+          ストック上限: 10
+        </span>
+      </div>
+
+      <p class="text-xs text-slate-400 font-semibold leading-relaxed border-b border-slate-100 pb-2">
+        ※「支配発動」ボタンを押すと消費され、その元素アビリティが現在地を中心に放たれます。（原子番号順に自動ソートされます）
+      </p>
+
+      <!-- キープ中カードリスト -->
+      <div id="stock-cards-list"
+        class="flex-1 overflow-y-auto flex flex-col gap-2.5 p-1 bg-slate-50/50 rounded-xl border border-slate-100">
+        <!-- JSでソートして注入 -->
+      </div>
+
+      <div class="border-t border-slate-100 pt-3 flex justify-end gap-2 shrink-0">
+        <button onclick="closeStockModal()"
+          class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition-all">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Javascript 処理 -->
+  <script>
+    // --- 118元素 + 特殊中継点マスの全データ定義 ---
+    const elementsData = [
+      { num: 1, sym: "H", name: "水素", group: 1, period: 1, row: 1, col: 1, type: "nonmetal" },
+      { num: 2, sym: "He", name: "ヘリウム", group: 18, period: 1, row: 1, col: 18, type: "noble" },
+      { num: 3, sym: "Li", name: "リチウム", group: 1, period: 2, row: 2, col: 1, type: "alkali" },
+      { num: 4, sym: "Be", name: "ベリリウム", group: 2, period: 2, row: 2, col: 2, type: "alkaline-earth" },
+      { num: 5, sym: "B", name: "ホウ素", group: 13, period: 2, row: 2, col: 13, type: "metalloid" },
+      { num: 6, sym: "C", name: "炭素", group: 14, period: 2, row: 2, col: 14, type: "nonmetal" },
+      { num: 7, sym: "N", name: "窒素", group: 15, period: 2, row: 2, col: 15, type: "nonmetal" },
+      { num: 8, sym: "O", name: "酸素", group: 16, period: 2, row: 2, col: 16, type: "nonmetal" },
+      { num: 9, sym: "F", name: "フッ素", group: 17, period: 2, row: 2, col: 17, type: "halogen" },
+      { num: 10, sym: "Ne", name: "ネオン", group: 18, period: 2, row: 2, col: 18, type: "noble" },
+      { num: 11, sym: "Na", name: "ナトリウム", group: 1, period: 3, row: 3, col: 1, type: "alkali" },
+      { num: 12, sym: "Mg", name: "マグネシウム", group: 2, period: 3, row: 3, col: 2, type: "alkaline-earth" },
+      { num: 13, sym: "Al", name: "アルミニウム", group: 13, period: 3, row: 3, col: 13, type: "post-transition" },
+      { num: 14, sym: "Si", name: "ケイ素", group: 14, period: 3, row: 3, col: 14, type: "metalloid" },
+      { num: 15, sym: "P", name: "リン", group: 15, period: 3, row: 3, col: 15, type: "nonmetal" },
+      { num: 16, sym: "S", name: "硫黄", group: 16, period: 3, row: 3, col: 16, type: "nonmetal" },
+      { num: 17, sym: "Cl", name: "塩素", group: 17, period: 3, row: 3, col: 17, type: "halogen" },
+      { num: 18, sym: "Ar", name: "アルゴン", group: 18, period: 3, row: 3, col: 18, type: "noble" },
+      { num: 19, sym: "K", name: "カリウム", group: 1, period: 4, row: 4, col: 1, type: "alkali" },
+      { num: 20, sym: "Ca", name: "カルシウム", group: 2, period: 4, row: 4, col: 2, type: "alkaline-earth" },
+      { num: 21, sym: "Sc", name: "スカンジウム", group: 3, period: 4, row: 4, col: 3, type: "transition" },
+      { num: 22, sym: "Ti", name: "チタン", group: 4, period: 4, row: 4, col: 4, type: "transition" },
+      { num: 23, sym: "V", name: "バナジウム", group: 5, period: 4, row: 4, col: 5, type: "transition" },
+      { num: 24, sym: "Cr", name: "クロム", group: 6, period: 4, row: 4, col: 6, type: "transition" },
+      { num: 25, sym: "Mn", name: "マンガン", group: 7, period: 4, row: 4, col: 7, type: "transition" },
+      { num: 26, sym: "Fe", name: "鉄", group: 8, period: 4, row: 4, col: 8, type: "transition" },
+      { num: 27, sym: "Co", name: "コバルト", group: 9, period: 4, row: 4, col: 9, type: "transition" },
+      { num: 28, sym: "Ni", name: "ニッケル", group: 10, period: 4, row: 4, col: 10, type: "transition" },
+      { num: 29, sym: "Cu", name: "銅", group: 11, period: 4, row: 4, col: 11, type: "transition" },
+      { num: 30, sym: "Zn", name: "亜鉛", group: 12, period: 4, row: 4, col: 12, type: "transition" },
+      { num: 31, sym: "Ga", name: "ガリウム", group: 13, period: 4, row: 4, col: 13, type: "post-transition" },
+      { num: 32, sym: "Ge", name: "ゲルマニウム", group: 14, period: 4, row: 4, col: 14, type: "metalloid" },
+      { num: 33, sym: "As", name: "ヒ素", group: 15, period: 4, row: 4, col: 15, type: "metalloid" },
+      { num: 34, sym: "Se", name: "セレン", group: 16, period: 4, row: 4, col: 16, type: "nonmetal" },
+      { num: 35, sym: "Br", name: "臭素", group: 17, period: 4, row: 4, col: 17, type: "halogen" },
+      { num: 36, sym: "Kr", name: "クリプトン", group: 18, period: 4, row: 4, col: 18, type: "noble" },
+      { num: 37, sym: "Rb", name: "ルビジウム", group: 1, period: 5, row: 5, col: 1, type: "alkali" },
+      { num: 38, sym: "Sr", name: "ストロンチウム", group: 2, period: 5, row: 5, col: 2, type: "alkaline-earth" },
+      { num: 39, sym: "Y", name: "イットリウム", group: 3, period: 5, row: 5, col: 3, type: "transition" },
+      { num: 40, sym: "Zr", name: "ジルコニウム", group: 4, period: 5, row: 5, col: 4, type: "transition" },
+      { num: 41, sym: "Nb", name: "ニオブ", group: 5, period: 5, row: 5, col: 5, type: "transition" },
+      { num: 42, sym: "Mo", name: "モリブデン", group: 6, period: 5, row: 5, col: 6, type: "transition" },
+      { num: 43, sym: "Tc", name: "テクネチウム", group: 7, period: 5, row: 5, col: 7, type: "transition" },
+      { num: 44, sym: "Ru", name: "ルテニウム", group: 8, period: 5, row: 5, col: 8, type: "transition" },
+      { num: 45, sym: "Rh", name: "ロジウム", group: 9, period: 5, row: 5, col: 9, type: "transition" },
+      { num: 46, sym: "Pd", name: "パラジウム", group: 10, period: 5, row: 5, col: 10, type: "transition" },
+      { num: 47, sym: "Ag", name: "銀", group: 11, period: 5, row: 5, col: 11, type: "transition" },
+      { num: 48, sym: "Cd", name: "カドミウム", group: 12, period: 5, row: 5, col: 12, type: "transition" },
+      { num: 49, sym: "In", name: "インジウム", group: 13, period: 5, row: 5, col: 13, type: "post-transition" },
+      { num: 50, sym: "Sn", name: "スズ", group: 14, period: 5, row: 5, col: 14, type: "post-transition" },
+      { num: 51, sym: "Sb", name: "アンチモン", group: 15, period: 5, row: 5, col: 15, type: "metalloid" },
+      { num: 52, sym: "Te", name: "テルル", group: 16, period: 5, row: 5, col: 16, type: "metalloid" },
+      { num: 53, sym: "I", name: "ヨウ素", group: 17, period: 5, row: 5, col: 17, type: "halogen" },
+      { num: 54, sym: "Xe", name: "キセノン", group: 18, period: 5, row: 5, col: 18, type: "noble" },
+
+      // 第6周期 (ランタノイドのブリッジ Ln を配置)
+      { num: 55, sym: "Cs", name: "セシウム", group: 1, period: 6, row: 6, col: 1, type: "alkali" },
+      { num: 56, sym: "Ba", name: "バリウム", group: 2, period: 6, row: 6, col: 2, type: "alkaline-earth" },
+      { num: "Ln", sym: "Ln", name: "ランタノイド橋", group: 3, period: 6, row: 6, col: 3, type: "lanthanide-link" },
+      { num: 72, sym: "Hf", name: "ハフニウム", group: 4, period: 6, row: 6, col: 4, type: "transition" },
+      { num: 73, sym: "Ta", name: "タンタル", group: 5, period: 6, row: 6, col: 5, type: "transition" },
+      { num: 74, sym: "W", name: "タングステン", group: 6, period: 6, row: 6, col: 6, type: "transition" },
+      { num: 75, sym: "Re", name: "レニウム", group: 7, period: 6, row: 6, col: 7, type: "transition" },
+      { num: 76, sym: "Os", name: "オスミウム", group: 8, period: 6, row: 6, col: 8, type: "transition" },
+      { num: 77, sym: "Ir", name: "イリジウム", group: 9, period: 6, row: 6, col: 9, type: "transition" },
+      { num: 78, sym: "Pt", name: "白金", group: 10, period: 6, row: 6, col: 10, type: "transition" },
+      { num: 79, sym: "Au", name: "金", group: 11, period: 6, row: 6, col: 11, type: "transition" },
+      { num: 80, sym: "Hg", name: "水銀", group: 12, period: 6, row: 6, col: 12, type: "transition" },
+      { num: 81, sym: "Tl", name: "タリウム", group: 13, period: 6, row: 6, col: 13, type: "post-transition" },
+      { num: 82, sym: "Pb", name: "鉛", group: 14, period: 6, row: 6, col: 14, type: "post-transition" },
+      { num: 83, sym: "Bi", name: "ビスマス", group: 15, period: 6, row: 6, col: 15, type: "post-transition" },
+      { num: 84, sym: "Po", name: "ポロニウム", group: 16, period: 6, row: 6, col: 16, type: "metalloid" },
+      { num: 85, sym: "At", name: "アスタチン", group: 17, period: 6, row: 6, col: 17, type: "halogen" },
+      { num: 86, sym: "Rn", name: "ラドン", group: 18, period: 6, row: 6, col: 18, type: "noble" },
+
+      // 第7周期 (アクチノイドのブリッジ An を配置)
+      { num: 87, sym: "Fr", name: "フランシウム", group: 1, period: 7, row: 7, col: 1, type: "alkali" },
+      { num: 88, sym: "Ra", name: "ラジウム", group: 2, period: 7, row: 7, col: 2, type: "actinide-link" },
+      { num: "An", sym: "An", name: "アクチノイド橋", group: 3, period: 7, row: 7, col: 3, type: "actinide-link" },
+      { num: 104, sym: "Rf", name: "ラザホジウム", group: 4, period: 7, row: 7, col: 4, type: "transition" },
+      { num: 105, sym: "Db", name: "ドブニウム", group: 5, period: 7, row: 7, col: 5, type: "transition" },
+      { num: 106, sym: "Sg", name: "シーボーギウム", group: 6, period: 7, row: 7, col: 6, type: "transition" },
+      { num: 107, sym: "Bh", name: "ボーリウム", group: 7, period: 7, row: 7, col: 7, type: "transition" },
+      { num: 108, sym: "Hs", name: "ハッシウム", group: 8, period: 7, row: 7, col: 8, type: "transition" },
+      { num: 109, sym: "Mt", name: "マイトネリウム", group: 9, period: 7, row: 7, col: 9, type: "transition" },
+      { num: 110, sym: "Ds", name: "ダームスタチウム", group: 10, period: 7, row: 7, col: 10, type: "transition" },
+      { num: 111, sym: "Rg", name: "レントゲニウム", group: 11, period: 7, row: 7, col: 11, type: "transition" },
+      { num: 112, sym: "Cn", name: "コペルニシウム", group: 12, period: 7, row: 7, col: 12, type: "transition" },
+      { num: 113, sym: "Nh", name: "ニホニウム", group: 13, period: 7, row: 7, col: 13, type: "post-transition" },
+      { num: 114, sym: "Fl", name: "フレロビウム", group: 14, period: 7, row: 7, col: 14, type: "post-transition" },
+      { num: 115, sym: "Mc", name: "モスコビウム", group: 15, period: 7, row: 7, col: 15, type: "post-transition" },
+      { num: 116, sym: "Lv", name: "リバモリウム", group: 16, period: 7, row: 7, col: 16, type: "post-transition" },
+      { num: 117, sym: "Ts", name: "テネシン", group: 17, period: 7, row: 7, col: 17, type: "halogen" },
+      { num: 118, sym: "Og", name: "オガネソン", group: 18, period: 7, row: 7, col: 18, type: "noble" },
+
+      // ランタノイドエリア (ショップ用)
+      { num: 57, sym: "La", name: "ランタン", group: 3, period: 6, row: 9, col: 3, type: "lanthanide" },
+      { num: 58, sym: "Ce", name: "セリウム", group: 3, period: 6, row: 9, col: 4, type: "lanthanide" },
+      { num: 59, sym: "Pr", name: "プラセオジウム", group: 3, period: 6, row: 9, col: 5, type: "lanthanide" },
+      { num: 60, sym: "Nd", name: "ネオジウム", group: 3, period: 6, row: 9, col: 6, type: "lanthanide" },
+      { num: 61, sym: "Pm", name: "プロメチウム", group: 3, period: 6, row: 9, col: 7, type: "lanthanide" },
+      { num: 62, sym: "Sm", name: "サマリウム", group: 3, period: 6, row: 9, col: 8, type: "lanthanide" },
+      { num: 63, sym: "Eu", name: "ユウロピウム", group: 3, period: 6, row: 9, col: 9, type: "lanthanide" },
+      { num: 64, sym: "Gd", name: "ガドリニウム", group: 3, period: 6, row: 9, col: 10, type: "lanthanide" },
+      { num: 65, sym: "Tb", name: "テルビウム", group: 3, period: 6, row: 9, col: 11, type: "lanthanide" },
+      { num: 66, sym: "Dy", name: "ジスプロシウム", group: 3, period: 6, row: 9, col: 12, type: "lanthanide" },
+      { num: 67, sym: "Ho", name: "ホルミウム", group: 3, period: 6, row: 9, col: 13, type: "lanthanide" },
+      { num: 68, sym: "Er", name: "エルビウム", group: 3, period: 6, row: 9, col: 14, type: "lanthanide" },
+      { num: 69, sym: "Tm", name: "ツリウム", group: 3, period: 6, row: 9, col: 15, type: "lanthanide" },
+      { num: 70, sym: "Yb", name: "イッテルビウム", group: 3, period: 6, row: 9, col: 16, type: "lanthanide" },
+      { num: 71, sym: "Lu", name: "ルテチウム", group: 3, period: 6, row: 9, col: 17, type: "lanthanide" },
+
+      // アクチノイドエリア (ショップ用)
+      { num: 89, sym: "Ac", name: "アクチニウム", group: 3, period: 7, row: 10, col: 3, type: "actinide" },
+      { num: 90, sym: "Th", name: "トリウム", group: 3, period: 7, row: 10, col: 4, type: "actinide" },
+      { num: 91, sym: "Pa", name: "プロトアクチニウム", group: 3, period: 7, row: 10, col: 5, type: "actinide" },
+      { num: 92, sym: "U", name: "ウラン", group: 3, period: 7, row: 10, col: 6, type: "actinide" },
+      { num: 93, sym: "Np", name: "ネプツニウム", group: 3, period: 7, row: 10, col: 7, type: "actinide" },
+      { num: 94, sym: "Pu", name: "プルトニウム", group: 3, period: 7, row: 10, col: 8, type: "actinide" },
+      { num: 95, sym: "Am", name: "アメリシウム", group: 3, period: 7, row: 10, col: 9, type: "actinide" },
+      { num: 96, sym: "Cm", name: "キュリウム", group: 3, period: 7, row: 10, col: 10, type: "actinide" },
+      { num: 97, sym: "Bk", name: "バークリウム", group: 3, period: 7, row: 10, col: 11, type: "actinide" },
+      { num: 98, sym: "Cf", name: "カリホルニウム", group: 3, period: 7, row: 10, col: 12, type: "actinide" },
+      { num: 99, sym: "Es", name: "アインシュタニウム", group: 3, period: 7, row: 10, col: 13, type: "actinide" },
+      { num: 100, sym: "Fm", name: "フェルミウム", group: 3, period: 7, row: 10, col: 14, type: "actinide" },
+      { num: 101, sym: "Md", name: "メンデレビウム", group: 3, period: 7, row: 10, col: 15, type: "actinide" },
+      { num: 102, sym: "No", name: "ノーベリウム", group: 3, period: 7, row: 10, col: 16, type: "actinide" },
+      { num: 103, sym: "Lr", name: "ローレンシウム", group: 3, period: 7, row: 10, col: 17, type: "actinide" }
+    ];
+
+    const SHAPE_TYPES = {
+      TARGET: "target",
+      CROSS: "cross",
+      CIRCLE: "circle",
+      WIDE: "wide",
+      ROW: "row",
+      COL: "col"
+    };
+
+    const GAME_PHASES = {
+      ROLL_DICE: "ROLL_DICE",
+      MOVE: "MOVE",
+      SUMMON: "SUMMON",
+      DOMINATE: "DOMINATE",
+      TELEPORT_WAIT: "TELEPORT_WAIT",
+      GAME_OVER: "GAME_OVER"
+    };
+
+    let activePlayer = 1;
+    let currentPhase = GAME_PHASES.ROLL_DICE;
+    let turnCount = 1;
+    let diceValue = 0;
+    let highlightedMoves = [];
+
+    const gridState = {};
+    elementsData.forEach(e => {
+      gridState[e.num] = {
+        owner: null,
+        defLevel: 0
+      };
+    });
+
+    const players = {
+      1: {
+        pos: 1,
+        electrons: 5,
+        stock: [],
+        nextRollFix: null, // null or 4
+        nextRollAdd: 0,    // +2バフ
+        extraDominate: false,
+        canTeleport: false
+      },
+      2: {
+        pos: 1,
+        electrons: 5,
+        stock: [],
+        nextRollFix: null,
+        nextRollAdd: 0,
+        extraDominate: false,
+        canTeleport: false
+      }
+    };
+
+    function getAdjacentElements(target, context = 'dominate') {
+      if (!target) return [];
+      const adjacent = [];
+      elementsData.forEach(e => {
+        if (e.num === target.num) return;
+        if (e.row === 9 || e.row === 10) return;
+
+        const isGridNeighbor = (Math.abs(e.row - target.row) + Math.abs(e.col - target.col)) === 1;
+        if (isGridNeighbor) {
+          adjacent.push(e);
+        }
+      });
+
+      if (context === 'move') {
+        if (target.num === 1) {
+          const he = elementsData.find(e => e.num === 2);
+          if (he) adjacent.push(he);
+        }
+        if (target.num === 2) {
+          const h = elementsData.find(e => e.num === 1);
+          if (h) adjacent.push(h);
+        }
+        if (target.num === 4) {
+          const b = elementsData.find(e => e.num === 5);
+          if (b) adjacent.push(b);
+        }
+        if (target.num === 5) {
+          const be = elementsData.find(e => e.num === 4);
+          if (be) adjacent.push(be);
+        }
+        if (target.num === 12) {
+          const al = elementsData.find(e => e.num === 13);
+          if (al) adjacent.push(al);
+        }
+        if (target.num === 13) {
+          const mg = elementsData.find(e => e.num === 12);
+          if (mg) adjacent.push(mg);
+        }
+      }
+
+      return adjacent;
+    }
+
+    function getValidMoves(startNum, steps) {
+      const startEl = elementsData.find(e => e.num === startNum);
+      if (!startEl) return [];
+
+      const results = [];
+      const visited = {};
+      visited[startNum] = 0;
+
+      const queue = [startEl];
+
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        const currDist = visited[curr.num];
+
+        if (currDist >= steps) continue;
+
+        const adj = getAdjacentElements(curr, 'move');
+        adj.forEach(nextEl => {
+          if (visited[nextEl.num] === undefined) {
+            visited[nextEl.num] = currDist + 1;
+            results.push(nextEl.num);
+            queue.push(nextEl);
+          }
+        });
+      }
+
+      return Array.from(new Set(results)).filter(num => num !== startNum);
+    }
+
+    function getDominationShape(num) {
+      if (num === 92) return SHAPE_TYPES.WIDE;
+      if (num === 8 || num === 1 || num === 6) return SHAPE_TYPES.CROSS;
+
+      if (typeof num === 'number' && num <= 10) {
+        if (num === 9) return SHAPE_TYPES.CROSS;
+        return SHAPE_TYPES.TARGET;
+      }
+
+      if (num === 11 || num === 79) return SHAPE_TYPES.CIRCLE;
+
+      const el = elementsData.find(e => e.num === num);
+      if (!el) return SHAPE_TYPES.TARGET;
+
+      switch (el.type) {
+        case "noble": return SHAPE_TYPES.TARGET;
+        case "alkali":
+        case "alkaline-earth":
+          return SHAPE_TYPES.CIRCLE;
+        case "transition":
+        case "lanthanide":
+        case "actinide":
+          return SHAPE_TYPES.CROSS;
+        case "halogen":
+          return SHAPE_TYPES.COL;
+        case "metalloid":
+        case "post-transition":
+          return SHAPE_TYPES.ROW;
+        default:
+          return SHAPE_TYPES.CROSS;
+      }
+    }
+
+    function getDominationTargets(currentPos, shapeType) {
+      const el = elementsData.find(e => e.num === currentPos);
+      if (!el) return [];
+
+      const targets = new Set();
+      if (typeof currentPos === 'number') {
+        targets.add(currentPos);
+      }
+
+      const adj1 = getAdjacentElements(el, 'dominate');
+
+      if (shapeType === SHAPE_TYPES.CROSS || shapeType === SHAPE_TYPES.CIRCLE || shapeType === SHAPE_TYPES.WIDE) {
+        adj1.forEach(e => {
+          if (typeof e.num === 'number') targets.add(e.num);
+        });
+      }
+
+      if (shapeType === SHAPE_TYPES.CIRCLE || shapeType === SHAPE_TYPES.WIDE) {
+        elementsData.forEach(e => {
+          if (typeof e.num !== 'number') return;
+          if (e.row === 9 || e.row === 10) return;
+          if (Math.abs(e.row - el.row) === 1 && Math.abs(e.col - el.col) === 1) {
+            targets.add(e.num);
+          }
+        });
+      }
+
+      if (shapeType === SHAPE_TYPES.WIDE) {
+        elementsData.forEach(e => {
+          if (typeof e.num !== 'number') return;
+          if (e.row === 9 || e.row === 10) return;
+          const rDiff = Math.abs(e.row - el.row);
+          const cDiff = Math.abs(e.col - el.col);
+          if (rDiff <= 2 && cDiff <= 2) {
+            targets.add(e.num);
+          }
+        });
+      }
+
+      if (shapeType === SHAPE_TYPES.ROW) {
+        elementsData.forEach(e => {
+          if (typeof e.num !== 'number') return;
+          if (e.row === el.row && Math.abs(e.col - el.col) <= 2) {
+            targets.add(e.num);
+          }
+        });
+      }
+
+      if (shapeType === SHAPE_TYPES.COL) {
+        elementsData.forEach(e => {
+          if (typeof e.num !== 'number') return;
+          if (e.row === 9 || e.row === 10) return;
+          if (e.col === el.col && Math.abs(e.row - el.row) <= 2) {
+            targets.add(e.num);
+          }
+        });
+      }
+
+      return Array.from(targets);
+    }
+
+    function generateShapeMatrixHTML(shapeType) {
+      const matrix = [
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0]
+      ];
+
+      if (shapeType === SHAPE_TYPES.CROSS) {
+        matrix[1][2] = 1; matrix[3][2] = 1;
+        matrix[2][1] = 1; matrix[2][3] = 1;
+      } else if (shapeType === SHAPE_TYPES.CIRCLE) {
+        matrix[1][1] = 1; matrix[1][2] = 1; matrix[1][3] = 1;
+        matrix[2][1] = 1; matrix[2][3] = 1;
+        matrix[3][1] = 1; matrix[3][2] = 1; matrix[3][3] = 1;
+      } else if (shapeType === SHAPE_TYPES.WIDE) {
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 5; c++) {
+            matrix[r][c] = 1;
+          }
+        }
+      } else if (shapeType === SHAPE_TYPES.ROW) {
+        matrix[2][0] = 1; matrix[2][1] = 1; matrix[2][3] = 1; matrix[2][4] = 1;
+      } else if (shapeType === SHAPE_TYPES.COL) {
+        matrix[0][2] = 1; matrix[1][2] = 1; matrix[3][2] = 1; matrix[4][2] = 1;
+      }
+
+      let html = `<div class="grid grid-cols-5 gap-0.5 w-12 h-12 bg-indigo-50/50 p-1 rounded-lg border border-indigo-100 shrink-0 shadow-inner">`;
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          let cellClass = "rounded-[2px] transition-colors ";
+          if (r === 2 && c === 2) {
+            cellClass += "bg-indigo-500 animate-pulse";
+          } else if (matrix[r][c] === 1) {
+            cellClass += (shapeType === SHAPE_TYPES.WIDE) ? "bg-amber-400" : "bg-indigo-400";
+          } else {
+            cellClass += "bg-white";
+          }
+          html += `<div class="w-full h-full ${cellClass}"></div>`;
+        }
+      }
+      html += `</div>`;
+      return html;
+    }
+
+    function getShapeNameJP(shape) {
+      switch (shape) {
+        case SHAPE_TYPES.TARGET: return "自身 [ 🎯 ]";
+        case SHAPE_TYPES.CROSS: return "十字 [ ✚ ]";
+        case SHAPE_TYPES.CIRCLE: return "周囲 [ ⭕ ]";
+        case SHAPE_TYPES.WIDE: return "広域 [ 🌟 ]";
+        case SHAPE_TYPES.ROW: return "横列 [ ▬ ]";
+        case SHAPE_TYPES.COL: return "縦列 [ ❙ ]";
+        default: return "自身 [ 🎯 ]";
+      }
+    }
+
+    function getOwnerBgClass(ownerId, defLevel) {
+      if (ownerId === 1) {
+        switch (defLevel) {
+          case 0: return "bg-rose-100/40 text-rose-800 border-rose-200/50 ring-2 ring-rose-300/40";
+          case 1: return "bg-rose-200/55 text-rose-800 border-rose-300/60 ring-2 ring-rose-400/50";
+          case 2: return "bg-rose-300/70 text-rose-900 border-rose-400/70 ring-2 ring-rose-500/60 font-semibold";
+          case 3: return "bg-rose-400/80 text-rose-950 border-rose-500/80 ring-2 ring-rose-600/75 font-bold shadow-sm shadow-rose-200/40";
+          case 4: return "bg-rose-500/90 text-white border-rose-600 ring-2 ring-rose-600 font-extrabold shadow-md shadow-rose-200/60";
+          case 5:
+          default: return "bg-gradient-to-br from-rose-500 to-rose-600 text-white border-rose-700 ring-2 ring-rose-700 font-black shadow-lg shadow-rose-300/80";
+        }
+      } else if (ownerId === 2) {
+        switch (defLevel) {
+          case 0: return "bg-cyan-100/40 text-cyan-800 border-cyan-200/50 ring-2 ring-cyan-300/40";
+          case 1: return "bg-cyan-200/55 text-cyan-800 border-cyan-300/60 ring-2 ring-cyan-400/50";
+          case 2: return "bg-cyan-300/70 text-cyan-900 border-cyan-400/70 ring-2 ring-cyan-500/60 font-semibold";
+          case 3: return "bg-cyan-400/80 text-cyan-950 border-cyan-500/80 ring-2 ring-cyan-600/75 font-bold shadow-sm shadow-cyan-200/40";
+          case 4: return "bg-cyan-500/90 text-white border-cyan-600 ring-2 ring-cyan-600 font-extrabold shadow-md shadow-cyan-200/60";
+          case 5:
+          default: return "bg-gradient-to-br from-cyan-500 to-cyan-600 text-white border-cyan-700 ring-2 ring-cyan-700 font-black shadow-lg shadow-cyan-300/80";
+        }
+      }
+      return "";
+    }
+
+    // --- UI更新処理 ＆ アクションボタンの動的生成 ---
+    function updateUI() {
+      // コックピットバッジ
+      document.getElementById("p1-stock-badge").textContent = players[1].stock.length;
+      document.getElementById("p2-stock-badge").textContent = players[2].stock.length;
+
+      document.getElementById("p1-electrons").textContent = `${players[1].electrons} e⁻`;
+      document.getElementById("p2-electrons").textContent = `${players[2].electrons} e⁻`;
+
+      const p1AtomSum = players[1].stock.reduce((sum, item) => sum + (typeof item.num === 'number' ? item.num : 0), 0);
+      const p2AtomSum = players[2].stock.reduce((sum, item) => sum + (typeof item.num === 'number' ? item.num : 0), 0);
+      document.getElementById("p1-atom-sum").textContent = p1AtomSum;
+      document.getElementById("p2-atom-sum").textContent = p2AtomSum;
+
+      const p1Inc = Math.floor(p1AtomSum * 0.5) + 3;
+      const p2Inc = Math.floor(p2AtomSum * 0.5) + 3;
+      document.getElementById("p1-income").textContent = `+${p1Inc} e⁻`;
+      document.getElementById("p2-income").textContent = `+${p2Inc} e⁻`;
+
+      let p1Territory = 0;
+      let p2Territory = 0;
+      Object.keys(gridState).forEach(k => {
+        if (gridState[k].owner === 1) p1Territory++;
+        if (gridState[k].owner === 2) p2Territory++;
+      });
+      document.getElementById("p1-territory").textContent = p1Territory;
+      document.getElementById("p2-territory").textContent = p2Territory;
+
+      // コックピットアクティブカラー切り替え
+      const p1Panel = document.getElementById("p1-panel");
+      const p2Panel = document.getElementById("p2-panel");
+      const ctrlCenter = document.getElementById("control-panel-center");
+
+      if (activePlayer === 1) {
+        p1Panel.className = "bg-rose-50/80 border-rose-400 border-2 ring-2 ring-rose-200/50 p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all duration-300 shadow-sm";
+        p2Panel.className = "bg-white/80 border-slate-200 border p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all duration-300 opacity-60";
+        ctrlCenter.className = "bg-white border-rose-400 border-2 rounded-2xl flex flex-col justify-between gap-2 shadow-md relative transition-all duration-300";
+      } else {
+        p1Panel.className = "bg-white/80 border-slate-200 border p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all duration-300 opacity-60";
+        p2Panel.className = "bg-cyan-50/80 border-cyan-400 border-2 ring-2 ring-cyan-200/50 p-3 rounded-2xl flex flex-col justify-between gap-2 transition-all duration-300 shadow-sm";
+        ctrlCenter.className = "bg-white border-cyan-400 border-2 rounded-2xl flex flex-col justify-between gap-2 shadow-md relative transition-all duration-300";
+      }
+
+      const totalClaimed = p1Territory + p2Territory;
+      document.getElementById("total-claimed").textContent = `${totalClaimed} / 80`;
+      const p1Percent = (p1Territory / 118) * 100;
+      const p2Percent = (p2Territory / 118) * 100;
+      document.getElementById("progress-p1").style.width = `${p1Percent}%`;
+      document.getElementById("progress-p2").style.width = `${p2Percent}%`;
+
+      // モーダル以外のメイン側パスボタン制御（ヌル安全処理に修正）
+      const btnDominateSkip = document.getElementById("btn-dominate-skip");
+      if (btnDominateSkip) {
+        btnDominateSkip.disabled = (currentPhase !== GAME_PHASES.DOMINATE);
+      }
+
+      // コントロールセンター上部情報
+      const turnEl = document.getElementById("turn-count");
+      turnEl.textContent = `TURN ${turnCount}`;
+      const activeNameEl = document.getElementById("active-player-display");
+      activeNameEl.textContent = `PLAYER ${activePlayer}`;
+      activeNameEl.className = `text-xs font-black tracking-wider ${activePlayer === 1 ? 'text-rose-500 neon-text-rose' : 'text-cyan-500 neon-text-cyan'}`;
+      const indicatorColor = document.getElementById("turn-indicator-color");
+      indicatorColor.className = `w-2.5 h-2.5 rounded-full ${activePlayer === 1 ? 'bg-rose-400 shadow-md shadow-rose-300' : 'bg-cyan-400 shadow-md shadow-cyan-300'}`;
+
+      // 指示
+      const instructionEl = document.getElementById("phase-instruction");
+      if (currentPhase === GAME_PHASES.ROLL_DICE) {
+        instructionEl.textContent = "サイコロを振ってください";
+        instructionEl.className = "text-[10px] text-amber-600 font-bold bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200";
+      } else if (currentPhase === GAME_PHASES.MOVE) {
+        instructionEl.textContent = "光るマスのどこかへ移動してください";
+        instructionEl.className = "text-[10px] text-amber-600 font-bold bg-yellow-50 px-2.5 py-0.5 rounded-full border border-yellow-200";
+      } else if (currentPhase === GAME_PHASES.SUMMON) {
+        instructionEl.textContent = "召喚選択中...";
+        instructionEl.className = "text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 animate-pulse";
+      } else if (currentPhase === GAME_PHASES.DOMINATE) {
+        instructionEl.textContent = "支配をするか、パスするか選択してください";
+        instructionEl.className = "text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200";
+      } else if (currentPhase === GAME_PHASES.TELEPORT_WAIT) {
+        instructionEl.textContent = "次元ポータル起動中！好きなマスへワープしてください";
+        instructionEl.className = "text-[10px] text-purple-600 font-bold bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200 animate-pulse";
+      } else {
+        instructionEl.textContent = "ゲーム終了";
+        instructionEl.className = "text-[10px] text-slate-500 font-bold bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200";
+      }
+
+      // --- 【更新】中央コントロールの動的ボタン群 ---
+      const actionsContainer = document.getElementById("central-actions-container");
+      actionsContainer.innerHTML = "";
+
+      if (currentPhase === GAME_PHASES.ROLL_DICE) {
+        const btn = document.createElement("button");
+        btn.className = "px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-extrabold text-xs shadow-md shadow-indigo-200 transition-all active:scale-95 flex items-center gap-1";
+        btn.innerHTML = `<i data-lucide="dices" class="w-3.5 h-3.5"></i> ダイス`;
+        btn.onclick = triggerDicePhase;
+        actionsContainer.appendChild(btn);
+      } else if (currentPhase === GAME_PHASES.MOVE) {
+        actionsContainer.innerHTML = `<span class="text-xs text-amber-600 font-bold bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">アリーナで移動先を選択...</span>`;
+      } else if (currentPhase === GAME_PHASES.SUMMON) {
+        actionsContainer.innerHTML = `<span class="text-xs text-emerald-600 font-bold bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">召喚儀式中...</span>`;
+      } else if (currentPhase === GAME_PHASES.DOMINATE) {
+        // 「🔮 支配を実行」 と 「➔ パスしてターン交代」
+        const btnDominate = document.createElement("button");
+        btnDominate.className = "px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs transition-all flex items-center gap-1 shadow-md active:scale-95";
+        btnDominate.innerHTML = `<i data-lucide="sparkles" class="w-3.5 h-3.5"></i> 🔮 支配を実行`;
+        btnDominate.onclick = () => openStockModal(activePlayer);
+
+        const btnPass = document.createElement("button");
+        btnPass.className = "px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs transition-all flex items-center gap-1 border border-slate-200 active:scale-95";
+        btnPass.innerHTML = `<i data-lucide="skip-forward" class="w-3.5 h-3.5"></i> パス`;
+        btnPass.onclick = skipDomination;
+
+        actionsContainer.appendChild(btnDominate);
+        actionsContainer.appendChild(btnPass);
+      } else if (currentPhase === GAME_PHASES.TELEPORT_WAIT) {
+        actionsContainer.innerHTML = `<span class="text-xs text-purple-600 font-bold bg-purple-50 px-3 py-2 rounded-lg border border-purple-100 animate-pulse">アリーナで移動先を選択...</span>`;
+      }
+
+      renderBoard();
+      lucide.createIcons();
+    }
+
+    // 召喚コスト
+    function getSummonCost(num, player) {
+      if (typeof num !== 'number') return 0;
+      const state = gridState[num];
+      if (!state) return num;
+      if (state.owner === null) {
+        return num;
+      } else if (state.owner === player) {
+        return Math.max(1, Math.floor(num * 0.5));
+      } else {
+        return num * 2;
+      }
+    }
+
+    // getTypeNameJPをグローバルスコープ（updateUI関数の外）に配置
+    function getTypeNameJP(type) {
+      switch (type) {
+        case "alkali": return "アルカリ金属";
+        case "alkaline-earth": return "アルカリ土類金属";
+        case "transition": return "遷移金属";
+        case "post-transition": return "その他の金属";
+        case "metalloid": return "半金属";
+        case "nonmetal": return "非金属";
+        case "halogen": return "ハロゲン";
+        case "noble": return "希ガス";
+        case "lanthanide": return "ランタノイド";
+        case "actinide": return "アクチノイド";
+        default: return "特殊マス";
+      }
+    }
+
+    // 【新規・修正】 getElementDescriptionをグローバルスコープに追加
+    function getElementDescription(num) {
+      switch (num) {
+        case 1: return "【水素爆発】十字範囲の敵陣のみ破壊。中立なら自陣(★0)化。";
+        case 2: return "【不活性推進】次の自分のダイスロール結果を強制的に【 4 】にする。";
+        case 6: return "【無限結合】十字の自陣の防衛レベルがさらに+1上昇する(合計+2補強)。";
+        case 8: return "【酸化サビ】十字範囲 of 敵陣すべてにサビ劣化ダメージ1。";
+        case 9: return "【連続結合】反応 of 極大化。この支配発動後、もう一度だけ支配を実行可能！";
+        case 10: return "【ネオンパルス】この支配の終了後、次のダイスの出目を【 ＋2 】する。";
+        case 11: return "【ナトリウム激水】周囲 of 敵陣の防衛Lvを一撃で0にし強奪。かつ全HとOを強制自陣化。";
+        case 17: return "【電子強奪】相手プレイヤーが所持している電子（魔力）を半分（端数切捨て）に強奪！";
+        case 18: return "【次元転移】このターン終了時、周期表ボードの好きなマス（中継点除く）へワープ。";
+        case 35: return "【最高核粉砕】相手が手元にストックしている元素の中で、最も原子番号の高い１つを破壊！";
+        case 79: return "【絶対金剛】周囲の自陣 of 防衛レベルを劇的に+3補強する。";
+        case 92: return "【核分裂】周囲2マスの全マスを問答無用で【防衛Lv3 of 自陣】にする。";
+        default:
+          const el = elementsData.find(e => e.num === num);
+          if (!el) return "基本形状効果";
+          if (el.type !== "alkali" && el.type !== "alkaline-earth" && el.type !== "transition" && el.type !== "noble" && el.type !== "halogen") {
+            return "【触媒合成】範囲内の各マスに対して支配効果を発動 ＋ 追加で電子+2チャージ。";
+          }
+          return "基本効果 (射程範囲への攻撃 ＆ 補強 ＆ 自陣化)";
+      }
+    }
+
+    // --- キープ（ストックの書）のソート ＆ 支配発動 ---
+    function updateStockUI() {
+      const stock = players[activePlayer].stock;
+    }
+
+    function openStockModal(playerVal) {
+      const stock = players[playerVal].stock;
+
+      // 手元のキープカードは原子番号順に完全にソートされる
+      stock.sort((a, b) => a.num - b.num);
+
+      const titleEl = document.getElementById("stock-modal-title");
+      titleEl.textContent = `PLAYER ${playerVal} の魔導ストック`;
+
+      const dotEl = document.getElementById("stock-modal-player-dot");
+      dotEl.className = `w-3.5 h-3.5 rounded-full shadow-md ${playerVal === 1 ? 'bg-rose-400 shadow-rose-300' : 'bg-cyan-400 shadow-cyan-300'}`;
+
+      const listContainer = document.getElementById("stock-cards-list");
+      listContainer.innerHTML = "";
+
+      if (stock.length === 0) {
+        listContainer.innerHTML = `<div class="text-xs text-slate-400 italic p-6 text-center w-full">キープしている元素がありません</div>`;
+        openModal("stock-modal");
+        lucide.createIcons();
+        return;
+      }
+
+      stock.forEach((item, index) => {
+        if (!item) return;
+        const itemDiv = document.createElement("div");
+        itemDiv.className = `w-full bg-white border border-slate-200 p-3 rounded-2xl flex gap-3.5 items-center transition-all hover:border-indigo-100 hover:shadow-sm`;
+
+        const shape = getDominationShape(item.num);
+        const matrixHTML = generateShapeMatrixHTML(shape);
+
+        const contentCol = document.createElement("div");
+        contentCol.className = "flex-1 flex flex-col gap-1";
+
+        contentCol.innerHTML = `
+          <div class="flex justify-between items-center w-full leading-none">
+            <div class="flex items-center gap-1.5">
+              <span class="px-1.5 py-0.5 rounded text-[8px] font-bold bg-indigo-50 text-indigo-600 font-orbitron">${item.num}</span>
+              <span class="font-black text-sm text-slate-800">${item.sym}</span>
+              <span class="text-xs text-slate-500 font-bold">${item.name}</span>
+            </div>
+            <span class="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full border border-indigo-100">範囲: ${getShapeNameJP(shape)}</span>
+          </div>
+          <div class="text-[10px] text-slate-500 bg-slate-50 p-1.5 rounded-lg border border-slate-100 font-medium leading-relaxed mt-1">
+            ${getElementDescription(item.num)}
+          </div>
+        `;
+
+        // 支配ボタン：現在手番でかつDOMINATEフェイズ、さらに本人のみ発動可能
+        const btnUse = document.createElement("button");
+        btnUse.className = "px-3 py-2.5 shrink-0 font-black rounded-xl text-xs bg-gradient-to-r from-rose-400 to-amber-400 hover:from-rose-500 hover:to-amber-500 text-white shadow-md active:scale-95 disabled:from-slate-100 disabled:to-slate-100 disabled:text-slate-400 disabled:shadow-none disabled:pointer-events-none transition-all";
+        btnUse.textContent = "支配発動";
+
+        const isSelfTurn = (playerVal === activePlayer);
+        if (currentPhase === GAME_PHASES.DOMINATE && isSelfTurn) {
+          btnUse.disabled = false;
+          btnUse.onclick = () => {
+            closeModal("stock-modal");
+            executeDomination(index);
+          };
+        } else {
+          btnUse.disabled = true;
+        }
+
+        itemDiv.appendChild(matrixContainerHTML(matrixHTML));
+        itemDiv.appendChild(contentCol);
+        itemDiv.appendChild(btnUse);
+        listContainer.appendChild(itemDiv);
+      });
+
+      openModal("stock-modal");
+      lucide.createIcons();
+    }
+
+    function matrixContainerHTML(htmlStr) {
+      const div = document.createElement("div");
+      div.className = "shrink-0";
+      div.innerHTML = htmlStr;
+      return div.firstElementChild;
+    }
+
+    function closeStockModal() {
+      closeModal("stock-modal");
+    }
+
+    // --- 周期表ボードのレンダリング (パルスインジケーター改善搭載) ---
+    function renderBoard() {
+      const boardEl = document.getElementById("periodic-board");
+      boardEl.innerHTML = "";
+
+      for (let r = 1; r <= 7; r++) {
+        for (let c = 1; c <= 18; c++) {
+          const cell = document.createElement("div");
+          cell.style.gridRow = r;
+          cell.style.gridColumn = c;
+
+          const el = elementsData.find(e => e.row === r && e.col === c);
+          if (el) {
+            cell.className = `element-cell relative border border-slate-200/80 rounded-xl flex flex-col items-center justify-between p-1.5 text-xs cursor-pointer select-none transition-all duration-200 shadow-sm`;
+
+            // カテゴリごとのデフォルトパステル色（全てごく薄い灰色に統一！）
+            let typeClass = getTypeBgClass(el.type);
+            cell.className += ` ${typeClass}`;
+
+            const state = gridState[el.num];
+            if (state && state.owner) {
+              const defClass = getOwnerBgClass(state.owner, state.defLevel);
+              cell.className += ` ${defClass}`;
+            }
+
+            // プレイヤー駒
+            const p1Here = players[1].pos === el.num;
+            const p2Here = players[2].pos === el.num;
+
+            let pieceHtml = "";
+            if (p1Here && p2Here) {
+              pieceHtml = `
+                <div class="absolute inset-0 flex items-center justify-center gap-1 bg-white/90 rounded-xl z-20 border border-indigo-100">
+                  <span class="w-5 h-5 rounded-full bg-rose-400 border border-white flex items-center justify-center text-[8px] text-white font-extrabold animate-bounce">P1</span>
+                  <span class="w-5 h-5 rounded-full bg-cyan-400 border border-white flex items-center justify-center text-[8px] text-white font-extrabold animate-bounce">P2</span>
+                </div>
+              `;
+            } else if (p1Here) {
+              pieceHtml = `
+                <div class="absolute inset-0 flex items-center justify-center bg-white/40 rounded-xl z-20">
+                  <span class="w-6 h-6 rounded-full bg-rose-400 border-2 border-white flex items-center justify-center text-[9px] text-white font-black animate-pulse shadow-md shadow-rose-300">P1</span>
+                </div>
+              `;
+            } else if (p2Here) {
+              pieceHtml = `
+                <div class="absolute inset-0 flex items-center justify-center bg-white/40 rounded-xl z-20">
+                  <span class="w-6 h-6 rounded-full bg-cyan-400 border-2 border-white flex items-center justify-center text-[9px] text-white font-black animate-pulse shadow-md shadow-cyan-300">P2</span>
+                </div>
+              `;
+            }
+
+            let topHtml = "";
+            if (typeof el.num === 'number') {
+              topHtml = `<span class="text-[9px] font-bold text-slate-400 font-orbitron">${el.num}</span>`;
+              if (state && state.owner) {
+                topHtml += `<span class="text-[9px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">★${state.defLevel}</span>`;
+              }
+            } else {
+              topHtml = `<span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest">${el.sym}</span>`;
+            }
+
+            // 【重要】移動マスのオーバーレイ（元の陣地色を完全に残したまま、中心に上品な魔法ドットを配置）
+            let highlightOverlay = "";
+            if (currentPhase === GAME_PHASES.MOVE && highlightedMoves.includes(el.num)) {
+              cell.className += " scale-[1.02] z-30 shadow-[0_0_10px_rgba(245,158,11,0.4)]";
+
+              const cost = getSummonCost(el.num, activePlayer);
+              const canSummon = typeof el.num === 'number' && players[activePlayer].electrons >= cost;
+
+              if (canSummon) {
+                // 現在電子で購入可能なマスをオレンジドットで明示 (JITの影バグ回避のため、スタイルをインラインで直接補強)
+                highlightOverlay = `
+                  <div class="absolute w-4 h-4 bg-orange-400 rounded-full opacity-95 animate-pulse pointer-events-none z-30" style="top:50%; left:50%; transform:translate(-50%, -50%); border: 1.5px solid white; box-shadow: 0 0 12px #f97316;"></div>
+                `;
+              } else {
+                // 予算オーバー または中継点 Ln/An (黄色ドット)
+                highlightOverlay = `
+                  <div class="absolute w-4 h-4 bg-yellow-400 rounded-full opacity-90 animate-pulse pointer-events-none z-30" style="top:50%; left:50%; transform:translate(-50%, -50%); border: 1.5px solid white; box-shadow: 0 0 12px #eab308;"></div>
+                `;
+              }
+            } else if (currentPhase === GAME_PHASES.TELEPORT_WAIT && typeof el.num === 'number') {
+              cell.className += " scale-[1.02] z-30 shadow-[0_0_10px_rgba(168,85,247,0.4)]";
+              highlightOverlay = `
+                <div class="absolute w-4 h-4 bg-purple-400 rounded-full opacity-90 animate-pulse pointer-events-none z-30" style="top:50%; left:50%; transform:translate(-50%, -50%); border: 1.5px solid white; box-shadow: 0 0 12px #a855f7;"></div>
+              `;
+            }
+
+            cell.innerHTML = `
+              ${pieceHtml}
+              ${highlightOverlay}
+              <div class="w-full flex justify-between items-center leading-none">
+                ${topHtml}
+              </div>
+              <div class="text-sm font-black tracking-wide text-slate-700 font-orbitron py-0.5">${el.sym}</div>
+              <div class="text-[9px] text-slate-500 truncate w-full text-center font-bold">${el.name}</div>
+            `;
+
+            cell.addEventListener("click", () => handleCellClick(el.num));
+          } else {
+            cell.className = "border border-transparent pointer-events-none";
+          }
+          boardEl.appendChild(cell);
+        }
+      }
+    }
+
+    function getTypeBgClass(type) {
+      if (type === "lanthanide-link" || type === "actinide-link") {
+        return "bg-slate-100 hover:bg-slate-200 text-slate-400 border-slate-300 border-dashed";
+      }
+      return "bg-slate-100/70 hover:bg-slate-200/90 text-slate-600 border-slate-200/80";
+    }
+
+    // --- ロギングシステム ---
+    function addLog(message, type = "info") {
+      const container = document.getElementById("log-container");
+      const logDiv = document.createElement("div");
+
+      let colorClass = "text-slate-600";
+      if (type === "p1") colorClass = "text-rose-600 font-bold border-l-2 border-rose-400 pl-1.5";
+      if (type === "p2") colorClass = "text-cyan-600 font-bold border-l-2 border-cyan-400 pl-1.5";
+      if (type === "success") colorClass = "text-emerald-600 font-bold";
+      if (type === "warning") colorClass = "text-amber-600 font-bold";
+      if (type === "system") colorClass = "text-indigo-500 italic font-bold";
+
+      logDiv.className = `leading-relaxed py-0.5 shrink-0 ${colorClass}`;
+      logDiv.innerHTML = `[${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] ${message}`;
+
+      container.appendChild(logDiv);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // --- モーダル制御 ---
+    function openModal(id) {
+      document.getElementById(id).classList.remove("hidden");
+    }
+
+    function showModal(title, desc, btnText, callback) {
+      const modal = document.getElementById("game-modal");
+      document.getElementById("modal-title").textContent = title;
+      document.getElementById("modal-desc").textContent = desc;
+
+      const btn = document.getElementById("modal-btn");
+      btn.textContent = btnText;
+
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+
+      newBtn.addEventListener("click", () => {
+        modal.classList.add("hidden");
+        if (callback) callback();
+      });
+
+      modal.classList.remove("hidden");
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add("hidden");
+    }
+
+    // --- ダイスロールダイアログ起動 ---
+    function triggerDicePhase() {
+      currentPhase = GAME_PHASES.ROLL_DICE;
+
+      const player = players[activePlayer];
+      const playerTag = document.getElementById("dice-modal-player-tag");
+      playerTag.textContent = `PLAYER ${activePlayer}`;
+      if (activePlayer === 1) {
+        playerTag.className = "text-sm font-extrabold px-3 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200";
+      } else {
+        playerTag.className = "text-sm font-extrabold px-3 py-1 rounded-full bg-cyan-50 text-cyan-600 border border-cyan-200";
+      }
+
+      document.getElementById("dice-modal-turn").textContent = `TURN ${turnCount}`;
+      document.getElementById("dice-modal-visual").textContent = "-";
+      document.getElementById("btn-modal-roll").disabled = false;
+
+      updateUI();
+      openModal("dice-modal");
+    }
+
+    // サイコロロール（ウェイト付き）➔ ロール後1秒で自動進行
+    document.getElementById("btn-modal-roll").addEventListener("click", () => {
+      const diceVisual = document.getElementById("dice-modal-visual");
+      diceVisual.classList.add("animate-spin");
+      document.getElementById("btn-modal-roll").disabled = true;
+
+      setTimeout(() => {
+        diceVisual.classList.remove("animate-spin");
+
+        const player = players[activePlayer];
+
+        if (player.nextRollFix !== null) {
+          diceValue = player.nextRollFix;
+          player.nextRollFix = null;
+          addLog(`✨ ヘリウムの不活性推進！ダイスの目は強制的に [ ${diceValue} ] に固定されました。`, `p${activePlayer}`);
+        } else {
+          // 3(44.4%), 2(22.2%), 4(22.2%), 1(11.1%)
+          const diceWeightPool = [1, 2, 2, 3, 3, 3, 3, 4, 4];
+          diceValue = diceWeightPool[Math.floor(Math.random() * diceWeightPool.length)];
+
+          if (player.nextRollAdd > 0) {
+            const originVal = diceValue;
+            diceValue = Math.min(6, diceValue + player.nextRollAdd);
+            player.nextRollAdd = 0;
+            addLog(`⚡ ネオンパルス！ダイスの目が ＋2 され [ ${diceValue} ] に強化されました！`, `p${activePlayer}`);
+          } else {
+            addLog(`Player ${activePlayer} がサイコロを振って [ ${diceValue} ] が出ました！`, `p${activePlayer}`);
+          }
+        }
+
+        diceVisual.textContent = diceValue;
+        document.getElementById("dice-visual").textContent = diceValue;
+
+        highlightedMoves = getValidMoves(players[activePlayer].pos, diceValue);
+
+        // ロール完了から1秒後に自動的にモーダルを閉じ、アリーナ選択状態にする
+        setTimeout(() => {
+          closeModal("dice-modal");
+          if (highlightedMoves.length === 0) {
+            addLog("移動可能なマスが周囲にありません。ターンをスキップします。", "warning");
+            endTurn();
+          } else {
+            currentPhase = GAME_PHASES.MOVE;
+            updateUI();
+          }
+        }, 1000);
+
+      }, 700);
+    });
+
+    // マス移動完了アクション
+    function handleCellClick(num) {
+      if (currentPhase === GAME_PHASES.TELEPORT_WAIT) {
+        if (num === "Ln" || num === "An") {
+          addLog("中継ブリッジマスへは次元転移できません！", "warning");
+          return;
+        }
+        players[activePlayer].pos = num;
+        addLog(`✨ プレイヤー${activePlayer} は [ ${elementsData.find(e => e.num === num).sym} ] へ次元転移ワープしました！`, `p${activePlayer}`);
+        endTurn();
+        return;
+      }
+
+      if (currentPhase !== GAME_PHASES.MOVE) return;
+
+      if (!highlightedMoves.includes(num)) {
+        addLog("そこへはダイスの歩数が届きません。", "warning");
+        return;
+      }
+
+      players[activePlayer].pos = num;
+      highlightedMoves = [];
+
+      const targetEl = elementsData.find(e => e.num === num);
+      addLog(`Player ${activePlayer} は ${targetEl.sym}(${targetEl.name}) へ移動しました。`, `p${activePlayer}`);
+
+      if (num === "Ln") {
+        openShopModal("lanthanide");
+      } else if (num === "An") {
+        openShopModal("actinide");
+      } else {
+        openSummonModal(num);
+      }
+    }
+
+    // 召喚確認モーダルの起動
+    function openSummonModal(num) {
+      currentPhase = GAME_PHASES.SUMMON;
+
+      const el = elementsData.find(e => e.num === num);
+      if (!el) return;
+
+      const cost = getSummonCost(num, activePlayer);
+
+      document.getElementById("summon-modal-type").textContent = getTypeNameJP(el.type);
+      document.getElementById("summon-modal-display").textContent = `[No.${el.num}] ${el.sym} (${el.name})`;
+      document.getElementById("summon-modal-cost").textContent = `${cost} e⁻`;
+      document.getElementById("summon-modal-effect").textContent = getElementDescription(el.num);
+      document.getElementById("summon-modal-player-electrons").textContent = `${players[activePlayer].electrons} e⁻`;
+
+      const btnConfirm = document.getElementById("btn-modal-summon-confirm");
+      btnConfirm.disabled = (players[activePlayer].electrons < cost || players[activePlayer].stock.length >= 10);
+
+      updateUI();
+      openModal("summon-modal");
+    }
+
+    // 召喚確定
+    document.getElementById("btn-modal-summon-confirm").addEventListener("click", () => {
+      const pPos = players[activePlayer].pos;
+      const el = elementsData.find(e => e.num === pPos);
+      const cost = getSummonCost(pPos, activePlayer);
+
+      players[activePlayer].electrons -= cost;
+      players[activePlayer].stock.push(el);
+
+      addLog(`召喚成功! ${el.sym}(${el.name}) を獲得しキープにストックしました！`, "success");
+
+      closeModal("summon-modal");
+
+      currentPhase = GAME_PHASES.DOMINATE;
+      updateUI();
+    });
+
+    // 召喚パス
+    document.getElementById("btn-modal-summon-skip").addEventListener("click", () => {
+      addLog(`プレイヤー${activePlayer} は召喚を行わずにパスしました。`, "system");
+      closeModal("summon-modal");
+      currentPhase = GAME_PHASES.DOMINATE;
+      updateUI();
+    });
+
+    // 4. ランタノイド／アクチノイド特殊ショップモーダル
+    function openShopModal(type) {
+      currentPhase = GAME_PHASES.SUMMON;
+
+      const titleEl = document.getElementById("shop-modal-title");
+      const container = document.getElementById("shop-cards-container");
+      container.innerHTML = "";
+
+      document.getElementById("shop-modal-player-electrons").textContent = `${players[activePlayer].electrons} e⁻`;
+
+      const filterType = (type === "lanthanide") ? "lanthanide" : "actinide";
+      titleEl.innerHTML = (type === "lanthanide")
+        ? `<i data-lucide="store" class="w-5 h-5"></i> 秘境 of 元素ショップ - ランタノイド編`
+        : `<i data-lucide="store" class="w-5 h-5"></i> 秘境 of 元素ショップ - アクチノイド編`;
+
+      const shopElements = elementsData.filter(e => e.type === filterType);
+
+      shopElements.forEach(el => {
+        const cost = el.num;
+        const canBuy = (players[activePlayer].electrons >= cost && players[activePlayer].stock.length < 10);
+
+        const card = document.createElement("div");
+        card.className = `p-3.5 bg-white border border-slate-200 rounded-2xl flex flex-col justify-between gap-2.5 transition-all hover:border-indigo-100 hover:shadow-sm ${!canBuy ? 'opacity-80' : ''}`;
+
+        const shape = getDominationShape(el.num);
+        const matrixHTML = generateShapeMatrixHTML(shape);
+
+        card.innerHTML = `
+          <div class="flex gap-2.5 items-center">
+            ${matrixHTML}
+            <div class="flex-1 flex flex-col">
+              <div class="flex justify-between items-center leading-none">
+                <span class="px-1.5 py-0.5 rounded text-[8px] font-bold bg-slate-100 text-indigo-600 font-orbitron">${el.num}</span>
+                <span class="text-[9px] font-bold text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-full border border-indigo-100">範囲: ${getShapeNameJP(shape)}</span>
+              </div>
+              <div class="flex items-baseline gap-1 mt-1">
+                <span class="font-black text-slate-800 text-sm">${el.sym}</span>
+                <span class="text-xs text-slate-500 font-bold">${el.name}</span>
+              </div>
+            </div>
+          </div>
+          <div class="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 font-semibold leading-relaxed">
+            ${getElementDescription(el.num)}
+          </div>
+          <div class="flex justify-between items-center mt-1 border-t border-slate-100 pt-2">
+            <span class="text-[10px] text-slate-400 font-bold">必要魔力: <span class="text-indigo-600 text-xs font-orbitron font-extrabold">${cost} e⁻</span></span>
+            <button onclick="buyShopElement(${el.num})" ${!canBuy ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg font-black text-[10px] bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm transition-all active:scale-95 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:pointer-events-none">
+              召喚
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      lucide.createIcons();
+      openModal("shop-modal");
+    }
+
+    function buyShopElement(num) {
+      const el = elementsData.find(e => e.num === num);
+      if (!el) return;
+
+      const cost = el.num;
+      if (players[activePlayer].electrons < cost) return;
+
+      players[activePlayer].electrons -= cost;
+      players[activePlayer].stock.push(el);
+
+      addLog(`ゲート召喚成功! 特別元素 ${el.sym}(${el.name}) を獲得しキープにストックしました！`, "success");
+
+      closeModal("shop-modal");
+
+      currentPhase = GAME_PHASES.DOMINATE;
+      updateUI();
+    }
+
+    function closeShopModal() {
+      addLog(`プレイヤー${activePlayer} はショップで何も買わずにアリーナに戻りました。`, "system");
+      closeModal("shop-modal");
+      currentPhase = GAME_PHASES.DOMINATE;
+      updateUI();
+    }
+
+    // 支配（発動）実行
+    function executeDomination(stockIndex) {
+      if (currentPhase !== GAME_PHASES.DOMINATE) return;
+
+      const stock = players[activePlayer].stock;
+      const el = stock[stockIndex];
+      const pPos = players[activePlayer].pos;
+
+      if (!el) return;
+
+      applyDominationEffect(el.num, pPos);
+      stock.splice(stockIndex, 1);
+
+      checkVictory();
+
+      // フッ素の連続結合が効いている場合、再帰的に手札発動を連続許可
+      if (players[activePlayer].extraDominate && players[activePlayer].stock.length > 0) {
+        players[activePlayer].extraDominate = false;
+        addLog("⚙️ フッ素の超活性効果！手元から連続して、もう一度支配を実行できます！", "success");
+        currentPhase = GAME_PHASES.DOMINATE;
+        updateUI();
+        openStockModal(activePlayer); // 再度手元を即座に見せる
+      }
+      else if (players[activePlayer].canTeleport) {
+        players[activePlayer].canTeleport = false;
+        currentPhase = GAME_PHASES.TELEPORT_WAIT;
+        addLog("🔮 アルゴンの次元ポータル解放！好きなマス（中継点除く）をクリックしてワープ！", "system");
+        updateUI();
+      }
+      else {
+        endTurn();
+      }
+    }
+
+    // 支配せず交代するパスアクションの確立
+    function skipDomination() {
+      if (currentPhase !== GAME_PHASES.DOMINATE) return;
+      addLog(`プレイヤー${activePlayer} は支配をパスしました。`, "system");
+      endTurn();
+    }
+
+    // --- 支配アビリティ効果ロジック ---
+    function applyDominationEffect(elementNum, currentPos) {
+      const shape = getDominationShape(elementNum);
+      const targets = getDominationTargets(currentPos, shape);
+      const activeEl = elementsData.find(e => e.num === elementNum);
+      const enemyPlayer = activePlayer === 1 ? 2 : 1;
+
+      if (!activeEl) return;
+
+      addLog(`魔力支配: ${activeEl.sym}(${activeEl.name}) ➔ 範囲：${getShapeNameJP(shape)}`, `p${activePlayer}`);
+
+      // 1. 水素 H (No.1)
+      if (elementNum === 1) {
+        addLog("💥 水素爆発! 十字範囲の敵陣のみ防衛レベルを-1します(中立は★0で自陣化)。", "warning");
+        targets.forEach(tNum => {
+          const state = gridState[tNum];
+          if (!state) return;
+          if (state.owner === null) {
+            claimElement(tNum, activePlayer, 0);
+          } else if (state.owner === enemyPlayer) {
+            damageElement(tNum, 1, activePlayer);
+          }
+        });
+      }
+      // 2. ヘリウム He (No.2)
+      else if (elementNum === 2) {
+        addLog("🎈 不活性推進! 次の自分のダイスロール結果を強制的に【 4 】にします！", "success");
+        players[activePlayer].nextRollFix = 4;
+        targets.forEach(tNum => {
+          applyBaseDomination(tNum);
+        });
+      }
+      // 3. 炭素 C (No.6)
+      else if (elementNum === 6) {
+        addLog("💎 ダイヤモンド無限結合! 十字範囲の自陣の防衛レベルを+2補強します！", "success");
+        targets.forEach(tNum => {
+          const state = gridState[tNum];
+          if (!state) return;
+          if (state.owner === null) {
+            claimElement(tNum, activePlayer, 0);
+          } else if (state.owner === activePlayer) {
+            fortifyElement(tNum, 2, activePlayer);
+          } else {
+            damageElement(tNum, 1, activePlayer);
+          }
+        });
+      }
+      // 4. 酸素 O (No.8)
+      else if (elementNum === 8) {
+        addLog("⚠️ 酸化作用! 十字範囲の敵防衛Lvを-1し、中立は自陣化します！", "warning");
+        targets.forEach(tNum => {
+          const state = gridState[tNum];
+          if (!state) return;
+          if (state.owner === null) {
+            claimElement(tNum, activePlayer, 0);
+          } else if (state.owner === enemyPlayer) {
+            damageElement(tNum, 1, activePlayer);
+          }
+        });
+      }
+      // 5. フッ素 F (No.9)
+      else if (elementNum === 9) {
+        addLog("⚙️ 連続結合! この支配の完了後、ストックがあればもう一度別の支配を行えます！", "success");
+        players[activePlayer].extraDominate = true;
+        targets.forEach(tNum => {
+          applyBaseDomination(tNum);
+        });
+      }
+      // 6. ネオン Ne (No.10)
+      else if (elementNum === 10) {
+        addLog("⚡ ネオンパルス！次の自分のダイスの出目に【 ＋2 】するバフをチャージ！", "success");
+        players[activePlayer].nextRollAdd = 2;
+        targets.forEach(tNum => {
+          applyBaseDomination(tNum);
+        });
+      }
+      // 7. ナトリウム Na (No.11)
+      else if (elementNum === 11) {
+        addLog("🌊 ナトリウム激水! 周囲マスの敵防衛Lvを一撃で0にして強制強奪し、全HとOを支配します！", "success");
+        targets.forEach(tNum => {
+          const state = gridState[tNum];
+          if (!state) return;
+          if (state.owner === null) {
+            claimElement(tNum, activePlayer, 0);
+          } else if (state.owner === activePlayer) {
+            fortifyElement(tNum, 1, activePlayer);
+          } else if (state.owner === enemyPlayer) {
+            state.defLevel = 0;
+            damageElement(tNum, 1, activePlayer);
+          }
+        });
+        claimElement(1, activePlayer, 0);
+        claimElement(8, activePlayer, 0);
+        addLog("大気中のすべての H (1) と O (8) マスが自動的に自陣になりました！", "success");
+      }
+      // 8. 塩素 Cl (No.17)
+      else if (elementNum === 17) {
+        const originElec = players[enemyPlayer].electrons;
+        const stole = Math.floor(originElec / 2);
+        players[enemyPlayer].electrons -= stole;
+        addLog(`🧪 電子強奪！相手(Player${enemyPlayer})の魔力を半分削り、魔力 ${stole} e⁻ を消滅させました！ (残：${players[enemyPlayer].electrons} e⁻)`, "warning");
+        targets.forEach(tNum => {
+          applyBaseDomination(tNum);
+        });
+      }
+      // 9. アルゴン Ar (No.18)
+      else if (elementNum === 18) {
+        addLog("🔮 次元転移ポータル！支配フェイズ終了時に好きなマスへテレポートできます！", "success");
+        players[activePlayer].canTeleport = true;
+        targets.forEach(tNum => {
+          applyBaseDomination(tNum);
+        });
+      }
+      // 10. 臭素 Br (No.35)
+      else if (elementNum === 35) {
+        const enemyStock = players[enemyPlayer].stock;
+        if (enemyStock.length > 0) {
+          let maxIdx = 0;
+          let maxNum = -1;
+          enemyStock.forEach((st, idx) => {
+            if (st.num > maxNum) {
+              maxNum = st.num;
+              maxIdx = idx;
+            }
+          });
+          const destroyedEl = enemyStock[maxIdx];
+          enemyStock.splice(maxIdx, 1);
+          addLog(`💥 最高核粉砕！相手がキープしていた最大の切り札 [No.${destroyedEl.num}] ${destroyedEl.sym}(${destroyedEl.name}) を完全に破壊しました！`, "warning");
+        } else {
+          addLog("相手は手元にキープしている元素がなかったため、粉砕は不発に終わりました。", "system");
+        }
+        targets.forEach(tNum => {
+          applyBaseDomination(tNum);
+        });
+      }
+      // 11. 金 Au (No.79)
+      else if (elementNum === 79) {
+        addLog("👑 絶対黄金不金! 周囲マスの自陣の防衛レベルを+3補強し、中立なら初期防衛3で自陣化！", "success");
+        targets.forEach(tNum => {
+          const state = gridState[tNum];
+          if (!state) return;
+          if (state.owner === null) {
+            claimElement(tNum, activePlayer, 3);
+          } else if (state.owner === activePlayer) {
+            fortifyElement(tNum, 3, activePlayer);
+          } else {
+            damageElement(tNum, 1, activePlayer);
+          }
+        });
+      }
+      // 12. ウラン U (No.92)
+      else if (elementNum === 92) {
+        addLog("☢️ 終末の核分裂! 射程2マスの全マスを強制的に防衛レベル3 of 自陣（★3）に塗り替えます！", "warning");
+        targets.forEach(tNum => {
+          claimElement(tNum, activePlayer, 3);
+        });
+      }
+      // 13. その他の元素 (共通効果)
+      else {
+        targets.forEach(tNum => {
+          applyBaseDomination(tNum);
+        });
+
+        if (activeEl.type !== "alkali" && activeEl.type !== "alkaline-earth" && activeEl.type !== "transition" && activeEl.type !== "noble" && activeEl.type !== "halogen") {
+          addLog("🧪 触媒効果! 元素消費 of 化学エネルギー還元により電子+2を獲得！", "success");
+          players[activePlayer].electrons += 2;
+        }
+      }
+    }
+
+    function applyBaseDomination(tNum) {
+      const state = gridState[tNum];
+      if (!state) return;
+      if (state.owner === null) {
+        claimElement(tNum, activePlayer, 0);
+      } else if (state.owner === activePlayer) {
+        fortifyElement(tNum, 1, activePlayer);
+      } else {
+        damageElement(tNum, 1, activePlayer);
+      }
+    }
+
+    function damageElement(targetNum, amount, attackerId) {
+      const state = gridState[targetNum];
+      if (!state || typeof targetNum !== 'number') return;
+
+      const defenderId = state.owner;
+
+      if (state.owner === null) {
+        if (amount > 0) {
+          state.owner = attackerId;
+          state.defLevel = 0;
+          addLog("中立マス " + elementsData.find(e => e.num === targetNum).sym + " が プレイヤー" + attackerId + " の陣地になりました。", "success");
+        }
+        return;
+      }
+
+      if (state.owner === attackerId) {
+        return;
+      }
+
+      let currentDef = state.defLevel;
+      currentDef -= amount;
+
+      if (currentDef < 0) {
+        state.owner = attackerId;
+        state.defLevel = 0;
+        addLog("強奪! プレイヤー" + defenderId + " の陣地 " + elementsData.find(e => e.num === targetNum).sym + " を破壊し、プレイヤー" + attackerId + " の陣地(★0)にしました！", "success");
+      } else {
+        state.defLevel = currentDef;
+        addLog("敵陣 " + elementsData.find(e => e.num === targetNum).sym + " の防衛力を削り ★" + currentDef + " にしました。");
+      }
+    }
+
+    function claimElement(targetNum, ownerId, defLevel = 0) {
+      if (typeof targetNum !== 'number') return;
+      const state = gridState[targetNum];
+      if (!state) return;
+      state.owner = ownerId;
+      state.defLevel = defLevel;
+    }
+
+    function fortifyElement(targetNum, amount, ownerId) {
+      if (typeof targetNum !== 'number') return;
+      const state = gridState[targetNum];
+      if (state && state.owner === ownerId) {
+        state.defLevel = Math.min(5, state.defLevel + amount);
+        addLog("陣地 " + elementsData.find(e => e.num === targetNum).sym + " を ★" + state.defLevel + " に強化しました。", "success");
+      }
+    }
+
+    // --- ターンの切り替え処理 ＆ 収入の付与 ---
+    function endTurn() {
+      activePlayer = activePlayer === 1 ? 2 : 1;
+
+      if (activePlayer === 1) {
+        turnCount++;
+      }
+
+      const stock = players[activePlayer].stock;
+      const atomSum = stock.reduce((sum, item) => sum + (typeof item.num === 'number' ? item.num : 0), 0);
+      const income = Math.floor(atomSum * 0.5) + 3;
+      players[activePlayer].electrons += income;
+
+      addLog(`プレイヤー ${activePlayer} のターン開始！基本支給(+3) ＋ 手持ち精霊ボーナス(${Math.floor(atomSum * 0.5)}) ＝ 【 +${income} e⁻ 】を獲得！`, `p${activePlayer}`);
+
+      // 自動ダイスフェイズ起動
+      triggerDicePhase();
+    }
+
+    // --- 勝利条件チェック ---
+    function checkVictory() {
+      let p1Territory = 0;
+      let p2Territory = 0;
+      Object.keys(gridState).forEach(k => {
+        if (gridState[k].owner === 1) p1Territory++;
+        if (gridState[k].owner === 2) p2Territory++;
+      });
+
+      const total = p1Territory + p2Territory;
+
+      if (total >= 80) {
+        currentPhase = GAME_PHASES.GAME_OVER;
+        let winnerName = "引き分け";
+        if (p1Territory > p2Territory) {
+          winnerName = "PLAYER 1";
+        } else if (p2Territory > p1Territory) {
+          winnerName = "PLAYER 2";
+        }
+
+        closeModal("dice-modal");
+        closeModal("summon-modal");
+        closeModal("shop-modal");
+        closeModal("stock-modal");
+
+        showModal(
+          "👑 大戦終了！",
+          `魔力占領マスの合計が目標の80マスに到達しました！\n\n【最終結果】\nPLAYER 1: ${p1Territory}マス\nPLAYER 2: ${p2Territory}マス\n\n見事、大賢者【 ${winnerName} 】の勝利です！`,
+          "もう一度プレイする",
+          () => {
+            resetGame();
+          }
+        );
+      }
+    }
+
+    // --- ゲームの初期化 ---
+    function resetGame() {
+      activePlayer = 1;
+      currentPhase = GAME_PHASES.ROLL_DICE;
+      turnCount = 1;
+      diceValue = 0;
+      highlightedMoves = [];
+
+      players[1] = { pos: 1, electrons: 5, stock: [], nextRollFix: null, nextRollAdd: 0, extraDominate: false, canTeleport: false };
+      players[2] = { pos: 1, electrons: 5, stock: [], nextRollFix: null, nextRollAdd: 0, extraDominate: false, canTeleport: false };
+
+      Object.keys(gridState).forEach(k => {
+        gridState[k].owner = null;
+        gridState[k].defLevel = 0;
+      });
+
+      document.getElementById("log-container").innerHTML = "";
+      addLog("=== 錬金アリーナへの扉が開かれました！ ===", "system");
+      addLog("プレイヤー1: 水素(H)からスタート！ 魔力: 5e⁻", "p1");
+      addLog("プレイヤー2: 水素(H)からスタート！ 魔力: 5e⁻", "p2");
+
+      updateUI();
+      triggerDicePhase();
+    }
+
+    // 初回起動
+    window.onload = function () {
+      showModal(
+        "精霊の元素アリーナへようこそ",
+        "サイコロ(重み付き1〜4)を振り、止まったマスで元素を【召喚（キープ）】。キープした元素を消費して【支配アビリティ（新アビリティ多数実装！）】を放ち、周囲一帯を美しく自陣化して対戦する魔法の科学すごろく。総占領数が80マスに達した時点で勝敗を決定します！",
+        "アカデミーの闘技場へ",
+        () => {
+          resetGame();
+        }
+      );
+    }
+  </script>
+</body>
+
+</html>
