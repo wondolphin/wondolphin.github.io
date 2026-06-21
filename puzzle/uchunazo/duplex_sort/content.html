@@ -627,10 +627,17 @@
           "「Duplex Sort」をクリアしました！", 
           "「Duplex Sort」を【一撃で】クリアしました！"
         );
+       }
+        let tweetText2 = SHARE_CONFIG.TWEET_TEXT2;
+      if (moveCount === 9) {
+        tweetText2 = tweetText2.replace(
+          "「Duplex Sort」をクリアしました！", 
+          "「Duplex Sort」を【一撃で】クリアしました！"
+        );
       }
       
       // 手動コピー用のテキスト
-      const manualText = tweetText + "\n" + SHARE_CONFIG.TWEET_URL;
+      const manualText = tweetText2 + "\n" + SHARE_CONFIG.TWEET_URL;
 
       const mainBtn = document.createElement('button');
       mainBtn.className = 'share-btn';
