@@ -449,6 +449,7 @@
     let B = [...initialB];
     let activeFrame = 0;
     let isCleared = false;
+    let moveCount = 0; // ボタン操作回数のカウンタを追加
 
     // DOM要素の生成と初期化
     window.onload = function() {
@@ -555,6 +556,9 @@
       // 枠は一つ右に移動する。右端に達した場合は一番左に戻る
       activeFrame = (activeFrame + 1) % 9;
 
+      // 操作回数を1加算
+      moveCount++;
+
       // 画面更新とクリア判定
       updateUI();
       checkClear();
@@ -616,8 +620,17 @@
       const shareContainer = document.getElementById('share-container');
       shareContainer.innerHTML = '';
       
+      // 動的にシェアテキストを判定 (moveCountがちょうど9回なら「【一撃で】」に差し替え)
+      let tweetText = SHARE_CONFIG.TWEET_TEXT;
+      if (moveCount === 9) {
+        tweetText = tweetText.replace(
+          "「Duplex Sort」をクリアしました！", 
+          "「Duplex Sort」を【一撃で】クリアしました！"
+        );
+      }
+      
       // 手動コピー用のテキスト
-      const manualText = SHARE_CONFIG.TWEET_TEXT + "\n" + SHARE_CONFIG.TWEET_URL;
+      const manualText = tweetText + "\n" + SHARE_CONFIG.TWEET_URL;
 
       const mainBtn = document.createElement('button');
       mainBtn.className = 'share-btn';
@@ -666,7 +679,7 @@
       // 各種ボタンのイベント設定（x.comを使い、インテントの不具合を防止）
       reportBtn.onclick = (e) => {
         e.stopPropagation();
-        const text = encodeURIComponent(SHARE_CONFIG.TWEET_TEXT);
+        const text = encodeURIComponent(tweetText); // 動的に判定したテキストをエンコード
         const url = encodeURIComponent(SHARE_CONFIG.TWEET_URL);
         window.open(`https://x.com/intent/tweet?text=${text}&url=${url}`, '_blank', 'noopener,noreferrer');
       };
@@ -733,6 +746,7 @@
       B = [...initialB];
       activeFrame = 0;
       isCleared = false;
+      moveCount = 0; // リセット時にもボタン操作回数を0にクリアする
       
       // ランプのアニメーション状態とディレイ設定をクリア
       for (let i = 0; i < 9; i++) {
