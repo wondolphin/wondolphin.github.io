@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Duplex Sort</title>
   <style>
-    /* 宇宙の雰囲気を醸し出す星空背景と全体スタイル */
     * {
       box-sizing: border-box;
       touch-action: manipulation;
@@ -45,9 +44,6 @@
       z-index: -1;
     }
 
-    /* 【パラメータ調整①】正方形のラッパー
-      paddingの最初の値(%)を大きくすると中身が全体的に下へ移動します。
-    */
     .wrapper {
       width: 90vmin;
       height: 90vmin;
@@ -78,7 +74,7 @@
       width: 100%;
     }
 
-    /* 【パラメータ調整②】各行ごとの垂直余白 (margin) */
+    /* 各行ごとの垂直余白 (margin) */
     #center-grid-container {
       margin-bottom: 2%; /* 中央正方形からランプへの距離 */
     }
@@ -101,7 +97,7 @@
       position: relative;
     }
 
-    /* 【パラメータ調整③】中央に配置されたランプの大きさ (scale) */
+    /* ランプの大きさ */
     .lamp {
       border-radius: 50%;
       transform: scale(0.45); /* ランプの大きさ */
@@ -159,18 +155,22 @@
     .bottom-cell {
       border-radius: 12%;
       cursor: pointer;
-      /* 押せる感じを出すため、上のターゲットと同構造の枠を追加（色は半透明ホワイト） */
+      /* 押せる感じを出すため、半透明ホワイトの枠を追加 */
       outline: 2px solid rgba(255, 255, 255, 0.35);
       outline-offset: 3px;
     }
 
-    .bottom-cell:hover {
-      transform: scale(1.08) translateY(-2px);
-      filter: brightness(1.1);
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
-      outline-color: rgba(255, 255, 255, 0.75);
+    /* ホバー可能なデバイス(PCのマウスなど)のみホバーエフェクトを適用 */
+    @media (hover: hover) {
+      .bottom-cell:hover {
+        transform: scale(1.08) translateY(-2px);
+        filter: brightness(1.1);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+        outline-color: rgba(255, 255, 255, 0.75);
+      }
     }
 
+    /* タップやクリックの瞬間の縮小レスポンス（スマホ・PC共通） */
     .bottom-cell:active {
       transform: scale(0.95);
       outline-color: rgba(255, 255, 255, 0.95);
@@ -243,6 +243,26 @@
       pointer-events: auto;
     }
 
+    /* 一撃！専用のバッジテキスト */
+    .ichigeki-badge {
+      font-size: 5.5vmin;
+      font-weight: 800;
+      color: #FFF59D;
+      background: linear-gradient(135deg, #FFE600, #F59E0B);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.2rem;
+      letter-spacing: 0.25em;
+      text-align: center;
+      text-shadow: 0 0 15px rgba(255, 230, 0, 0.4);
+      animation: ichigeki-pop 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes ichigeki-pop {
+      0% { transform: scale(0.3); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
     .clear-text {
       font-size: 8.5vmin;
       font-weight: 900;
@@ -254,7 +274,7 @@
         0 0 40px rgba(147, 51, 234, 0.6);
       animation: pulse 2.5s infinite;
       text-align: center;
-      margin-bottom: 1.5rem;
+      margin-bottom: 0.8rem;
     }
 
     @keyframes pulse {
@@ -272,6 +292,23 @@
           0 0 30px rgba(59, 130, 246, 0.9), 
           0 0 50px rgba(147, 51, 234, 0.8);
       }
+    }
+
+    /* 褒め言葉用スタイル */
+    .praise-message {
+      font-size: 3.2vmin;
+      color: rgba(255, 255, 255, 0.95);
+      text-align: center;
+      max-width: 82%;
+      line-height: 1.5;
+      margin-bottom: 1.8rem;
+      text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+      animation: praise-fade 0.9s ease-out;
+    }
+
+    @keyframes praise-fade {
+      0% { opacity: 0; transform: translateY(10px); }
+      100% { opacity: 1; transform: translateY(0); }
     }
 
     /* シェアボタン関連のスタイル（最新の共通設計を反映） */
@@ -329,11 +366,11 @@
       min-width: 150px;
     }
 
-    /* 選択肢ボタンのコンテナ（ピュアCSSで隙間を確実に空ける） */
+    /* 選択肢ボタンのコンテナ */
     .choices-wrapper {
       display: flex;
       flex-direction: column;
-      gap: 0.8rem; /* ボタン同士に隙間を空ける */
+      gap: 0.8rem;
       align-items: center;
       width: 100%;
     }
@@ -411,7 +448,9 @@
 
     <!-- クリア時演出用オーバーレイ -->
     <div class="clear-overlay" id="clear-overlay">
-      <div class="clear-text">CLEAR!</div>
+      <div id="ichigeki-badge" class="ichigeki-badge hidden">一撃！</div>
+      <div class="clear-text" id="clear-text">CLEAR!</div>
+      <div id="praise-message" class="praise-message"></div>
       <div id="share-container">
         <!-- JSで動的に生成 -->
       </div>
@@ -449,7 +488,7 @@
     let B = [...initialB];
     let activeFrame = 0;
     let isCleared = false;
-    let moveCount = 0; // ボタン操作回数のカウンタを追加
+    let moveCount = 0; // ボタン操作回数のカウンタ
 
     // DOM要素の生成と初期化
     window.onload = function() {
@@ -510,7 +549,7 @@
         if (isOn) {
           lampEl.classList.remove('off');
           lampEl.classList.add('on');
-          // 揃った色その目でランプを鮮やかに発光させる
+          // 揃った色そのものでランプを鮮やかに発光させる
           const matchedColor = colorPalette[A[i]];
           lampEl.style.backgroundColor = matchedColor;
           lampEl.style.color = matchedColor; // ネオンの影色に反映
@@ -604,8 +643,20 @@
 
     // クリアオーバーレイ表示
     function showClear() {
-      setupShareUI();
       const overlay = document.getElementById('clear-overlay');
+      const badge = document.getElementById('ichigeki-badge');
+      const praiseMsg = document.getElementById('praise-message');
+
+      // 一撃クリア（ジャスト9回）か通常クリアかでオーバーレイ内部を切り替えて褒めちぎる
+      if (moveCount === 9) {
+        badge.classList.remove('hidden');
+        praiseMsg.innerText = "最少手数でクリアしました！お見事です！";
+      } else {
+        badge.classList.add('hidden');
+        praiseMsg.innerText = "";
+      }
+
+      setupShareUI();
       overlay.classList.add('show');
     }
 
@@ -627,8 +678,8 @@
           "「Duplex Sort」をクリアしました！", 
           "「Duplex Sort」を【一撃で】クリアしました！"
         );
-       }
-        let tweetText2 = SHARE_CONFIG.TWEET_TEXT2;
+      }
+      let tweetText2 = SHARE_CONFIG.TWEET_TEXT2;
       if (moveCount === 9) {
         tweetText2 = tweetText2.replace(
           "「Duplex Sort」をクリアしました！", 
