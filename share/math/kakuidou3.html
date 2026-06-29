@@ -3,41 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2直線のなす角の可視化</title>
+    <title>角の移動ゲーム</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .angle-arc {
-            cursor: pointer;
-        }
-        .draggable-line {
-            cursor: grabbing;
-        }
-        .shadow-line {
-            stroke-dasharray: 5,5;
-            opacity: 0.7;
-            pointer-events: none;
-        }
-        .shadow-angle {
-            opacity: 0.5;
-            pointer-events: none;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .angle-arc { cursor: pointer; }
+        .draggable-line { cursor: grabbing; }
+        .shadow-line { stroke-dasharray: 5,5; opacity: 0.7; pointer-events: none; }
+        .shadow-angle { opacity: 0.5; pointer-events: none; }
+        .goal-edge { stroke-dasharray: 4,3; pointer-events: none; }
+        @keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+        #clear-banner.show { animation: pop 0.5s ease-out forwards; }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
     <div class="bg-white p-8 rounded-xl shadow-lg max-w-2xl w-full text-center">
-        <h1 class="text-2xl font-bold text-gray-800 mb-4">角の移動ゲーム</h1>
-        <p class="text-gray-600 mb-6">扇形を選択し、光った線や点を操作してください。</p>
-        
-        
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">角の移動ゲーム</h1>
+        <p class="text-gray-600 mb-1">扇形を選択し、光った線や点を操作してください。</p>
+        <p id="hint" class="text-sm text-gray-500 mb-4">スタートの角を動かすと、コピーが移動します（元は残ります）。</p>
+
+        <!-- クリア表示 -->
+        <div id="clear-banner" class="hidden text-2xl font-bold text-green-600 mb-3">🎉 クリア！</div>
+
         <!-- SVG表示エリア -->
-        <div class="border border-gray-200 rounded-lg p-4 mb-6" id="svg-container">
+        <div class="border border-gray-200 rounded-lg p-4 mb-4" id="svg-container">
             <svg id="line-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 343.22 203.53" class="w-full h-auto">
+                <g id="goal-container"></g>
                 <g id="shadow-container"></g>
-                
+
                 <line id="l1" x1="31.21" y1="48.31" x2="259.02" y2="48.31" fill="none" stroke="#da7be1" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"/>
                 <line id="l2" x1="105.23" y1="132.74" x2="333.04" y2="132.74" fill="none" stroke="#da7be1" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"/>
                 <line id="l3" x1="63.61" y1="17.94" x2="218.64" y2="172.97" fill="none" stroke="#73cce1" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2"/>
@@ -49,23 +43,29 @@
                 <circle id="p4" class="intersection-point" cx="259.92" cy="132.74" r="3" fill="#661944"/>
             </svg>
         </div>
+
+        <button id="reset-btn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium">最初からやり直す</button>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const SVG_NS = 'http://www.w3.org/2000/svg';
             let angles = [];
             const globalState = {
                 selectedAngle: null,
-                dragInfo: null, // {angle, line, startPos}
+                composite: null,      // {A, B, tempSum}
+                dragInfo: null,
                 allLines: [],
                 allPoints: [],
                 angleSignCache: {},
                 nextAngleId: 0,
                 nextColorSetIndex: 0,
                 highlightedElements: new Map(),
+                solved: false,
             };
             const HIGHLIGHT_COLOR = '#3b82f6';
             const HIGHLIGHT_WIDTH = '4';
+            const ARC_RADIUS = 30;
 
             const colorSets = [
                 { name: 'オレンジ', normal: 'rgba(255, 165, 0, 0.6)', supplementary: 'rgba(76, 175, 80, 0.6)', stroke: '#FFA500', strokeSup: '#4CAF50', supName: '緑' },
@@ -75,17 +75,21 @@
             ];
 
             const parallelPairs = { 'l1': 'l2', 'l2': 'l1', 'l3': 'l4', 'l4': 'l3' };
-            
+
             const initialConfigs = [
                 { line1_id: 'l1', line2_id: 'l3', line1_endpoint: 'start', line2_endpoint: 'start' },
                 { line1_id: 'l1', line2_id: 'l5', line1_endpoint: 'end', line2_endpoint: 'end' }
             ];
 
-            const svg = document.getElementById('line-svg');
-            
-            
-            const shadowContainer = document.getElementById('shadow-container');
+            // ゴール: p4(l2∩l4)に180°〜225°の45°の欠けを固定配置。
+            const GOAL = { x: 259.92, y: 132.74, arm1: Math.PI, arm2: Math.PI * 1.25, radius: ARC_RADIUS };
 
+            const svg = document.getElementById('line-svg');
+            const shadowContainer = document.getElementById('shadow-container');
+            const goalContainer = document.getElementById('goal-container');
+            const clearBanner = document.getElementById('clear-banner');
+
+            // ---------- 幾何ヘルパ ----------
             const getCoords = (el) => {
                 if (el.tagName === 'line') return { id: el.id, x1: el.x1.baseVal.value, y1: el.y1.baseVal.value, x2: el.x2.baseVal.value, y2: el.y2.baseVal.value };
                 if (el.tagName === 'circle') return { id: el.id, x: el.cx.baseVal.value, y: el.cy.baseVal.value };
@@ -96,17 +100,36 @@
                 const t = ((l1.x1 - l2.x1) * (l2.y1 - l2.y2) - (l1.y1 - l2.y1) * (l2.x1 - l2.x2)) / den;
                 return { x: l1.x1 + t * (l1.x2 - l1.x1), y: l1.y1 + t * (l1.y2 - l1.y1) };
             };
-            const distance = (p1, p2) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+            const distance = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
             const getAngle = v => (Math.atan2(v.y, v.x) + 2 * Math.PI) % (2 * Math.PI);
             const dot = (v1, v2) => v1.x * v2.x + v1.y * v2.y;
+            const angleDiff = (a, b) => { let d = Math.abs(a - b) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; };
+            const isBetween = (x, a, b) => Math.abs(angleDiff(a, x) + angleDiff(x, b) - angleDiff(a, b)) < 1e-3;
 
             function getSvgPoint(e) {
                 const pt = svg.createSVGPoint();
-                pt.x = e.clientX;
-                pt.y = e.clientY;
+                pt.x = e.clientX; pt.y = e.clientY;
                 return pt.matrixTransform(svg.getScreenCTM().inverse());
             }
 
+            function getArmInfo(angle) {
+                const c = angle.config;
+                return [
+                    { vec: angle.angleVectors[0], ang: getAngle(angle.angleVectors[0]), lineId: c.line1_id, endpoint: c.line1_endpoint },
+                    { vec: angle.angleVectors[1], ang: getAngle(angle.angleVectors[1]), lineId: c.line2_id, endpoint: c.line2_endpoint },
+                ];
+            }
+            const angleSize = (angle) => angleDiff(getAngle(angle.angleVectors[0]), getAngle(angle.angleVectors[1]));
+
+            // 描画される扇形の中央角と開き角
+            function wedgeMidSpan(vectors) {
+                let s = getAngle(vectors[0]), e = getAngle(vectors[1]);
+                let lo = Math.min(s, e), hi = Math.max(s, e);
+                if (hi - lo > Math.PI) { const t = lo; lo = hi; hi = t + 2 * Math.PI; }
+                return { mid: (lo + hi) / 2, span: hi - lo };
+            }
+
+            // ---------- Angle ----------
             class Angle {
                 constructor(initialConfig, forceColorSetIndex = null) {
                     this.id = `angle-${globalState.nextAngleId++}`;
@@ -118,7 +141,9 @@
                     }
                     this.colorSet = colorSets[this.colorSetIndex];
                     this.config = initialConfig;
+                    this.group = null;
                     this.el = null;
+                    this.isStart = false;
                     this.intersectionPoint = null;
                     this.angleVectors = [];
                     this.currentPointId = null;
@@ -127,7 +152,6 @@
 
                 initialize(config) {
                     this.config = { ...config };
-                    
                     const line1El = globalState.allLines.find(l => l.id === config.line1_id);
                     const line2El = globalState.allLines.find(l => l.id === config.line2_id);
                     if (!line1El || !line2El) return;
@@ -138,15 +162,15 @@
                         const vecs1 = { start: { x: line1El.x1 - ix, y: line1El.y1 - iy }, end: { x: line1El.x2 - ix, y: line1El.y2 - iy } };
                         const vecs2 = { start: { x: line2El.x1 - ix, y: line2El.y1 - iy }, end: { x: line2El.x2 - ix, y: line2El.y2 - iy } };
                         this.angleVectors = [vecs1[config.line1_endpoint], vecs2[config.line2_endpoint]];
-                        
+
                         const cacheKey = [config.line1_id, config.line2_id].sort().join('-');
                         if (!globalState.angleSignCache[cacheKey]) globalState.angleSignCache[cacheKey] = Math.sign(dot(vecs1['end'], vecs2['end']));
-                        
+
                         this.updateCurrentPoint();
                         this.draw();
                     }
                 }
-                
+
                 updateCurrentPoint() {
                     if (!this.intersectionPoint) return;
                     let closestDist = Infinity, closestPointId = null;
@@ -160,15 +184,12 @@
                 getArcPathDString(intersectionPoint, vectors) {
                     const { x: ix, y: iy } = intersectionPoint;
                     const [vecA, vecB] = vectors;
-                    
                     const angle1 = getAngle(vecA), angle2 = getAngle(vecB);
                     let startAngle = Math.min(angle1, angle2), endAngle = Math.max(angle1, angle2);
                     if (endAngle - startAngle > Math.PI) [startAngle, endAngle] = [endAngle, startAngle + 2 * Math.PI];
-                    
-                    const radius = 30;
+                    const radius = ARC_RADIUS;
                     return `M ${ix + radius * Math.cos(startAngle)} ${iy + radius * Math.sin(startAngle)} A ${radius} ${radius} 0 ${endAngle - startAngle <= Math.PI ? '0' : '1'} 1 ${ix + radius * Math.cos(endAngle)} ${iy + radius * Math.sin(endAngle)} L ${ix} ${iy} Z`;
                 }
-
 
                 createArcPath(isShadow = false) {
                     const cacheKey = [this.config.line1_id, this.config.line2_id].sort().join('-');
@@ -178,10 +199,9 @@
 
                     const fillColor = isSupplementary ? this.colorSet.supplementary : this.colorSet.normal;
                     const strokeColor = isSupplementary ? this.colorSet.strokeSup : this.colorSet.stroke;
-                    
                     const d = this.getArcPathDString(this.intersectionPoint, this.angleVectors);
 
-                    const arcPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    const arcPath = document.createElementNS(SVG_NS, 'path');
                     arcPath.setAttribute('d', d);
                     arcPath.setAttribute('fill', fillColor);
                     arcPath.setAttribute('stroke', strokeColor);
@@ -189,94 +209,212 @@
                     if (isShadow) arcPath.classList.add('shadow-angle');
                     return arcPath;
                 }
-                
+
+                // かわいい目と口
+                buildFace(group) {
+                    if (!this.intersectionPoint || this.angleVectors.length < 2) return;
+                    const { mid, span } = wedgeMidSpan(this.angleVectors);
+                    const { x: ix, y: iy } = this.intersectionPoint;
+                    const eg = document.createElementNS(SVG_NS, 'g');
+                    eg.setAttribute('pointer-events', 'none');
+
+                    const er = ARC_RADIUS * 0.5;
+                    const bx = ix + er * Math.cos(mid), by = iy + er * Math.sin(mid);
+                    const perp = { x: Math.cos(mid + Math.PI / 2), y: Math.sin(mid + Math.PI / 2) };
+                    const dir = { x: Math.cos(mid), y: Math.sin(mid) };
+                    const off = Math.min(4.2, Math.max(2.4, er * Math.tan(Math.min(span, Math.PI / 2) / 2) * 0.55));
+
+                    for (const sgn of [1, -1]) {
+                        const ex = bx + perp.x * off * sgn, ey = by + perp.y * off * sgn;
+                        const sclera = document.createElementNS(SVG_NS, 'circle');
+                        sclera.setAttribute('cx', ex); sclera.setAttribute('cy', ey); sclera.setAttribute('r', 2.6);
+                        sclera.setAttribute('fill', '#fff'); sclera.setAttribute('stroke', '#1f2937'); sclera.setAttribute('stroke-width', 0.6);
+                        eg.appendChild(sclera);
+                        const pupil = document.createElementNS(SVG_NS, 'circle');
+                        pupil.setAttribute('cx', ex + dir.x * 0.7); pupil.setAttribute('cy', ey + dir.y * 0.7); pupil.setAttribute('r', 1.2);
+                        pupil.setAttribute('fill', '#1f2937');
+                        eg.appendChild(pupil);
+                    }
+                    // にっこり口
+                    const mx = ix + er * 0.95 * Math.cos(mid), my = iy + er * 0.95 * Math.sin(mid);
+                    const ml = { x: mx + perp.x * 2.2, y: my + perp.y * 2.2 };
+                    const mr = { x: mx - perp.x * 2.2, y: my - perp.y * 2.2 };
+                    const ctrl = { x: mx + dir.x * 2.2, y: my + dir.y * 2.2 };
+                    const mouth = document.createElementNS(SVG_NS, 'path');
+                    mouth.setAttribute('d', `M ${ml.x} ${ml.y} Q ${ctrl.x} ${ctrl.y} ${mr.x} ${mr.y}`);
+                    mouth.setAttribute('fill', 'none'); mouth.setAttribute('stroke', '#1f2937');
+                    mouth.setAttribute('stroke-width', 0.8); mouth.setAttribute('stroke-linecap', 'round');
+                    eg.appendChild(mouth);
+
+                    group.appendChild(eg);
+                }
+
                 draw() {
-                    if (this.el) this.el.remove();
+                    if (this.group) this.group.remove();
                     if (!this.intersectionPoint) return;
+                    this.group = document.createElementNS(SVG_NS, 'g');
+                    this.group.classList.add('angle-group');
                     this.el = this.createArcPath();
                     this.el.id = this.id;
-                    this.el.style.display = 'block';
                     this.el.classList.add('angle-arc');
-                    svg.appendChild(this.el);
-                    this.el.addEventListener('mousedown', (e) => {
-                        e.stopPropagation();
-                        this.select();
-                    });
+                    this.group.appendChild(this.el);
+                    this.buildFace(this.group);
+                    svg.appendChild(this.group);
+                    this.el.addEventListener('mousedown', (e) => { e.stopPropagation(); handleAngleClick(this); });
                 }
-                
-                select() {
-                    clearSelection();
-                    globalState.selectedAngle = this;
 
+                remove() { if (this.group) this.group.remove(); }
+
+                applyHighlight() {
                     const highlight = (element) => {
                         if (!element) return;
                         const originalAttrs = {};
-                        if (element.hasAttribute('stroke')) {
-                            originalAttrs.stroke = element.getAttribute('stroke');
-                            element.setAttribute('stroke', HIGHLIGHT_COLOR);
-                        }
-                        if (element.hasAttribute('stroke-width')) {
-                            originalAttrs['stroke-width'] = element.getAttribute('stroke-width');
-                            element.setAttribute('stroke-width', HIGHLIGHT_WIDTH);
-                        }
-                        if (element.hasAttribute('fill')) {
-                            originalAttrs.fill = element.getAttribute('fill');
-                            element.setAttribute('fill', HIGHLIGHT_COLOR);
-                        }
-                        if (element.tagName === 'line') {
-                            element.classList.add('draggable-line');
-                        }
-                        if (element.tagName === 'circle') {
-                            originalAttrs.r = element.getAttribute('r');
-                            element.setAttribute('r', '8');
-                            svg.appendChild(element); // Bring to front
-                        }
+                        if (element.hasAttribute('stroke')) { originalAttrs.stroke = element.getAttribute('stroke'); element.setAttribute('stroke', HIGHLIGHT_COLOR); }
+                        if (element.hasAttribute('stroke-width')) { originalAttrs['stroke-width'] = element.getAttribute('stroke-width'); element.setAttribute('stroke-width', HIGHLIGHT_WIDTH); }
+                        if (element.hasAttribute('fill')) { originalAttrs.fill = element.getAttribute('fill'); element.setAttribute('fill', HIGHLIGHT_COLOR); }
+                        if (element.tagName === 'line') element.classList.add('draggable-line');
+                        if (element.tagName === 'circle') { originalAttrs.r = element.getAttribute('r'); element.setAttribute('r', '8'); svg.appendChild(element); }
                         globalState.highlightedElements.set(element, originalAttrs);
                     };
-
                     highlight(document.getElementById(this.config.line1_id));
                     highlight(document.getElementById(this.config.line2_id));
                     highlight(document.getElementById(this.currentPointId));
                     highlight(this.el);
+                    if (this.group) svg.appendChild(this.group); // 選択中は前面へ
+                }
+
+                select() {
+                    clearSelection();
+                    globalState.selectedAngle = this;
+                    this.applyHighlight();
                 }
             }
-            
+
+            // 「シュン！」と元位置から移動先へ
+            function animateGroupFrom(group, dx, dy) {
+                if (!group) return;
+                group.style.transition = 'none';
+                group.style.transform = `translate(${-dx}px, ${-dy}px)`;
+                void group.getBoundingClientRect();
+                requestAnimationFrame(() => {
+                    if (!group.isConnected) return;
+                    group.style.transition = 'transform 340ms cubic-bezier(0.18, 1.25, 0.3, 1)';
+                    group.style.transform = 'translate(0px, 0px)';
+                });
+            }
+
+            // ---------- 選択・合成 ----------
+            function handleAngleClick(angle) {
+                if (globalState.selectedAngle && globalState.selectedAngle !== angle && !globalState.composite) {
+                    const base = angles.includes(globalState.selectedAngle) ? globalState.selectedAngle : null;
+                    if (base) {
+                        const comp = tryBuildComposite(base, angle);
+                        if (comp) { setComposite(comp); return; }
+                    }
+                }
+                angle.select();
+            }
+
+            function tryBuildComposite(A, B) {
+                if (!A.intersectionPoint || !B.intersectionPoint) return null;
+                if (distance(A.intersectionPoint, B.intersectionPoint) > 3) return null;
+                const armsA = getArmInfo(A), armsB = getArmInfo(B);
+                const tol = 0.05;
+                for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+                    if (angleDiff(armsA[i].ang, armsB[j].ang) < tol) {
+                        const outerA = armsA[1 - i], outerB = armsB[1 - j];
+                        if (outerA.lineId === outerB.lineId) return null;
+                        const sum = angleSize(A) + angleSize(B);
+                        if (Math.abs(angleDiff(outerA.ang, outerB.ang) - sum) > 0.05) continue;
+                        if (sum >= Math.PI - 1e-3) return null;
+                        return { A, B, outerA, outerB };
+                    }
+                }
+                return null;
+            }
+
+            function setComposite(comp) {
+                clearSelection();
+                const sumConfig = {
+                    line1_id: comp.outerA.lineId, line1_endpoint: comp.outerA.endpoint,
+                    line2_id: comp.outerB.lineId, line2_endpoint: comp.outerB.endpoint
+                };
+                const tempSum = new Angle(sumConfig, comp.A.colorSetIndex);
+                if (comp.A.group) comp.A.group.style.display = 'none';
+                if (comp.B.group) comp.B.group.style.display = 'none';
+                globalState.composite = { A: comp.A, B: comp.B, tempSum };
+                globalState.selectedAngle = tempSum;
+                tempSum.applyHighlight();
+                setHint('合成中：光った線をドラッグして移動できます。');
+            }
+
+            function cancelComposite() {
+                const c = globalState.composite;
+                if (!c) return;
+                if (c.tempSum) c.tempSum.remove();
+                if (c.A.group) c.A.group.style.display = 'block';
+                if (c.B.group) c.B.group.style.display = 'block';
+                globalState.composite = null;
+            }
+
+            // 合成角を確定（スタートは残し、クローンは統合）
+            function finalizeComposite() {
+                const c = globalState.composite;
+                if (!c) return null;
+                [c.A, c.B].forEach(m => {
+                    if (m.isStart) { if (m.group) m.group.style.display = 'block'; m.draw(); }
+                    else { m.remove(); angles = angles.filter(a => a !== m); }
+                });
+                c.tempSum.isStart = false;
+                angles.push(c.tempSum);
+                globalState.composite = null;
+                return c.tempSum;
+            }
+
             function redrawAllAngles() {
-                 angles.forEach(angle => { if (angle.el) svg.appendChild(angle.el); });
+                angles.forEach(angle => { if (angle.group) svg.appendChild(angle.group); });
+                if (globalState.composite && globalState.composite.tempSum.group) svg.appendChild(globalState.composite.tempSum.group);
             }
 
             function clearSelection() {
                 globalState.highlightedElements.forEach((originalAttrs, el) => {
-                    for (const attr in originalAttrs) {
-                        el.setAttribute(attr, originalAttrs[attr]);
-                    }
-                    if (el.tagName === 'line') {
-                        el.classList.remove('draggable-line');
-                    }
+                    for (const attr in originalAttrs) el.setAttribute(attr, originalAttrs[attr]);
+                    if (el.tagName === 'line') el.classList.remove('draggable-line');
                 });
                 globalState.highlightedElements.clear();
+                cancelComposite();
                 globalState.selectedAngle = null;
+                if (!globalState.solved) setHint('スタートの角を動かすと、コピーが移動します（元は残ります）。');
             }
 
+            // ---------- 点クリック（対頂角トグル） ----------
             function handlePointClick(e) {
                 const selectedAngle = globalState.selectedAngle;
                 if (!selectedAngle || selectedAngle.currentPointId !== e.target.id) return;
 
-                const newConfig = { ...selectedAngle.config, 
-                    line1_endpoint: selectedAngle.config.line1_endpoint === 'start' ? 'end' : 'start', 
-                    line2_endpoint: selectedAngle.config.line2_endpoint === 'start' ? 'end' : 'start' 
+                const newConfig = { ...selectedAngle.config,
+                    line1_endpoint: selectedAngle.config.line1_endpoint === 'start' ? 'end' : 'start',
+                    line2_endpoint: selectedAngle.config.line2_endpoint === 'start' ? 'end' : 'start'
                 };
                 selectedAngle.initialize(newConfig);
-                selectedAngle.select();
+
+                let target = selectedAngle;
+                if (globalState.composite && globalState.composite.tempSum === selectedAngle) {
+                    target = finalizeComposite();
+                }
+                target.select();
+                detectSubtraction(target);
                 redrawAllAngles();
+                updateGoal();
             }
 
+            // ---------- ドラッグ ----------
             function startLineDrag(e) {
                 const selectedAngle = globalState.selectedAngle;
                 if (!selectedAngle) return;
                 const lineId = e.target.id;
-                if(lineId !== selectedAngle.config.line1_id && lineId !== selectedAngle.config.line2_id) return;
-                
+                if (lineId !== selectedAngle.config.line1_id && lineId !== selectedAngle.config.line2_id) return;
+
                 globalState.dragInfo = {
                     angle: selectedAngle,
                     draggedLineId: lineId,
@@ -284,21 +422,18 @@
                     originalLine: globalState.allLines.find(l => l.id === lineId)
                 };
                 createShadowElements();
-                selectedAngle.el.style.display = 'none';
+                if (selectedAngle.group) selectedAngle.group.style.display = 'none';
                 document.addEventListener('mousemove', onDragMove);
                 document.addEventListener('mouseup', onDragEnd);
             }
-            
+
             function createShadowElements() {
                 const { angle, originalLine } = globalState.dragInfo;
-                const shadowLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                const shadowLine = document.createElementNS(SVG_NS, 'line');
                 shadowLine.id = 'shadow-line';
-                shadowLine.setAttribute('x1', originalLine.x1);
-                shadowLine.setAttribute('y1', originalLine.y1);
-                shadowLine.setAttribute('x2', originalLine.x2);
-                shadowLine.setAttribute('y2', originalLine.y2);
-                shadowLine.setAttribute('stroke', '#333');
-                shadowLine.setAttribute('stroke-width', '2');
+                shadowLine.setAttribute('x1', originalLine.x1); shadowLine.setAttribute('y1', originalLine.y1);
+                shadowLine.setAttribute('x2', originalLine.x2); shadowLine.setAttribute('y2', originalLine.y2);
+                shadowLine.setAttribute('stroke', '#333'); shadowLine.setAttribute('stroke-width', '2');
                 shadowLine.classList.add('shadow-line');
                 shadowContainer.appendChild(shadowLine);
 
@@ -311,19 +446,12 @@
                 if (!globalState.dragInfo) return;
                 const { angle, originalLine, startPos } = globalState.dragInfo;
                 const currentPos = getSvgPoint(e);
-                const dx = currentPos.x - startPos.x;
-                const dy = currentPos.y - startPos.y;
+                const dx = currentPos.x - startPos.x, dy = currentPos.y - startPos.y;
 
                 const shadowLineEl = document.getElementById('shadow-line');
-                const shadowLineData = {
-                    id: 'shadow',
-                    x1: originalLine.x1 + dx, y1: originalLine.y1 + dy,
-                    x2: originalLine.x2 + dx, y2: originalLine.y2 + dy
-                };
-                shadowLineEl.setAttribute('x1', shadowLineData.x1);
-                shadowLineEl.setAttribute('y1', shadowLineData.y1);
-                shadowLineEl.setAttribute('x2', shadowLineData.x2);
-                shadowLineEl.setAttribute('y2', shadowLineData.y2);
+                const shadowLineData = { id: 'shadow', x1: originalLine.x1 + dx, y1: originalLine.y1 + dy, x2: originalLine.x2 + dx, y2: originalLine.y2 + dy };
+                shadowLineEl.setAttribute('x1', shadowLineData.x1); shadowLineEl.setAttribute('y1', shadowLineData.y1);
+                shadowLineEl.setAttribute('x2', shadowLineData.x2); shadowLineEl.setAttribute('y2', shadowLineData.y2);
 
                 const fixedLineId = angle.config.line1_id === originalLine.id ? angle.config.line2_id : angle.config.line1_id;
                 const fixedLineData = globalState.allLines.find(l => l.id === fixedLineId);
@@ -331,77 +459,190 @@
 
                 if (newIntersection) {
                     const shadowAngleEl = document.getElementById('shadow-angle');
-                    
                     const { x: ix, y: iy } = newIntersection;
                     const vecs1 = { start: { x: fixedLineData.x1 - ix, y: fixedLineData.y1 - iy }, end: { x: fixedLineData.x2 - ix, y: fixedLineData.y2 - iy } };
                     const vecs2 = { start: { x: shadowLineData.x1 - ix, y: shadowLineData.y1 - iy }, end: { x: shadowLineData.x2 - ix, y: shadowLineData.y2 - iy } };
-                    
                     const fixedEndpoint = angle.config.line1_id === fixedLineId ? angle.config.line1_endpoint : angle.config.line2_endpoint;
                     const draggedEndpoint = angle.config.line1_id !== fixedLineId ? angle.config.line1_endpoint : angle.config.line2_endpoint;
-
                     const vectors = [vecs1[fixedEndpoint], vecs2[draggedEndpoint]];
-                    
-                    const newD = angle.getArcPathDString(newIntersection, vectors);
-                    shadowAngleEl.setAttribute('d', newD);
+                    shadowAngleEl.setAttribute('d', angle.getArcPathDString(newIntersection, vectors));
                 }
             }
 
             function onDragEnd(e) {
                 if (!globalState.dragInfo) return;
                 const { angle, draggedLineId } = globalState.dragInfo;
-
+                const oldVertex = angle.intersectionPoint ? { ...angle.intersectionPoint } : null;
                 const fixedLineId = angle.config.line1_id === draggedLineId ? angle.config.line2_id : angle.config.line1_id;
                 const parallelLineId = parallelPairs[draggedLineId];
-                let moved = false;
 
+                let newConfig = null, newVertex = null;
                 if (parallelLineId) {
                     const fixedLineData = globalState.allLines.find(l => l.id === fixedLineId);
                     const parallelLineData = globalState.allLines.find(l => l.id === parallelLineId);
-                    
                     if (fixedLineData && parallelLineData) {
-                        const newIntersection = findIntersection(fixedLineData, parallelLineData);
+                        const ni = findIntersection(fixedLineData, parallelLineData);
                         const mousePos = getSvgPoint(e);
-
-                        if (newIntersection && distance(mousePos, newIntersection) < 75) {
-                            const newConfig = { ...angle.config };
-                            if (draggedLineId === newConfig.line1_id) {
-                                newConfig.line1_id = parallelLineId;
-                            } else {
-                                newConfig.line2_id = parallelLineId;
-                            }
-                            angle.initialize(newConfig);
-                            moved = true;
+                        if (ni && distance(mousePos, ni) < 75) {
+                            newConfig = { ...angle.config };
+                            if (draggedLineId === newConfig.line1_id) newConfig.line1_id = parallelLineId;
+                            else newConfig.line2_id = parallelLineId;
+                            newVertex = ni;
                         }
                     }
                 }
-                
-                if (!moved) {
-                     angle.draw(); 
-                }
-                
+
                 shadowContainer.innerHTML = '';
                 document.removeEventListener('mousemove', onDragMove);
                 document.removeEventListener('mouseup', onDragEnd);
                 globalState.dragInfo = null;
-                angle.select();
+
+                const isComposite = globalState.composite && globalState.composite.tempSum === angle;
+
+                if (newConfig) {
+                    const dx = newVertex.x - oldVertex.x, dy = newVertex.y - oldVertex.y;
+                    if (angle.isStart && !isComposite) {
+                        // スタートは残し、移動するコピーを生成
+                        angle.draw();
+                        const clone = new Angle(newConfig, angle.colorSetIndex);
+                        clone.isStart = false;
+                        angles.push(clone);
+                        animateGroupFrom(clone.group, dx, dy);
+                        clone.select();
+                        detectSubtraction(clone);
+                    } else {
+                        angle.initialize(newConfig);
+                        let target = angle;
+                        if (isComposite) target = finalizeComposite();
+                        animateGroupFrom(target.group, dx, dy);
+                        target.select();
+                        detectSubtraction(target);
+                    }
+                } else {
+                    // 移動なし
+                    if (isComposite) {
+                        angle.draw();
+                        globalState.selectedAngle = angle;
+                        angle.applyHighlight();
+                    } else {
+                        angle.draw();
+                        angle.select();
+                    }
+                }
                 redrawAllAngles();
+                updateGoal();
             }
 
-            // --- Main Initialization ---
-            globalState.allLines = Array.from(svg.querySelectorAll('line')).map(getCoords);
-            globalState.allPoints = Array.from(svg.querySelectorAll('circle')).map(getCoords);
-            
-            initialConfigs.forEach(config => angles.push(new Angle(config)));
-            redrawAllAngles();
+            // ---------- 差分（削れた角） ----------
+            function detectSubtraction(moved) {
+                if (!moved || !moved.intersectionPoint) return;
+                const tol = 0.05;
+                for (const other of angles) {
+                    if (other === moved || other.isStart || !other.intersectionPoint) continue;
+                    if (distance(moved.intersectionPoint, other.intersectionPoint) > 3) continue;
+                    const armsM = getArmInfo(moved), armsO = getArmInfo(other);
+                    for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+                        if (angleDiff(armsM[i].ang, armsO[j].ang) >= tol) continue;
+                        const sharedAng = armsO[j].ang;
+                        const innerM = armsM[1 - i];
+                        const outerO = armsO[1 - j];
+                        if (innerM.lineId === outerO.lineId) continue;
+                        const sizeM = angleSize(moved), sizeO = angleSize(other);
+                        if (sizeM <= sizeO + 1e-3 && isBetween(innerM.ang, sharedAng, outerO.ang)) {
+                            other.initialize({
+                                line1_id: innerM.lineId, line1_endpoint: innerM.endpoint,
+                                line2_id: outerO.lineId, line2_endpoint: outerO.endpoint
+                            });
+                            other.draw();
+                            return;
+                        }
+                    }
+                }
+            }
 
-            svg.addEventListener('mousedown', (e) => {
-                if (e.target.id === 'line-svg') clearSelection();
-            });
-            globalState.allPoints.forEach(p => document.getElementById(p.id).addEventListener('mousedown', (e) => { e.stopPropagation(); handlePointClick(e); }));
-            globalState.allLines.forEach(l => document.getElementById(l.id).addEventListener('mousedown', (e) => { e.stopPropagation(); startLineDrag(e); }));
+            // ---------- ゴール ----------
+            function drawGoal() {
+                goalContainer.innerHTML = '';
+                const { x, y, arm1, arm2, radius } = GOAL;
+                const lo = Math.min(arm1, arm2), hi = Math.max(arm1, arm2);
+                const fillStart = hi, fillEnd = lo + 2 * Math.PI;
+                const sx = x + radius * Math.cos(fillStart), sy = y + radius * Math.sin(fillStart);
+                const ex = x + radius * Math.cos(fillEnd), ey = y + radius * Math.sin(fillEnd);
+                const large = (fillEnd - fillStart) > Math.PI ? 1 : 0;
+                const disc = document.createElementNS(SVG_NS, 'path');
+                disc.setAttribute('d', `M ${x} ${y} L ${sx} ${sy} A ${radius} ${radius} 0 ${large} 1 ${ex} ${ey} Z`);
+                disc.setAttribute('id', 'goal-disc');
+                disc.setAttribute('fill', '#e5e7eb');
+                disc.setAttribute('stroke', '#9ca3af');
+                disc.setAttribute('stroke-width', '1');
+                goalContainer.appendChild(disc);
 
+                [arm1, arm2].forEach(a => {
+                    const edge = document.createElementNS(SVG_NS, 'line');
+                    edge.setAttribute('x1', x); edge.setAttribute('y1', y);
+                    edge.setAttribute('x2', x + radius * Math.cos(a)); edge.setAttribute('y2', y + radius * Math.sin(a));
+                    edge.setAttribute('stroke', '#9ca3af'); edge.setAttribute('stroke-width', '1.5');
+                    edge.classList.add('goal-edge');
+                    goalContainer.appendChild(edge);
+                });
+            }
+
+            function candidateAngles() {
+                const list = angles.slice();
+                if (globalState.composite && globalState.composite.tempSum) list.push(globalState.composite.tempSum);
+                return list;
+            }
+
+            function updateGoal() {
+                if (globalState.solved) return;
+                const posTol = 6, angTol = 0.06;
+                const goalArms = [GOAL.arm1, GOAL.arm2];
+                for (const a of candidateAngles()) {
+                    if (!a.intersectionPoint) continue;
+                    if (distance(a.intersectionPoint, { x: GOAL.x, y: GOAL.y }) > posTol) continue;
+                    const arms = getArmInfo(a).map(x => x.ang);
+                    const m1 = (angleDiff(arms[0], goalArms[0]) < angTol && angleDiff(arms[1], goalArms[1]) < angTol);
+                    const m2 = (angleDiff(arms[0], goalArms[1]) < angTol && angleDiff(arms[1], goalArms[0]) < angTol);
+                    if (m1 || m2) { onSolved(); return; }
+                }
+            }
+
+            function onSolved() {
+                globalState.solved = true;
+                const disc = document.getElementById('goal-disc');
+                if (disc) { disc.setAttribute('fill', 'rgba(34,197,94,0.35)'); disc.setAttribute('stroke', '#16a34a'); }
+                clearBanner.classList.remove('hidden');
+                clearBanner.classList.add('show');
+                setHint('ぴったり収まりました！');
+            }
+
+            function setHint(text) { document.getElementById('hint').textContent = text; }
+
+            // ---------- セットアップ ----------
+            function setupInteractions() {
+                globalState.allPoints.forEach(p => document.getElementById(p.id).addEventListener('mousedown', (e) => { e.stopPropagation(); handlePointClick(e); }));
+                globalState.allLines.forEach(l => document.getElementById(l.id).addEventListener('mousedown', (e) => { e.stopPropagation(); startLineDrag(e); }));
+            }
+
+            function initGame() {
+                globalState.allLines = Array.from(svg.querySelectorAll('line')).map(getCoords);
+                globalState.allPoints = Array.from(svg.querySelectorAll('circle')).map(getCoords);
+                drawGoal();
+                initialConfigs.forEach(config => {
+                    const a = new Angle(config);
+                    a.isStart = true;
+                    angles.push(a);
+                });
+                redrawAllAngles();
+                setupInteractions();
+                updateGoal();
+            }
+
+            svg.addEventListener('mousedown', (e) => { if (e.target.id === 'line-svg') clearSelection(); });
+            document.getElementById('reset-btn').addEventListener('click', () => { window.location.reload(); });
+
+            initGame();
         });
     </script>
 </body>
 </html>
-
