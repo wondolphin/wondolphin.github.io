@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三角形変形ゲーム</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding-top: 20px;
+            background-color: #f0f2f5;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        #level-selector {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        #level-selector button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: #fff;
+            color: #4a90e2;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        #level-selector button.active {
+            background-color: #4a90e2;
+            color: white;
+            border-color: #4a90e2;
+        }
+        #game-container {
+            position: relative;
+            width: 90%;
+            max-width: 650px;
+            border: 1px solid #ccc;
+            border-radius: 12px;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        #svg-wrapper {
+            width: 100%;
+        }
+        svg {
+            width: 100%;
+            height: auto;
+            cursor: grab;
+        }
+        svg .draggable-point {
+            cursor: grab;
+            transition: r 0.2s;
+        }
+        svg .draggable-point:hover {
+            r: 15;
+            opacity: 0.5;
+            fill: #4a90e2;
+        }
+        .dragging {
+            cursor: grabbing;
+        }
+        .highlight {
+            stroke: #ff6347;
+            stroke-width: 5;
+            transition: all 0.2s ease-in-out;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { stroke-opacity: 1; }
+            50% { stroke-opacity: 0.5; }
+            100% { stroke-opacity: 1; }
+        }
+        p {
+            margin-top: 20px;
+            color: #555;
+            text-align: center;
+            max-width: 600px;
+        }
+        #clear-message {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            border-radius: 12px;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease-in-out;
+        }
+        #clear-message.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #clear-message h2 {
+            font-size: 4rem;
+            color: #ff6347;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        #clear-message button {
+            margin-top: 20px;
+            padding: 10px 25px;
+            font-size: 1rem;
+            color: white;
+            background-color: #4a90e2;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #clear-message button:hover {
+            background-color: #357abd;
+        }
+        .game-cleared .draggable-point {
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>三角形変形ゲーム</h1>
+
+    <div id="level-selector">
+        <button id="btn-level-1" class="active">問題1</button>
+        <button id="btn-level-2">問題2</button>
+    </div>
+
+    <div id="game-container">
+        <div id="svg-wrapper"></div>
+        <div id="clear-message">
+            <h2>クリア！</h2>
+            <button id="restart-button">もう一度遊ぶ</button>
+        </div>
+    </div>
+    <p>三角形の頂点をドラッグして、薄いオレンジ色のゴールに重ねましょう。</p>
+
+    <script>
+    (function() {
+        // --- ゲームデータ ---
+        const levels = [
+            { // 問題1
+                svgHTML: `
+                <svg id="game-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 623.98 502.05">
+                    <g id="goal-shape">
+                        <polygon id="goal-triangle" points="143.25,330.47 300.07,165.53 280.4,262.21" fill="orange" opacity="0.2" stroke="darkorange" stroke-width="2" stroke-dasharray="5,5"/>
+                    </g>
+                    <g id="lines">
+                        <line id="l1" x1="121.04" y1="165.53" x2="436.32" y2="165.53" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width=".5"/>
+                        <line id="l2" x1="121.04" y1="262.21" x2="412.29" y2="262.21" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width=".5"/>
+                        <line id="l3" x1="201.36" y1="44.95" x2="140.94" y2="341.82" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width=".5"/>
+                        <line id="l4" x1="317.85" y1="78.16" x2="262.47" y2="350.28" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width=".5"/>
+                    </g>
+                    <g id="triangle-group">
+                         <polygon id="triangle" fill="#b2ff3b" fill-rule="evenodd" opacity=".7" stroke="#19b166" stroke-linejoin="round" stroke-width="3"/>
+                    </g>
+                    <g id="points">
+                        <circle id="p1" cx="143.25" cy="330.47" r="5.24" fill="#b2253b"/>
+                        <circle id="p2" cx="157.14" cy="262.21" r="5.24" fill="#b2253b"/>
+                        <circle id="p3" cx="176.82" cy="165.53" r="5.24" fill="#b2253b"/>
+                        <circle id="p4" cx="300.07" cy="165.53" r="5.24" fill="#b2253b"/>
+                        <circle id="p5" cx="220.58" cy="165.53" r="5.24" fill="#b2253b"/>
+                        <circle id="p6" cx="280.4" cy="262.21" r="5.24" fill="#b2253b"/>
+                    </g>
+                    <g id="drag-handles">
+                        <circle id="d1-handle" class="draggable-point" r="10" fill="transparent"/>
+                        <circle id="d2-handle" class="draggable-point" r="10" fill="transparent"/>
+                        <circle id="d3-handle" class="draggable-point" r="10" fill="transparent"/>
+                    </g>
+                </svg>`,
+                points: {
+                    p1: { x: 143.25, y: 330.47 }, p2: { x: 157.14, y: 262.21 },
+                    p3: { x: 176.82, y: 165.53 }, p4: { x: 300.07, y: 165.53 },
+                    p5: { x: 220.58, y: 165.53 }, p6: { x: 280.40, y: 262.21 },
+                },
+                initialState: { d1: 'p5', d2: 'p2', d3: 'p6' },
+                goalPoints: ['p1', 'p4', 'p6'],
+                parallelGroups: [ ['l1', 'l2'], ['l3', 'l4'] ],
+                pointOnLineMap: {
+                    l1: ['p3', 'p4', 'p5'], l2: ['p2', 'p6'],
+                    l3: ['p1', 'p2', 'p3'], l4: ['p4', 'p6'],
+                }
+            },
+            { // 問題2
+                svgHTML: `
+                <svg id="game-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 623.98 502.05">
+                    <g id="goal-shape">
+                        <polygon id="goal-triangle" points="300.09,165.43 280.68,261.91 438.24,94.89" fill="orange" opacity="0.2" stroke="darkorange" stroke-width="2" stroke-dasharray="5,5"/>
+                    </g>
+                    <g id="lines">
+                        <line id="l1" x1="121.04" y1="165.53" x2="436.32" y2="165.53" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width=".5"/>
+                        <line id="l2" x1="121.04" y1="262.21" x2="412.29" y2="262.21" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width=".5"/>
+                        <line id="l3" x1="201.36" y1="44.95" x2="140.94" y2="341.82" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width=".5"/>
+                        <line id="l4" x1="317.85" y1="78.16" x2="262.47" y2="350.28" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width=".5"/>
+                        <line id="l5" x1="439.98" y1="85.37" x2="384.6" y2="357.49" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width=".5"/>
+                        <line id="l6" x1="196.5" y1="68.83" x2="457.07" y2="311.79" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width=".5"/>
+                        <line id="l7" x1="176.7" y1="165.53" x2="372.31" y2="347.91" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width=".5"/>
+                    </g>
+                    <g id="triangle-group">
+                        <polygon id="triangle" fill="#b2ff3b" fill-rule="evenodd" opacity=".7" stroke="#19b166" stroke-linejoin="round" stroke-width="3"/>
+                    </g>
+                    <g id="points">
+                        <circle id="p1" cx="196.43" cy="69.14" r="5.24" fill="#b2253b"/>
+                        <circle id="p2" cx="176.7" cy="165.53" r="5.24" fill="#b2253b"/>
+                        <circle id="p3" cx="157.14" cy="262.21" r="5.24" fill="#b2253b"/>
+                        <circle id="p4" cx="220.58" cy="165.53" r="5.24" fill="#b2253b"/>
+                        <circle id="p5" cx="300.09" cy="165.43" r="5.24" fill="#b2253b"/>
+                        <circle id="p6" cx="280.68" cy="261.91" r="5.24" fill="#b2253b"/>
+                        <circle id="p7" cx="438.24" cy="94.89" r="5.24" fill="#b2253b"/>
+                        <circle id="p8" cx="423.66" cy="165.53" r="5.24" fill="#b2253b"/>
+                        <circle id="p9" cx="403.92" cy="262.56" r="5.24" fill="#b2253b"/>
+                    </g>
+                    <g id="drag-handles">
+                        <circle id="d1-handle" class="draggable-point" r="10" fill="transparent"/>
+                        <circle id="d2-handle" class="draggable-point" r="10" fill="transparent"/>
+                        <circle id="d3-handle" class="draggable-point" r="10" fill="transparent"/>
+                    </g>
+                </svg>`,
+                points: {
+                    p1: { x: 196.43, y: 69.14 }, p2: { x: 176.7, y: 165.53 }, p3: { x: 157.14, y: 262.21 },
+                    p4: { x: 220.58, y: 165.53 }, p5: { x: 300.09, y: 165.43 }, p6: { x: 280.68, y: 261.91 },
+                    p7: { x: 438.24, y: 94.89 }, p8: { x: 423.66, y: 165.53 }, p9: { x: 403.92, y: 262.56 },
+                },
+                initialState: { d1: 'p4', d2: 'p3', d3: 'p6' },
+                goalPoints: ['p5', 'p6', 'p7'],
+                parallelGroups: [ ['l1', 'l2'], ['l3', 'l4', 'l5'], ['l6', 'l7'] ],
+                // [FIX] データにp4を追加
+                pointOnLineMap: {
+                    l1: ['p2','p4','p5','p8'], l2: ['p3','p6','p9'], l3: ['p1','p2','p3'],
+                    l4: ['p5','p6'], l5: ['p7','p8','p9'], l6: ['p1','p5','p9'], l7: ['p2','p6'],
+                }
+            }
+        ];
+
+        // --- グローバル変数 (現在のレベルの状態を保持) ---
+        let currentLevel;
+        let svg, triangle, handles, lines, points, clearMessage;
+        let triangleState, goalPoints, parallelGroups, pointOnLineMap;
+        let dragInfo = { isDragging: false, draggedVertexId: null, line_p: null, line_q: null };
+
+        // --- DOM要素 ---
+        const svgWrapper = document.getElementById('svg-wrapper');
+        const btnLevel1 = document.getElementById('btn-level-1');
+        const btnLevel2 = document.getElementById('btn-level-2');
+        const restartButton = document.getElementById('restart-button');
+
+        function loadLevel(levelIndex) {
+            currentLevel = levels[levelIndex];
+            
+            svgWrapper.innerHTML = currentLevel.svgHTML;
+            
+            svg = document.getElementById('game-svg');
+            triangle = document.getElementById('triangle');
+            clearMessage = document.getElementById('clear-message');
+            handles = {
+                d1: document.getElementById('d1-handle'),
+                d2: document.getElementById('d2-handle'),
+                d3: document.getElementById('d3-handle'),
+            };
+            lines = {};
+            currentLevel.parallelGroups.flat().forEach(id => {
+                if (document.getElementById(id)) {
+                    lines[id] = document.getElementById(id);
+                }
+            });
+            
+            points = currentLevel.points;
+            triangleState = { ...currentLevel.initialState };
+            goalPoints = currentLevel.goalPoints;
+            parallelGroups = currentLevel.parallelGroups;
+            
+            pointOnLineMap = {};
+            Object.entries(currentLevel.pointOnLineMap).forEach(([lineId, pointIds]) => {
+                pointIds.forEach(pointId => {
+                    if (!pointOnLineMap[pointId]) pointOnLineMap[pointId] = [];
+                    pointOnLineMap[pointId].push(lineId);
+                });
+            });
+
+            Object.values(handles).forEach(handle => {
+                handle.addEventListener('mousedown', onMouseDown);
+                handle.addEventListener('touchstart', onMouseDown, { passive: false });
+            });
+
+            svg.addEventListener('mousemove', onMouseMove);
+            svg.addEventListener('touchmove', onMouseMove, { passive: false });
+            svg.addEventListener('mouseup', onMouseUp);
+            svg.addEventListener('touchend', onMouseUp);
+            svg.addEventListener('mouseleave', onMouseUp);
+            
+            initialize();
+        }
+
+        function initialize() {
+            const initialPointsStr = Object.values(triangleState)
+                .map(pointId => `${points[pointId].x},${points[pointId].y}`)
+                .join(' ');
+            triangle.setAttribute('points', initialPointsStr);
+            
+            Object.keys(handles).forEach(key => {
+                const pointId = triangleState[key];
+                handles[key].setAttribute('cx', points[pointId].x);
+                handles[key].setAttribute('cy', points[pointId].y);
+            });
+
+            clearMessage.classList.remove('show');
+            if (svg) svg.classList.remove('game-cleared');
+        }
+
+        function onMouseDown(e) {
+            e.preventDefault();
+            const vertexId = Object.keys(handles).find(key => handles[key] === e.target);
+            if (!vertexId) return;
+
+            dragInfo = { isDragging: true, draggedVertexId: vertexId };
+            svg.classList.add('dragging');
+            e.target.r.baseVal.value = 15;
+
+            determineMovementLines();
+            highlightLines();
+        }
+
+        function onMouseMove(e) {
+            if (!dragInfo.isDragging || !dragInfo.line_q) return;
+            e.preventDefault();
+            const mousePos = getSVGPoint(e, svg);
+            const line_q_el = lines[dragInfo.line_q];
+            if (!line_q_el) return;
+            const line = {
+                x1: line_q_el.x1.baseVal.value, y1: line_q_el.y1.baseVal.value,
+                x2: line_q_el.x2.baseVal.value, y2: line_q_el.y2.baseVal.value,
+            };
+            const newPos = projectPointOnLine(mousePos, line);
+            updateVertexPosition(dragInfo.draggedVertexId, newPos);
+        }
+
+        function onMouseUp(e) {
+            if (!dragInfo.isDragging) return;
+            const currentPos = {
+                x: handles[dragInfo.draggedVertexId].cx.baseVal.value,
+                y: handles[dragInfo.draggedVertexId].cy.baseVal.value,
+            };
+            const closestPoint = findClosestPointOnLine(currentPos, dragInfo.line_q);
+            if (closestPoint) {
+                updateVertexPosition(dragInfo.draggedVertexId, points[closestPoint]);
+                triangleState[dragInfo.draggedVertexId] = closestPoint;
+            }
+            dragInfo.isDragging = false;
+            svg.classList.remove('dragging');
+            handles[dragInfo.draggedVertexId].r.baseVal.value = 10;
+            clearHighlights();
+            checkWinCondition();
+        }
+        
+        function determineMovementLines() {
+            const fixedVertexIds = Object.keys(triangleState).filter(id => id !== dragInfo.draggedVertexId);
+            const p_fixed1_id = triangleState[fixedVertexIds[0]];
+            const p_fixed2_id = triangleState[fixedVertexIds[1]];
+            const lines1 = pointOnLineMap[p_fixed1_id] || [];
+            const lines2 = pointOnLineMap[p_fixed2_id] || [];
+            dragInfo.line_p = lines1.find(l => lines2.includes(l));
+
+            if (dragInfo.line_p) {
+                const parallelGroup = parallelGroups.find(g => g.includes(dragInfo.line_p));
+                const movingPointId = triangleState[dragInfo.draggedVertexId];
+                const movingPointLines = pointOnLineMap[movingPointId] || [];
+                // [FIX] 移動点が乗っている平行な線を見つける
+                dragInfo.line_q = parallelGroup.find(l => movingPointLines.includes(l));
+            } else {
+                 dragInfo.line_q = null;
+            }
+        }
+        
+        function updateVertexPosition(vertexId, newPos) {
+            const x = newPos.x;
+            const y = newPos.y;
+            handles[vertexId].setAttribute('cx', x);
+            handles[vertexId].setAttribute('cy', y);
+            const pointsStr = Object.keys(handles).map(key => `${handles[key].cx.baseVal.value},${handles[key].cy.baseVal.value}`).join(' ');
+            triangle.setAttribute('points', pointsStr);
+        }
+
+        function findClosestPointOnLine(pos, lineId) {
+            if (!lineId) return null;
+            let closestPointId = null;
+            let minDistance = 50; 
+            const pointsOnLine = Object.keys(pointOnLineMap).filter(pId => pointOnLineMap[pId].includes(lineId));
+            pointsOnLine.forEach(pointId => {
+                const p = points[pointId];
+                const distance = Math.sqrt(Math.pow(pos.x - p.x, 2) + Math.pow(pos.y - p.y, 2));
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestPointId = pointId;
+                }
+            });
+            return closestPointId;
+        }
+
+        function checkWinCondition() {
+            const currentPoints = Object.values(triangleState).sort();
+            const sortedGoalPoints = [...goalPoints].sort();
+            if (JSON.stringify(currentPoints) === JSON.stringify(sortedGoalPoints)) {
+                clearMessage.classList.add('show');
+                svg.classList.add('game-cleared');
+            }
+        }
+        
+        function getSVGPoint(e, svgElement) {
+            const pt = svgElement.createSVGPoint();
+            if (e.touches) {
+                pt.x = e.touches[0].clientX;
+                pt.y = e.touches[0].clientY;
+            } else {
+                pt.x = e.clientX;
+                pt.y = e.clientY;
+            }
+            return pt.matrixTransform(svgElement.getScreenCTM().inverse());
+        }
+
+        function projectPointOnLine(p, line) {
+            const { x1, y1, x2, y2 } = line;
+            const A = p.x - x1, B = p.y - y1, C = x2 - x1, D = y2 - y1;
+            const t = (A * C + B * D) / (C * C + D * D);
+            return { x: x1 + t * C, y: y1 + t * D };
+        }
+
+        function highlightLines() {
+            if (dragInfo.line_p) lines[dragInfo.line_p]?.classList.add('highlight');
+            if (dragInfo.line_q) lines[dragInfo.line_q]?.classList.add('highlight');
+        }
+
+        function clearHighlights() {
+            Object.values(lines).forEach(line => line?.classList.remove('highlight'));
+        }
+        
+        btnLevel1.addEventListener('click', () => {
+            loadLevel(0);
+            btnLevel1.classList.add('active');
+            btnLevel2.classList.remove('active');
+        });
+        btnLevel2.addEventListener('click', () => {
+            loadLevel(1);
+            btnLevel2.classList.add('active');
+            btnLevel1.classList.remove('active');
+        });
+        restartButton.addEventListener('click', () => {
+            const currentLevelIndex = levels.indexOf(currentLevel);
+            loadLevel(currentLevelIndex);
+        });
+
+        loadLevel(0);
+    })();
+    </script>
+</body>
+</html>
